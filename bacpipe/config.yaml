@@ -1,0 +1,71 @@
+## MAIN VARS ##
+
+# PATHS:
+# define paths for your data, these are the standard directories, if you 
+# used the file condenser. If you do not have annotated data, and all of your
+# sound files are in one directory, change accordingly
+audio_dir :       "ievad/test_files/audio/humpbacks"
+# audio_dir :       "/media/vincent/Extreme SSD/MA/20221019-Benoit/transfer_1780104_files_cfc5b86f/SABA01_201511_201604_SN275/resampled_2kHz/wav"
+
+# fixed path, embeddings will be stored here, DO NOT CHANGE
+embed_parent_dir :   "ievad/test_files/embeds"
+umap_parent_dir :   "ievad/test_files/umap_embeds"
+
+# annots_path:        'files/raw/annots'
+# sample rate
+sr : 2000
+
+# embedding model name
+embedding_model: 'biolingual'
+
+# length limitation for condensed file
+segs_lim:             1500
+
+# supported formats of audio files
+audio_suffixes: ['.wav', '.WAV', '.aif', '.mp3']
+
+# PLOTTING:
+# heading for main interactive plot
+title :               "UMAP Embedding"
+spec_win_len:         1024
+umap_height:          900
+spec_height:          800
+f_min:                50
+
+# PLAYBACK:
+# amplify audio to make audible
+amp:                  5
+
+# UMAP settings
+n_neighbors : 50
+min_dist: 0.1
+n_components : 2
+metric : 'euclidean'
+random_state: 42
+
+# CONDENSER:
+dt_format_std:        False
+dt_format:            '%Y%m%d%H%M%S'
+
+## HELPER VARS ##
+# preprocessing configurations
+preproc:
+  # main parent directory containing all annotation files
+  annots_path:        "/media/vincent/Extreme SSD/MA/20221019-Benoit/transfer_1780104_files_cfc5b86f/SABA01_201511_201604_SN275/selTab"
+  # annots_path:        '/home/vincent/Code/MA/generated_annotations/for_umap'
+  # main parent directory containing all sound files
+  sound_files_path:   'files/raw/uncondensed'
+  # sound_files_path:   '/media/vincent/Expansion/NOAA/NRS08_20162018_new20220711'
+  # set to lowest sample rate in your dataset, to ensure comparability
+  downsample_sr:      2000
+  resamp_size:        2000
+  # if you don't want to downsample the data to a common sample rate, set to 'False'
+  downsample:         True
+
+  ## Fixed model parameters, do not change
+  model_sr:           2000
+  model_time_length:  3
+  plot_spec_sr:       2000
+  # model_sr:           16000
+  # model_time_length:  0.96
+

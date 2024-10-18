@@ -1,0 +1,4 @@
+env*
+bacpipe/models/*
+bacpipe/test*
+*__pycache__*
