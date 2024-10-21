@@ -18,8 +18,8 @@
 import dataclasses
 import re
 
-from ievad.perch_chirp.chirp.models import efficientnet
-from ievad.perch_chirp.chirp.models import layers
+from bacpipe.perch_chirp.chirp.models import efficientnet
+from bacpipe.perch_chirp.chirp.models import layers
 from flax import linen as nn
 from jax import numpy as jnp
 

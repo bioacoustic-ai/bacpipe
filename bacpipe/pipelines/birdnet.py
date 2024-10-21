@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import librosa as lb
 import logging
-logger = logging.getLogger('ievad')
+logger = logging.getLogger('bacpipe')
 logger.setLevel(level=logging.DEBUG)
 
 SAMPLE_RATE = 48000
@@ -14,7 +14,7 @@ class Model(ModelBaseClass):
     
     def __init__(self):
         super().__init__()
-        model = tf.keras.models.load_model('ievad/models/birdnet', 
+        model = tf.keras.models.load_model('bacpipe/models/birdnet', 
                                                 compile=False)
         self.model = tf.keras.Sequential(model.embeddings_model)
 

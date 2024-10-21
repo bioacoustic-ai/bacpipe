@@ -18,8 +18,8 @@
 import warnings
 
 from absl import logging
-from ievad.perch_chirp.chirp import config_utils
-from ievad.perch_chirp.chirp.inference import embed_lib
+from bacpipe.perch_chirp.chirp import config_utils
+from bacpipe.perch_chirp.chirp.inference import embed_lib
 import numpy as np
 import tensorflow as tf
 

@@ -34,7 +34,7 @@ from fairseq.modules import (
     TransposeLast,
     # Fp32InstanceNorm
 )
-from ievad.animal2vec_nn.nn import SincConv
+from bacpipe.animal2vec_nn.nn import SincConv
 
 try:
     from torch import _assert

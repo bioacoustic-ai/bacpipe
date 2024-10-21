@@ -16,7 +16,7 @@
 """Flax layers for audio processing."""
 import functools
 
-from ievad.perch_chirp.chirp import audio_utils
+from bacpipe.perch_chirp.chirp import audio_utils
 from flax import linen as nn
 from jax import lax
 from jax import numpy as jnp

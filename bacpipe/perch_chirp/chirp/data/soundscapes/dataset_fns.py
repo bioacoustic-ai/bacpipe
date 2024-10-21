@@ -18,7 +18,7 @@
 import csv
 import os
 
-from ievad.perch_chirp.chirp.data.soundscapes import soundscapes_lib
+from bacpipe.perch_chirp.chirp.data.soundscapes import soundscapes_lib
 from etils import epath
 import pandas as pd
 import tensorflow as tf

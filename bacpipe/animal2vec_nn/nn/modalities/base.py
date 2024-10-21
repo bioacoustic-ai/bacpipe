@@ -21,7 +21,7 @@ from typing import Optional, Callable, List
 from fairseq.data.data_utils import compute_mask_indices
 from fairseq.modules import GradMultiply
 from fairseq.utils import index_put
-from ievad.animal2vec_nn.nn import Modality
+from bacpipe.animal2vec_nn.nn import Modality
 from .modules import D2vDecoderConfig
 
 logger = logging.getLogger(__name__)

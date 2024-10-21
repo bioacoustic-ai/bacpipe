@@ -26,7 +26,7 @@ from fairseq.models.wav2vec import (
 from argparse import Namespace
 from fairseq import checkpoint_utils, tasks, utils
 from fairseq.dataclass.utils import convert_namespace_to_omegaconf
-from ievad.animal2vec_nn.nn import FusedSegmentationMixin
+from bacpipe.animal2vec_nn.nn import FusedSegmentationMixin
 
 try:
     from torch import _assert

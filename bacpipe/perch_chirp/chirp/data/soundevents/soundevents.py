@@ -21,10 +21,10 @@ from typing import Any, Callable, cast
 import warnings
 
 from absl import logging
-from ievad.perch_chirp.chirp import audio_utils
-from ievad.perch_chirp.chirp.data import filter_scrub_utils as fsu
-from ievad.perch_chirp.chirp.data import tfds_features
-from ievad.perch_chirp.chirp.taxonomy import namespace_db
+from bacpipe.perch_chirp.chirp import audio_utils
+from bacpipe.perch_chirp.chirp.data import filter_scrub_utils as fsu
+from bacpipe.perch_chirp.chirp.data import tfds_features
+from bacpipe.perch_chirp.chirp.taxonomy import namespace_db
 from etils import epath
 from jax import numpy as jnp
 import numpy as np

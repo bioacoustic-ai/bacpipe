@@ -18,10 +18,10 @@
 import dataclasses
 from typing import Sequence
 
-from ievad.perch_chirp.chirp.inference import tf_examples
-from ievad.perch_chirp.chirp.inference.classify import data_lib
-from ievad.perch_chirp.chirp.models import metrics
-from ievad.perch_chirp.chirp.projects.zoo import zoo_interface
+from bacpipe.perch_chirp.chirp.inference import tf_examples
+from bacpipe.perch_chirp.chirp.inference.classify import data_lib
+from bacpipe.perch_chirp.chirp.models import metrics
+from bacpipe.perch_chirp.chirp.projects.zoo import zoo_interface
 import numpy as np
 import tensorflow as tf
 import tqdm

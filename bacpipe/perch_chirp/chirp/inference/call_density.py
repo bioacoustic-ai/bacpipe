@@ -19,7 +19,7 @@ import collections
 import dataclasses
 from typing import Optional
 
-from ievad.perch_chirp.chirp.inference.search import search
+from bacpipe.perch_chirp.chirp.inference.search import search
 from etils import epath
 import numpy as np
 import pandas as pd

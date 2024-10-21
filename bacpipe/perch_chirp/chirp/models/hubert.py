@@ -17,8 +17,8 @@
 import enum
 from typing import Any, Sequence
 
-from ievad.perch_chirp.chirp.models import conformer
-from ievad.perch_chirp.chirp.models import layers
+from bacpipe.perch_chirp.chirp.models import conformer
+from bacpipe.perch_chirp.chirp.models import layers
 import flax
 from flax import linen as nn
 import jax

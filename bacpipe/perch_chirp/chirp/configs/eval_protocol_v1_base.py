@@ -17,7 +17,7 @@
 
 import itertools
 
-from ievad.perch_chirp.chirp import config_utils
+from bacpipe.perch_chirp.chirp import config_utils
 from ml_collections import config_dict
 
 _callable_config = config_utils.callable_config

@@ -19,9 +19,9 @@ import dataclasses
 import functools
 from typing import Sequence
 
-from ievad.perch_chirp.chirp.inference.search import bootstrap
-from ievad.perch_chirp.chirp.inference.search import search
-from ievad.perch_chirp.chirp.models import frontend
+from bacpipe.perch_chirp.chirp.inference.search import bootstrap
+from bacpipe.perch_chirp.chirp.inference.search import search
+from bacpipe.perch_chirp.chirp.models import frontend
 import IPython
 from IPython.display import clear_output
 from IPython.display import display as ipy_display

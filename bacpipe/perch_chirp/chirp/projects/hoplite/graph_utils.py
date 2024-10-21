@@ -18,7 +18,7 @@
 import collections
 from typing import Iterator
 
-from ievad.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.perch_chirp.chirp.projects.hoplite import interface
 import numpy as np
 import tqdm
 

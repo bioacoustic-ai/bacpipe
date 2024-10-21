@@ -2,10 +2,10 @@ import yaml
 import json
 import logging
 import numpy as np
-from ievad.generate_embeddings import generate_embeddings
-logger = logging.getLogger('ievad')
+from bacpipe.generate_embeddings import generate_embeddings
+logger = logging.getLogger('bacpipe')
  
-with open('ievad/config.yaml', 'rb') as f:
+with open('bacpipe/config.yaml', 'rb') as f:
     config = yaml.safe_load(f)
 
 def get_embeddings(check_if_primary_combination_exists=False,

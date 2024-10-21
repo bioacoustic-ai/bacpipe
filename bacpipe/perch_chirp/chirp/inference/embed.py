@@ -22,9 +22,9 @@ from absl import app
 from absl import flags
 from absl import logging
 import apache_beam as beam
-from ievad.perch_chirp.chirp import config_utils
-from ievad.perch_chirp.chirp.configs import config_globals
-from ievad.perch_chirp.chirp.inference import embed_lib
+from bacpipe.perch_chirp.chirp import config_utils
+from bacpipe.perch_chirp.chirp.configs import config_globals
+from bacpipe.perch_chirp.chirp.inference import embed_lib
 from etils import epath
 import numpy as np
 

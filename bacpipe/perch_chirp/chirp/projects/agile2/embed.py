@@ -20,11 +20,11 @@ from typing import Iterator
 
 from absl import logging
 import audioread
-from ievad.perch_chirp.chirp import audio_utils
-from ievad.perch_chirp.chirp.projects.agile2 import source_info
-from ievad.perch_chirp.chirp.projects.hoplite import interface as hoplite_interface
-from ievad.perch_chirp.chirp.projects.zoo import models
-from ievad.perch_chirp.chirp.projects.zoo import zoo_interface
+from bacpipe.perch_chirp.chirp import audio_utils
+from bacpipe.perch_chirp.chirp.projects.agile2 import source_info
+from bacpipe.perch_chirp.chirp.projects.hoplite import interface as hoplite_interface
+from bacpipe.perch_chirp.chirp.projects.zoo import models
+from bacpipe.perch_chirp.chirp.projects.zoo import zoo_interface
 from ml_collections import config_dict
 import numpy as np
 import soundfile

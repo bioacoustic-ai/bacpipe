@@ -7,7 +7,7 @@ import librosa as lb
 import soundfile as sf
 from pathlib import Path
 
-with open('ievad/config.yaml', 'rb') as f:
+with open('bacpipe/config.yaml', 'rb') as f:
     config = yaml.safe_load(f)
 
 config_preproc = config['preproc']

@@ -19,10 +19,10 @@ import dataclasses
 import os
 
 from absl import logging
-from ievad.perch_chirp.chirp import audio_utils
-from ievad.perch_chirp.chirp.inference import embed_lib
-from ievad.perch_chirp.chirp.inference import tf_examples
-from ievad.perch_chirp.chirp.projects.zoo import taxonomy_model_tf
+from bacpipe.perch_chirp.chirp import audio_utils
+from bacpipe.perch_chirp.chirp.inference import embed_lib
+from bacpipe.perch_chirp.chirp.inference import tf_examples
+from bacpipe.perch_chirp.chirp.projects.zoo import taxonomy_model_tf
 from etils import epath
 from ml_collections import config_dict
 import numpy as np

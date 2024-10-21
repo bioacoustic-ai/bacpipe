@@ -18,7 +18,7 @@ import dataclasses
 import math
 from typing import Callable
 
-from ievad.perch_chirp.chirp.models import layers
+from bacpipe.perch_chirp.chirp.models import layers
 from flax import linen as nn
 from jax import numpy as jnp
 import numpy as np

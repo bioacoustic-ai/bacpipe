@@ -18,8 +18,8 @@
 import json
 import os
 
-from ievad.perch_chirp.chirp.taxonomy import annotations
-from ievad.perch_chirp.chirp.taxonomy import namespace_db
+from bacpipe.perch_chirp.chirp.taxonomy import annotations
+from bacpipe.perch_chirp.chirp.taxonomy import namespace_db
 from etils import epath
 import pandas as pd
 

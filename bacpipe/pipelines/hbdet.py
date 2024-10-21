@@ -95,7 +95,7 @@ class MelSpectrogram(tf.keras.layers.Layer):
 
 class Model(ModelBaseClass):
     def __init__(self):
-        orig_model = tf.keras.models.load_model('ievad/models/hbdet',
+        orig_model = tf.keras.models.load_model('bacpipe/models/hbdet',
                 custom_objects={"FBetaScote": metrics.FBetaScore},
         )
         model_list = orig_model.layers[:-2]
@@ -108,8 +108,8 @@ class Model(ModelBaseClass):
             layers=[layer for layer in model_list]
         )
     
-    def preprocess(self, audio):
-        re_audio = lb.resample(audio, orig_sr = self.config['sr'], 
+    def preprocess(self, audio, orig_sr=2_000):
+        re_audio = lb.resample(audio, orig_sr = orig_sr, 
                                target_sr = SAMPLE_RATE)
         num = np.ceil(len(re_audio) / LENGTH_IN_SAMPLES)
         # zero pad in case the end is reached

@@ -21,7 +21,7 @@ import os
 from absl import app
 from absl import flags
 from absl import logging
-import ievad.perch_chirp.chirp.inference.scann_search_lib as scann_lib
+import bacpipe.perch_chirp.chirp.inference.scann_search_lib as scann_lib
 
 FLAGS = flags.FLAGS
 

@@ -34,7 +34,7 @@ Here's how to load a single classifier and use it to embed some audio:
 ```
 import numpy as np
 import tensorflow
-from ievad.perch_chirp.chirp.birb_sep_paper import model_utils
+from bacpipe.perch_chirp.chirp.birb_sep_paper import model_utils
 
 tf = tensorflow.compat.v1
 

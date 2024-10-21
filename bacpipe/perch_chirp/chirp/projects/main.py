@@ -31,12 +31,12 @@ from typing import Protocol, Sequence
 from absl import app
 from absl import flags
 from absl import logging
-from ievad.perch_chirp.chirp import config_utils
-from ievad.perch_chirp.chirp.configs import config_globals
-from ievad.perch_chirp.chirp.train import classifier
-from ievad.perch_chirp.chirp.train import hubert
-from ievad.perch_chirp.chirp.train import mae
-from ievad.perch_chirp.chirp.train import separator
+from bacpipe.perch_chirp.chirp import config_utils
+from bacpipe.perch_chirp.chirp.configs import config_globals
+from bacpipe.perch_chirp.chirp.train import classifier
+from bacpipe.perch_chirp.chirp.train import hubert
+from bacpipe.perch_chirp.chirp.train import mae
+from bacpipe.perch_chirp.chirp.train import separator
 from ml_collections import config_dict
 from ml_collections.config_flags import config_flags
 

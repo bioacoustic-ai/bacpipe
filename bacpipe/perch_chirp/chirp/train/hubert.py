@@ -22,15 +22,15 @@ import time
 from typing import Any, Callable
 
 from absl import logging
-from ievad.perch_chirp.chirp.data import utils as data_utils
-from ievad.perch_chirp.chirp.models import frontend as frontend_models
-from ievad.perch_chirp.chirp.models import hubert
-from ievad.perch_chirp.chirp.models import layers
-from ievad.perch_chirp.chirp.models import metrics
-from ievad.perch_chirp.chirp.models import output
-from ievad.perch_chirp.chirp.models import quantizers
-from ievad.perch_chirp.chirp.taxonomy import class_utils
-from ievad.perch_chirp.chirp.train import train_utils
+from bacpipe.perch_chirp.chirp.data import utils as data_utils
+from bacpipe.perch_chirp.chirp.models import frontend as frontend_models
+from bacpipe.perch_chirp.chirp.models import hubert
+from bacpipe.perch_chirp.chirp.models import layers
+from bacpipe.perch_chirp.chirp.models import metrics
+from bacpipe.perch_chirp.chirp.models import output
+from bacpipe.perch_chirp.chirp.models import quantizers
+from bacpipe.perch_chirp.chirp.taxonomy import class_utils
+from bacpipe.perch_chirp.chirp.train import train_utils
 from clu import checkpoint
 from clu import metric_writers
 from clu import metrics as clu_metrics

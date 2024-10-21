@@ -20,8 +20,8 @@ import json
 import os
 import typing
 
-from ievad.perch_chirp.chirp import path_utils
-from ievad.perch_chirp.chirp.taxonomy import namespace
+from bacpipe.perch_chirp.chirp import path_utils
+from bacpipe.perch_chirp.chirp.taxonomy import namespace
 from etils import epath
 
 TAXONOMY_DATABASE_FILENAME = "taxonomy/taxonomy_database.json"

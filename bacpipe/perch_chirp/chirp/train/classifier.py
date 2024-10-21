@@ -19,12 +19,12 @@ import functools
 from typing import Any, Callable, Sequence
 
 from absl import logging
-from ievad.perch_chirp.chirp import export_utils
-from ievad.perch_chirp.chirp.data import utils as data_utils
-from ievad.perch_chirp.chirp.models import metrics
-from ievad.perch_chirp.chirp.models import output
-from ievad.perch_chirp.chirp.models import taxonomy_model
-from ievad.perch_chirp.chirp.train import train_utils
+from bacpipe.perch_chirp.chirp import export_utils
+from bacpipe.perch_chirp.chirp.data import utils as data_utils
+from bacpipe.perch_chirp.chirp.models import metrics
+from bacpipe.perch_chirp.chirp.models import output
+from bacpipe.perch_chirp.chirp.models import taxonomy_model
+from bacpipe.perch_chirp.chirp.train import train_utils
 from clu import checkpoint
 from clu import metric_writers
 from clu import metrics as clu_metrics

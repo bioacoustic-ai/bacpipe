@@ -23,7 +23,7 @@ import json
 import sqlite3
 from typing import Any
 
-from ievad.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.perch_chirp.chirp.projects.hoplite import interface
 from ml_collections import config_dict
 import numpy as np
 

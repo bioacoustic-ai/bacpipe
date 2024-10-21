@@ -15,8 +15,8 @@
 
 """Configuration to run baseline separation model."""
 
-from ievad.perch_chirp.chirp import config_utils
-from ievad.perch_chirp.chirp.configs import presets
+from bacpipe.perch_chirp.chirp import config_utils
+from bacpipe.perch_chirp.chirp.configs import presets
 from ml_collections import config_dict
 
 _c = config_utils.callable_config

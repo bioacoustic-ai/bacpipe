@@ -28,7 +28,7 @@ from .modules import (
     TransformerDecoder,
     EncDecTransformerDecoder,
 )
-from ievad.animal2vec_nn.nn import Modality, to_2tuple, get_2d_sincos_pos_embed
+from bacpipe.animal2vec_nn.nn import Modality, to_2tuple, get_2d_sincos_pos_embed
 
 try:
     from torch import _assert

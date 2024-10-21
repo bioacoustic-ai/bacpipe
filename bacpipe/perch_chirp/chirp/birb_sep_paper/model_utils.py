@@ -21,7 +21,7 @@ import json
 import os
 
 from absl import logging
-from ievad.perch_chirp.chirp.birb_sep_paper import audio_ops
+from bacpipe.perch_chirp.chirp.birb_sep_paper import audio_ops
 from etils import epath
 from ml_collections import config_dict
 import numpy as np

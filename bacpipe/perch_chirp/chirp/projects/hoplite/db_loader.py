@@ -16,9 +16,9 @@
 """Database configuration and constructor."""
 
 import dataclasses
-from ievad.perch_chirp.chirp.projects.hoplite import in_mem_impl
-from ievad.perch_chirp.chirp.projects.hoplite import interface
-from ievad.perch_chirp.chirp.projects.hoplite import sqlite_impl
+from bacpipe.perch_chirp.chirp.projects.hoplite import in_mem_impl
+from bacpipe.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.perch_chirp.chirp.projects.hoplite import sqlite_impl
 from ml_collections import config_dict
 import numpy as np
 import tqdm

@@ -18,8 +18,8 @@ import enum
 import functools
 from typing import Any, Dict, NamedTuple, Sequence, Union
 
-from ievad.perch_chirp.chirp.data import sampling_utils as su
-from ievad.perch_chirp.chirp.taxonomy import namespace_db
+from bacpipe.perch_chirp.chirp.data import sampling_utils as su
+from bacpipe.perch_chirp.chirp.taxonomy import namespace_db
 import numpy as np
 import pandas as pd
 

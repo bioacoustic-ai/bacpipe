@@ -14,8 +14,8 @@
 # limitations under the License.
 
 """Configuration to train only a Product Quantizer."""
-from ievad.perch_chirp.chirp import config_utils
-from ievad.perch_chirp.chirp.configs import hubert_base_pq
+from bacpipe.perch_chirp.chirp import config_utils
+from bacpipe.perch_chirp.chirp.configs import hubert_base_pq
 from ml_collections import config_dict
 
 _c = config_utils.callable_config

@@ -18,10 +18,10 @@
 import os
 import tempfile
 
-from ievad.perch_chirp.chirp.projects.zoo import models
-from ievad.perch_chirp.chirp.projects.zoo import taxonomy_model_tf
-from ievad.perch_chirp.chirp.projects.zoo import zoo_interface
-from ievad.perch_chirp.chirp.taxonomy import namespace
+from bacpipe.perch_chirp.chirp.projects.zoo import models
+from bacpipe.perch_chirp.chirp.projects.zoo import taxonomy_model_tf
+from bacpipe.perch_chirp.chirp.projects.zoo import zoo_interface
+from bacpipe.perch_chirp.chirp.taxonomy import namespace
 from ml_collections import config_dict
 import numpy as np
 import tensorflow as tf

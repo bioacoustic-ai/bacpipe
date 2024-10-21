@@ -23,5 +23,5 @@ for u in birdnet_umap_embeds:
     
 print('fin')
 
-import ievad.pipelines.umap as umap
+import bacpipe.pipelines.umap as umap
 umap.UMAP()

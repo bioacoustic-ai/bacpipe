@@ -17,10 +17,10 @@
 
 import dataclasses
 
-from ievad.perch_chirp.chirp.projects.agile2 import embed
-from ievad.perch_chirp.chirp.projects.hoplite import db_loader
-from ievad.perch_chirp.chirp.projects.hoplite import interface
-from ievad.perch_chirp.chirp.projects.zoo import models
+from bacpipe.perch_chirp.chirp.projects.agile2 import embed
+from bacpipe.perch_chirp.chirp.projects.hoplite import db_loader
+from bacpipe.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.perch_chirp.chirp.projects.zoo import models
 from etils import epath
 from ml_collections import config_dict
 

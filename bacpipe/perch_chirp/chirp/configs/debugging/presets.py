@@ -15,8 +15,8 @@
 
 """Presets for the control experiments."""
 
-from ievad.perch_chirp.chirp.config_utils import callable_config as _c
-from ievad.perch_chirp.chirp.config_utils import object_config as _o
+from bacpipe.perch_chirp.chirp.config_utils import callable_config as _c
+from bacpipe.perch_chirp.chirp.config_utils import object_config as _o
 from ml_collections import config_dict
 
 

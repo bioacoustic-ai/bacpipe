@@ -15,8 +15,8 @@
 
 """Sample evaluation protocol v1 configuration."""
 
-from ievad.perch_chirp.chirp import config_utils
-from ievad.perch_chirp.chirp.configs import eval_protocol_v1_base
+from bacpipe.perch_chirp.chirp import config_utils
+from bacpipe.perch_chirp.chirp.configs import eval_protocol_v1_base
 from ml_collections import config_dict
 
 _c = config_utils.callable_config

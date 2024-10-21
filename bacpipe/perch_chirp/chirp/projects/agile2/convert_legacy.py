@@ -16,12 +16,12 @@
 """Conversion for TFRecord embeddings to Hoplite DB."""
 
 import os
-from ievad.perch_chirp.chirp.inference import embed_lib
-from ievad.perch_chirp.chirp.inference import tf_examples
-from ievad.perch_chirp.chirp.projects.agile2 import embed
-from ievad.perch_chirp.chirp.projects.hoplite import in_mem_impl
-from ievad.perch_chirp.chirp.projects.hoplite import interface
-from ievad.perch_chirp.chirp.projects.hoplite import sqlite_impl
+from bacpipe.perch_chirp.chirp.inference import embed_lib
+from bacpipe.perch_chirp.chirp.inference import tf_examples
+from bacpipe.perch_chirp.chirp.projects.agile2 import embed
+from bacpipe.perch_chirp.chirp.projects.hoplite import in_mem_impl
+from bacpipe.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.perch_chirp.chirp.projects.hoplite import sqlite_impl
 from etils import epath
 import numpy as np
 import tqdm

@@ -6,14 +6,14 @@ import time
 from tqdm import tqdm
 import logging
 import importlib
-logger = logging.getLogger('ievad')
+logger = logging.getLogger('bacpipe')
 
 class Loader():
     def __init__(self, check_if_combination_exists=True, 
                  model_name='umap', **kwargs):
         self.model_name = model_name
         
-        with open('ievad/config.yaml', "r") as f:
+        with open('bacpipe/config.yaml', "r") as f:
             self.config =  yaml.safe_load(f)
             
         for key, val in self.config.items():
@@ -207,7 +207,7 @@ class Loader():
 class Embedder:
     def __init__(self, model_name, **kwargs):
         import yaml
-        with open('ievad/config.yaml', 'rb') as f:
+        with open('bacpipe/config.yaml', 'rb') as f:
             self.config = yaml.safe_load(f)
             
         self.model_name = model_name
@@ -215,7 +215,7 @@ class Embedder:
 
     def _init_model(self):
         module = importlib.import_module(
-            f'ievad.pipelines.{self.model_name}'
+            f'bacpipe.pipelines.{self.model_name}'
             )
         self.model = module.Model()
 
@@ -261,7 +261,7 @@ def save_embeddings_dict_with_timestamps(file_dest, embeds, input_len,
     with open(file_dest, 'w') as f:
         json.dump(d, f)
     
-def generate_embeddings(**kwargs):
+def generate_embeddings(save_files=True, **kwargs):
     ld = Loader(**kwargs)
     if not ld.combination_already_exists:    
         embed = Embedder(**kwargs)

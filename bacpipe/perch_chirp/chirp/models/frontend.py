@@ -23,9 +23,9 @@ For some frontends it also defines inverses (e.g., for separation models).
 """
 import dataclasses
 
-from ievad.perch_chirp.chirp import audio_utils
-from ievad.perch_chirp.chirp import signal
-from ievad.perch_chirp.chirp.models import cwt
+from bacpipe.perch_chirp.chirp import audio_utils
+from bacpipe.perch_chirp.chirp import signal
+from bacpipe.perch_chirp.chirp.models import cwt
 from flax import linen as nn
 import jax
 from jax import numpy as jnp

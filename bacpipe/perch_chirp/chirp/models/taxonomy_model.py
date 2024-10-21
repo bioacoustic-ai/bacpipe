@@ -16,9 +16,9 @@
 """Taxonomy model."""
 import dataclasses
 
-from ievad.perch_chirp.chirp.models import conformer
-from ievad.perch_chirp.chirp.models import frontend
-from ievad.perch_chirp.chirp.models import layers
+from bacpipe.perch_chirp.chirp.models import conformer
+from bacpipe.perch_chirp.chirp.models import frontend
+from bacpipe.perch_chirp.chirp.models import layers
 from flax import linen as nn
 from jax import numpy as jnp
 

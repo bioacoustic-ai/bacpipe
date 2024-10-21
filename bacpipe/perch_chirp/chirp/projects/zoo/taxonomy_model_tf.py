@@ -19,8 +19,8 @@ import dataclasses
 from typing import Any
 
 from absl import logging
-from ievad.perch_chirp.chirp.projects.zoo import zoo_interface
-from ievad.perch_chirp.chirp.taxonomy import namespace
+from bacpipe.perch_chirp.chirp.projects.zoo import zoo_interface
+from bacpipe.perch_chirp.chirp.taxonomy import namespace
 from etils import epath
 from ml_collections import config_dict
 import numpy as np

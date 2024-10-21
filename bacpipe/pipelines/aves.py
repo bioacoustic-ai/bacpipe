@@ -6,7 +6,7 @@ import torch.nn as nn
 import numpy as np
 
 import logging
-logger = logging.getLogger('ievad')
+logger = logging.getLogger('bacpipe')
 logger.setLevel(level=logging.DEBUG)
 
 from .utils import ModelBaseClass
@@ -23,7 +23,7 @@ class Model(ModelBaseClass, nn.Module):
         nn.Module.__init__(self)
 
         # reference: https://pytorch.org/audio/stable/_modules/torchaudio/models/wav2vec2/utils/import_fairseq.html
-        base_path = 'ievad/models'
+        base_path = 'bacpipe/models'
         if self.config['embedding_model'] == 'birdaves':
             model_config_path = f'{base_path}/birdaves/birdaves-bioxn-large.torchaudio.model_config.json'
             model_path = f'{base_path}/birdaves/birdaves-bioxn-large.torchaudio.pt'

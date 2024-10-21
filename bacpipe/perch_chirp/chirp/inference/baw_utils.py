@@ -21,7 +21,7 @@ import re
 from typing import Generator, Sequence
 import urllib
 
-from ievad.perch_chirp.chirp import audio_utils
+from bacpipe.perch_chirp.chirp import audio_utils
 import librosa
 from ml_collections import config_dict
 import numpy as np

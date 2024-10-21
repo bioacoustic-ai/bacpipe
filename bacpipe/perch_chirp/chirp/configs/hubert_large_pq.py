@@ -14,9 +14,9 @@
 # limitations under the License.
 
 """Configuration to run HuBERT with Product Quantizers."""
-from ievad.perch_chirp.chirp import config_utils
-from ievad.perch_chirp.chirp.configs import hubert_base_pq
-from ievad.perch_chirp.chirp.configs import hubert_presets
+from bacpipe.perch_chirp.chirp import config_utils
+from bacpipe.perch_chirp.chirp.configs import hubert_base_pq
+from bacpipe.perch_chirp.chirp.configs import hubert_presets
 from ml_collections import config_dict
 
 _c = config_utils.callable_config

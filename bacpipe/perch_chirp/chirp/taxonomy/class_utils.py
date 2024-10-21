@@ -15,7 +15,7 @@
 
 """Convenience utilities for handling class lists."""
 
-from ievad.perch_chirp.chirp.taxonomy import namespace_db
+from bacpipe.perch_chirp.chirp.taxonomy import namespace_db
 
 
 def get_class_lists(species_class_list_name: str, add_taxonomic_labels: bool):

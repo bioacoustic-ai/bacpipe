@@ -18,8 +18,8 @@ import typing
 
 from absl import app
 from absl import flags
-from ievad.perch_chirp.chirp.taxonomy import namespace
-from ievad.perch_chirp.chirp.taxonomy import namespace_db
+from bacpipe.perch_chirp.chirp.taxonomy import namespace
+from bacpipe.perch_chirp.chirp.taxonomy import namespace_db
 import numpy as np
 import pandas as pd
 

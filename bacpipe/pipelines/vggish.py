@@ -9,7 +9,7 @@ LENGH_IN_SAMPLES = int(0.96 * SAMPLE_RATE)
 class Model(ModelBaseClass):
     def __init__(self):
         super().__init__()
-        self.model = hub.load('ievad/models/vggish')
+        self.model = hub.load('bacpipe/models/vggish')
 
     def preprocess(self, audio):
         return (audio * 32767).astype(np.int16)

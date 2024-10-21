@@ -21,8 +21,8 @@ import functools
 import heapq
 from typing import Any, Callable, List, Sequence
 
-from ievad.perch_chirp.chirp.inference import tf_examples
-from ievad.perch_chirp.chirp.projects.zoo import zoo_interface
+from bacpipe.perch_chirp.chirp.inference import tf_examples
+from bacpipe.perch_chirp.chirp.projects.zoo import zoo_interface
 from etils import epath
 import numpy as np
 from scipy.io import wavfile

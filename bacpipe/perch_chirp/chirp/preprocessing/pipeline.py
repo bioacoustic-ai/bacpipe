@@ -19,10 +19,10 @@ import dataclasses
 from typing import Any, Iterable, Sequence, Tuple
 
 from absl import logging
-from ievad.perch_chirp.chirp import audio_utils
-from ievad.perch_chirp.chirp.models import frontend
-from ievad.perch_chirp.chirp.taxonomy import namespace
-from ievad.perch_chirp.chirp.taxonomy import namespace_db
+from bacpipe.perch_chirp.chirp import audio_utils
+from bacpipe.perch_chirp.chirp.models import frontend
+from bacpipe.perch_chirp.chirp.taxonomy import namespace
+from bacpipe.perch_chirp.chirp.taxonomy import namespace_db
 import jax
 from jax import numpy as jnp
 import pandas as pd

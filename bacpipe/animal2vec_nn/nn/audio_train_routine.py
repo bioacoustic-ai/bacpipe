@@ -22,7 +22,7 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 logger = logging.getLogger("animal2vec.hydra_train")
-# import ievad.animalvec_nn.nn
+# import bacpipe.animalvec_nn.nn
 import torch
 
 import numpy as np

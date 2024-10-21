@@ -26,7 +26,7 @@ from fairseq.modules import EMAModule, EMAModuleConfig
 from fairseq.dataclass import FairseqDataclass
 from fairseq.models import BaseFairseqModel, register_model
 
-from ievad.animal2vec_nn.nn import (
+from bacpipe.animal2vec_nn.nn import (
     Modality,
     MaskSeed,
     D2vModalityConfig,

@@ -18,7 +18,7 @@
 import os
 from typing import Callable
 
-from ievad.perch_chirp.chirp import audio_utils
+from bacpipe.perch_chirp.chirp import audio_utils
 from etils import epath
 import numpy as np
 

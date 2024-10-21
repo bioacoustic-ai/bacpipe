@@ -16,22 +16,22 @@
 """Define the globals that can be used in configuration files."""
 from typing import Any
 
-from ievad.perch_chirp.chirp import audio_utils
-from ievad.perch_chirp.chirp import config_utils
-from ievad.perch_chirp.chirp.eval import callbacks
-from ievad.perch_chirp.chirp.eval import eval_lib
-from ievad.perch_chirp.chirp.models import conformer
-from ievad.perch_chirp.chirp.models import efficientnet
-from ievad.perch_chirp.chirp.models import efficientnet_v2
-from ievad.perch_chirp.chirp.models import frontend
-from ievad.perch_chirp.chirp.models import handcrafted_features
-from ievad.perch_chirp.chirp.models import hubert
-from ievad.perch_chirp.chirp.models import layers
-from ievad.perch_chirp.chirp.models import quantizers
-from ievad.perch_chirp.chirp.models import soundstream_unet
-from ievad.perch_chirp.chirp.models import taxonomy_model
-from ievad.perch_chirp.chirp.preprocessing import pipeline
-from ievad.perch_chirp.chirp.train import train_utils
+from bacpipe.perch_chirp.chirp import audio_utils
+from bacpipe.perch_chirp.chirp import config_utils
+from bacpipe.perch_chirp.chirp.eval import callbacks
+from bacpipe.perch_chirp.chirp.eval import eval_lib
+from bacpipe.perch_chirp.chirp.models import conformer
+from bacpipe.perch_chirp.chirp.models import efficientnet
+from bacpipe.perch_chirp.chirp.models import efficientnet_v2
+from bacpipe.perch_chirp.chirp.models import frontend
+from bacpipe.perch_chirp.chirp.models import handcrafted_features
+from bacpipe.perch_chirp.chirp.models import hubert
+from bacpipe.perch_chirp.chirp.models import layers
+from bacpipe.perch_chirp.chirp.models import quantizers
+from bacpipe.perch_chirp.chirp.models import soundstream_unet
+from bacpipe.perch_chirp.chirp.models import taxonomy_model
+from bacpipe.perch_chirp.chirp.preprocessing import pipeline
+from bacpipe.perch_chirp.chirp.train import train_utils
 from flax import linen as nn
 import optax
 

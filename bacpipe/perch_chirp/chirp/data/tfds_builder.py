@@ -20,8 +20,8 @@ import dataclasses
 import logging
 from typing import Any, Iterable
 
-from ievad.perch_chirp.chirp import audio_utils
-from ievad.perch_chirp.chirp.data import tfds_features
+from bacpipe.perch_chirp.chirp import audio_utils
+from bacpipe.perch_chirp.chirp.data import tfds_features
 from etils import epath
 import numpy as np
 import tensorflow as tf
