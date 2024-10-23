@@ -406,10 +406,10 @@ class ModalitySpecificEncoder(nn.Module):
                         min_masks=1,
                         require_same_masks=True,
                         mask_dropout=cfg.mask_dropout,
-                        add_masks=cfg.add_masks,
-                        seed=mask_seed.seed if mask_seed is not None else None,
-                        epoch=mask_seed.update if mask_seed is not None else None,
-                        indices=mask_seed.ids if mask_seed is not None else None,
+                        # add_masks=cfg.add_masks,
+                        # seed=mask_seed.seed if mask_seed is not None else None,
+                        # epoch=mask_seed.update if mask_seed is not None else None,
+                        # indices=mask_seed.ids if mask_seed is not None else None,
                     )
 
                     mask = torch.from_numpy(mask).to(device=x.device)

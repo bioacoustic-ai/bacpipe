@@ -49,3 +49,9 @@ def test_birdnet():
 # biolingual
 def test_biolingual():
     call_models("biolingual")
+
+# insect66
+def test_insect66():
+    call_models("insect66")
+
+test_insect66()

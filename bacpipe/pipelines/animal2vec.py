@@ -4,6 +4,7 @@ from .utils import ModelBaseClass
 from tqdm import tqdm
 import numpy as np
 import torch
+# from bacpipe.animal2vec_nn.nn.data2vec2 import Data2VecMultiModel
 
 SAMPLE_RATE = 8000
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
@@ -11,8 +12,9 @@ LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
 class Model(ModelBaseClass):
     def __init__(self):
         super().__init__()
+        # path_to_pt_file = "bacpipe/models/animal2vec/checkpoint_last_xeno_canto_base_pretrain_5s-2-1_5_sinc_90ms_mixup_pswish_pretrain.pt"
         path_to_pt_file = "bacpipe/models/animal2vec/animal2vec_large_finetuned_MeerKAT_240507.pt"
-        models, _ = checkpoint_utils.load_model_ensemble([path_to_pt_file])
+        models, _ = checkpoint_utils.load_model_ensemble([path_to_pt_file])#, weights_only=True)
         self.model = models[0].to("cpu")
         self.model.eval()
         
