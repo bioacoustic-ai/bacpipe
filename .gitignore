@@ -2,3 +2,4 @@ env*
 bacpipe/models/*
 bacpipe/test*
 *__pycache__*
+.vscode

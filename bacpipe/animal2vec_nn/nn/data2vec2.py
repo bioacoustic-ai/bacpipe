@@ -197,7 +197,7 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
             task=task,
         )
 
-    def __init__(self, cfg: Data2VecMultiConfig, modalities, skip_ema=False, task=None):
+    def __init__(self, cfg: Data2VecMultiConfig, modalities, skip_ema=True, task=None):
         super().__init__()
         self.cfg = cfg
 

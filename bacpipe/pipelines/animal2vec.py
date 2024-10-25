@@ -7,13 +7,14 @@ import torch
 # from bacpipe.animal2vec_nn.nn.data2vec2 import Data2VecMultiModel
 
 SAMPLE_RATE = 8000
-LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
+# LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
+LENGTH_IN_SAMPLES = int(5 * SAMPLE_RATE)
 
 class Model(ModelBaseClass):
     def __init__(self):
         super().__init__()
-        # path_to_pt_file = "bacpipe/models/animal2vec/checkpoint_last_xeno_canto_base_pretrain_5s-2-1_5_sinc_90ms_mixup_pswish_pretrain.pt"
-        path_to_pt_file = "bacpipe/models/animal2vec/animal2vec_large_finetuned_MeerKAT_240507.pt"
+        path_to_pt_file = "bacpipe/models/animal2vec/checkpoint_last_xeno_canto_base_pretrain_5s-2-1_5_sinc_90ms_mixup_pswish_pretrain.pt"
+        # path_to_pt_file = "bacpipe/models/animal2vec/animal2vec_large_finetuned_MeerKAT_240507.pt"
         models, _ = checkpoint_utils.load_model_ensemble([path_to_pt_file])#, weights_only=True)
         self.model = models[0].to("cpu")
         self.model.eval()
@@ -33,7 +34,7 @@ class Model(ModelBaseClass):
     def __call__(self, input):
         all_embeds = []
         for batch in tqdm(input):
-            res = self.model(source=batch.view(1, -1))
+            res = self.model(source=batch.view(1, -1), mode='AUDIO', features_only=True)
             embeds = res['layer_results']
             np_embeds = [a.detach().numpy() for a in embeds]
             all_embeds.append(np_embeds)

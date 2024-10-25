@@ -240,6 +240,7 @@ class Embedder:
             input_len = 3
             save_embeddings_dict_with_timestamps(file_dest, embeds, input_len, 
                                                  fileloader_obj, file_idx)
+            # TODO save png of embeddings for umap embeds
         else:
             file_dest = str(file_dest) + '.npy'
             np.save(file_dest, embeds)
