@@ -3,18 +3,21 @@ import json
 import logging
 import numpy as np
 from bacpipe.generate_embeddings import generate_embeddings
+from bacpipe.visualize_umaps import plot_embeddings
 logger = logging.getLogger('bacpipe')
- 
+
+
 with open('bacpipe/config.yaml', 'rb') as f:
     config = yaml.safe_load(f)
 
-def get_embeddings(check_if_primary_combination_exists=False,
-                   check_if_secondary_combination_exists=False):
+def get_embeddings(check_if_primary_combination_exists=True,
+                   check_if_secondary_combination_exists=True):
     
     generate_embeddings(model_name=config['embedding_model'], 
             check_if_combination_exists=check_if_primary_combination_exists)
     ld = generate_embeddings(model_name='umap', 
             check_if_combination_exists=check_if_secondary_combination_exists)
+    plot_embeddings(ld.umap_embed_dir)
     embeds, divisions_array = [], []
     for ind, file in enumerate(ld.files):
         d = json.load(open(file))

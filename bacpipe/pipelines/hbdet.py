@@ -95,6 +95,7 @@ class MelSpectrogram(tf.keras.layers.Layer):
 
 class Model(ModelBaseClass):
     def __init__(self):
+        super().__init__()
         orig_model = tf.keras.models.load_model('bacpipe/models/hbdet',
                 custom_objects={"FBetaScote": metrics.FBetaScore},
         )
