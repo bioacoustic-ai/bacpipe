@@ -30,7 +30,7 @@ from fairseq.tasks.audio_pretraining import AudioPretrainingConfig, AudioPretrai
 from fairseq.dataclass import FairseqDataclass
 from fairseq.tasks import FairseqTask, register_task
 import torch.multiprocessing
-from bacpipe.animal2vec_nn.nn.utils import get_conv_size
+from . import get_conv_size
 
 logger = logging.getLogger("animal2vec.hydra_train")
 

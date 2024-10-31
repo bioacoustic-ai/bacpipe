@@ -34,7 +34,7 @@ from fairseq.modules import (
     TransposeLast,
     # Fp32InstanceNorm
 )
-from bacpipe.animal2vec_nn.nn import SincConv
+from . import SincConv
 
 try:
     from torch import _assert
@@ -158,18 +158,19 @@ def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
 def plot_to_image(figure):
     """Converts the matplotlib plot specified by 'figure' to a PNG image and
     returns it. The supplied figure is closed and inaccessible after this call."""
-    # Save the plot to a PNG in memory.
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    # Closing the figure prevents it from being displayed directly inside
-    # the notebook.
-    plt.close(figure)
-    buf.seek(0)
-    # Convert PNG buffer to TF image
-    image = decode_png(buf.getvalue(), channels=4)
-    # Add the batch dimension
-    image = torch.tensor(image).unsqueeze(0)
-    return image
+    pass
+    # # Save the plot to a PNG in memory.
+    # buf = io.BytesIO()
+    # plt.savefig(buf, format='png')
+    # # Closing the figure prevents it from being displayed directly inside
+    # # the notebook.
+    # plt.close(figure)
+    # buf.seek(0)
+    # # Convert PNG buffer to TF image
+    # image = decode_png(buf.getvalue(), channels=4)
+    # # Add the batch dimension
+    # image = torch.tensor(image).unsqueeze(0)
+    # return image
 
 
 def plot_confusion_matrices(confusion_matrix, class_labels=None):
@@ -565,7 +566,7 @@ def canny(time_s, signal, method_dict):
 
     # Set the threshold to minimize the intra-class variance on a 2 class
     # problem (Otsu's method)
-    tau = threshold_otsu(mag)
+    tau = 0#threshold_otsu(mag) BUG: threshold_otsu is not defined
 
     # indicator functions for where we exceed threshold
     # We store filter outputs that we might need again
@@ -711,7 +712,7 @@ class FusedSegmentationMixin:
     def get_segmented_probs_and_targets(self, sample, probs, method_dict,
                                         method="avg", focal_only=False):
         targets = sample["target"]
-        if targets.dim() == probs.dim():
+        if False:#targets.dim() == probs.dim(): BUG IntervalTree is not defined
             # The indices where an event happens in the target
             fused_targets = sample["seg_target_idx"]
             # Estimate these boundaries using the fuse_predict routine

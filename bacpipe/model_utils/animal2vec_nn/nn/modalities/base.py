@@ -21,7 +21,7 @@ from typing import Optional, Callable, List
 from fairseq.data.data_utils import compute_mask_indices
 from fairseq.modules import GradMultiply
 from fairseq.utils import index_put
-from bacpipe.animal2vec_nn.nn import Modality
+from .. import Modality
 from .modules import D2vDecoderConfig
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ class ModalitySpecificEncoder(nn.Module):
             self,
             modality_cfg: D2vModalityConfig,
             embed_dim: int,
-            local_encoder: nn.Module or List,
+            local_encoder,
             project_features: nn.Module,
             fixed_positional_encoder: Optional[nn.Module],
             relative_positional_encoder: Optional[nn.Module],

@@ -15,7 +15,7 @@ from fairseq.criterions import register_criterion
 from fairseq.criterions.label_smoothed_cross_entropy import LabelSmoothedCrossEntropyCriterion, \
     LabelSmoothedCrossEntropyCriterionConfig
 from fairseq.criterions.model_criterion import ModelCriterion, ModelCriterionConfig
-from bacpipe.animal2vec_nn.nn import confusion, sigmoid_focal_loss, ConcatTensorMeter
+from . import confusion, sigmoid_focal_loss, ConcatTensorMeter
 from sklearn import metrics as sklearn_metrics
 import numpy as np
 

@@ -1,4 +1,4 @@
-from bacpipe.animal2vec_nn.nn import chunk_and_normalize
+from bacpipe.model_utils.animal2vec_nn.nn import chunk_and_normalize
 from fairseq import checkpoint_utils
 from .utils import ModelBaseClass
 from tqdm import tqdm
@@ -13,8 +13,8 @@ LENGTH_IN_SAMPLES = int(5 * SAMPLE_RATE)
 class Model(ModelBaseClass):
     def __init__(self):
         super().__init__()
-        path_to_pt_file = "bacpipe/models/animal2vec/checkpoint_last_xeno_canto_base_pretrain_5s-2-1_5_sinc_90ms_mixup_pswish_pretrain.pt"
-        # path_to_pt_file = "bacpipe/models/animal2vec/animal2vec_large_finetuned_MeerKAT_240507.pt"
+        # path_to_pt_file = "bacpipe/models/animal2vec/checkpoint_last_xeno_canto_base_pretrain_5s-2-1_5_sinc_90ms_mixup_pswish_pretrain.pt"
+        path_to_pt_file = "bacpipe/models/animal2vec/animal2vec_large_finetuned_MeerKAT_240507.pt"
         models, _ = checkpoint_utils.load_model_ensemble([path_to_pt_file])#, weights_only=True)
         self.model = models[0].to("cpu")
         self.model.eval()

@@ -26,7 +26,7 @@ from fairseq.modules import EMAModule, EMAModuleConfig
 from fairseq.dataclass import FairseqDataclass
 from fairseq.models import BaseFairseqModel, register_model
 
-from bacpipe.animal2vec_nn.nn import (
+from . import (
     Modality,
     MaskSeed,
     D2vModalityConfig,
@@ -325,23 +325,23 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
         self.num_updates = 0
 
     def _init_weights(self, m):
+        pass
+        # try:
+        #     from apex.normalization import FusedLayerNorm
 
-        try:
-            from apex.normalization import FusedLayerNorm
+        #     fn = FusedLayerNorm
+        # except:
+        #     fn = nn.LayerNorm
 
-            fn = FusedLayerNorm
-        except:
-            fn = nn.LayerNorm
-
-        if isinstance(m, nn.Linear):
-            torch.nn.init.xavier_uniform_(m.weight)
-            if isinstance(m, nn.Linear) and m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LayerNorm) or isinstance(m, fn):
-            if m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-            if m.weight is not None:
-                nn.init.constant_(m.weight, 1.0)
+        # if isinstance(m, nn.Linear):
+        #     torch.nn.init.xavier_uniform_(m.weight)
+        #     if isinstance(m, nn.Linear) and m.bias is not None:
+        #         nn.init.constant_(m.bias, 0)
+        # elif isinstance(m, nn.LayerNorm) or isinstance(m, fn):
+        #     if m.bias is not None:
+        #         nn.init.constant_(m.bias, 0)
+        #     if m.weight is not None:
+        #         nn.init.constant_(m.weight, 1.0)
 
     @torch.no_grad()
     def make_ema_teacher(self, ema_decay):

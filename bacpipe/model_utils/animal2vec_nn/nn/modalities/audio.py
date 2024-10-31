@@ -13,7 +13,7 @@ import torch.nn as tnn
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Optional
-from bacpipe.animal2vec_nn.nn import ConvFeatureExtractionModel
+from .. import ConvFeatureExtractionModel
 from fairseq.modules import (
     LayerNorm,
     SamePad,
@@ -23,7 +23,7 @@ from fairseq.modules import (
 from fairseq.tasks import FairseqTask
 from .base import D2vModalityConfig, ModalitySpecificEncoder, get_alibi_bias
 from .modules import BlockEncoder, Decoder1d
-from bacpipe.animal2vec_nn.nn import Modality, get_conv_size
+from .. import Modality, get_conv_size
 from omegaconf import II
 
 @dataclass
