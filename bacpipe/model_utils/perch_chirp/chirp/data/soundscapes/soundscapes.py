@@ -21,11 +21,11 @@ from typing import Any, Callable, Sequence
 import warnings
 
 from absl import logging
-from bacpipe.perch_chirp.chirp import audio_utils
-from bacpipe.perch_chirp.chirp.data import tfds_features
-from bacpipe.perch_chirp.chirp.data.bird_taxonomy import bird_taxonomy
-from bacpipe.perch_chirp.chirp.data.soundscapes import soundscapes_lib
-from bacpipe.perch_chirp.chirp.taxonomy import annotations_fns
+from bacpipe.model_utils.perch_chirp.chirp import audio_utils
+from bacpipe.model_utils.perch_chirp.chirp.data import tfds_features
+from bacpipe.model_utils.perch_chirp.chirp.data.bird_taxonomy import bird_taxonomy
+from bacpipe.model_utils.perch_chirp.chirp.data.soundscapes import soundscapes_lib
+from bacpipe.model_utils.perch_chirp.chirp.taxonomy import annotations_fns
 from etils import epath
 import numpy as np
 import pandas as pd

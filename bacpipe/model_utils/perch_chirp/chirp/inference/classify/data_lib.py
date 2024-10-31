@@ -32,9 +32,9 @@ import itertools
 import time
 from typing import Dict, Sequence, Tuple
 
-from bacpipe.perch_chirp.chirp import audio_utils
-from bacpipe.perch_chirp.chirp.inference import tf_examples
-from bacpipe.perch_chirp.chirp.projects.zoo import zoo_interface
+from bacpipe.model_utils.perch_chirp.chirp import audio_utils
+from bacpipe.model_utils.perch_chirp.chirp.inference import tf_examples
+from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import zoo_interface
 from etils import epath
 import numpy as np
 import tensorflow as tf

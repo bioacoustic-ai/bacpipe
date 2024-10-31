@@ -20,7 +20,7 @@ import datetime
 import os
 from typing import Sequence
 
-from bacpipe.perch_chirp.chirp.projects.zoo import zoo_interface
+from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import zoo_interface
 from etils import epath
 import numpy as np
 import tensorflow as tf

@@ -16,7 +16,7 @@ umap_parent_dir :   "bacpipe/test_files/umap_embeds"
 sr : 2000
 
 # embedding model name
-embedding_model: 'hbdet'
+embedding_model: 'mix2'
 
 # length limitation for condensed file
 segs_lim:             1500

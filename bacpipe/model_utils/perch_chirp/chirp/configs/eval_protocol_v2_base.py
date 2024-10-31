@@ -23,7 +23,7 @@ evaluation is performed over the specified pre-trained model.
 
 import itertools
 from typing import Dict, Sequence
-from bacpipe.perch_chirp.chirp import config_utils
+from bacpipe.model_utils.perch_chirp.chirp import config_utils
 from ml_collections import config_dict
 
 _callable_config = config_utils.callable_config

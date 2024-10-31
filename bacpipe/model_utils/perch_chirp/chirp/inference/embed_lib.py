@@ -24,11 +24,11 @@ from typing import Any, Sequence, Set
 from absl import logging
 import apache_beam as beam
 import audioread
-from bacpipe.perch_chirp.chirp import audio_utils
-from bacpipe.perch_chirp.chirp import path_utils
-from bacpipe.perch_chirp.chirp.inference import tf_examples
-from bacpipe.perch_chirp.chirp.projects.zoo import models
-from bacpipe.perch_chirp.chirp.projects.zoo import zoo_interface
+from bacpipe.model_utils.perch_chirp.chirp import audio_utils
+from bacpipe.model_utils.perch_chirp.chirp import path_utils
+from bacpipe.model_utils.perch_chirp.chirp.inference import tf_examples
+from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import models
+from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import zoo_interface
 from etils import epath
 from ml_collections import config_dict
 import numpy as np

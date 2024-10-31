@@ -15,9 +15,9 @@
 
 """HuBERT presets for the control experiments."""
 
-from bacpipe.perch_chirp.chirp.config_utils import callable_config as _c
-from bacpipe.perch_chirp.chirp.configs import hubert_presets as hubert_presets_default
-from bacpipe.perch_chirp.chirp.configs.debugging import presets as presets_debug
+from bacpipe.model_utils.perch_chirp.chirp.config_utils import callable_config as _c
+from bacpipe.model_utils.perch_chirp.chirp.configs import hubert_presets as hubert_presets_default
+from bacpipe.model_utils.perch_chirp.chirp.configs.debugging import presets as presets_debug
 from ml_collections import config_dict
 
 

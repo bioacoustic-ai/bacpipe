@@ -26,8 +26,8 @@ import tempfile
 from typing import Callable, Generator, Sequence
 import warnings
 
-from bacpipe.perch_chirp.chirp import path_utils
-from bacpipe.perch_chirp.chirp import signal
+from bacpipe.model_utils.perch_chirp.chirp import path_utils
+from bacpipe.model_utils.perch_chirp.chirp import signal
 from etils import epath
 from jax import lax
 from jax import numpy as jnp
@@ -49,7 +49,7 @@ _BOUNDARY_TO_PADDING_MODE = {'zeros': 'CONSTANT'}
 
 
 def load_audio(
-    path: epath.PathLike,
+    path,#: epath.PathLike,
     target_sample_rate: int,
     dtype: str = 'float32',
     **kwargs,

@@ -22,11 +22,11 @@ import tempfile
 from typing import Any, Callable
 import warnings
 
-from bacpipe.perch_chirp.chirp import audio_utils
-from bacpipe.perch_chirp.chirp.data import filter_scrub_utils as fsu
-from bacpipe.perch_chirp.chirp.data import tfds_features
-from bacpipe.perch_chirp.chirp.data.bird_taxonomy import premade_queries
-from bacpipe.perch_chirp.chirp.taxonomy import namespace_db
+from bacpipe.model_utils.perch_chirp.chirp import audio_utils
+from bacpipe.model_utils.perch_chirp.chirp.data import filter_scrub_utils as fsu
+from bacpipe.model_utils.perch_chirp.chirp.data import tfds_features
+from bacpipe.model_utils.perch_chirp.chirp.data.bird_taxonomy import premade_queries
+from bacpipe.model_utils.perch_chirp.chirp.taxonomy import namespace_db
 from etils import epath
 import jax
 from jax import numpy as jnp

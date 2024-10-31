@@ -18,8 +18,8 @@
 import warnings
 
 from absl import logging
-from bacpipe.perch_chirp.chirp import config_utils
-from bacpipe.perch_chirp.chirp.inference import embed_lib
+from bacpipe.model_utils.perch_chirp.chirp import config_utils
+from bacpipe.model_utils.perch_chirp.chirp.inference import embed_lib
 import numpy as np
 import tensorflow as tf
 

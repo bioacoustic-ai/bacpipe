@@ -17,8 +17,8 @@
 
 from typing import Any
 
-from bacpipe.perch_chirp.chirp.models import metrics
-from bacpipe.perch_chirp.chirp.projects.agile2 import classifier_data
+from bacpipe.model_utils.perch_chirp.chirp.models import metrics
+from bacpipe.model_utils.perch_chirp.chirp.projects.agile2 import classifier_data
 import jax
 import jax.numpy as jnp
 import numpy as np

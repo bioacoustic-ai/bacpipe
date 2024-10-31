@@ -20,13 +20,13 @@ import functools
 import hashlib
 from typing import Callable, Iterator, Sequence
 
-from bacpipe.perch_chirp.chirp import audio_utils
-from bacpipe.perch_chirp.chirp.inference import baw_utils
-from bacpipe.perch_chirp.chirp.inference import embed_lib
-from bacpipe.perch_chirp.chirp.inference import tf_examples
-from bacpipe.perch_chirp.chirp.inference.search import search
-from bacpipe.perch_chirp.chirp.projects.zoo import models
-from bacpipe.perch_chirp.chirp.projects.zoo import zoo_interface
+from bacpipe.model_utils.perch_chirp.chirp import audio_utils
+from bacpipe.model_utils.perch_chirp.chirp.inference import baw_utils
+from bacpipe.model_utils.perch_chirp.chirp.inference import embed_lib
+from bacpipe.model_utils.perch_chirp.chirp.inference import tf_examples
+from bacpipe.model_utils.perch_chirp.chirp.inference.search import search
+from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import models
+from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import zoo_interface
 from etils import epath
 from ml_collections import config_dict
 import tensorflow as tf

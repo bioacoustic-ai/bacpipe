@@ -20,8 +20,8 @@ import os
 from typing import Any, Callable, Iterator, Set
 
 from absl import logging
-from bacpipe.perch_chirp.chirp.taxonomy import namespace
-from bacpipe.perch_chirp.chirp.taxonomy import namespace_db
+from bacpipe.model_utils.perch_chirp.chirp.taxonomy import namespace
+from bacpipe.model_utils.perch_chirp.chirp.taxonomy import namespace_db
 from etils import epath
 from jax import numpy as jnp
 import numpy as np

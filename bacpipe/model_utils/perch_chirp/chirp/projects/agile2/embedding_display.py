@@ -19,10 +19,10 @@ import dataclasses
 import functools
 from typing import Callable, Iterator, Sequence
 
-from bacpipe.perch_chirp.chirp import audio_utils
-from bacpipe.perch_chirp.chirp.models import frontend
-from bacpipe.perch_chirp.chirp.projects.hoplite import interface
-from bacpipe.perch_chirp.chirp.projects.hoplite import search_results
+from bacpipe.model_utils.perch_chirp.chirp import audio_utils
+from bacpipe.model_utils.perch_chirp.chirp.models import frontend
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import search_results
 import IPython
 from IPython.display import clear_output
 from IPython.display import display as ipy_display

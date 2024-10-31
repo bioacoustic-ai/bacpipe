@@ -15,7 +15,7 @@
 
 """Presets for the baseline experiments."""
 
-from bacpipe.perch_chirp.chirp import config_utils
+from bacpipe.model_utils.perch_chirp.chirp import config_utils
 from ml_collections import config_dict
 
 _c = config_utils.callable_config

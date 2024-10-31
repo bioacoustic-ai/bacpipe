@@ -14,8 +14,8 @@
 # limitations under the License.
 
 """Configuration to run baseline model.
-from bacpipe.perch_chirp.chirp import config_utils
-from bacpipe.perch_chirp.chirp.configs.debugging import presets
+from bacpipe.model_utils.perch_chirp.chirp import config_utils
+from bacpipe.model_utils.perch_chirp.chirp.configs.debugging import presets
 from ml_collections import config_dict
 
 _c = config_utils.callable_config

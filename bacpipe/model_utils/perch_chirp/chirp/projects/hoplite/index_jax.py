@@ -26,8 +26,8 @@ import functools
 import itertools
 import time
 
-from bacpipe.perch_chirp.chirp.projects.hoplite import graph_utils
-from bacpipe.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import graph_utils
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import interface
 import jax
 from jax import numpy as jnp
 import numpy as np

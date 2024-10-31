@@ -26,7 +26,7 @@ from typing import Any, Sequence
 
 from absl import app
 from absl import flags
-from bacpipe.perch_chirp.chirp.data import utils
+from bacpipe.model_utils.perch_chirp.chirp.data import utils
 import pandas as pd
 import ratelimiter
 import requests

@@ -19,10 +19,10 @@ import collections
 import dataclasses
 from typing import Callable
 
-from bacpipe.perch_chirp.chirp.projects.agile2 import embed
-from bacpipe.perch_chirp.chirp.projects.hoplite import db_loader
-from bacpipe.perch_chirp.chirp.projects.hoplite import interface
-from bacpipe.perch_chirp.chirp.taxonomy import annotations_fns
+from bacpipe.model_utils.perch_chirp.chirp.projects.agile2 import embed
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import db_loader
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.model_utils.perch_chirp.chirp.taxonomy import annotations_fns
 from etils import epath
 from ml_collections import config_dict
 import pandas as pd

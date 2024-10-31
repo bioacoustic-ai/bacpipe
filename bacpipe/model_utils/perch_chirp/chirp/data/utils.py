@@ -19,9 +19,9 @@ import hashlib
 import os.path
 from typing import Any, Iterable, Sequence
 
-import bacpipe.perch_chirp.chirp.data.bird_taxonomy  # pylint: disable=unused-import
-import bacpipe.perch_chirp.chirp.data.soundscapes  # pylint: disable=unused-import
-from bacpipe.perch_chirp.chirp.preprocessing import pipeline as pipeline_
+import bacpipe.model_utils.perch_chirp.chirp.data.bird_taxonomy  # pylint: disable=unused-import
+import bacpipe.model_utils.perch_chirp.chirp.data.soundscapes  # pylint: disable=unused-import
+from bacpipe.model_utils.perch_chirp.chirp.preprocessing import pipeline as pipeline_
 import tensorflow as tf
 import tensorflow_datasets as tfds
 

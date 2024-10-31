@@ -16,22 +16,22 @@
 """Define the globals that can be used in configuration files."""
 from typing import Any
 
-from bacpipe.perch_chirp.chirp import audio_utils
-from bacpipe.perch_chirp.chirp import config_utils
-from bacpipe.perch_chirp.chirp.eval import callbacks
-from bacpipe.perch_chirp.chirp.eval import eval_lib
-from bacpipe.perch_chirp.chirp.models import conformer
-from bacpipe.perch_chirp.chirp.models import efficientnet
-from bacpipe.perch_chirp.chirp.models import efficientnet_v2
-from bacpipe.perch_chirp.chirp.models import frontend
-from bacpipe.perch_chirp.chirp.models import handcrafted_features
-from bacpipe.perch_chirp.chirp.models import hubert
-from bacpipe.perch_chirp.chirp.models import layers
-from bacpipe.perch_chirp.chirp.models import quantizers
-from bacpipe.perch_chirp.chirp.models import soundstream_unet
-from bacpipe.perch_chirp.chirp.models import taxonomy_model
-from bacpipe.perch_chirp.chirp.preprocessing import pipeline
-from bacpipe.perch_chirp.chirp.train import train_utils
+from bacpipe.model_utils.perch_chirp.chirp import audio_utils
+from bacpipe.model_utils.perch_chirp.chirp import config_utils
+from bacpipe.model_utils.perch_chirp.chirp.eval import callbacks
+from bacpipe.model_utils.perch_chirp.chirp.eval import eval_lib
+from bacpipe.model_utils.perch_chirp.chirp.models import conformer
+from bacpipe.model_utils.perch_chirp.chirp.models import efficientnet
+from bacpipe.model_utils.perch_chirp.chirp.models import efficientnet_v2
+from bacpipe.model_utils.perch_chirp.chirp.models import frontend
+from bacpipe.model_utils.perch_chirp.chirp.models import handcrafted_features
+from bacpipe.model_utils.perch_chirp.chirp.models import hubert
+from bacpipe.model_utils.perch_chirp.chirp.models import layers
+from bacpipe.model_utils.perch_chirp.chirp.models import quantizers
+from bacpipe.model_utils.perch_chirp.chirp.models import soundstream_unet
+from bacpipe.model_utils.perch_chirp.chirp.models import taxonomy_model
+from bacpipe.model_utils.perch_chirp.chirp.preprocessing import pipeline
+from bacpipe.model_utils.perch_chirp.chirp.train import train_utils
 from flax import linen as nn
 import optax
 

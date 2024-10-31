@@ -20,7 +20,7 @@ import json
 from typing import Any, Callable, Dict
 
 from absl import logging
-from bacpipe.perch_chirp.chirp.taxonomy import namespace
+from bacpipe.model_utils.perch_chirp.chirp.taxonomy import namespace
 from etils import epath
 import librosa
 from ml_collections import config_dict

@@ -15,12 +15,12 @@
 
 """Training loop for MAE."""
 import functools
-from bacpipe.perch_chirp.chirp.data import utils as data_utils
-from bacpipe.perch_chirp.chirp.models import mae
-from bacpipe.perch_chirp.chirp.models import taxonomy_model
-from bacpipe.perch_chirp.chirp.taxonomy import class_utils
-from bacpipe.perch_chirp.chirp.train import classifier
-from bacpipe.perch_chirp.chirp.train import train_utils
+from bacpipe.model_utils.perch_chirp.chirp.data import utils as data_utils
+from bacpipe.model_utils.perch_chirp.chirp.models import mae
+from bacpipe.model_utils.perch_chirp.chirp.models import taxonomy_model
+from bacpipe.model_utils.perch_chirp.chirp.taxonomy import class_utils
+from bacpipe.model_utils.perch_chirp.chirp.train import classifier
+from bacpipe.model_utils.perch_chirp.chirp.train import train_utils
 from clu import checkpoint
 from clu import metric_writers
 from clu import periodic_actions

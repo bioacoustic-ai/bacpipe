@@ -19,8 +19,8 @@ import concurrent
 import threading
 from typing import Any, Callable, Sequence
 
-from bacpipe.perch_chirp.chirp.projects.hoplite import interface
-from bacpipe.perch_chirp.chirp.projects.hoplite import search_results
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import search_results
 import numpy as np
 
 

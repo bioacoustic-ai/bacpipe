@@ -19,7 +19,7 @@ import dataclasses
 import itertools
 from typing import Any, Iterator, Sequence
 
-from bacpipe.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import interface
 import numpy as np
 
 

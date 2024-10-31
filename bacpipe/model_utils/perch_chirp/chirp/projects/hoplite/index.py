@@ -21,11 +21,11 @@ import dataclasses
 import threading
 from typing import Any, Callable
 
-from bacpipe.perch_chirp.chirp.projects.hoplite import brutalism
-from bacpipe.perch_chirp.chirp.projects.hoplite import graph_utils
-from bacpipe.perch_chirp.chirp.projects.hoplite import interface
-from bacpipe.perch_chirp.chirp.projects.hoplite import score_functions
-from bacpipe.perch_chirp.chirp.projects.hoplite import search_results
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import brutalism
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import graph_utils
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import score_functions
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import search_results
 import numpy as np
 import tqdm
 

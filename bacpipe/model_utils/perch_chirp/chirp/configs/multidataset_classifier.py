@@ -20,8 +20,8 @@ defined inside this config and we define a get_final_pipeline function for
 batching these datasets together.
 """
 
-from bacpipe.perch_chirp.chirp import config_utils
-from bacpipe.perch_chirp.chirp.configs import presets
+from bacpipe.model_utils.perch_chirp.chirp import config_utils
+from bacpipe.model_utils.perch_chirp.chirp.configs import presets
 from ml_collections import config_dict
 
 # Dataset dirs

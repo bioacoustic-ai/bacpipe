@@ -1,6 +1,6 @@
 from ml_collections import config_dict
-from bacpipe.perch_chirp.chirp.inference.embed_lib import EmbedFn
-from bacpipe.perch_chirp.chirp.projects.zoo.models import get_preset_model_config
+from bacpipe.model_utils.perch_chirp.chirp.inference.embed_lib import EmbedFn
+from bacpipe.model_utils.perch_chirp.chirp.projects.zoo.models import get_preset_model_config
 import numpy as np
 import librosa as lb
 

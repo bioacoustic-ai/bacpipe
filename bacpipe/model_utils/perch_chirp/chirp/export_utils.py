@@ -19,7 +19,7 @@ import os
 from typing import Sequence
 
 from absl import logging
-from bacpipe.perch_chirp.chirp.taxonomy import namespace
+from bacpipe.model_utils.perch_chirp.chirp.taxonomy import namespace
 from jax.experimental import jax2tf
 import tensorflow as tf
 

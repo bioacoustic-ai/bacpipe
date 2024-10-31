@@ -20,7 +20,7 @@ import dataclasses
 import functools
 from typing import Any, Sequence
 
-from bacpipe.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import interface
 from ml_collections import config_dict
 import numpy as np
 

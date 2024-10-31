@@ -24,7 +24,7 @@ from typing import Callable, NamedTuple
 
 from aqt.jax.v2 import aqt_conv_general
 from aqt.jax.v2 import config as aqt_cfg  # pylint: disable=unused-import
-from bacpipe.perch_chirp.chirp.models import layers
+from bacpipe.model_utils.perch_chirp.chirp.models import layers
 from flax import linen as nn
 import flax.typing as flax_typing
 import jax

@@ -21,9 +21,9 @@ import os
 from typing import Callable, Iterator, Mapping, Sequence, TypeVar
 
 from absl import logging
-from bacpipe.perch_chirp.chirp.data import utils as data_utils
-from bacpipe.perch_chirp.chirp.models import metrics
-from bacpipe.perch_chirp.chirp.taxonomy import namespace_db
+from bacpipe.model_utils.perch_chirp.chirp.data import utils as data_utils
+from bacpipe.model_utils.perch_chirp.chirp.models import metrics
+from bacpipe.model_utils.perch_chirp.chirp.taxonomy import namespace_db
 import jax
 import ml_collections
 import numpy as np

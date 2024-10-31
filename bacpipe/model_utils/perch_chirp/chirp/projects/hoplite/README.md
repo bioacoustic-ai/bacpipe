@@ -37,7 +37,7 @@ For up-to-date usage, see `tests/hoplite_test.py`. We give a brief overview of f
 The in-memory database uses fixed-size numpy arrays for storing embeddings and sparse lists of graph edges. The embedding dimension should be known from the embedding model. The `max_size` is the maximum number of embeddings the database will contain. The `degree_bound` determines the maximum number of outgoing edges per embedding.
 
 ```
-from bacpipe.perch_chirp.chirp.projects.hoplite import in_mem_impl
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import in_mem_impl
 
 db = in_mem_impl.InMemoryGraphSearchDB.create(
     embedding_dim=1280,
@@ -50,7 +50,7 @@ db.setup()
 The SQLite backend has no particular limit on the number of embeddings or number of edges per vertex. You can create an SQLite backend like so:
 
 ```
-from bacpipe.perch_chirp.chirp.projects.hoplite import sqlite_impl
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import sqlite_impl
 
 db = sqlite_impl.SQLiteGraphSearchDB.create(
     db_path=db_file_path,
@@ -64,7 +64,7 @@ db.setup()
 Adding embeddings to the database is simple. Describe the embedding source, and insert it using the API. The insertion call will return the unique ID for this embedding.
 
 ```
-from bacpipe.perch_chirp.chirp.projects.hoplite import interface
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import interface
 
 dataset_name = 'my_data'
 source_id = 'some_file.wav'
@@ -170,7 +170,7 @@ For bioacoustic embeddings, we recommend *inner product*, as it handles mixture 
 Brute force search capabilities are handled by `brutalism.py`. Here's some example usage:
 
 ```
-from bacpipe.perch_chirp.chirp.projects.hoplite import brutalism
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import brutalism
 
 query = np.random.normal(size=[1280])
 score_fn = np.dot
@@ -216,7 +216,7 @@ Indexing is performed with algorithms implemented in JAX, which can run on eithe
 For now, JAX indexing only uses the inner product metric.
 
 ```
-from bacpipe.perch_chirp.chirp.projects.hoplite import index_jax
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import index_jax
 
 index_jax.build_sharded_index(
   db,
@@ -235,7 +235,7 @@ index_jax.build_sharded_index(
 Once indexing is complete, we can search like so:
 
 ```
-from bacpipe.perch_chirp.chirp.projects.hoplite import index
+from bacpipe.model_utils.perch_chirp.chirp.projects.hoplite import index
 
 hoplite_index = index.HopliteSearchIndex(db)
 results, _ = hoplite_index.greedy_search(query, db.get_embedding)

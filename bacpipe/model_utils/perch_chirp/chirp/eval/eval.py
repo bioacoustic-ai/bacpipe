@@ -21,9 +21,9 @@ import os
 from absl import app
 from absl import flags
 from absl import logging
-from bacpipe.perch_chirp.chirp import config_utils
-from bacpipe.perch_chirp.chirp.configs import config_globals
-from bacpipe.perch_chirp.chirp.eval import eval_lib
+from bacpipe.model_utils.perch_chirp.chirp import config_utils
+from bacpipe.model_utils.perch_chirp.chirp.configs import config_globals
+from bacpipe.model_utils.perch_chirp.chirp.eval import eval_lib
 import jax
 from ml_collections.config_flags import config_flags
 

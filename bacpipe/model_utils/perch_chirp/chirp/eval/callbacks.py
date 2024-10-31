@@ -19,14 +19,14 @@ import dataclasses
 from typing import Sequence, cast
 
 from absl import logging
-from bacpipe.perch_chirp.chirp.eval import eval_lib
-from bacpipe.perch_chirp.chirp.projects.zoo import models as inference_models
-from bacpipe.perch_chirp.chirp.projects.zoo import zoo_interface
-from bacpipe.perch_chirp.chirp.taxonomy import namespace
-from bacpipe.perch_chirp.chirp.taxonomy import namespace_db
-from bacpipe.perch_chirp.chirp.train import classifier
-from bacpipe.perch_chirp.chirp.train import hubert
-from bacpipe.perch_chirp.chirp.train import separator
+from bacpipe.model_utils.perch_chirp.chirp.eval import eval_lib
+from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import models as inference_models
+from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import zoo_interface
+from bacpipe.model_utils.perch_chirp.chirp.taxonomy import namespace
+from bacpipe.model_utils.perch_chirp.chirp.taxonomy import namespace_db
+from bacpipe.model_utils.perch_chirp.chirp.train import classifier
+from bacpipe.model_utils.perch_chirp.chirp.train import hubert
+from bacpipe.model_utils.perch_chirp.chirp.train import separator
 from clu import checkpoint
 from etils import epath
 import jax

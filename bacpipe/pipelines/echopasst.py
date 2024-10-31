@@ -77,7 +77,7 @@ class Model(ModelBaseClass):
         self.model = get_basic_model(mode = 'logits', arch="passt_s_kd_p16_128_ap486")
         self.model.net = get_model_passt(arch="passt_s_kd_p16_128_ap486", n_classes=585)
         self.model.net.to("cpu")
-        ckpnt = torch.load(f"{MODEL_BASE_PATH}/passt/passt_bghani_202410.pt", weights_only=True)
+        ckpnt = torch.load(f"{MODEL_BASE_PATH}/echopasst/passt_bghani_202410.pt", weights_only=True)
         self.model.load_state_dict(ckpnt)
         
         self.preprocessor = AugmentMelSTFT(n_mels=128, sr=SAMPLE_RATE, win_length=800, hopsize=320, n_fft=1024)

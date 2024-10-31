@@ -1,5 +1,6 @@
 from bacpipe.generate_embeddings import generate_embeddings, Loader, Embedder
 import numpy as np
+from pathlib import Path
 
 def embedder_fn(loader, model_name):
     embedder = Embedder(model_name)
@@ -18,40 +19,48 @@ def call_models(model):
     print(f"Testing {model}")
     embedder_fn(loader, model)
 
-# vggish
-def test_vggish():
-    call_models("vggish")
+def test_all_models():
+    models = [mod.stem for mod in Path('bacpipe/pipelines').glob('*.py') 
+            if not mod.stem in ['__init__', 'utils', 'umap']]
 
-# hbdet
-def test_hbdet():
-    call_models("hbdet")
+    for model in models:
+        call_models(model)
+        
+test_all_models()
+# # vggish
+# def test_vggish():
+#     call_models("vggish")
 
-# animal2vec
-def test_animal2vec():
-    call_models("animal2vec")
+# # hbdet
+# def test_hbdet():
+#     call_models("hbdet")
 
-# perch
-def test_perch():
-    call_models("perch")
+# # animal2vec
+# def test_animal2vec():
+#     call_models("animal2vec")
 
-# aves
-def test_aves():
-    call_models("aves")
+# # perch
+# def test_perch():
+#     call_models("perch")
 
-# birdaves
-def test_birdaves():
-    call_models("birdaves")
+# # aves
+# def test_aves():
+#     call_models("aves")
 
-# birdnet
-def test_birdnet():
-    call_models("birdnet")
+# # birdaves
+# def test_birdaves():
+#     call_models("birdaves")
 
-# biolingual
-def test_biolingual():
-    call_models("biolingual")
+# # birdnet
+# def test_birdnet():
+#     call_models("birdnet")
 
-# insect66
-def test_insect66():
-    call_models("insect66")
+# # biolingual
+# def test_biolingual():
+#     call_models("biolingual")
 
-test_insect66()
+# # insect66
+# def test_insect66():
+#     call_models("insect66")
+
+# test_insect66()
