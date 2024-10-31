@@ -5,6 +5,24 @@ This repository aims to streamline the generation and testing of embeddings usin
 
 Models currently include:
 
+## Available models
+
+|   Name|   ref paper|   ref code|   sampling rate|   input length|
+|---|---|---|---|---|
+|  Animal2vec_XC|   paper   |   [code](https://github.com/livingingroups/animal2vec)    |   8 kHz (?)|   5 s|
+|  Animal2vec_MK|   paper   |   [code](https://github.com/livingingroups/animal2vec)    |   8 kHz|   10 s|
+|   AudioMAE    |   paper   |   [code](https://github.com/facebookresearch/AudioMAE)    |   16 kHz|   10 s|
+|   Aves        |   paper   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s|
+|   BioLingual  |   paper   |   [code](https://github.com/david-rx/biolingual)    |   48 kHz|   10 s|
+|   BirdAves    |   paper   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s|
+|   BirdNET     |   paper   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s|
+|   EchoPASST   |   paper   |   code    |   32 kHz|   3 s|
+|   HumpbackNET |   paper   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s|
+|   Insect66NET |   paper   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   44.1 kHz|   5.5 s|
+|   Mix2        |   paper   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   16 kHz|   3 s|
+|   Perch       |   paper   |   [code](https://github.com/google-research/perch)    |   32 kHz|   5 s|
+|   UMAP        |   paper   |   [code](https://github.com/lmcinnes/umap)    |   - |   - |
+|   VGGish      |   paper   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   16 kHz|   0.96 s|
 
 ## Installation
 
