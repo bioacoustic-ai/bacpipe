@@ -9,20 +9,20 @@ Models currently include:
 
 |   Name|   ref paper|   ref code|   sampling rate|   input length|
 |---|---|---|---|---|
-|  Animal2vec_XC|   paper   |   [code](https://github.com/livingingroups/animal2vec)    |   8 kHz (?)|   5 s|
-|  Animal2vec_MK|   paper   |   [code](https://github.com/livingingroups/animal2vec)    |   8 kHz|   10 s|
-|   AudioMAE    |   paper   |   [code](https://github.com/facebookresearch/AudioMAE)    |   16 kHz|   10 s|
-|   Aves        |   paper   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s|
-|   BioLingual  |   paper   |   [code](https://github.com/david-rx/biolingual)    |   48 kHz|   10 s|
-|   BirdAves    |   paper   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s|
-|   BirdNET     |   paper   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s|
-|   EchoPASST   |   paper   |   code    |   32 kHz|   3 s|
-|   HumpbackNET |   paper   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s|
+|  Animal2vec_XC|   [paper](https://arxiv.org/abs/2406.01253)   |   [code](https://github.com/livingingroups/animal2vec)    |   8 kHz (?)|   5 s|
+|  Animal2vec_MK|   [paper](https://arxiv.org/abs/2406.01253)   |   [code](https://github.com/livingingroups/animal2vec)    |   8 kHz|   10 s|
+|   AudioMAE    |   [paper](https://proceedings.neurips.cc/paper_files/paper/2022/hash/b89d5e209990b19e33b418e14f323998-Abstract-Conference.html)   |   [code](https://github.com/facebookresearch/AudioMAE)    |   16 kHz|   10 s|
+|   Aves        |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s|
+|   BioLingual  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   48 kHz|   10 s|
+|   BirdAves    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s|
+|   BirdNET     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s|
+|   EchoPASST   |   [paper](https://arxiv.org/abs/2409.15383)   |   code    |   32 kHz|   3 s|
+|   HumpbackNET |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s|
 |   Insect66NET |   paper   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   44.1 kHz|   5.5 s|
-|   Mix2        |   paper   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   16 kHz|   3 s|
-|   Perch       |   paper   |   [code](https://github.com/google-research/perch)    |   32 kHz|   5 s|
-|   UMAP        |   paper   |   [code](https://github.com/lmcinnes/umap)    |   - |   - |
-|   VGGish      |   paper   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   16 kHz|   0.96 s|
+|   Mix2        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   16 kHz|   3 s|
+|   Perch       |   [paper](https://www.nature.com/articles/s41598-023-49989-z.epdf)   |   [code](https://github.com/google-research/perch)    |   32 kHz|   5 s|
+|   UMAP        |   [paper](https://arxiv.org/abs/1802.03426)   |   [code](https://github.com/lmcinnes/umap)    |   - |   - |
+|   VGGish      |   [paper](https://ieeexplore.ieee.org/document/7952132)   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   16 kHz|   0.96 s|
 
 ## Installation
 
