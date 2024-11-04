@@ -10,8 +10,8 @@ logger = logging.getLogger('bacpipe')
 with open('bacpipe/config.yaml', 'rb') as f:
     config = yaml.safe_load(f)
 
-def get_embeddings(check_if_primary_combination_exists=True,
-                   check_if_secondary_combination_exists=True):
+def get_embeddings(check_if_primary_combination_exists=False,
+                   check_if_secondary_combination_exists=False):
     
     generate_embeddings(model_name=config['embedding_model'], 
             check_if_combination_exists=check_if_primary_combination_exists)
@@ -23,7 +23,7 @@ def get_embeddings(check_if_primary_combination_exists=True,
         d = json.load(open(file))
         arr = np.array([d['x'], d['x']]).reshape([len(d['x']), 2])
         embeds.append(arr)
-        append_timeList(ld.metadata_dict, ind, divisions_array)
+        # append_timeList(ld.metadata_dict, ind, divisions_array)
         
     return embeds, ld.metadata_dict, divisions_array
 

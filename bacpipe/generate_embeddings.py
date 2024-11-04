@@ -97,7 +97,6 @@ class Loader():
     def _init_metadata_dict(self):
         self.metadata_dict = {
             'model_name': self.model_name,
-            'sr': self.sr,
             'audio_dir': str(self.audio_dir),
             'embed_dir': str(self.embed_dir),
             'files' : {

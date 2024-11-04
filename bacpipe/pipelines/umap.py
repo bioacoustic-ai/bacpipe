@@ -3,7 +3,7 @@ import umap
 
 class Model(ModelBaseClass):
     def __init__(self):
-        super().__init__()
+        super().__init__(sr=None, segment_length=None)
         self.model = umap.UMAP(n_neighbors=self.config['n_neighbors'],
                             n_components=self.config['n_components'],
                             min_dist=self.config['min_dist'],

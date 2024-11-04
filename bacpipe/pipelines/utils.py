@@ -6,9 +6,13 @@ import numpy as np
 MODEL_BASE_PATH = 'bacpipe/models'
 
 class ModelBaseClass:
-    def __init__(self, **kwargs):
+    def __init__(self, sr, segment_length, **kwargs):
         with open('bacpipe/config.yaml', 'rb') as f:
             self.config = yaml.safe_load(f)
+            self.sr = sr
+            self.segment_length = segment_length
+        for key, value in kwargs.items():
+            setattr(self, key, value)
             
     def resample(self, input_tup):
         if not input_tup[1]:
@@ -16,10 +20,7 @@ class ModelBaseClass:
             return embeddings
         else:
             audio, sr = input_tup
-            target_sr = (importlib
-                         .import_module(
-                             f"bacpipe.pipelines.{self.config['embedding_model']}")
-                         .SAMPLE_RATE)
+            target_sr = self.sr
             re_audio = lb.resample(audio, orig_sr=sr, target_sr=target_sr)
             # return self.window_audio(re_audio)
             return re_audio
