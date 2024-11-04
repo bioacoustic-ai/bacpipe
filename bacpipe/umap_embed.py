@@ -17,7 +17,7 @@ def get_embeddings(check_if_primary_combination_exists=False,
             check_if_combination_exists=check_if_primary_combination_exists)
     ld = generate_embeddings(model_name='umap', 
             check_if_combination_exists=check_if_secondary_combination_exists)
-    plot_embeddings(ld.umap_embed_dir)
+    plot_embeddings(ld.embed_dir)
     embeds, divisions_array = [], []
     for ind, file in enumerate(ld.files):
         d = json.load(open(file))
