@@ -8,7 +8,7 @@ Models currently include:
 ## Available models
 
 |   Name|   ref paper|   ref code|   sampling rate|   input length| embedding dimension |
-|---|---|---|---|---|
+|---|---|---|---|---|---|
 |  Animal2vec_XC|   [paper](https://arxiv.org/abs/2406.01253)   |   [code](https://github.com/livingingroups/animal2vec)    |   8 kHz (?)|   5 s| 768 |
 |  Animal2vec_MK|   [paper](https://arxiv.org/abs/2406.01253)   |   [code](https://github.com/livingingroups/animal2vec)    |   8 kHz|   10 s| 1024 |
 |   AudioMAE    |   [paper](https://proceedings.neurips.cc/paper_files/paper/2022/hash/b89d5e209990b19e33b418e14f323998-Abstract-Conference.html)   |   [code](https://github.com/facebookresearch/AudioMAE)    |   16 kHz|   10 s| 768 |
