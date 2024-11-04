@@ -170,29 +170,15 @@ class Loader():
         self.metadata_dict['files']['embedding_dimensions'].append(
             embeds.shape
             )
-        return embeds, False
+        return embeds
     
-    def load(self, file):
-        if not self.model_name in ['umap', 'tsne']:
-            return self.audio_read(file)
-        else:
-            return self.embed_read(file)
-    
-    def audio_read(self, file):
-        if not file.suffix in self.config['audio_suffixes']:
-            logger.warning(f'{str(file)} could not be read due to unsupported format.')
-            return None
-        with open(file, 'rb') as r:
-            audio, sr = lb.load(r)
-        
+    def write_audio_file_to_metadata(self, file, embed):
         self.metadata_dict['files']['audio_files'].append(
             file.stem + file.suffix
             )
         self.metadata_dict['files']['file_lengths (s)'].append(
-            len(audio)//sr
+            embed.model.segment_length//embed.model.sr
             )
-        
-        return audio, sr
     
     def write_metadata_file(self):
         with open(str(self.embed_dir.joinpath('metadata.yml')), 'w') as f:
@@ -218,8 +204,13 @@ class Embedder:
             )
         self.model = module.Model()
 
-    def get_embeddings_from_model(self, input_tup):
-        samples = self.model.preprocess(self.model.resample(input_tup))
+    def get_embeddings_from_model(self, sample):
+        if isinstance(sample, np.ndarray):
+            samples = self.model.preprocess(sample)
+        else:
+            audio = self.model.load_and_resample(sample)
+            frames = self.model.window_audio(audio)
+            samples = self.model.preprocess(frames)
         start = time.time()
         
         embeds = self.model(samples)
@@ -266,10 +257,12 @@ def generate_embeddings(save_files=True, **kwargs):
     if not ld.combination_already_exists:    
         embed = Embedder(**kwargs)
         for idx, file in tqdm(enumerate(ld.files)):
-            input_tup = ld.load(file)
-            if input_tup is None:
-                continue
-            embeds = embed.get_embeddings_from_model(input_tup)
+            if file.suffix == '.npy':
+                sample = ld.embed_read(file)
+            else:
+                sample = file
+                ld.write_audio_file_to_metadata(file, embed)
+            embeds = embed.get_embeddings_from_model(sample)
             embed.save_embeddings(idx, ld, file, embeds)
         ld.write_metadata_file()
         ld.update_files()

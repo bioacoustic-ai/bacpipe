@@ -26,6 +26,9 @@ def test_all_models():
     for model in models:
         call_models(model)
         
+def test_embedding_dimensions():
+    pass        
+
 test_all_models()
 # # vggish
 # def test_vggish():

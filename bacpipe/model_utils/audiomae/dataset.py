@@ -126,7 +126,7 @@ def lookup_list(index_list, label_csv):
     return label_list
 
 class AudiosetDataset(Dataset):
-    def __init__(self, audio_array, sr, audio_conf, label_csv=None, use_fbank=False, fbank_dir=None, roll_mag_aug=False, load_video=False, mode='train'):
+    def __init__(self, sr, audio_conf, use_fbank=False, fbank_dir=None):
         """
         Dataset that manages audio recordings
         :param audio_conf: Dictionary containing the audio loading and preprocessing settings
@@ -135,7 +135,6 @@ class AudiosetDataset(Dataset):
         self.use_fbank = use_fbank
         self.fbank_dir = fbank_dir
 
-        self.data = audio_array
         self.sr = sr
         self.audio_conf = audio_conf
         print('---------------the {:s} dataloader---------------'.format(self.audio_conf.get('mode')))
@@ -190,20 +189,20 @@ class AudiosetDataset(Dataset):
             fbank = mix_lambda * np.load(fn1) + (1-mix_lambda) * np.load(fn2)  
             return torch.from_numpy(fbank), mix_lambda
 
-    def __getitem__(self, index):
+    def process(self, data):
         """
         returns: image, audio, nframes
         where image is a FloatTensor of size (3, H, W)
         audio is a FloatTensor of size (N_freq, N_frames) for spectrogram, or (N_frames) for waveform
         nframes is an integer
         """
-        fbank, mix_lambda = self._wav2fbank(self.data, self.sr)
+        fbank, mix_lambda = self._wav2fbank(data, self.sr)
 
         fbank = torch.transpose(fbank.squeeze(), 0, 1) # time, freq
         fbank = (fbank - self.norm_mean) / (self.norm_std * 2)
         
         # the output fbank shape is [time_frame_num, frequency_bins], e.g., [1024, 128]
-        return fbank.reshape([1, 1, 1024, 128])
+        return fbank
 
     def __len__(self):
         return len(self.data)

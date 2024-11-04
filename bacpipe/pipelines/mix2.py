@@ -8,7 +8,7 @@ LENGTH_IN_SAMPLES = int(3*SAMPLE_RATE)
 from .utils import ModelBaseClass
 class Model(ModelBaseClass):
     def __init__(self):
-        super().__init__()
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         self.model = mobilenetv3()
         dict = torch.load('bacpipe/models/mix2/mix2.pth', map_location='cpu', 
                           weights_only=True)
@@ -17,12 +17,12 @@ class Model(ModelBaseClass):
         self.ampl2db = AmplitudeToDB()
         self.min_max_norm = MinMaxNorm()
     
-    def preprocess(self, x):
-        x = torch.from_numpy(x[: LENGTH_IN_SAMPLES]).float() # FIXME: enable windowing so batching is possible
-        x = self.mel(x)
-        x = self.ampl2db(x)
-        x = self.min_max_norm(x)
-        return x.reshape([1, 1, 128, 376])
+    def preprocess(self, audio):
+        audio = torch.from_numpy(audio)
+        audio = self.mel(audio)
+        audio = self.ampl2db(audio)
+        audio = self.min_max_norm(audio)
+        return audio.unsqueeze(dim=1)
     
     def __call__(self, x):
         return self.model(x).detach().numpy()

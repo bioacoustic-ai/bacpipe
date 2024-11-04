@@ -4,12 +4,14 @@ import torch
 import torch.nn as nn
 # extract_feature in the torchaudio version will output all 12 layers' output, -1 to select the final one
 import numpy as np
-
+from tqdm import tqdm
 import logging
 logger = logging.getLogger('bacpipe')
 logger.setLevel(level=logging.DEBUG)
 
 from .utils import ModelBaseClass
+
+BATCH_SIZE = 64
 
 SAMPLE_RATE = 16000
 LENGTH_IN_SAMPLES = 16000
@@ -19,7 +21,7 @@ LENGTH_IN_SAMPLES = 16000
 class Model(ModelBaseClass, nn.Module):
     def __init__(self, pooling='mean'):
 
-        super().__init__()
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         nn.Module.__init__(self)
 
         # reference: https://pytorch.org/audio/stable/_modules/torchaudio/models/wav2vec2/utils/import_fairseq.html
@@ -32,22 +34,18 @@ class Model(ModelBaseClass, nn.Module):
             model_path = f'{base_path}/aves/aves-base-bio.torchaudio.pt'
         model_config = json.load(open(model_config_path, 'r'))
         self.pooling = pooling
-        self.batch_size = 64
         self.model = wav2vec2_model(**model_config, aux_num_out=None)
         self.model.load_state_dict(torch.load(model_path))
         self.model.feature_extractor.requires_grad_(False)
         self.model.eval()
     
     def preprocess(self, audio):
-        num_of_segments = int(audio.shape[0]/LENGTH_IN_SAMPLES)
-        audio = audio[:num_of_segments*LENGTH_IN_SAMPLES]
-        audio = audio.reshape(num_of_segments, LENGTH_IN_SAMPLES)
-        
-        return torch.tensor(audio)
+        return torch.from_numpy(audio)
 
+    @torch.inference_mode()
     def __call__(self, input):
-        for i in range(input.shape[0]//self.batch_size+1):
-            batch = input[i*self.batch_size:(i+1)*self.batch_size]
+        for i in tqdm(range(input.shape[0]//BATCH_SIZE+1)):
+            batch = input[i*BATCH_SIZE:(i+1)*BATCH_SIZE]
             out = self.model.extract_features(batch)[0][-1]
             out = getattr(torch, self.pooling)(out, dim=1)
             if i == 0:

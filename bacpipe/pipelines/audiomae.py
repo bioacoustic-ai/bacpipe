@@ -12,6 +12,7 @@
 
 import torch
 import torch.nn as nn
+from tqdm import tqdm
 
 from timm.models.layers import trunc_normal_
 from timm.models.layers import to_2tuple
@@ -21,8 +22,7 @@ import bacpipe.model_utils.audiomae.models_vit as models_vit
 from bacpipe.model_utils.audiomae.dataset import AudiosetDataset
 from .utils import ModelBaseClass
 
-BATCH_SIZE = 4
-EPOCHS = 60
+BATCH_SIZE = 8 # important to lower this if run on laptop cpu
 
 SAMPLE_RATE = 16000
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
@@ -65,7 +65,7 @@ class PatchEmbed_new(nn.Module):
 
 class Model(ModelBaseClass):
     def __init__(self):
-        super().__init__()
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         self.nb_classes=527
         self.model='vit_base_patch16'
         self.model_path='bacpipe/models/audiomae/finetuned.pth'
@@ -118,10 +118,18 @@ class Model(ModelBaseClass):
         
     def preprocess(self, audio, sr=SAMPLE_RATE):
         # model.to(device)
-        audio = torch.from_numpy(audio).view(1, -1)
-        return AudiosetDataset(audio, sr, audio_conf=self.audio_conf_val,
-                                        mode='eval')
+        audio = torch.from_numpy(audio)#.view(1, -1)
+        audio_obj = AudiosetDataset(sr, audio_conf=self.audio_conf_val)
+        processed_frame = []
+        for frame in audio:
+            processed_frame.append(audio_obj.process(frame.view(1, -1)))
+        processed_frame = torch.stack(processed_frame)
+        return processed_frame.unsqueeze(dim=1)
 
+    @torch.inference_mode()
     def __call__(self, input):
-        embeds = self.model(input[0])
+        embeds = []
+        for batch in tqdm(input.split(BATCH_SIZE)):
+            embeds.append(self.model(batch))
+        embeds = torch.cat(embeds)
         return embeds.detach().numpy()
