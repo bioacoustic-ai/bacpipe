@@ -21,6 +21,8 @@ Models currently include:
 |   Insect66NET |   paper   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   44.1 kHz|   5.5 s| 1280 |
 |   Mix2        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   16 kHz|   3 s| 960 |
 |   Perch       |   [paper](https://www.nature.com/articles/s41598-023-49989-z.epdf)   |   [code](https://github.com/google-research/perch)    |   32 kHz|   5 s| 1280 |
+|   SurfPerch       |   [paper](https://arxiv.org/abs/2404.16436)   |   [code](https://www.kaggle.com/models/google/surfperch)    |   32 kHz|   5 s| 1280 |
+|   WhalePerch       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   24 kHz|   5 s| 1280 |
 |   UMAP        |   [paper](https://arxiv.org/abs/1802.03426)   |   [code](https://github.com/lmcinnes/umap)    |   - |   - | |
 |   VGGish      |   [paper](https://ieeexplore.ieee.org/document/7952132)   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   16 kHz|   0.96 s| 128 |
 
@@ -117,6 +119,20 @@ Mix2 is a [MobileNet v3](https://github.com/pytorch/vision/blob/main/torchvision
 - trained on bird song data
 
 Perch is a EFficientNet B1 model trained on the entire Xeno-canto database.
+
+### SurfPerch
+- CNN
+- supervised training model
+- trained on bird song, fine-tuned on tropical reef data
+
+Perch is a EFficientNet B1 model trained on the entire Xeno-canto database and fine tuned on coral reef and unrelated sounds.
+
+### WhalePerch
+- CNN
+- supervised training model
+- trained on 7 whale species
+
+WhalePerch (multispecies_whale) is a EFficientNet B0 model trained on whale sounds.
 
 ### UMAP
 see [repo](https://github.com/lmcinnes/umap)
