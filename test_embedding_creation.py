@@ -4,9 +4,8 @@ from pathlib import Path
 
 def embedder_fn(loader, model_name):
     embedder = Embedder(model_name)
-    input = loader.load(loader.files[0])
-    embeds = embedder.get_embeddings_from_model(input)
-    assert isinstance(embeds, np.ndarray) and embeds.size > 0
+    input = loader.files[0]
+    return embedder.get_embeddings_from_model(input)
 
 def loader_fn():
     loader = Loader(check_if_combination_exists=False, 
@@ -14,56 +13,23 @@ def loader_fn():
     assert loader.files is not None and len(loader.files) > 0
     return loader
 
-def call_models(model):
-    loader = loader_fn()
-    print(f"Testing {model}")
-    embedder_fn(loader, model)
-
-def test_all_models():
-    models = [mod.stem for mod in Path('bacpipe/pipelines').glob('*.py') 
-            if not mod.stem in ['__init__', 'utils', 'umap']]
-
-    for model in models:
-        call_models(model)
+# def test_all_models():
+models = [mod.stem for mod in Path('bacpipe/pipelines').glob('*.py') 
+        if not mod.stem in ['__init__', 'utils', 'umap']]
         
 def test_embedding_dimensions():
     pass        
 
-test_all_models()
-# # vggish
-# def test_vggish():
-#     call_models("vggish")
+# Define the pytest_generate_tests hook to generate test cases
+def pytest_generate_tests(metafunc):
+    if 'model' in metafunc.fixturenames:
+        # Generate test cases based on the test_data list
+        metafunc.parametrize('model', models)
 
-# # hbdet
-# def test_hbdet():
-#     call_models("hbdet")
+# Define the actual test function
+def test_model(model):
+    loader = loader_fn()
+    result = embedder_fn(loader, model)
+    assert isinstance(result, np.ndarray) and result.size > 0
 
-# # animal2vec
-# def test_animal2vec():
-#     call_models("animal2vec")
-
-# # perch
-# def test_perch():
-#     call_models("perch")
-
-# # aves
-# def test_aves():
-#     call_models("aves")
-
-# # birdaves
-# def test_birdaves():
-#     call_models("birdaves")
-
-# # birdnet
-# def test_birdnet():
-#     call_models("birdnet")
-
-# # biolingual
-# def test_biolingual():
-#     call_models("biolingual")
-
-# # insect66
-# def test_insect66():
-#     call_models("insect66")
-
-# test_insect66()
+# pytest -v test_embedding_creation.py
