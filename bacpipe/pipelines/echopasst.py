@@ -73,7 +73,7 @@ class AugmentMelSTFT(nn.Module):
 
 class Model(ModelBaseClass):
     def __init__(self):
-        super().__init__()
+        super().__init__(sr = SAMPLE_RATE, segment_length = LENGTH_IN_SAMPLES)
         self.model = get_basic_model(mode = 'logits', arch="passt_s_kd_p16_128_ap486")
         self.model.net = get_model_passt(arch="passt_s_kd_p16_128_ap486", n_classes=585)
         self.model.net.to("cpu")
@@ -83,11 +83,9 @@ class Model(ModelBaseClass):
         self.preprocessor = AugmentMelSTFT(n_mels=128, sr=SAMPLE_RATE, win_length=800, hopsize=320, n_fft=1024)
         
     def preprocess(self, audio):
+        return self.preprocessor(torch.from_numpy(audio))
         
-        audio = audio[:LENGTH_IN_SAMPLES]
-        return self.preprocessor(torch.from_numpy(audio).view(1, -1))
-        # return self.model.mel(torch.from_numpy(audio).view(1, -1))
-    
+    @torch.inference_mode()
     def __call__(self, input):
-        x, features = self.model.net(input.unsqueeze(1))
+        classes, features = self.model.net(input.unsqueeze(1))
         return features.detach().numpy()
