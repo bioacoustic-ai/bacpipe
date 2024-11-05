@@ -11,12 +11,12 @@ LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
 class Model(ModelBaseClass):
     def __init__(self):
         super().__init__(sr = SAMPLE_RATE, segment_length = LENGTH_IN_SAMPLES)
-        if self.config['embedding_model'] == 'animal2vec_xc':
+        if 'animal2vec_xc' in __name__:
             from . import animal2vec_xc as A2VXC
             path_to_pt_file = A2VXC.PATH_TO_PT_FILE
             self.sr = A2VXC.SAMPLE_RATE
             self.segment_length = A2VXC.LENGTH_IN_SAMPLES
-        elif self.config['embedding_model'] == 'animal2vec_mk':
+        elif 'animal2vec_mk' in __name__:
             path_to_pt_file = "bacpipe/models/animal2vec/animal2vec_large_finetuned_MeerKAT_240507.pt"
         models, _ = checkpoint_utils.load_model_ensemble([path_to_pt_file])#, weights_only=True)
         self.model = models[0].to("cpu")
@@ -25,7 +25,7 @@ class Model(ModelBaseClass):
     
     def preprocess(self, audio):
         chunk = chunk_and_normalize(
-            torch.tensor(audio),
+            torch.tensor(audio.reshape(1, -1)),
             segment_length=self.segment_length/self.sr,
             sample_rate=self.sr,
             normalize=True,

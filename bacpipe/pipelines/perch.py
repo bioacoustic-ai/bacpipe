@@ -11,7 +11,7 @@ LENGH_IN_SAMPLES = 160000
 
 class Model(ModelBaseClass):
     def __init__(self):
-        super().__init__()
+        super().__init__(sr = SAMPLE_RATE, segment_length = LENGH_IN_SAMPLES)
         
         model_choice = 'perch_8'
         config = config_dict.ConfigDict()
@@ -34,16 +34,7 @@ class Model(ModelBaseClass):
         
         
     def preprocess(self, audio):
-        re_audio = lb.resample(audio, 
-                                orig_sr = self.config['sr'], 
-                                target_sr = SAMPLE_RATE)
-        num = np.ceil(len(re_audio) / LENGH_IN_SAMPLES)
-        # zero pad in case the end is reached
-        re_audio = [*re_audio, 
-                    *np.zeros([int(num * LENGH_IN_SAMPLES - len(re_audio))])]
-        wins = np.array(re_audio).reshape([int(num), LENGH_IN_SAMPLES])
-
-        return np.array(wins, dtype=np.float32)
+        return audio
 
 
     def __call__(self, input):

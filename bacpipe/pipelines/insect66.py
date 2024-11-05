@@ -8,7 +8,7 @@ import torchaudio as ta
 from .utils import ModelBaseClass, MODEL_BASE_PATH
 
 SAMPLE_RATE = 44100
-LENGTH_IN_SAMPLES = 5.5*SAMPLE_RATE
+LENGTH_IN_SAMPLES = int(5.5*SAMPLE_RATE)
 
 
 class SpectrogramCNN(nn.Module):
@@ -61,7 +61,7 @@ class SpectrogramCNN(nn.Module):
 
 class Model(ModelBaseClass):
     def __init__(self):
-        super().__init__()
+        super().__init__(sr = SAMPLE_RATE, segment_length = LENGTH_IN_SAMPLES)
         with open(f"{MODEL_BASE_PATH}/insect66/config_insecteffnet.yaml", "rt") as infp:
             cfg = SimpleNamespace(**yaml.safe_load(infp))
 
@@ -73,7 +73,7 @@ class Model(ModelBaseClass):
         self.model.load_state_dict(state_dict, strict=False)
         
     def preprocess(self, audio):
-        audio = torch.from_numpy(audio).view(1, -1)
+        audio = torch.from_numpy(audio)
         audio = audio[:, None, :]
 
         # (bs, channel, mel, time)

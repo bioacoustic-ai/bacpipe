@@ -109,16 +109,8 @@ class Model(ModelBaseClass):
             layers=[layer for layer in model_list]
         )
     
-    def preprocess(self, audio, orig_sr=2_000):
-        re_audio = lb.resample(audio, orig_sr = orig_sr, 
-                               target_sr = SAMPLE_RATE)
-        num = np.ceil(len(re_audio) / LENGTH_IN_SAMPLES)
-        # zero pad in case the end is reached
-        re_audio = [*re_audio, 
-                    *np.zeros([int(num * LENGTH_IN_SAMPLES - len(re_audio))])]
-        wins = np.array(re_audio).reshape([int(num), LENGTH_IN_SAMPLES])
-
-        return tf.convert_to_tensor(wins)
+    def preprocess(self, audio):
+        return tf.convert_to_tensor(audio)
     
     def __call__(self, input):
         return self.model.predict(input)
