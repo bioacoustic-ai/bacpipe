@@ -10,7 +10,7 @@ logger = logging.getLogger('bacpipe')
 
 class Loader():
     def __init__(self, check_if_combination_exists=True, 
-                 model_name='umap', **kwargs):
+                 model_name='umap', testing=False, **kwargs):
         self.model_name = model_name
         
         with open('bacpipe/config.yaml', "r") as f:
@@ -32,7 +32,7 @@ class Loader():
             self._get_audio_paths()
             self._init_metadata_dict()
         
-        if not self.combination_already_exists:
+        if not self.combination_already_exists and not testing:
             self.embed_dir.mkdir(exist_ok=True, parents=True)
         else:
             if self.model_name == 'umap':

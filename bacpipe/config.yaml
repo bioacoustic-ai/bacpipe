@@ -13,7 +13,7 @@ umap_parent_dir :   "bacpipe/test_files/umap_embeds"
 
 
 # embedding model name
-embedding_model: 'whaleperch'
+embedding_model: 'rcl_fs_bsed'
 
 # supported formats of audio files
 audio_suffixes: ['.wav', '.WAV', '.aif', '.mp3']

@@ -1,4 +1,3 @@
-from fairseq import checkpoint_utils
 from .animal2vec_mk import Model as A2VMK
 
 SAMPLE_RATE = 8000
@@ -7,4 +6,4 @@ PATH_TO_PT_FILE = "bacpipe/models/animal2vec/checkpoint_last_xeno_canto_base_pre
 
 class Model(A2VMK):
     def __init__(self):
-        super().__init__()
+        super().__init__(xeno_canto=True)

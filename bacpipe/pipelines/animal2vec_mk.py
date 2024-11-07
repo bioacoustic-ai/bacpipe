@@ -9,14 +9,14 @@ SAMPLE_RATE = 8000
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
 
 class Model(ModelBaseClass):
-    def __init__(self):
+    def __init__(self, xeno_canto = False):
         super().__init__(sr = SAMPLE_RATE, segment_length = LENGTH_IN_SAMPLES)
-        if 'animal2vec_xc' in __name__:
+        if xeno_canto:
             from . import animal2vec_xc as A2VXC
             path_to_pt_file = A2VXC.PATH_TO_PT_FILE
             self.sr = A2VXC.SAMPLE_RATE
             self.segment_length = A2VXC.LENGTH_IN_SAMPLES
-        elif 'animal2vec_mk' in __name__:
+        else:
             path_to_pt_file = "bacpipe/models/animal2vec/animal2vec_large_finetuned_MeerKAT_240507.pt"
         models, _ = checkpoint_utils.load_model_ensemble([path_to_pt_file])#, weights_only=True)
         self.model = models[0].to("cpu")
