@@ -22,25 +22,25 @@ _c = config_utils.callable_config
 
 
 def get_config() -> config_dict.ConfigDict:
-  """Create configuration dictionary for training."""
-  config = hubert_base_pq.get_config()
+    """Create configuration dictionary for training."""
+    config = hubert_base_pq.get_config()
 
-  config.init_config.learning_rate_schedule = "cosine_decay"
-  config.init_config.start_learning_rate = 0.0001
-  config.init_config.reload_hubert_from = ""
+    config.init_config.learning_rate_schedule = "cosine_decay"
+    config.init_config.start_learning_rate = 0.0001
+    config.init_config.reload_hubert_from = ""
 
-  # Decide on which layer to add the supervision.
-  # note that index 6 is the last layer!
-  config.init_config.model_config.omit_classifier_stop_grads = (6,)
+    # Decide on which layer to add the supervision.
+    # note that index 6 is the last layer!
+    config.init_config.model_config.omit_classifier_stop_grads = (6,)
 
-  # Turn off the HuBERT and quantizer training.
-  config.train_config.hubert_loss_mult = 0
-  config.train_config.quant_loss_mult = 0
+    # Turn off the HuBERT and quantizer training.
+    config.train_config.hubert_loss_mult = 0
+    config.train_config.quant_loss_mult = 0
 
-  return config
+    return config
 
 
 def get_hyper(hyper):
-  return hyper.sweep(
-      "config.init_config.start_learning_rate", hyper.discrete([0.0001])
-  )
+    return hyper.sweep(
+        "config.init_config.start_learning_rate", hyper.discrete([0.0001])
+    )

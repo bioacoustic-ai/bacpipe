@@ -44,21 +44,20 @@ from xmanager import xm  # pylint: disable=unused-import
 
 
 class Run(Protocol):
-  """Protocol for entry points of project scripts.
+    """Protocol for entry points of project scripts.
 
-  These scripts should aim to include project-specific arguments into the config
-  argument as much as possible, since updating this interface would require
-  changing every project that uses this entry point.
-  """
+    These scripts should aim to include project-specific arguments into the config
+    argument as much as possible, since updating this interface would require
+    changing every project that uses this entry point.
+    """
 
-  def __call__(
-      self,
-      mode: str,
-      config: config_dict.ConfigDict,
-      workdir: str,
-      tf_data_service_address: str,
-  ):
-    ...
+    def __call__(
+        self,
+        mode: str,
+        config: config_dict.ConfigDict,
+        workdir: str,
+        tf_data_service_address: str,
+    ): ...
 
 
 TARGETS: dict[str, Run] = {
@@ -69,12 +68,8 @@ TARGETS: dict[str, Run] = {
 }
 
 _CONFIG = config_flags.DEFINE_config_file("config")
-_WORKDIR = flags.DEFINE_string(
-    "workdir", None, "Work unit checkpointing directory."
-)
-_TARGET = flags.DEFINE_enum(
-    "target", None, TARGETS.keys(), "The module to run."
-)
+_WORKDIR = flags.DEFINE_string("workdir", None, "Work unit checkpointing directory.")
+_TARGET = flags.DEFINE_enum("target", None, TARGETS.keys(), "The module to run.")
 _MODE = flags.DEFINE_string("mode", None, "The mode to run.")
 _TF_DATA_SERVICE_ADDRESS = flags.DEFINE_string(
     "tf_data_service_address",
@@ -87,26 +82,24 @@ flags.mark_flags_as_required(["config", "workdir", "target", "mode"])
 
 
 def main(argv: Sequence[str]) -> None:
-  if len(argv) > 1:
-    raise app.UsageError("Too many command-line arguments.")
-  logging.info(_CONFIG.value)
-  if _TF.value:
-    # We assume that scripts use JAX, so here we prevent TensorFlow from
-    # reserving all the GPU memory (which leaves nothing for JAX to use).
-    import tensorflow as tf  # pylint: disable=g-import-not-at-top
+    if len(argv) > 1:
+        raise app.UsageError("Too many command-line arguments.")
+    logging.info(_CONFIG.value)
+    if _TF.value:
+        # We assume that scripts use JAX, so here we prevent TensorFlow from
+        # reserving all the GPU memory (which leaves nothing for JAX to use).
+        import tensorflow as tf  # pylint: disable=g-import-not-at-top
 
-    tf.config.experimental.set_visible_devices([], "GPU")
-  config = config_utils.parse_config(
-      _CONFIG.value, config_globals.get_globals()
-  )
+        tf.config.experimental.set_visible_devices([], "GPU")
+    config = config_utils.parse_config(_CONFIG.value, config_globals.get_globals())
 
-  TARGETS[_TARGET.value](
-      _MODE.value,
-      config,
-      _WORKDIR.value,
-      _TF_DATA_SERVICE_ADDRESS.value,
-  )
+    TARGETS[_TARGET.value](
+        _MODE.value,
+        config,
+        _WORKDIR.value,
+        _TF_DATA_SERVICE_ADDRESS.value,
+    )
 
 
 if __name__ == "__main__":
-  app.run(main)
+    app.run(main)

@@ -12,8 +12,10 @@ from dataclasses import dataclass, field
 from fairseq import utils, metrics
 from fairseq.logging.meters import safe_round
 from fairseq.criterions import register_criterion
-from fairseq.criterions.label_smoothed_cross_entropy import LabelSmoothedCrossEntropyCriterion, \
-    LabelSmoothedCrossEntropyCriterionConfig
+from fairseq.criterions.label_smoothed_cross_entropy import (
+    LabelSmoothedCrossEntropyCriterion,
+    LabelSmoothedCrossEntropyCriterionConfig,
+)
 from fairseq.criterions.model_criterion import ModelCriterion, ModelCriterionConfig
 from . import confusion, sigmoid_focal_loss, ConcatTensorMeter
 from sklearn import metrics as sklearn_metrics
@@ -22,12 +24,15 @@ import numpy as np
 try:
     from torch import _assert
 except ImportError:
+
     def _assert(condition: bool, message: str):
         assert condition, message
 
 
 @dataclass
-class LabelSmoothedCrossEntropyCriterionConfigModifiedLogs(LabelSmoothedCrossEntropyCriterionConfig):
+class LabelSmoothedCrossEntropyCriterionConfigModifiedLogs(
+    LabelSmoothedCrossEntropyCriterionConfig
+):
     unique_labels: str = II("task.unique_labels")
     verbose_tensorboard_logging: str = II("task.verbose_tensorboard_logging")
     segmentation_metrics: bool = field(
@@ -43,38 +48,50 @@ class LabelSmoothedCrossEntropyCriterionConfigModifiedLogs(LabelSmoothedCrossEnt
         metadata={"help": "The minimum likelihood which is deemed a prediction"},
     )
     iou_threshold: float = field(
-        default=0.,
-        metadata={"help": "The minimum IoU that is needed for a prediction to be counted as "
-                          "overlapping. 0 means that even a single frame overlap is enough, "
-                          "while 1 means that only a perfect overlap is counted as overlap."},
+        default=0.0,
+        metadata={
+            "help": "The minimum IoU that is needed for a prediction to be counted as "
+            "overlapping. 0 means that even a single frame overlap is enough, "
+            "while 1 means that only a perfect overlap is counted as overlap."
+        },
     )
     sigma_s: float = field(
         default=0.1,
-        metadata={"help": "Size of Gaussian (std dev) in seconds for the canny method. "
-                          "Filter width in seconds for avg and max methods."},
+        metadata={
+            "help": "Size of Gaussian (std dev) in seconds for the canny method. "
+            "Filter width in seconds for avg and max methods."
+        },
     )
     maxfilt_s: float = field(
         default=0.1,
-        metadata={"help": "Time to smooth with maxixmum filter. Only used when method=canny"},
+        metadata={
+            "help": "Time to smooth with maxixmum filter. Only used when method=canny"
+        },
     )
     max_duration_s: float = field(
         default=0.5,
-        metadata={"help": "Detections are never longer than max duration (s). Only used when method=canny"},
+        metadata={
+            "help": "Detections are never longer than max duration (s). Only used when method=canny"
+        },
     )
     lowP: float = field(
         default=0.125,
-        metadata={"help": "Low threshold. Detections are based on Canny edge detector, "
-                          "but the detector sometimes misses the minima on some transients"
-                          "if they are not sharp enough.  lowP is used for pruning detections."
-                          "Detections whose Gaussian-smoothed signal is beneath lowP are discarded."
-                          "Only used when method=canny"},
+        metadata={
+            "help": "Low threshold. Detections are based on Canny edge detector, "
+            "but the detector sometimes misses the minima on some transients"
+            "if they are not sharp enough.  lowP is used for pruning detections."
+            "Detections whose Gaussian-smoothed signal is beneath lowP are discarded."
+            "Only used when method=canny"
+        },
     )
     method: str = field(
         default="avg",
-        metadata={"help": "Which method to use for fusing the predictions into time bins."
-                          "avg: Average pooling, then thresholding."
-                          "max: Max pooling, then thresholding."
-                          "canny: Canny edge detector"},
+        metadata={
+            "help": "Which method to use for fusing the predictions into time bins."
+            "avg: Average pooling, then thresholding."
+            "max: Max pooling, then thresholding."
+            "canny: Canny edge detector"
+        },
     )
 
     can_sum: bool = True
@@ -97,74 +114,90 @@ class ExpandedModelCriterionConfig(ModelCriterionConfig):
         metadata={"help": "The minimum likelihood which is deemed a prediction"},
     )
     iou_threshold: float = field(
-        default=0.,
-        metadata={"help": "The minimum IoU that is needed for a prediction to be counted as "
-                          "overlapping. 0 means that even a single frame overlap is enough, "
-                          "while 1 means that only a perfect overlap is counted as overlap."},
+        default=0.0,
+        metadata={
+            "help": "The minimum IoU that is needed for a prediction to be counted as "
+            "overlapping. 0 means that even a single frame overlap is enough, "
+            "while 1 means that only a perfect overlap is counted as overlap."
+        },
     )
     sigma_s: float = field(
         default=0.1,
-        metadata={"help": "Size of Gaussian (std dev) in seconds for the canny method. "
-                          "Filter width in seconds for avg and max methods."},
+        metadata={
+            "help": "Size of Gaussian (std dev) in seconds for the canny method. "
+            "Filter width in seconds for avg and max methods."
+        },
     )
     maxfilt_s: float = field(
         default=0.1,
-        metadata={"help": "Time to smooth with maxixmum filter. Only used when method=canny"},
+        metadata={
+            "help": "Time to smooth with maxixmum filter. Only used when method=canny"
+        },
     )
     max_duration_s: float = field(
         default=0.5,
-        metadata={"help": "Detections are never longer than max duration (s). Only used when method=canny"},
+        metadata={
+            "help": "Detections are never longer than max duration (s). Only used when method=canny"
+        },
     )
     lowP: float = field(
         default=0.125,
-        metadata={"help": "Low threshold. Detections are based on Canny edge detector, "
-                          "but the detector sometimes misses the minima on some transients"
-                          "if they are not sharp enough.  lowP is used for pruning detections."
-                          "Detections whose Gaussian-smoothed signal is beneath lowP are discarded."
-                          "Only used when method=canny"},
+        metadata={
+            "help": "Low threshold. Detections are based on Canny edge detector, "
+            "but the detector sometimes misses the minima on some transients"
+            "if they are not sharp enough.  lowP is used for pruning detections."
+            "Detections whose Gaussian-smoothed signal is beneath lowP are discarded."
+            "Only used when method=canny"
+        },
     )
     method: str = field(
         default="avg",
-        metadata={"help": "Which method to use for fusing the predictions into time bins."
-                          "avg: Average pooling, then thresholding."
-                          "max: Max pooling, then thresholding."
-                          "canny: Canny edge detector"},
+        metadata={
+            "help": "Which method to use for fusing the predictions into time bins."
+            "avg: Average pooling, then thresholding."
+            "max: Max pooling, then thresholding."
+            "canny: Canny edge detector"
+        },
     )
 
     can_sum: bool = True
 
 
-@register_criterion("finetunecriterion", dataclass=LabelSmoothedCrossEntropyCriterionConfigModifiedLogs)
+@register_criterion(
+    "finetunecriterion", dataclass=LabelSmoothedCrossEntropyCriterionConfigModifiedLogs
+)
 class FinetuneCrossEntropyCriterion(LabelSmoothedCrossEntropyCriterion):
     """
     The clones the fairseq LabelSmoothed CE Loss and adds some logging macros and the focal loss
     """
 
     def __init__(
-            self,
-            task,
-            sentence_avg,
-            label_smoothing,
-            unique_labels,
-            segmentation_metrics,
-            use_focal_loss,
-            metric_threshold,
-            iou_threshold,
-            sigma_s,
-            maxfilt_s,
-            max_duration_s,
-            lowP,
-            method,
-            can_sum,
-            verbose_tensorboard_logging,
-            ignore_prefix_size=0,
-            report_accuracy=False,
+        self,
+        task,
+        sentence_avg,
+        label_smoothing,
+        unique_labels,
+        segmentation_metrics,
+        use_focal_loss,
+        metric_threshold,
+        iou_threshold,
+        sigma_s,
+        maxfilt_s,
+        max_duration_s,
+        lowP,
+        method,
+        can_sum,
+        verbose_tensorboard_logging,
+        ignore_prefix_size=0,
+        report_accuracy=False,
     ):
-        super().__init__(task=task,
-                         sentence_avg=sentence_avg,
-                         label_smoothing=label_smoothing,
-                         ignore_prefix_size=ignore_prefix_size,
-                         report_accuracy=report_accuracy)
+        super().__init__(
+            task=task,
+            sentence_avg=sentence_avg,
+            label_smoothing=label_smoothing,
+            ignore_prefix_size=ignore_prefix_size,
+            report_accuracy=report_accuracy,
+        )
         self.num_classes = len(eval(unique_labels))
         self.segmentation_metrics = segmentation_metrics
         self.use_focal_loss = use_focal_loss
@@ -184,11 +217,11 @@ class FinetuneCrossEntropyCriterion(LabelSmoothedCrossEntropyCriterion):
         target = model.get_targets(sample, net_output)
         if self.ignore_prefix_size > 0:
             # lprobs: B x T x C
-            lprobs = lprobs[:, self.ignore_prefix_size:, :].contiguous()
+            lprobs = lprobs[:, self.ignore_prefix_size :, :].contiguous()
             if target.dim() == lprobs.dim():
-                target = target[:, self.ignore_prefix_size:, :].contiguous()
+                target = target[:, self.ignore_prefix_size :, :].contiguous()
             else:
-                target = target[:, self.ignore_prefix_size:].contiguous()
+                target = target[:, self.ignore_prefix_size :].contiguous()
 
         if target.dim() == lprobs.dim():
             target = target.view(-1, target.size(-1))
@@ -199,7 +232,9 @@ class FinetuneCrossEntropyCriterion(LabelSmoothedCrossEntropyCriterion):
     def compute_accuracy(self, model, net_output, sample):
         lprobs, target = self.get_lprobs_and_target(model, net_output, sample)
         if target.dim() == lprobs.dim():
-            preds = torch.sigmoid(model.get_logits(net_output).view(-1, lprobs.size(-1)))
+            preds = torch.sigmoid(
+                model.get_logits(net_output).view(-1, lprobs.size(-1))
+            )
             preds = torch.where(preds < self.metric_threshold, 0, 1)
             n_correct = torch.sum(preds.eq(target))
             total = torch.tensor(target.shape).prod()
@@ -219,7 +254,9 @@ class FinetuneCrossEntropyCriterion(LabelSmoothedCrossEntropyCriterion):
     def compute_prec_rec_f1(self, model, net_output, sample):
         lprobs, target = self.get_lprobs_and_target(model, net_output, sample)
         if target.dim() == lprobs.dim():
-            preds = torch.sigmoid(model.get_logits(net_output).view(-1, lprobs.size(-1)))
+            preds = torch.sigmoid(
+                model.get_logits(net_output).view(-1, lprobs.size(-1))
+            )
         else:
             preds = torch.softmax(model.get_logits(net_output), -1)
             target = torch.nn.functional.one_hot(target.long(), preds.size(-1))
@@ -242,9 +279,8 @@ class FinetuneCrossEntropyCriterion(LabelSmoothedCrossEntropyCriterion):
             logits = model.get_logits(net_output)
             target = model.get_targets(sample, net_output)
             reduction = "none" if not reduce else "sum"
-            loss = sigmoid_focal_loss(logits, target,
-                                      reduction=reduction)
-            nll_loss = torch.tensor(0.)
+            loss = sigmoid_focal_loss(logits, target, reduction=reduction)
+            nll_loss = torch.tensor(0.0)
         else:
             loss, nll_loss = self.compute_loss(model, net_output, sample, reduce=reduce)
         sample_size = (
@@ -269,8 +305,12 @@ class FinetuneCrossEntropyCriterion(LabelSmoothedCrossEntropyCriterion):
             logging_output["finetune/fn"] = utils.item(fn)
         if self.verbose_tensorboard_logging and not model.training:
             self.can_sum = False
-            logging_output["_predictions"] = torch.sigmoid(model.get_logits(net_output, reshape=False))
-            logging_output["_targets"] = model.get_targets(sample, net_output, reshape=False)
+            logging_output["_predictions"] = torch.sigmoid(
+                model.get_logits(net_output, reshape=False)
+            )
+            logging_output["_targets"] = model.get_targets(
+                sample, net_output, reshape=False
+            )
             if self.segmentation_metrics:
                 logging_output["_source_size"] = sample["net_input"]["source"].size(-1)
 
@@ -297,7 +337,8 @@ class FinetuneCrossEntropyCriterion(LabelSmoothedCrossEntropyCriterion):
             "misc/nll_loss", nll_loss_sum / ntokens / math.log(2), ntokens, round=3
         )
         metrics.log_derived(
-            "misc/perplexity", lambda meters: utils.get_perplexity(meters["misc/nll_loss"].avg)
+            "misc/perplexity",
+            lambda meters: utils.get_perplexity(meters["misc/nll_loss"].avg),
         )
 
         total = sum(log.get("count", 0) for log in logging_outputs)
@@ -309,17 +350,22 @@ class FinetuneCrossEntropyCriterion(LabelSmoothedCrossEntropyCriterion):
             "ntokens",
             "nsentences",
             "sample_size",
-            "total"
+            "total",
         }
 
         for k in logging_outputs[0]:
             # print("Key: {} ...".format(k), end="")
             if k not in builtin_keys and not k.startswith("_"):
                 # print("added")
-                val = sum(log.get(k, 0) for log in logging_outputs)  # sum across devices
+                val = sum(
+                    log.get(k, 0) for log in logging_outputs
+                )  # sum across devices
                 if k.startswith("loss"):
                     metrics.log_scalar(
-                        "individual_losses/" + k, val / (sample_size or 1) / math.log(2), sample_size, round=3
+                        "individual_losses/" + k,
+                        val / (sample_size or 1) / math.log(2),
+                        sample_size,
+                        round=3,
                     )
                 else:
                     metrics.log_scalar(k, val / len(logging_outputs), round=3)
@@ -329,40 +375,63 @@ class FinetuneCrossEntropyCriterion(LabelSmoothedCrossEntropyCriterion):
         if utils.item(sum(log.get("finetune/total", 0) for log in logging_outputs)) > 0:
             metrics.log_derived(
                 "metrics/finetune/accuracy",
-                lambda meters: safe_round(
-                    meters["finetune/n_correct"].sum * 100.0 / meters[
-                        "finetune/total"].sum, 3
-                )
-                if meters["finetune/total"].sum > 0
-                else float("nan"),
+                lambda meters: (
+                    safe_round(
+                        meters["finetune/n_correct"].sum
+                        * 100.0
+                        / meters["finetune/total"].sum,
+                        3,
+                    )
+                    if meters["finetune/total"].sum > 0
+                    else float("nan")
+                ),
             )
             metrics.log_derived(
                 "metrics/finetune/precision",
-                lambda meters: safe_round(
-                    meters["finetune/tp"].sum * 100.0 / (meters["finetune/tp"].sum + meters["finetune/fp"].sum),
-                    3
-                )
-                if meters["finetune/tp"].sum + meters["finetune/fp"].sum > 0
-                else float("nan"),
+                lambda meters: (
+                    safe_round(
+                        meters["finetune/tp"].sum
+                        * 100.0
+                        / (meters["finetune/tp"].sum + meters["finetune/fp"].sum),
+                        3,
+                    )
+                    if meters["finetune/tp"].sum + meters["finetune/fp"].sum > 0
+                    else float("nan")
+                ),
             )
             metrics.log_derived(
                 "metrics/finetune/recall",
-                lambda meters: safe_round(
-                    meters["finetune/tp"].sum * 100.0 / (meters["finetune/tp"].sum + meters["finetune/fn"].sum),
-                    3
-                )
-                if meters["finetune/tp"].sum + meters["finetune/fn"].sum > 0
-                else float("nan"),
+                lambda meters: (
+                    safe_round(
+                        meters["finetune/tp"].sum
+                        * 100.0
+                        / (meters["finetune/tp"].sum + meters["finetune/fn"].sum),
+                        3,
+                    )
+                    if meters["finetune/tp"].sum + meters["finetune/fn"].sum > 0
+                    else float("nan")
+                ),
             )
             metrics.log_derived(
                 "metrics/finetune/f1",
-                lambda meters: safe_round(
-                    meters["finetune/tp"].sum * 100.0 * 2 / (
-                            2 * meters["finetune/tp"].sum + meters["finetune/fn"].sum + meters["finetune/fp"].sum),
-                    3
-                )
-                if 2 * meters["finetune/tp"].sum + meters["finetune/fn"].sum + meters["finetune/fp"].sum > 0
-                else float("nan"),
+                lambda meters: (
+                    safe_round(
+                        meters["finetune/tp"].sum
+                        * 100.0
+                        * 2
+                        / (
+                            2 * meters["finetune/tp"].sum
+                            + meters["finetune/fn"].sum
+                            + meters["finetune/fp"].sum
+                        ),
+                        3,
+                    )
+                    if 2 * meters["finetune/tp"].sum
+                    + meters["finetune/fn"].sum
+                    + meters["finetune/fp"].sum
+                    > 0
+                    else float("nan")
+                ),
             )
 
         for kk in ["_predictions", "_targets", "_source_size"]:
@@ -427,13 +496,7 @@ class ExpandedModelCriterion(ModelCriterion):
         metrics.log_scalar("nsentences", nsentences)
         metrics.log_scalar("sample_size", sample_size)
 
-        builtin_keys = {
-            "loss",
-            "ntokens",
-            "nsentences",
-            "sample_size",
-            "_world_size"
-        }
+        builtin_keys = {"loss", "ntokens", "nsentences", "sample_size", "_world_size"}
 
         world_size = utils.item(
             sum(log.get("_world_size", 0) for log in logging_outputs)
@@ -453,40 +516,63 @@ class ExpandedModelCriterion(ModelCriterion):
         if total > 0:
             metrics.log_derived(
                 "metrics/pretrain/accuracy",
-                lambda meters: safe_round(
-                    meters["pretrain/n_correct"].sum * 100.0 / meters[
-                        "pretrain/total"].sum, 3
-                )
-                if meters["pretrain/total"].sum > 0
-                else float("nan"),
+                lambda meters: (
+                    safe_round(
+                        meters["pretrain/n_correct"].sum
+                        * 100.0
+                        / meters["pretrain/total"].sum,
+                        3,
+                    )
+                    if meters["pretrain/total"].sum > 0
+                    else float("nan")
+                ),
             )
             metrics.log_derived(
                 "metrics/pretrain/precision",
-                lambda meters: safe_round(
-                    meters["pretrain/tp"].sum * 100.0 / (meters["pretrain/tp"].sum + meters["pretrain/fp"].sum),
-                    3
-                )
-                if meters["pretrain/tp"].sum + meters["pretrain/fp"].sum > 0
-                else float("nan"),
+                lambda meters: (
+                    safe_round(
+                        meters["pretrain/tp"].sum
+                        * 100.0
+                        / (meters["pretrain/tp"].sum + meters["pretrain/fp"].sum),
+                        3,
+                    )
+                    if meters["pretrain/tp"].sum + meters["pretrain/fp"].sum > 0
+                    else float("nan")
+                ),
             )
             metrics.log_derived(
                 "metrics/pretrain/recall",
-                lambda meters: safe_round(
-                    meters["pretrain/tp"].sum * 100.0 / (meters["pretrain/tp"].sum + meters["pretrain/fn"].sum),
-                    3
-                )
-                if meters["pretrain/tp"].sum + meters["pretrain/fn"].sum > 0
-                else float("nan"),
+                lambda meters: (
+                    safe_round(
+                        meters["pretrain/tp"].sum
+                        * 100.0
+                        / (meters["pretrain/tp"].sum + meters["pretrain/fn"].sum),
+                        3,
+                    )
+                    if meters["pretrain/tp"].sum + meters["pretrain/fn"].sum > 0
+                    else float("nan")
+                ),
             )
             metrics.log_derived(
                 "metrics/pretrain/f1",
-                lambda meters: safe_round(
-                    meters["pretrain/tp"].sum * 100.0 * 2 / (
-                            2 * meters["pretrain/tp"].sum + meters["pretrain/fn"].sum + meters["pretrain/fp"].sum),
-                    3
-                )
-                if 2 * meters["pretrain/tp"].sum + meters["pretrain/fn"].sum + meters["pretrain/fp"].sum > 0
-                else float("nan"),
+                lambda meters: (
+                    safe_round(
+                        meters["pretrain/tp"].sum
+                        * 100.0
+                        * 2
+                        / (
+                            2 * meters["pretrain/tp"].sum
+                            + meters["pretrain/fn"].sum
+                            + meters["pretrain/fp"].sum
+                        ),
+                        3,
+                    )
+                    if 2 * meters["pretrain/tp"].sum
+                    + meters["pretrain/fn"].sum
+                    + meters["pretrain/fp"].sum
+                    > 0
+                    else float("nan")
+                ),
             )
 
             # print("\n from aggregating: \n", logging_outputs[0])
@@ -498,5 +584,7 @@ class ExpandedModelCriterion(ModelCriterion):
                         metrics.log_custom(
                             ConcatTensorMeter,
                             kk,
-                            torch.cat([logs[kk].cpu() for logs in logging_outputs], dim=0),
+                            torch.cat(
+                                [logs[kk].cpu() for logs in logging_outputs], dim=0
+                            ),
                         )

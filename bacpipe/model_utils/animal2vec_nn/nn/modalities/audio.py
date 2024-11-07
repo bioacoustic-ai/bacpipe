@@ -14,17 +14,13 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Optional
 from .. import ConvFeatureExtractionModel
-from fairseq.modules import (
-    LayerNorm,
-    SamePad,
-    TransposeLast,
-    Fp32LayerNorm
-)
+from fairseq.modules import LayerNorm, SamePad, TransposeLast, Fp32LayerNorm
 from fairseq.tasks import FairseqTask
 from .base import D2vModalityConfig, ModalitySpecificEncoder, get_alibi_bias
 from .modules import BlockEncoder, Decoder1d
 from .. import Modality, get_conv_size
 from omegaconf import II
+
 
 @dataclass
 class D2vAudioConfig(D2vModalityConfig):
@@ -55,14 +51,14 @@ class AudioEncoder(ModalitySpecificEncoder):
     modality_cfg: D2vAudioConfig
 
     def __init__(
-            self,
-            modality_cfg: D2vAudioConfig,
-            embed_dim: int,
-            make_block: Callable[[float], tnn.ModuleList],
-            norm_layer: Callable[[int], tnn.LayerNorm],
-            layer_norm_first: bool,
-            alibi_biases: Dict,
-            task: Optional[FairseqTask],
+        self,
+        modality_cfg: D2vAudioConfig,
+        embed_dim: int,
+        make_block: Callable[[float], tnn.ModuleList],
+        norm_layer: Callable[[int], tnn.LayerNorm],
+        layer_norm_first: bool,
+        alibi_biases: Dict,
+        task: Optional[FairseqTask],
     ):
 
         self.feature_enc_layers = eval(modality_cfg.conv_feature_layers)
@@ -113,7 +109,9 @@ class AudioEncoder(ModalitySpecificEncoder):
         )
 
         if modality_cfg.conv_pos_pre_ln:
-            positional_encoder = tnn.Sequential(Fp32LayerNorm(embed_dim), positional_encoder)
+            positional_encoder = tnn.Sequential(
+                Fp32LayerNorm(embed_dim), positional_encoder
+            )
 
         dpr = np.linspace(
             modality_cfg.start_drop_path_rate,
@@ -121,7 +119,9 @@ class AudioEncoder(ModalitySpecificEncoder):
             modality_cfg.prenet_depth,
         )
         context_encoder = BlockEncoder(
-            tnn.ModuleList(make_block(dpr[i]) for i in range(modality_cfg.prenet_depth)),
+            tnn.ModuleList(
+                make_block(dpr[i]) for i in range(modality_cfg.prenet_depth)
+            ),
             norm_layer(embed_dim) if not layer_norm_first else None,
             layer_norm_first,
             modality_cfg.prenet_layerdrop,
@@ -166,7 +166,9 @@ class AudioEncoder(ModalitySpecificEncoder):
 
             ft_out_size = [input_lengths]
             for xx in self.conv_feature_layers:
-                ft_out_size = [get_conv_size(ft_out_size, [xx[1]], [0], [1], [xx[2]], dim=1)[0]]
+                ft_out_size = [
+                    get_conv_size(ft_out_size, [xx[1]], [0], [1], [xx[2]], dim=1)[0]
+                ]
 
             return torch.tensor(ft_out_size).to(torch.long)
 
@@ -187,7 +189,7 @@ class AudioEncoder(ModalitySpecificEncoder):
                     )
                 ] = 1
                 padding_mask = (
-                        1 - padding_mask.flip([-1]).cumsum(-1).flip([-1])
+                    1 - padding_mask.flip([-1]).cumsum(-1).flip([-1])
                 ).bool()
             else:
                 padding_mask = torch.zeros(

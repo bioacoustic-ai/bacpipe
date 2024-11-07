@@ -93,24 +93,22 @@ class MelSpectrogram(tf.keras.layers.Layer):
     def call(self, inputs):
         return self._bin(self._stft(inputs))
 
+
 class Model(ModelBaseClass):
     def __init__(self):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
-        orig_model = tf.keras.models.load_model('bacpipe/models/hbdet',
-                custom_objects={"FBetaScote": metrics.FBetaScore},
+        orig_model = tf.keras.models.load_model(
+            "bacpipe/models/hbdet",
+            custom_objects={"FBetaScote": metrics.FBetaScore},
         )
         model_list = orig_model.layers[:-2]
         model_list.insert(0, tf.keras.layers.Input([LENGTH_IN_SAMPLES]))
-        model_list.insert(
-            1, tf.keras.layers.Lambda(lambda t: tf.expand_dims(t, -1))
-        )
+        model_list.insert(1, tf.keras.layers.Lambda(lambda t: tf.expand_dims(t, -1)))
         model_list.insert(2, MelSpectrogram())
-        self.model = tf.keras.Sequential(
-            layers=[layer for layer in model_list]
-        )
-    
+        self.model = tf.keras.Sequential(layers=[layer for layer in model_list])
+
     def preprocess(self, audio):
         return tf.convert_to_tensor(audio)
-    
+
     def __call__(self, input):
         return self.model.predict(input)

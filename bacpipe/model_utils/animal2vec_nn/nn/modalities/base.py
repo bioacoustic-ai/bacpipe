@@ -78,16 +78,16 @@ MaskInfo = namedtuple("MaskInfo", ["x_unmasked", "mask", "ids_restore", "ids_kee
 
 class ModalitySpecificEncoder(nn.Module):
     def __init__(
-            self,
-            modality_cfg: D2vModalityConfig,
-            embed_dim: int,
-            local_encoder,
-            project_features: nn.Module,
-            fixed_positional_encoder: Optional[nn.Module],
-            relative_positional_encoder: Optional[nn.Module],
-            context_encoder: nn.Module,
-            decoder: nn.Module,
-            get_alibi_bias: Optional[Callable[[int, int, str, str], torch.Tensor]],
+        self,
+        modality_cfg: D2vModalityConfig,
+        embed_dim: int,
+        local_encoder,
+        project_features: nn.Module,
+        fixed_positional_encoder: Optional[nn.Module],
+        relative_positional_encoder: Optional[nn.Module],
+        context_encoder: nn.Module,
+        decoder: nn.Module,
+        get_alibi_bias: Optional[Callable[[int, int, str, str], torch.Tensor]],
     ):
         super().__init__()
 
@@ -118,13 +118,17 @@ class ModalitySpecificEncoder(nn.Module):
             self.alibi_scale = nn.Parameter(
                 torch.full(
                     (
-                        (modality_cfg.prenet_depth + modality_cfg.model_depth)
-                        if modality_cfg.learned_alibi_scale_per_layer
-                        else 1,
+                        (
+                            (modality_cfg.prenet_depth + modality_cfg.model_depth)
+                            if modality_cfg.learned_alibi_scale_per_layer
+                            else 1
+                        ),
                         1,
-                        self.modality_cfg.num_alibi_heads
-                        if modality_cfg.learned_alibi_scale_per_head
-                        else 1,
+                        (
+                            self.modality_cfg.num_alibi_heads
+                            if modality_cfg.learned_alibi_scale_per_head
+                            else 1
+                        ),
                         1,
                         1,
                     ),
@@ -198,8 +202,7 @@ class ModalitySpecificEncoder(nn.Module):
                 x = self.local_encoder(features)
             else:
                 x = GradMultiply.apply(
-                    self.local_encoder(features),
-                    self.local_grad_mult
+                    self.local_encoder(features), self.local_grad_mult
                 )
         else:
             with torch.no_grad():
@@ -213,14 +216,14 @@ class ModalitySpecificEncoder(nn.Module):
         return x
 
     def contextualized_features(
-            self,
-            x,
-            padding_mask,
-            mask,
-            remove_masked,
-            clone_batch: int = 1,
-            mask_seeds: Optional[torch.Tensor] = None,
-            precomputed_mask=None,
+        self,
+        x,
+        padding_mask,
+        mask,
+        remove_masked,
+        clone_batch: int = 1,
+        mask_seeds: Optional[torch.Tensor] = None,
+        precomputed_mask=None,
     ):
 
         if padding_mask is not None:
@@ -327,9 +330,11 @@ class ModalitySpecificEncoder(nn.Module):
             x,
             masked_padding_mask,
             alibi_bias,
-            alibi_scale[: self.modality_cfg.prenet_depth]
-            if alibi_scale is not None
-            else None,
+            (
+                alibi_scale[: self.modality_cfg.prenet_depth]
+                if alibi_scale is not None
+                else None
+            ),
         )
 
         return {
@@ -337,21 +342,23 @@ class ModalitySpecificEncoder(nn.Module):
             "local_features": local_features,
             "padding_mask": masked_padding_mask,
             "alibi_bias": alibi_bias,
-            "alibi_scale": alibi_scale[self.modality_cfg.prenet_depth:]
-            if alibi_scale is not None and alibi_scale.size(0) > 1
-            else alibi_scale,
+            "alibi_scale": (
+                alibi_scale[self.modality_cfg.prenet_depth :]
+                if alibi_scale is not None and alibi_scale.size(0) > 1
+                else alibi_scale
+            ),
             "encoder_mask": mask_info,
         }
 
     def forward(
-            self,
-            features,
-            padding_mask,
-            mask: bool,
-            remove_masked: bool,
-            clone_batch: int = 1,
-            mask_seeds: Optional[torch.Tensor] = None,
-            precomputed_mask=None,
+        self,
+        features,
+        padding_mask,
+        mask: bool,
+        remove_masked: bool,
+        clone_batch: int = 1,
+        mask_seeds: Optional[torch.Tensor] = None,
+        precomputed_mask=None,
     ):
         x = self.local_features(features)
         return self.contextualized_features(  # Here is also the positional encoder, either relative or fixed
@@ -368,12 +375,12 @@ class ModalitySpecificEncoder(nn.Module):
         pass
 
     def compute_mask(
-            self,
-            x,
-            padding_mask,
-            mask_seed: Optional[MaskSeed],
-            apply,
-            precomputed_mask,
+        self,
+        x,
+        padding_mask,
+        mask_seed: Optional[MaskSeed],
+        apply,
+        precomputed_mask,
     ):
         if precomputed_mask is not None:
             mask = precomputed_mask
@@ -385,9 +392,9 @@ class ModalitySpecificEncoder(nn.Module):
             mask_prob = cfg.mask_prob
 
             if (
-                    cfg.mask_prob_min is not None
-                    and cfg.mask_prob_min >= 0
-                    and cfg.mask_prob_min < mask_prob
+                cfg.mask_prob_min is not None
+                and cfg.mask_prob_min >= 0
+                and cfg.mask_prob_min < mask_prob
             ):
                 mask_prob = np.random.uniform(cfg.mask_prob_min, mask_prob)
 
@@ -551,16 +558,16 @@ def gather_unmasked_mask(x: torch.Tensor, mask_info: MaskInfo) -> torch.Tensor:
 
 
 def get_alibi(
-        max_positions: int,
-        attention_heads: int,
-        dims: int = 1,
-        distance: str = "manhattan",
+    max_positions: int,
+    attention_heads: int,
+    dims: int = 1,
+    distance: str = "manhattan",
 ):
     def get_slopes(n):
         def get_slopes_power_of_2(n):
             start = 2 ** (-(2 ** -(math.log2(n) - 3)))
             ratio = start
-            return [start * ratio ** i for i in range(n)]
+            return [start * ratio**i for i in range(n)]
 
         # In the paper, we only train models that have 2^a heads for some
         # a. This function has some good properties that only occur when
@@ -571,8 +578,8 @@ def get_alibi(
         else:
             closest_power_of_2 = 2 ** math.floor(math.log2(n))
             return (
-                    get_slopes_power_of_2(closest_power_of_2)
-                    + get_slopes(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
+                get_slopes_power_of_2(closest_power_of_2)
+                + get_slopes(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
             )
 
     maxpos = max_positions
@@ -584,10 +591,10 @@ def get_alibi(
         # autoregressive model so we want a symmetric mask with 0 on the
         # diagonal and other wise linear decreasing valuees
         pos_bias = (
-                torch.abs(
-                    torch.arange(maxpos).unsqueeze(0) - torch.arange(maxpos).unsqueeze(1)
-                )
-                * -1
+            torch.abs(
+                torch.arange(maxpos).unsqueeze(0) - torch.arange(maxpos).unsqueeze(1)
+            )
+            * -1
         )
     elif dims == 2:
         if distance == "manhattan":
@@ -620,14 +627,14 @@ def get_alibi(
 
 
 def get_alibi_bias(
-        alibi_biases,
-        batch_size,
-        time_steps,
-        heads,
-        dtype,
-        device,
-        dims=1,
-        distance="manhattan",
+    alibi_biases,
+    batch_size,
+    time_steps,
+    heads,
+    dtype,
+    device,
+    dims=1,
+    distance="manhattan",
 ):
     cache_key = f"{dims}_{heads}_{distance}"
 
@@ -635,11 +642,11 @@ def get_alibi_bias(
 
     target_size = heads * batch_size
     if (
-            buffered is None
-            or buffered.size(0) < target_size
-            or buffered.size(1) < time_steps
-            or buffered.dtype != dtype
-            or buffered.device != device
+        buffered is None
+        or buffered.size(0) < target_size
+        or buffered.size(1) < time_steps
+        or buffered.dtype != dtype
+        or buffered.device != device
     ):
         bt = max(time_steps, buffered.size(1) if buffered is not None else 0)
         bn = max(target_size, buffered.size(0) if buffered is not None else 0) // heads
@@ -658,13 +665,13 @@ def get_alibi_bias(
 
 
 def _learned_alibi_bias(
-        alibi_bias,
-        batch_size,
-        time_steps,
-        heads,
-        scale,
-        dtype,
-        device,
+    alibi_bias,
+    batch_size,
+    time_steps,
+    heads,
+    scale,
+    dtype,
+    device,
 ):
     assert alibi_bias.size(1) == heads, alibi_bias.shape
     assert alibi_bias.dtype == dtype, alibi_bias.dtype

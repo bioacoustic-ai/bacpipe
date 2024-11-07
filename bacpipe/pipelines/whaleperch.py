@@ -1,6 +1,8 @@
 from ml_collections import config_dict
 from bacpipe.model_utils.perch_chirp.chirp.inference.embed_lib import EmbedFn
-from bacpipe.model_utils.perch_chirp.chirp.projects.zoo.models import get_preset_model_config
+from bacpipe.model_utils.perch_chirp.chirp.projects.zoo.models import (
+    get_preset_model_config,
+)
 import numpy as np
 import librosa as lb
 
@@ -9,16 +11,16 @@ from .utils import ModelBaseClass
 SAMPLE_RATE = 24_000
 LENGH_IN_SAMPLES = 50_000
 
+
 class Model(ModelBaseClass):
     def __init__(self):
-        super().__init__(sr = SAMPLE_RATE, segment_length = LENGH_IN_SAMPLES)
-        
-        model_choice = 'multispecies_whale'
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGH_IN_SAMPLES)
+
+        model_choice = "multispecies_whale"
         config = config_dict.ConfigDict()
         config.embed_fn_config = config_dict.ConfigDict()
         config.embed_fn_config.model_config = config_dict.ConfigDict()
-        model_key, embedding_dim, model_config = get_preset_model_config(
-            model_choice)
+        model_key, embedding_dim, model_config = get_preset_model_config(model_choice)
         config.embed_fn_config.model_key = model_key
         config.embed_fn_config.model_config = model_config
 
@@ -31,15 +33,12 @@ class Model(ModelBaseClass):
         embed_fn = EmbedFn(**config.embed_fn_config)
         embed_fn.setup()
         self.model = embed_fn.embedding_model.embed
-        
-        
+
     def preprocess(self, audio):
         return audio
-
 
     def __call__(self, input):
         embeds = []
         for batch in input:
             embeds.append(self.model(batch).embeddings.squeeze())
         return np.array(embeds)
-    

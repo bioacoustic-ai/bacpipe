@@ -22,13 +22,13 @@ _c = config_utils.callable_config
 
 
 def get_config() -> config_dict.ConfigDict:
-  """Create configuration dictionary for training."""
-  config = hubert_base_pq.get_config()
+    """Create configuration dictionary for training."""
+    config = hubert_base_pq.get_config()
 
-  config.init_config.base_quantizer_config.num_centroids = 1024
+    config.init_config.base_quantizer_config.num_centroids = 1024
 
-  config.init_config.quantizer_config.num_sections = 2
-  config.init_config.quantizer_config.strategy = "residual_quantization"
-  config.init_config.quantizer_config.use_entropy_quantizer = False
+    config.init_config.quantizer_config.num_sections = 2
+    config.init_config.quantizer_config.strategy = "residual_quantization"
+    config.init_config.quantizer_config.use_entropy_quantizer = False
 
-  return config
+    return config

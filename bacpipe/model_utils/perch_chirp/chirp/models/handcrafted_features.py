@@ -20,71 +20,73 @@ from jax import scipy as jsp
 
 
 class HandcraftedFeatures(nn.Module):
-  """Handcrafted features for linear models.
+    """Handcrafted features for linear models.
 
-  Attributes:
-    compute_mfccs: If True, turn log-melspectrograms into MFCCs.
-    num_mfccs: How many MFCCs to keep. Unused if compute_mfccs is False.
-    aggregation: How to aggregate over time. If 'beans', we concatenate the
-      mean, standard deviation, min, and max over the time axis (which mirrors
-      the processing done in the BEANS benchmark (Hagiwara et al., 2022)). If
-      'avg_pool', we perform average pooling over the time axis (controlled by
-      `window_size` and `window_stride`) before flattening the time and channel
-      axes. If `flatten`, we simply flatten the time and channel axes.
-    window_size: Average pooling window size. Unused if `aggregation` is not
-      `avg_pool`.
-    window_stride: Average pooling window stride. Unused if `aggregation` is not
-      `avg_pool`.
-  """
+    Attributes:
+      compute_mfccs: If True, turn log-melspectrograms into MFCCs.
+      num_mfccs: How many MFCCs to keep. Unused if compute_mfccs is False.
+      aggregation: How to aggregate over time. If 'beans', we concatenate the
+        mean, standard deviation, min, and max over the time axis (which mirrors
+        the processing done in the BEANS benchmark (Hagiwara et al., 2022)). If
+        'avg_pool', we perform average pooling over the time axis (controlled by
+        `window_size` and `window_stride`) before flattening the time and channel
+        axes. If `flatten`, we simply flatten the time and channel axes.
+      window_size: Average pooling window size. Unused if `aggregation` is not
+        `avg_pool`.
+      window_stride: Average pooling window stride. Unused if `aggregation` is not
+        `avg_pool`.
+    """
 
-  compute_mfccs: bool = False
-  num_mfccs: int = 20
-  aggregation: str = 'avg_pool'
-  window_size: int = 10
-  window_stride: int = 10
+    compute_mfccs: bool = False
+    num_mfccs: int = 20
+    aggregation: str = "avg_pool"
+    window_size: int = 10
+    window_stride: int = 10
 
-  @nn.compact
-  def __call__(
-      self,
-      inputs: jnp.ndarray,
-      train: bool,
-      use_running_average: bool | None = None,
-  ) -> jnp.ndarray:
-    del train
-    del use_running_average
+    @nn.compact
+    def __call__(
+        self,
+        inputs: jnp.ndarray,
+        train: bool,
+        use_running_average: bool | None = None,
+    ) -> jnp.ndarray:
+        del train
+        del use_running_average
 
-    # Reshape from [B, T, D, 1] to [B, T, D]
-    outputs = jnp.squeeze(inputs, axis=[-1])  # pytype: disable=wrong-arg-types  # jnp-type
+        # Reshape from [B, T, D, 1] to [B, T, D]
+        outputs = jnp.squeeze(
+            inputs, axis=[-1]
+        )  # pytype: disable=wrong-arg-types  # jnp-type
 
-    if self.compute_mfccs:
-      outputs = jsp.fft.dct(
-          outputs,
-          type=2,
-          n=self.num_mfccs,
-          axis=-1,
-          norm='ortho',
-      )
+        if self.compute_mfccs:
+            outputs = jsp.fft.dct(
+                outputs,
+                type=2,
+                n=self.num_mfccs,
+                axis=-1,
+                norm="ortho",
+            )
 
-    if self.aggregation == 'beans':
-      return jnp.concatenate(
-          [
-              outputs.mean(axis=-2),
-              outputs.std(axis=-2),
-              outputs.min(axis=-2),
-              outputs.max(axis=-2),
-          ],
-          axis=-1,
-      )
-    elif self.aggregation in ('flatten', 'avg_pool'):
-      if self.aggregation == 'avg_pool':
-        outputs = nn.pooling.avg_pool(
-            outputs,
-            window_shape=(self.window_size,),
-            strides=(self.window_stride,),
-        )
-      # Reshape from [B, T, D] to [B, T * D]
-      return outputs.reshape(
-          outputs.shape[0], outputs.shape[1] * outputs.shape[2]
-      )
-    else:
-      raise ValueError(f'unrecognized aggregation: {self.aggregation}')
+        if self.aggregation == "beans":
+            return jnp.concatenate(
+                [
+                    outputs.mean(axis=-2),
+                    outputs.std(axis=-2),
+                    outputs.min(axis=-2),
+                    outputs.max(axis=-2),
+                ],
+                axis=-1,
+            )
+        elif self.aggregation in ("flatten", "avg_pool"):
+            if self.aggregation == "avg_pool":
+                outputs = nn.pooling.avg_pool(
+                    outputs,
+                    window_shape=(self.window_size,),
+                    strides=(self.window_stride,),
+                )
+            # Reshape from [B, T, D] to [B, T * D]
+            return outputs.reshape(
+                outputs.shape[0], outputs.shape[1] * outputs.shape[2]
+            )
+        else:
+            raise ValueError(f"unrecognized aggregation: {self.aggregation}")

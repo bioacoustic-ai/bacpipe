@@ -24,43 +24,43 @@ from jax import random
 
 
 class RandomLowPassFilter(nn.Module):
-  """A random low-pass filter in the frequency-domain.
+    """A random low-pass filter in the frequency-domain.
 
-  Attributes:
-    rate: The rate at which random low-pass filters are applied.
-    deterministic: If true, no low-pass filters are applied.
-  """
-
-  rate: float
-  deterministic: bool | None = None
-
-  @nn.compact
-  def __call__(
-      self, inputs: jnp.ndarray, deterministic: bool | None = None
-  ) -> jnp.ndarray:
-    """Applies a random low-pass filter to a mel-spectrogram.
-
-    Args:
-      inputs: A (batch) of mel-spectrograms, assumed to have frequencies on the
-        last axis.
-      deterministic: If true, passes the input as is.
-
-    Returns:
-      Aspectrogram with the same size as the input, possibly with a random
-      low-pass filter applied.
+    Attributes:
+      rate: The rate at which random low-pass filters are applied.
+      deterministic: If true, no low-pass filters are applied.
     """
-    deterministic = nn.merge_param(
-        'deterministic', self.deterministic, deterministic
-    )
-    if self.rate == 0.0 or deterministic:
-      return inputs
-    rng = self.make_rng('low_pass')
-    rate_key, low_pass_key = random.split(rng)
-    x = lax.cond(
-        random.uniform(rate_key) < self.rate,
-        functools.partial(audio_utils.random_low_pass_filter, low_pass_key),
-        lambda x: x,
-        inputs,
-    )
 
-    return x
+    rate: float
+    deterministic: bool | None = None
+
+    @nn.compact
+    def __call__(
+        self, inputs: jnp.ndarray, deterministic: bool | None = None
+    ) -> jnp.ndarray:
+        """Applies a random low-pass filter to a mel-spectrogram.
+
+        Args:
+          inputs: A (batch) of mel-spectrograms, assumed to have frequencies on the
+            last axis.
+          deterministic: If true, passes the input as is.
+
+        Returns:
+          Aspectrogram with the same size as the input, possibly with a random
+          low-pass filter applied.
+        """
+        deterministic = nn.merge_param(
+            "deterministic", self.deterministic, deterministic
+        )
+        if self.rate == 0.0 or deterministic:
+            return inputs
+        rng = self.make_rng("low_pass")
+        rate_key, low_pass_key = random.split(rng)
+        x = lax.cond(
+            random.uniform(rate_key) < self.rate,
+            functools.partial(audio_utils.random_low_pass_filter, low_pass_key),
+            lambda x: x,
+            inputs,
+        )
+
+        return x

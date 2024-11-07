@@ -25,7 +25,11 @@ from scipy import interpolate
 from fairseq import metrics, utils
 from fairseq.data.audio.raw_audio_dataset import RawAudioDataset
 from fairseq.data.text_compressor import TextCompressor, TextCompressionLevel
-from fairseq.data.audio.audio_utils import parse_path, read_from_stored_zip, is_sf_audio_data
+from fairseq.data.audio.audio_utils import (
+    parse_path,
+    read_from_stored_zip,
+    is_sf_audio_data,
+)
 from fairseq.tasks.audio_pretraining import AudioPretrainingConfig, AudioPretrainingTask
 from fairseq.dataclass import FairseqDataclass
 from fairseq.tasks import FairseqTask, register_task
@@ -48,24 +52,32 @@ class AudioConfigCCAS(AudioPretrainingConfig):
     )
     do_focal_prediction: bool = field(
         default=True,
-        metadata={"help": "if set, try to predict if the vocalization was 'focal' or not."
-                          "That is, being issued by the animal that is tracked (focal) or by a"
-                          "nearby animal (non focal)."},
+        metadata={
+            "help": "if set, try to predict if the vocalization was 'focal' or not."
+            "That is, being issued by the animal that is tracked (focal) or by a"
+            "nearby animal (non focal)."
+        },
     )
     with_labels: bool = field(
         default=False,
-        metadata={"help": "if set, we have labels available that were created using "
-                          "one of the preparation scripts in the 'scripts' folder"},
+        metadata={
+            "help": "if set, we have labels available that were created using "
+            "one of the preparation scripts in the 'scripts' folder"
+        },
     )
     verbose_tensorboard_logging: bool = field(
         default=False,
-        metadata={"help": "if set, we log precision and recall curves as well as embeddings"},
+        metadata={
+            "help": "if set, we log precision and recall curves as well as embeddings"
+        },
     )
     min_label_size: int = field(
         default=0,
-        metadata={"help": "if set, we only load files from the manifest whose label file bytesize "
-                          "is larger then this value. Hint: Empty label files have Bytesize 1780."
-                          "Only used when with_labels is True"},
+        metadata={
+            "help": "if set, we only load files from the manifest whose label file bytesize "
+            "is larger then this value. Hint: Empty label files have Bytesize 1780."
+            "Only used when with_labels is True"
+        },
     )
     split: Optional[str] = field(
         default="pretrain",
@@ -73,14 +85,16 @@ class AudioConfigCCAS(AudioPretrainingConfig):
     )
     unique_labels: Optional[str] = field(
         default="['beep', 'synch', 'eating', 'cc', 'oth', 'sn', 'ld', 'mo', 'agg', 'al', 'soc', 'focal']",
-        metadata={"help": "a 'string list' of all the unique labels."
-                          "Only used when with_labels is True"},
+        metadata={
+            "help": "a 'string list' of all the unique labels."
+            "Only used when with_labels is True"
+        },
     )
     conv_feature_layers: str = field(
-        default='[(63, 125, 1)] +[(512, 10, 5)] + [(512, 3, 2)] * 3 + [(512, 3, 1)] + [(512, 2, 1)] * 2',
+        default="[(63, 125, 1)] +[(512, 10, 5)] + [(512, 3, 2)] * 3 + [(512, 3, 1)] + [(512, 2, 1)] * 2",
         metadata={
             "help": "string describing convolutional feature extraction layers in form of a python list that contains "
-                    "[(dim, kernel_size, stride), ...]"
+            "[(dim, kernel_size, stride), ...]"
         },
     )
     train_subset: str = II("dataset.train_subset")
@@ -94,7 +108,6 @@ class AudioConfigCCAS(AudioPretrainingConfig):
     post_save_script: Optional[bool] = False
     subsample: Optional[float] = 1.0
     seed: Optional[bool] = False
-
 
 
 @register_task("audio_ccas", dataclass=AudioConfigCCAS)
@@ -204,24 +217,24 @@ class FileAudioLabelDataset(RawAudioDataset, ABC):
     """
 
     def __init__(
-            self,
-            manifest_path,
-            sample_rate,
-            max_sample_size=None,
-            min_sample_size=0,
-            shuffle=True,
-            pad=False,
-            normalize=False,
-            num_buckets=0,
-            text_compression_level=TextCompressionLevel.none,
-            unique_labels=None,
-            use_focal_loss=None,
-            return_labels=True,
-            conv_feature_layers=None,
-            min_label_size=0,
-            segmentation_metrics=None,
-            do_focal_prediction=True,
-            **mask_compute_kwargs,
+        self,
+        manifest_path,
+        sample_rate,
+        max_sample_size=None,
+        min_sample_size=0,
+        shuffle=True,
+        pad=False,
+        normalize=False,
+        num_buckets=0,
+        text_compression_level=TextCompressionLevel.none,
+        unique_labels=None,
+        use_focal_loss=None,
+        return_labels=True,
+        conv_feature_layers=None,
+        min_label_size=0,
+        segmentation_metrics=None,
+        do_focal_prediction=True,
+        **mask_compute_kwargs,
     ):
         super().__init__(
             sample_rate=sample_rate,
@@ -258,13 +271,17 @@ class FileAudioLabelDataset(RawAudioDataset, ABC):
                 items = line.strip().split("\t")
                 assert len(items) == 2, line
                 sz = int(items[1])
-                label_file = self.filename_audio2label(os.path.join(self.root_dir, items[0]), lblext="h5")
+                label_file = self.filename_audio2label(
+                    os.path.join(self.root_dir, items[0]), lblext="h5"
+                )
                 label_file_check = os.path.isfile(label_file)
                 if label_file_check:
                     label_size = os.path.getsize(label_file)
                 else:
-                    label_size = 0.
-                if (min_sample_size is not None and sz < min_sample_size) or label_size <= min_label_size:
+                    label_size = 0.0
+                if (
+                    min_sample_size is not None and sz < min_sample_size
+                ) or label_size <= min_label_size:
                     # print("\n min_sample_size is not None", min_sample_size is not None)
                     # if min_sample_size is not None:
                     #     print("sz < min_sample_size", sz < min_sample_size, sz, min_sample_size)
@@ -299,7 +316,9 @@ class FileAudioLabelDataset(RawAudioDataset, ABC):
 
     # Used to transform audio file path to label file path
     # Assumes that audio is in a "wav" directory, file extension can be arbitrary (e.g., .flac)
-    audio2label_re = re.compile(r"(?P<pre>.*)(?P<dir>wav)(?P<post>/.*\.)(?P<ext>[a-z]+)$", re.IGNORECASE)
+    audio2label_re = re.compile(
+        r"(?P<pre>.*)(?P<dir>wav)(?P<post>/.*\.)(?P<ext>[a-z]+)$", re.IGNORECASE
+    )
 
     def filename_audio2label(self, audiofile, lbldir="lbl", lblext="npz"):
         """
@@ -323,6 +342,7 @@ class FileAudioLabelDataset(RawAudioDataset, ABC):
 
     def __getitem__(self, index):
         import soundfile as sf
+
         fn = self.fnames[index]  # binary representation or list
         fn = fn if isinstance(self.fnames, list) else fn.as_py()
         fn = self.text_compressor.decompress(fn)
@@ -344,7 +364,9 @@ class FileAudioLabelDataset(RawAudioDataset, ABC):
 
         # Load the label data
         if self.return_labels:
-            lbl_file = self.filename_audio2label(os.path.join(self.label_dir, fn), lblext="h5")
+            lbl_file = self.filename_audio2label(
+                os.path.join(self.label_dir, fn), lblext="h5"
+            )
             with h5py.File(lbl_file, "r") as f:
                 start_frame_lbl = list(f["start_frame_lbl"])
                 end_frame_lbl = list(f["end_frame_lbl"])
@@ -354,7 +376,11 @@ class FileAudioLabelDataset(RawAudioDataset, ABC):
 
             ft_out_size = [len(wav.squeeze())]
             for xx in self.conv_feature_layers:
-                ft_out_size = [get_conv_size(ft_out_size, [min(10, xx[1])], [0], [1], [xx[2]], dim=1)[0]]
+                ft_out_size = [
+                    get_conv_size(
+                        ft_out_size, [min(10, xx[1])], [0], [1], [xx[2]], dim=1
+                    )[0]
+                ]
 
             ft_out_size = np.array(ft_out_size).squeeze().astype(int)
             # print("\n conv_feature_layers", self.conv_feature_layers)
@@ -362,31 +388,39 @@ class FileAudioLabelDataset(RawAudioDataset, ABC):
             wav_len = len(wav.squeeze())
             # print("\n wav_len, len(self.unique_labels)", wav_len, len(self.unique_labels))
             if self.use_focal_loss:
-                source_vector = np.zeros(shape=[wav_len, len(self.unique_labels)],
-                                         dtype=np.int64)
+                source_vector = np.zeros(
+                    shape=[wav_len, len(self.unique_labels)], dtype=np.int64
+                )
             else:
-                source_vector = np.zeros(shape=[wav_len],
-                                         dtype=np.int64)
+                source_vector = np.zeros(shape=[wav_len], dtype=np.int64)
             source_idx_vector = np.arange(wav_len)
-            target_vector_idx_vector = np.round(np.linspace(0, wav_len,
-                                                            ft_out_size,
-                                                            endpoint=False)).astype(np.int64)
+            target_vector_idx_vector = np.round(
+                np.linspace(0, wav_len, ft_out_size, endpoint=False)
+            ).astype(np.int64)
 
             if len(start_frame_lbl) > 0 and len(end_frame_lbl) > 0 and len(lbl_cat) > 0:
-                for ii, (s, e, l) in enumerate(zip(start_frame_lbl, end_frame_lbl, lbl_cat)):
+                for ii, (s, e, l) in enumerate(
+                    zip(start_frame_lbl, end_frame_lbl, lbl_cat)
+                ):
                     if self.use_focal_loss:
-                        source_vector[int(s):int(e), int(l)] = 1
-                        if self.do_focal_prediction and self.unique_labels[-1].lower() == "focal":
+                        source_vector[int(s) : int(e), int(l)] = 1
+                        if (
+                            self.do_focal_prediction
+                            and self.unique_labels[-1].lower() == "focal"
+                        ):
                             # is it a focal call or not
                             focal_lbl = foc[ii]
                             if focal_lbl == 1:
-                                source_vector[int(s):int(e), -1] = focal_lbl
+                                source_vector[int(s) : int(e), -1] = focal_lbl
                     else:
-                        source_vector[int(s):int(e)] = int(l) + 1
+                        source_vector[int(s) : int(e)] = int(l) + 1
 
-            f = interpolate.interp1d(source_idx_vector, source_vector,
-                                     axis=0, kind="linear")
-            target_vector = np.round(f(target_vector_idx_vector), decimals=0).astype(np.int64)
+            f = interpolate.interp1d(
+                source_idx_vector, source_vector, axis=0, kind="linear"
+            )
+            target_vector = np.round(f(target_vector_idx_vector), decimals=0).astype(
+                np.int64
+            )
             # print("\n target_vector", target_vector)
             # print("\n target_vector shape", target_vector.shape)
             data_dict.update({"target": target_vector})
@@ -402,13 +436,16 @@ class FileAudioLabelDataset(RawAudioDataset, ABC):
             target_size = min(min(sizes), self.max_sample_size)  # Cropping to min size
 
         if samples[0].dim() > 1:
-            collated_samples = samples[0].new_zeros(len(samples), target_size, samples[0].size(-1))
+            collated_samples = samples[0].new_zeros(
+                len(samples), target_size, samples[0].size(-1)
+            )
         else:
             collated_samples = samples[0].new_zeros(len(samples), target_size)
         # print("\n\n collated_samples.size()", collated_samples.size())
 
-        padding_mask = (torch.BoolTensor(
-            collated_samples.shape).fill_(False) if self.pad else None)
+        padding_mask = (
+            torch.BoolTensor(collated_samples.shape).fill_(False) if self.pad else None
+        )
 
         for i, (source, size) in enumerate(zip(samples, sizes)):
             diff = size - target_size
@@ -417,10 +454,16 @@ class FileAudioLabelDataset(RawAudioDataset, ABC):
             elif diff < 0:
                 assert self.pad
                 if source.dim() > 1:
-                    targets = [torch.cat([x, x.new_full((-diff,), 0.0)]) for x in source.t()]
-                    collated_samples[i] = torch.cat(targets, dim=1).view(-1, target_size).t()
+                    targets = [
+                        torch.cat([x, x.new_full((-diff,), 0.0)]) for x in source.t()
+                    ]
+                    collated_samples[i] = (
+                        torch.cat(targets, dim=1).view(-1, target_size).t()
+                    )
                 else:
-                    collated_samples[i] = torch.cat([source, source.new_full((-diff,), 0.0)])
+                    collated_samples[i] = torch.cat(
+                        [source, source.new_full((-diff,), 0.0)]
+                    )
 
                 padding_mask[i, diff:] = True
             else:
@@ -428,7 +471,10 @@ class FileAudioLabelDataset(RawAudioDataset, ABC):
                     # print("\n\n diff", diff)
                     # print("\n\n target_size", target_size)
                     # print("\n\n source.size()", source.size())
-                    targets = [self.crop_to_max_size(x.squeeze(), target_size) for x in source.t()]
+                    targets = [
+                        self.crop_to_max_size(x.squeeze(), target_size)
+                        for x in source.t()
+                    ]
                     # print("\n\n targets len", [len(x) for x in targets])
                     # targets_numpy = np.array(targets).T
                     collated_samples[i] = torch.cat(targets).view(-1, target_size).t()

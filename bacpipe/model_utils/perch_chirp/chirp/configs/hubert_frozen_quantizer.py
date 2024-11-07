@@ -22,12 +22,12 @@ _c = config_utils.callable_config
 
 
 def get_config() -> config_dict.ConfigDict:
-  """Create configuration dictionary for training."""
-  config = hubert_base_pq.get_config()
+    """Create configuration dictionary for training."""
+    config = hubert_base_pq.get_config()
 
-  config.init_config.reload_quantizer_from = ""
+    config.init_config.reload_quantizer_from = ""
 
-  # Freeze the quantizer.
-  config.train_config.quant_loss_mult = 0
+    # Freeze the quantizer.
+    config.train_config.quant_loss_mult = 0
 
-  return config
+    return config

@@ -23,33 +23,33 @@ _object_config = config_utils.object_config
 
 
 def get_config() -> config_dict.ConfigDict:
-  """Create the Caples inference config."""
-  # Attention-based 5s model.
-  config = config_dict.ConfigDict()
+    """Create the Caples inference config."""
+    # Attention-based 5s model.
+    config = config_dict.ConfigDict()
 
-  config.output_dir = ''
-  config.source_file_patterns = ['soundscapes/*.wav']
+    config.output_dir = ""
+    config.source_file_patterns = ["soundscapes/*.wav"]
 
-  # Note that the model path should be either the location of the '.tflite'
-  # file or the directory contraining the 'saved_model.pb'.
-  model_path = ''
+    # Note that the model path should be either the location of the '.tflite'
+    # file or the directory contraining the 'saved_model.pb'.
+    model_path = ""
 
-  config.shard_len_s = -1
-  config.num_shards_per_file = -1
-  # Number of workers when using the Beam DirectRunner on a single machine.
-  config.num_direct_workers = 8
-  config.embed_fn_config = {
-      'write_embeddings': True,
-      'write_logits': False,
-      'write_separated_audio': False,
-      'write_raw_audio': False,
-      'file_id_depth': 1,
-      'model_key': 'birdnet',
-      'model_config': {
-          'model_path': model_path,
-          'window_size_s': 3.0,
-          'hop_size_s': 3.0,
-          'sample_rate': 48000,
-      },
-  }
-  return config
+    config.shard_len_s = -1
+    config.num_shards_per_file = -1
+    # Number of workers when using the Beam DirectRunner on a single machine.
+    config.num_direct_workers = 8
+    config.embed_fn_config = {
+        "write_embeddings": True,
+        "write_logits": False,
+        "write_separated_audio": False,
+        "write_raw_audio": False,
+        "file_id_depth": 1,
+        "model_key": "birdnet",
+        "model_config": {
+            "model_path": model_path,
+            "window_size_s": 3.0,
+            "hop_size_s": 3.0,
+            "sample_rate": 48000,
+        },
+    }
+    return config

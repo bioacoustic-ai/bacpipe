@@ -47,22 +47,22 @@ class SincConv(tnn.Module):
     """
 
     def __init__(
-            self,
-            out_channels,
-            kernel_size,
-            input_shape=None,
-            in_channels=1,
-            stride=1,
-            dilation=1,
-            padding="same",
-            padding_mode="reflect",
-            sample_rate=8000,
-            min_low_hz=50,
-            min_band_hz=None,
-            learnable_filters=False,
-            apply_window_to_root=False,
-            return_abs=False,
-            init_scale="mel"
+        self,
+        out_channels,
+        kernel_size,
+        input_shape=None,
+        in_channels=1,
+        stride=1,
+        dilation=1,
+        padding="same",
+        padding_mode="reflect",
+        sample_rate=8000,
+        min_low_hz=50,
+        min_band_hz=None,
+        learnable_filters=False,
+        apply_window_to_root=False,
+        return_abs=False,
+        init_scale="mel",
     ):
         super().__init__()
         self.in_channels = in_channels
@@ -88,7 +88,9 @@ class SincConv(tnn.Module):
             raise ValueError("Must provide one of input_shape or in_channels")
 
         if not self.learnable_filters:
-            assert apply_window_to_root is False, "when no learnable_filters then no apply_window_to_root"
+            assert (
+                apply_window_to_root is False
+            ), "when no learnable_filters then no apply_window_to_root"
 
         if self.in_channels is None:
             self.in_channels = self._check_input_shape(input_shape)
@@ -121,9 +123,7 @@ class SincConv(tnn.Module):
             x = x.unsqueeze(1)
 
         if self.padding == "same":
-            x = self._manage_padding(
-                x, self.kernel_size, self.dilation, self.stride
-            )
+            x = self._manage_padding(x, self.kernel_size, self.dilation, self.stride)
 
         elif self.padding == "causal":
             num_pad = (self.kernel_size - 1) * self.dilation
@@ -134,8 +134,7 @@ class SincConv(tnn.Module):
 
         else:
             raise ValueError(
-                "Padding must be 'same', 'valid' or 'causal'. Got %s."
-                % (self.padding)
+                "Padding must be 'same', 'valid' or 'causal'. Got %s." % (self.padding)
             )
 
         if not self.learnable_filters:
@@ -166,9 +165,7 @@ class SincConv(tnn.Module):
         elif len(shape) == 3:
             in_channels = shape[-1]
         else:
-            raise ValueError(
-                "sincconv expects 2d or 3d inputs. Got " + str(len(shape))
-            )
+            raise ValueError("sincconv expects 2d or 3d inputs. Got " + str(len(shape)))
 
         # Kernel size must be odd
         if self.kernel_size % 2 == 0:
@@ -178,7 +175,9 @@ class SincConv(tnn.Module):
             )
         return in_channels
 
-    def _get_sinc_filters(self, ):
+    def _get_sinc_filters(
+        self,
+    ):
         """This functions creates the sinc-filters to used for sinc-conv."""
         # Computing the low frequencies of the filters
         low = self.min_low_hz + torch.abs(self.low_hz_)
@@ -201,7 +200,12 @@ class SincConv(tnn.Module):
         f_times_t_high = torch.matmul(high.float(), self.n_)
 
         # Left part of the filters.
-        band_pass_left = (torch.sin(f_times_t_high) - torch.sin(f_times_t_low)) / self.n_ * 2 * self.window_
+        band_pass_left = (
+            (torch.sin(f_times_t_high) - torch.sin(f_times_t_low))
+            / self.n_
+            * 2
+            * self.window_
+        )
 
         # Central element of the filter
         band_pass_center = 2 * band.view(-1, 1)
@@ -271,9 +275,7 @@ class SincConv(tnn.Module):
 
         # Time axis  (only half is needed due to symmetry)
         n = (self.kernel_size - 1) / 2.0
-        self.n_ = (
-                2 * math.pi * torch.arange(-n, 0).view(1, -1) / self.sample_rate
-        )
+        self.n_ = 2 * math.pi * torch.arange(-n, 0).view(1, -1) / self.sample_rate
 
     def _to_mel(self, hz):
         """Converts frequency in Hz to the mel scale."""
@@ -284,7 +286,11 @@ class SincConv(tnn.Module):
         return 700 * (10 ** (mel / 2595) - 1)
 
     def _manage_padding(
-            self, x, kernel_size: int, dilation: int, stride: int,
+        self,
+        x,
+        kernel_size: int,
+        dilation: int,
+        stride: int,
     ):
         """This function performs zero-padding on the time axis
         such that their lengths is unchanged after the convolution.
@@ -327,9 +333,7 @@ def get_padding_elem(L_in: int, stride: int, kernel_size: int, dilation: int):
         padding = [math.floor(kernel_size / 2), math.floor(kernel_size / 2)]
 
     else:
-        L_out = (
-                math.floor((L_in - dilation * (kernel_size - 1) - 1) / stride) + 1
-        )
+        L_out = math.floor((L_in - dilation * (kernel_size - 1) - 1) / stride) + 1
         padding = [
             math.floor((L_in - L_out) / 2),
             math.floor((L_in - L_out) / 2),

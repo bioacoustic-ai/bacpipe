@@ -18,14 +18,14 @@ import torch.distributed as dist
 import random
 import math
 
+
 class DistributedSamplerWrapper(DistributedSampler):
     def __init__(
-            self, sampler, dataset,
-            num_replicas=None,
-            rank=None,
-            shuffle: bool = True):
+        self, sampler, dataset, num_replicas=None, rank=None, shuffle: bool = True
+    ):
         super(DistributedSamplerWrapper, self).__init__(
-            dataset, num_replicas, rank, shuffle)
+            dataset, num_replicas, rank, shuffle
+        )
         # source: @awaelchli https://github.com/PyTorchLightning/pytorch-lightning/issues/3238
         self.sampler = sampler
 
@@ -36,12 +36,21 @@ class DistributedSamplerWrapper(DistributedSampler):
         indices = list(self.sampler)
         if self.epoch == 0:
             print(f"\n DistributedSamplerWrapper :  {indices[:10]} \n\n")
-        indices = indices[self.rank:self.total_size:self.num_replicas]
+        indices = indices[self.rank : self.total_size : self.num_replicas]
         return iter(indices)
-        
+
+
 class DistributedWeightedSampler(Sampler):
-    #dataset_train, samples_weight,  num_replicas=num_tasks, rank=global_rank
-    def __init__(self, dataset, weights, num_replicas=None, rank=None, replacement=True, shuffle=True):
+    # dataset_train, samples_weight,  num_replicas=num_tasks, rank=global_rank
+    def __init__(
+        self,
+        dataset,
+        weights,
+        num_replicas=None,
+        rank=None,
+        replacement=True,
+        shuffle=True,
+    ):
         if num_replicas is None:
             if not dist.is_available():
                 raise RuntimeError("Requires distributed package to be available")
@@ -70,11 +79,11 @@ class DistributedWeightedSampler(Sampler):
             indices = list(range(len(self.dataset)))
 
         # add extra samples to make it evenly divisible
-        indices += indices[:(self.total_size - len(indices))]
+        indices += indices[: (self.total_size - len(indices))]
         assert len(indices) == self.total_size
 
         # subsample
-        indices = indices[self.rank:self.total_size:self.num_replicas]
+        indices = indices[self.rank : self.total_size : self.num_replicas]
         assert len(indices) == self.num_samples
 
         # # get targets (you can alternatively pass them in __init__, if this op is expensive)
@@ -86,7 +95,9 @@ class DistributedWeightedSampler(Sampler):
         # weights = self.calculate_weights(targets)
         weights = self.weights[indices]
 
-        subsample_balanced_indicies = torch.multinomial(weights, self.num_samples, self.replacement)
+        subsample_balanced_indicies = torch.multinomial(
+            weights, self.num_samples, self.replacement
+        )
         # now map these target indicies back to the original dataset index...
         dataset_indices = torch.tensor(indices)[subsample_balanced_indicies]
         return iter(dataset_indices.tolist())
@@ -100,23 +111,25 @@ class DistributedWeightedSampler(Sampler):
 
 def make_index_dict(label_csv):
     index_lookup = {}
-    with open(label_csv, 'r') as f:
+    with open(label_csv, "r") as f:
         csv_reader = csv.DictReader(f)
         line_count = 0
         for row in csv_reader:
-            index_lookup[row['mid']] = row['index']
+            index_lookup[row["mid"]] = row["index"]
             line_count += 1
     return index_lookup
 
+
 def make_name_dict(label_csv):
     name_lookup = {}
-    with open(label_csv, 'r') as f:
+    with open(label_csv, "r") as f:
         csv_reader = csv.DictReader(f)
         line_count = 0
         for row in csv_reader:
-            name_lookup[row['index']] = row['display_name']
+            name_lookup[row["index"]] = row["display_name"]
             line_count += 1
     return name_lookup
+
 
 def lookup_list(index_list, label_csv):
     label_list = []
@@ -124,6 +137,7 @@ def lookup_list(index_list, label_csv):
     for item in index_list:
         label_list.append(table[item])
     return label_list
+
 
 class AudiosetDataset(Dataset):
     def __init__(self, sr, audio_conf, use_fbank=False, fbank_dir=None):
@@ -137,31 +151,51 @@ class AudiosetDataset(Dataset):
 
         self.sr = sr
         self.audio_conf = audio_conf
-        print('---------------the {:s} dataloader---------------'.format(self.audio_conf.get('mode')))
-        if 'multilabel' in self.audio_conf.keys():
-            self.multilabel = self.audio_conf['multilabel']
+        print(
+            "---------------the {:s} dataloader---------------".format(
+                self.audio_conf.get("mode")
+            )
+        )
+        if "multilabel" in self.audio_conf.keys():
+            self.multilabel = self.audio_conf["multilabel"]
         else:
             self.multilabel = False
-        print(f'multilabel: {self.multilabel}')
-        self.melbins = self.audio_conf.get('num_mel_bins')
-        self.freqm = self.audio_conf.get('freqm')
-        self.timem = self.audio_conf.get('timem')
-        print('using following mask: {:d} freq, {:d} time'.format(self.audio_conf.get('freqm'), self.audio_conf.get('timem')))
-        self.mixup = self.audio_conf.get('mixup')
-        print('using mix-up with rate {:f}'.format(self.mixup))
-        self.dataset = self.audio_conf.get('dataset')
-        self.norm_mean = self.audio_conf.get('mean')
-        self.norm_std = self.audio_conf.get('std')
-        print('Dataset: {}, mean {:.3f} and std {:.3f}'.format(self.dataset, self.norm_mean, self.norm_std))
+        print(f"multilabel: {self.multilabel}")
+        self.melbins = self.audio_conf.get("num_mel_bins")
+        self.freqm = self.audio_conf.get("freqm")
+        self.timem = self.audio_conf.get("timem")
+        print(
+            "using following mask: {:d} freq, {:d} time".format(
+                self.audio_conf.get("freqm"), self.audio_conf.get("timem")
+            )
+        )
+        self.mixup = self.audio_conf.get("mixup")
+        print("using mix-up with rate {:f}".format(self.mixup))
+        self.dataset = self.audio_conf.get("dataset")
+        self.norm_mean = self.audio_conf.get("mean")
+        self.norm_std = self.audio_conf.get("std")
+        print(
+            "Dataset: {}, mean {:.3f} and std {:.3f}".format(
+                self.dataset, self.norm_mean, self.norm_std
+            )
+        )
 
     def _wav2fbank(self, waveform, sr):
-        
+
         waveform = waveform - waveform.mean()
         # 498 128, 998, 128
-        fbank = torchaudio.compliance.kaldi.fbank(waveform, htk_compat=True, sample_frequency=sr, use_energy=False,
-                                                  window_type='hanning', num_mel_bins=self.melbins, dither=0.0, frame_shift=10)
+        fbank = torchaudio.compliance.kaldi.fbank(
+            waveform,
+            htk_compat=True,
+            sample_frequency=sr,
+            use_energy=False,
+            window_type="hanning",
+            num_mel_bins=self.melbins,
+            dither=0.0,
+            frame_shift=10,
+        )
         # 512
-        target_length = self.audio_conf.get('target_length')
+        target_length = self.audio_conf.get("target_length")
         n_frames = fbank.shape[0]
 
         p = target_length - n_frames
@@ -175,18 +209,23 @@ class AudiosetDataset(Dataset):
 
         return fbank, 0
 
-
     def _fbank(self, filename, filename2=None):
         if filename2 == None:
-            fn1 = os.path.join(self.fbank_dir, os.path.basename(filename).replace('.wav','.npy'))
+            fn1 = os.path.join(
+                self.fbank_dir, os.path.basename(filename).replace(".wav", ".npy")
+            )
             fbank = np.load(fn1)
             return torch.from_numpy(fbank), 0
         else:
-            fn1 = os.path.join(self.fbank_dir, os.path.basename(filename).replace('.wav','.npy'))
-            fn2 = os.path.join(self.fbank_dir, os.path.basename(filename2).replace('.wav','.npy'))
+            fn1 = os.path.join(
+                self.fbank_dir, os.path.basename(filename).replace(".wav", ".npy")
+            )
+            fn2 = os.path.join(
+                self.fbank_dir, os.path.basename(filename2).replace(".wav", ".npy")
+            )
             # sample lambda from beta distribtion
             mix_lambda = np.random.beta(10, 10)
-            fbank = mix_lambda * np.load(fn1) + (1-mix_lambda) * np.load(fn2)  
+            fbank = mix_lambda * np.load(fn1) + (1 - mix_lambda) * np.load(fn2)
             return torch.from_numpy(fbank), mix_lambda
 
     def process(self, data):
@@ -198,13 +237,11 @@ class AudiosetDataset(Dataset):
         """
         fbank, mix_lambda = self._wav2fbank(data, self.sr)
 
-        fbank = torch.transpose(fbank.squeeze(), 0, 1) # time, freq
+        fbank = torch.transpose(fbank.squeeze(), 0, 1)  # time, freq
         fbank = (fbank - self.norm_mean) / (self.norm_std * 2)
-        
+
         # the output fbank shape is [time_frame_num, frequency_bins], e.g., [1024, 128]
         return fbank
 
     def __len__(self):
         return len(self.data)
-
-

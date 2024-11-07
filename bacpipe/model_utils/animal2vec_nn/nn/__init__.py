@@ -23,21 +23,19 @@ from bacpipe.model_utils.animal2vec_nn.nn.utils import (
     ConvFeatureExtractionModel,
     pad_left_right,
     get_padding_value,
-    chunk_and_normalize
+    chunk_and_normalize,
 )
 
-from bacpipe.model_utils.animal2vec_nn.nn.audio_tasks import (
-    AudioTaskCCAS
-)
+from bacpipe.model_utils.animal2vec_nn.nn.audio_tasks import AudioTaskCCAS
 from bacpipe.model_utils.animal2vec_nn.nn.wav2vec2 import (
     Wav2VecCcasFinetune,
 )
 from bacpipe.model_utils.animal2vec_nn.nn.audio_train_routine import (
-    animal2vec_audio_main
+    animal2vec_audio_main,
 )
 from bacpipe.model_utils.animal2vec_nn.nn.criterions import (
     FinetuneCrossEntropyCriterion,
-    ExpandedModelCriterion
+    ExpandedModelCriterion,
 )
 from bacpipe.model_utils.animal2vec_nn.nn.modalities.base import (
     MaskSeed,
@@ -49,7 +47,7 @@ from bacpipe.model_utils.animal2vec_nn.nn.modalities.modules import (
     D2vDecoderConfig,
     AltBlock,
     Decoder1d,
-    FixedPositionalEncoder
+    FixedPositionalEncoder,
 )
 
 from bacpipe.model_utils.animal2vec_nn.nn.modalities.audio import (
@@ -62,6 +60,4 @@ from bacpipe.model_utils.animal2vec_nn.nn.modalities.images import (
     ImageEncoder,
 )
 
-from bacpipe.model_utils.animal2vec_nn.nn.data2vec2 import (
-    Data2VecMultiModel
-)
+from bacpipe.model_utils.animal2vec_nn.nn.data2vec2 import Data2VecMultiModel

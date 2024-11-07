@@ -47,33 +47,35 @@ _SCANN_OUTPUT_DIR = flags.DEFINE_string(
     "The path to the scann output directory",
 )
 
-flags.mark_flags_as_required([
-    "embedding_glob_path",
-    "audio_path",
-    "embedding_model_path",
-    "scann_output_dir",
-])
+flags.mark_flags_as_required(
+    [
+        "embedding_glob_path",
+        "audio_path",
+        "embedding_model_path",
+        "scann_output_dir",
+    ]
+)
 
 
 def main(argv: Sequence[str]) -> None:
-  if len(argv) > 1:
-    raise app.UsageError("Too many command-line arguments.")
+    if len(argv) > 1:
+        raise app.UsageError("Too many command-line arguments.")
 
-  print("creating searcher")
-  searcher, embedding_files, timestamps = scann_lib.create_searcher(
-      _EMBEDDING_GLOB_PATH.value, _SCANN_OUTPUT_DIR.value
-  )
+    print("creating searcher")
+    searcher, embedding_files, timestamps = scann_lib.create_searcher(
+        _EMBEDDING_GLOB_PATH.value, _SCANN_OUTPUT_DIR.value
+    )
 
-  print("embedding audio query")
-  query_embedding = scann_lib.embed_query_audio(
-      _AUDIO_PATH.value, _EMBEDDING_MODEL_PATH.value
-  )
+    print("embedding audio query")
+    query_embedding = scann_lib.embed_query_audio(
+        _AUDIO_PATH.value, _EMBEDDING_MODEL_PATH.value
+    )
 
-  print("searching query")
-  results = scann_lib.search_query(
-      searcher, query_embedding, embedding_files, timestamps
-  )
+    print("searching query")
+    results = scann_lib.search_query(
+        searcher, query_embedding, embedding_files, timestamps
+    )
 
 
 if __name__ == "__main__":
-  app.run(main)
+    app.run(main)

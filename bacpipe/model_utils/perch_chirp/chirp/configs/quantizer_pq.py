@@ -22,19 +22,19 @@ _c = config_utils.callable_config
 
 
 def get_config() -> config_dict.ConfigDict:
-  """Create configuration dictionary for training."""
-  config = hubert_base_pq.get_config()
+    """Create configuration dictionary for training."""
+    config = hubert_base_pq.get_config()
 
-  config.init_config.learning_rate_schedule = "cosine_decay"
-  config.init_config.quant_start_learning_rate = 0.1
-  config.init_config.model_config.readout_points = [0]
-  config.train_config.readout_loss_mult = 0
-  config.train_config.hubert_loss_mult = 0
+    config.init_config.learning_rate_schedule = "cosine_decay"
+    config.init_config.quant_start_learning_rate = 0.1
+    config.init_config.model_config.readout_points = [0]
+    config.train_config.readout_loss_mult = 0
+    config.train_config.hubert_loss_mult = 0
 
-  return config
+    return config
 
 
 def get_hyper(hyper):
-  return hyper.sweep(
-      "config.init_config.quant_start_learning_rate", hyper.discrete([0.1])
-  )
+    return hyper.sweep(
+        "config.init_config.quant_start_learning_rate", hyper.discrete([0.1])
+    )

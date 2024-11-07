@@ -23,48 +23,48 @@ from jax import numpy as jnp
 
 @flax.struct.dataclass
 class EmbeddingOutput:
-  embedding: jnp.ndarray
+    embedding: jnp.ndarray
 
 
 @flax.struct.dataclass
 class ClassifierOutput(EmbeddingOutput):
-  label: jnp.ndarray
+    label: jnp.ndarray
 
 
 @flax.struct.dataclass
 class TaxonomyOutput(ClassifierOutput):
-  genus: jnp.ndarray
-  family: jnp.ndarray
-  order: jnp.ndarray
+    genus: jnp.ndarray
+    family: jnp.ndarray
+    order: jnp.ndarray
 
 
 @runtime_checkable
 class AnyOutput(Protocol):
-  """Any output must be a dataclass."""
+    """Any output must be a dataclass."""
 
-  __dataclass_fields__: dict[str, dataclasses.Field]  # pylint: disable=g-bare-generic
+    __dataclass_fields__: dict[str, dataclasses.Field]  # pylint: disable=g-bare-generic
 
 
 @runtime_checkable
 @dataclasses.dataclass
 class TaxonomicOutput(Protocol):
-  label: jnp.ndarray
-  genus: jnp.ndarray
-  family: jnp.ndarray
-  order: jnp.ndarray
+    label: jnp.ndarray
+    genus: jnp.ndarray
+    family: jnp.ndarray
+    order: jnp.ndarray
 
 
 def output_head_logits(output, output_head_metadatas) -> dict[str, jnp.ndarray]:
-  return {
-      f'{md.key}_logits': output[md.key]
-      for md in output_head_metadatas
-      if md.key in output
-  }
+    return {
+        f"{md.key}_logits": output[md.key]
+        for md in output_head_metadatas
+        if md.key in output
+    }
 
 
 def logits(output) -> dict[str, jnp.ndarray]:
-  return {
-      f'{key}_logits': getattr(output, key)
-      for key in ('label', 'genus', 'family', 'order')
-      if hasattr(output, key)
-  }
+    return {
+        f"{key}_logits": getattr(output, key)
+        for key in ("label", "genus", "family", "order")
+        if hasattr(output, key)
+    }

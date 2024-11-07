@@ -8,7 +8,7 @@ import torchaudio as ta
 from .utils import ModelBaseClass, MODEL_BASE_PATH
 
 SAMPLE_RATE = 44100
-LENGTH_IN_SAMPLES = int(5.5*SAMPLE_RATE)
+LENGTH_IN_SAMPLES = int(5.5 * SAMPLE_RATE)
 
 
 class SpectrogramCNN(nn.Module):
@@ -46,8 +46,7 @@ class SpectrogramCNN(nn.Module):
         )
 
         self.amplitude_to_db = ta.transforms.AmplitudeToDB(top_db=cfg.top_db)
-        self.wav2timefreq = torch.nn.Sequential(self.mel_spec,
-                                           self.amplitude_to_db)
+        self.wav2timefreq = torch.nn.Sequential(self.mel_spec, self.amplitude_to_db)
 
         if init_backbone:
             # Initialize pre-trained CNN
@@ -59,19 +58,20 @@ class SpectrogramCNN(nn.Module):
                 in_chans=cfg.in_chans,
             )
 
+
 class Model(ModelBaseClass):
     def __init__(self):
-        super().__init__(sr = SAMPLE_RATE, segment_length = LENGTH_IN_SAMPLES)
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         with open(f"{MODEL_BASE_PATH}/insect66/config_insecteffnet.yaml", "rt") as infp:
             cfg = SimpleNamespace(**yaml.safe_load(infp))
 
-        checkpoint = torch.jit.load(f'{MODEL_BASE_PATH}/insect66/model_traced.pt')
+        checkpoint = torch.jit.load(f"{MODEL_BASE_PATH}/insect66/model_traced.pt")
         state_dict = checkpoint.state_dict()
-        
+
         net = SpectrogramCNN(cfg)
-        self.model = net.eval().to('cpu')
+        self.model = net.eval().to("cpu")
         self.model.load_state_dict(state_dict, strict=False)
-        
+
     def preprocess(self, audio):
         audio = torch.from_numpy(audio)
         audio = audio[:, None, :]
@@ -83,17 +83,13 @@ class Model(ModelBaseClass):
     @torch.inference_mode()
     def __call__(self, input):
         self.model.block_features = self.model.backbone.blocks(
-                                        self.model.backbone.bn1(
-                                            self.model.backbone.conv_stem(input)
-                                            )
-                                        )
-        
+            self.model.backbone.bn1(self.model.backbone.conv_stem(input))
+        )
+
         self.model.embeddings = self.model.backbone.global_pool(
-                                    self.model.backbone.bn2(
-                                        self.model.backbone.conv_head(
-                                            self.model.block_features
-                                            )
-                                        )
-                                    )        
-        
+            self.model.backbone.bn2(
+                self.model.backbone.conv_head(self.model.block_features)
+            )
+        )
+
         return self.model.embeddings

@@ -88,9 +88,9 @@ class BlockEncoder(nn.Module):
 
         for i, blk in enumerate(self.blocks):
             if (
-                    not self.training
-                    or self.layerdrop == 0
-                    or (np.random.random() > self.layerdrop)
+                not self.training
+                or self.layerdrop == 0
+                or (np.random.random() > self.layerdrop)
             ):
                 ab = alibi_bias
                 if ab is not None and alibi_scale is not None:
@@ -123,9 +123,9 @@ class DecoderBase(nn.Module):
 
     def add_residual(self, x, residual, i, mask_info):
         if (
-                residual is None
-                or not self.decoder_cfg.decoder_residual
-                or residual.size(1) != x.size(1)
+            residual is None
+            or not self.decoder_cfg.decoder_residual
+            or residual.size(1) != x.size(1)
         ):
             return x
 
@@ -271,22 +271,22 @@ class TransformerDecoder(nn.Module):
 
 class AltBlock(nn.Module):
     def __init__(
-            self,
-            dim,
-            num_heads,
-            mlp_ratio=4.0,
-            qkv_bias=False,
-            qk_scale=None,
-            drop=0.0,
-            attn_drop=0.0,
-            mlp_drop=0.0,
-            post_mlp_drop=0.0,
-            drop_path=0.0,
-            act_layer=nn.GELU,
-            norm_layer=nn.LayerNorm,
-            layer_norm_first=True,
-            ffn_targets=False,
-            cosine_attention=False,
+        self,
+        dim,
+        num_heads,
+        mlp_ratio=4.0,
+        qkv_bias=False,
+        qk_scale=None,
+        drop=0.0,
+        attn_drop=0.0,
+        mlp_drop=0.0,
+        post_mlp_drop=0.0,
+        drop_path=0.0,
+        act_layer=nn.GELU,
+        norm_layer=nn.LayerNorm,
+        layer_norm_first=True,
+        ffn_targets=False,
+        cosine_attention=False,
     ):
         super().__init__()
 
@@ -339,19 +339,19 @@ class AltBlock(nn.Module):
 
 class AltAttention(nn.Module):
     def __init__(
-            self,
-            dim,
-            num_heads=8,
-            qkv_bias=False,
-            qk_scale=None,
-            attn_drop=0.0,
-            proj_drop=0.0,
-            cosine_attention=False,
+        self,
+        dim,
+        num_heads=8,
+        qkv_bias=False,
+        qk_scale=None,
+        attn_drop=0.0,
+        proj_drop=0.0,
+        cosine_attention=False,
     ):
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
-        self.scale = qk_scale or head_dim ** -0.5
+        self.scale = qk_scale or head_dim**-0.5
 
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
@@ -412,20 +412,20 @@ class AltAttention(nn.Module):
 
 class EncDecAttention(nn.Module):
     def __init__(
-            self,
-            q_dim,
-            kv_dim,
-            num_heads=8,
-            qkv_bias=False,
-            qk_scale=None,
-            attn_drop=0.0,
-            proj_drop=0.0,
-            cosine_attention=False,
+        self,
+        q_dim,
+        kv_dim,
+        num_heads=8,
+        qkv_bias=False,
+        qk_scale=None,
+        attn_drop=0.0,
+        proj_drop=0.0,
+        cosine_attention=False,
     ):
         super().__init__()
         self.num_heads = num_heads
         head_dim = q_dim // num_heads
-        self.scale = qk_scale or head_dim ** -0.5
+        self.scale = qk_scale or head_dim**-0.5
 
         self.q_proj = nn.Linear(q_dim, q_dim, bias=qkv_bias)
         self.kv_proj = nn.Linear(kv_dim, 2 * q_dim, bias=qkv_bias)
@@ -492,23 +492,23 @@ class EncDecAttention(nn.Module):
 
 class EncDecBlock(nn.Module):
     def __init__(
-            self,
-            q_dim,
-            kv_dim,
-            num_heads,
-            mlp_ratio=4.0,
-            qkv_bias=False,
-            qk_scale=None,
-            drop=0.0,
-            attn_drop=0.0,
-            mlp_drop=0.0,
-            post_mlp_drop=0.0,
-            drop_path=0.0,
-            act_layer=nn.GELU,
-            norm_layer=nn.LayerNorm,
-            layer_norm_first=True,
-            cosine_attention=False,
-            first_residual=True,
+        self,
+        q_dim,
+        kv_dim,
+        num_heads,
+        mlp_ratio=4.0,
+        qkv_bias=False,
+        qk_scale=None,
+        drop=0.0,
+        attn_drop=0.0,
+        mlp_drop=0.0,
+        post_mlp_drop=0.0,
+        drop_path=0.0,
+        act_layer=nn.GELU,
+        norm_layer=nn.LayerNorm,
+        layer_norm_first=True,
+        cosine_attention=False,
+        first_residual=True,
     ):
         super().__init__()
 

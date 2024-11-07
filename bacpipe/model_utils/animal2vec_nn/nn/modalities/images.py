@@ -33,6 +33,7 @@ from .. import Modality, to_2tuple, get_2d_sincos_pos_embed
 try:
     from torch import _assert
 except ImportError:
+
     def _assert(condition: bool, message: str):
         assert condition, message
 
@@ -59,14 +60,14 @@ class ImageEncoder(ModalitySpecificEncoder):
     modality_cfg: D2vImageConfig
 
     def __init__(
-            self,
-            modality_cfg: D2vImageConfig,
-            embed_dim: int,
-            make_block: Callable[[float, Optional[int], Optional[int]], tnn.ModuleList],
-            norm_layer: Callable[[int], tnn.LayerNorm],
-            layer_norm_first: bool,
-            alibi_biases: Dict,
-            task: Optional[FairseqTask],
+        self,
+        modality_cfg: D2vImageConfig,
+        embed_dim: int,
+        make_block: Callable[[float, Optional[int], Optional[int]], tnn.ModuleList],
+        norm_layer: Callable[[int], tnn.LayerNorm],
+        layer_norm_first: bool,
+        alibi_biases: Dict,
+        task: Optional[FairseqTask],
     ):
 
         img_size = to_2tuple(modality_cfg.input_size)
@@ -95,7 +96,7 @@ class ImageEncoder(ModalitySpecificEncoder):
             torch.zeros(1, num_patches, embed_dim), requires_grad=False
         )
 
-        side_n = int(num_patches ** 0.5)
+        side_n = int(num_patches**0.5)
 
         emb = get_2d_sincos_pos_embed(
             pos_embed.shape[-1],
@@ -114,7 +115,9 @@ class ImageEncoder(ModalitySpecificEncoder):
         )
 
         context_encoder = BlockEncoder(
-            tnn.ModuleList(make_block(dpr[i]) for i in range(modality_cfg.prenet_depth)),
+            tnn.ModuleList(
+                make_block(dpr[i]) for i in range(modality_cfg.prenet_depth)
+            ),
             norm_layer(embed_dim) if not layer_norm_first else None,
             layer_norm_first,
             modality_cfg.prenet_layerdrop,
@@ -178,7 +181,7 @@ class ImageEncoder(ModalitySpecificEncoder):
         h = w = imgs.shape[2] // p
         x = imgs.reshape(shape=(imgs.shape[0], 3, h, p, w, p))
         x = torch.einsum("nchpwq->nhwpqc", x)
-        x = x.reshape(shape=(imgs.shape[0], h * w, p ** 2 * 3))
+        x = x.reshape(shape=(imgs.shape[0], h * w, p**2 * 3))
 
         return x
 
@@ -198,13 +201,13 @@ class ImageEncoder(ModalitySpecificEncoder):
         return imgs
 
     def compute_mask(
-            self,
-            x,
-            padding_mask,
-            mask_seed: Optional[MaskSeed],
-            apply,
-            shape=None,
-            precomputed_mask=None,
+        self,
+        x,
+        padding_mask,
+        mask_seed: Optional[MaskSeed],
+        apply,
+        shape=None,
+        precomputed_mask=None,
     ):
         mlen = self.modality_cfg.mask_length
         if mlen <= 1:
@@ -240,8 +243,8 @@ class ImageEncoder(ModalitySpecificEncoder):
 
     def decoder_input(self, x, mask_info):
         if (
-                not self.modality_cfg.transformer_decoder
-                or not self.modality_cfg.enc_dec_transformer
+            not self.modality_cfg.transformer_decoder
+            or not self.modality_cfg.enc_dec_transformer
         ):
             return super().decoder_input(x, mask_info)
 
@@ -249,7 +252,7 @@ class ImageEncoder(ModalitySpecificEncoder):
         if inp_drop > 0:
             x = F.dropout(x, inp_drop, training=self.training, inplace=True)
 
-        kv = x[:, self.modality_cfg.num_extra_tokens:]
+        kv = x[:, self.modality_cfg.num_extra_tokens :]
 
         assert self.fixed_positional_encoder is not None
         pos = self.fixed_positional_encoder(x, None).expand(x.size(0), -1, -1)
@@ -264,18 +267,17 @@ class ImageEncoder(ModalitySpecificEncoder):
 
 
 class PatchEmbed(tnn.Module):
-    """ 2D Image to Patch Embedding
-    """
+    """2D Image to Patch Embedding"""
 
     def __init__(
-            self,
-            img_size=224,
-            patch_size=16,
-            in_chans=3,
-            embed_dim=768,
-            norm_layer=None,
-            flatten=True,
-            bias=True,
+        self,
+        img_size=224,
+        patch_size=16,
+        in_chans=3,
+        embed_dim=768,
+        norm_layer=None,
+        flatten=True,
+        bias=True,
     ):
         super().__init__()
         img_size = to_2tuple(img_size)
@@ -286,13 +288,21 @@ class PatchEmbed(tnn.Module):
         self.num_patches = self.grid_size[0] * self.grid_size[1]
         self.flatten = flatten
 
-        self.proj = tnn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size, bias=bias)
+        self.proj = tnn.Conv2d(
+            in_chans, embed_dim, kernel_size=patch_size, stride=patch_size, bias=bias
+        )
         self.norm = norm_layer(embed_dim) if norm_layer else tnn.Identity()
 
     def forward(self, x):
         B, C, H, W = x.shape
-        _assert(H == self.img_size[0], f"Input image height ({H}) doesn't match model ({self.img_size[0]}).")
-        _assert(W == self.img_size[1], f"Input image width ({W}) doesn't match model ({self.img_size[1]}).")
+        _assert(
+            H == self.img_size[0],
+            f"Input image height ({H}) doesn't match model ({self.img_size[0]}).",
+        )
+        _assert(
+            W == self.img_size[1],
+            f"Input image width ({W}) doesn't match model ({self.img_size[1]}).",
+        )
         x = self.proj(x)
         if self.flatten:
             x = x.flatten(2).transpose(1, 2)  # BCHW -> BNC

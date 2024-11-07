@@ -25,32 +25,27 @@ import tensorflow as tf
 
 
 def initialize(use_tf_gpu: bool = True, disable_warnings: bool = True):
-  """Apply notebook conveniences.
+    """Apply notebook conveniences.
 
-  Args:
-    use_tf_gpu: If True, allows GPU use and sets Tensorflow to 'memory growth'
-      mode (instead of reserving all available GPU memory at once). If False,
-      Tensorflow is restricted to CPU operation. Must run before any TF
-      computations to be effective.
-    disable_warnings: If True, disables printed warnings from library code.
-  """
-  if disable_warnings:
-    logging.set_verbosity(logging.ERROR)
-    warnings.filterwarnings('ignore')
+    Args:
+      use_tf_gpu: If True, allows GPU use and sets Tensorflow to 'memory growth'
+        mode (instead of reserving all available GPU memory at once). If False,
+        Tensorflow is restricted to CPU operation. Must run before any TF
+        computations to be effective.
+      disable_warnings: If True, disables printed warnings from library code.
+    """
+    if disable_warnings:
+        logging.set_verbosity(logging.ERROR)
+        warnings.filterwarnings("ignore")
 
-  if not use_tf_gpu:
-    tf.config.experimental.set_visible_devices([], 'GPU')
-  else:
-    for gpu in tf.config.list_physical_devices('GPU'):
-      tf.config.experimental.set_memory_growth(gpu, True)
+    if not use_tf_gpu:
+        tf.config.experimental.set_visible_devices([], "GPU")
+    else:
+        for gpu in tf.config.list_physical_devices("GPU"):
+            tf.config.experimental.set_memory_growth(gpu, True)
 
 
 def prstats(title: str, ar: np.ndarray):
-  """Print summary statistics for an array."""
-  tmpl = (
-      '% 16s : \tshape: % 16s\tmin: %6.2f\tmean: %6.2f\tmax: %6.2f\tstd: %6.2f'
-  )
-  print(
-      tmpl
-      % (title, np.shape(ar), np.min(ar), np.mean(ar), np.max(ar), np.std(ar))
-  )
+    """Print summary statistics for an array."""
+    tmpl = "% 16s : \tshape: % 16s\tmin: %6.2f\tmean: %6.2f\tmax: %6.2f\tstd: %6.2f"
+    print(tmpl % (title, np.shape(ar), np.min(ar), np.mean(ar), np.max(ar), np.std(ar)))

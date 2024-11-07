@@ -23,41 +23,41 @@ _object_config = config_utils.object_config
 
 
 def get_config() -> config_dict.ConfigDict:
-  """Create the Separated Seabird inference config."""
-  # Attention-based 5s model.
-  config = config_dict.ConfigDict()
+    """Create the Separated Seabird inference config."""
+    # Attention-based 5s model.
+    config = config_dict.ConfigDict()
 
-  config.output_dir = ''
-  config.source_file_patterns = ['soundscapes/*.wav']
-  sep_model_checkpoint_path = ''
-  emb_model_checkpoint_path = ''
+    config.output_dir = ""
+    config.source_file_patterns = ["soundscapes/*.wav"]
+    sep_model_checkpoint_path = ""
+    emb_model_checkpoint_path = ""
 
-  # Raw audio files are several hours long each
-  config.shard_len_s = -1
-  config.num_shards_per_file = -1
+    # Raw audio files are several hours long each
+    config.shard_len_s = -1
+    config.num_shards_per_file = -1
 
-  # Number of workers when using the Beam DirectRunner on a single machine.
-  config.num_direct_workers = 8
-  config.embed_fn_config = {
-      'file_id_depth': 0,
-      'write_embeddings': True,
-      'write_logits': False,
-      'write_separated_audio': False,
-      'write_raw_audio': False,
-      'model_key': 'separate_embed_model',
-      'model_config': {
-          'sample_rate': 32000,
-          'taxonomy_model_tf_config': {
-              'model_path': emb_model_checkpoint_path,
-              'window_size_s': 5.0,
-              'hop_size_s': 5.0,
-              'sample_rate': 32000,
-          },
-          'separator_model_tf_config': {
-              'model_path': sep_model_checkpoint_path,
-              'sample_rate': 32000,
-              'frame_size': 32000,
-          },
-      },
-  }
-  return config
+    # Number of workers when using the Beam DirectRunner on a single machine.
+    config.num_direct_workers = 8
+    config.embed_fn_config = {
+        "file_id_depth": 0,
+        "write_embeddings": True,
+        "write_logits": False,
+        "write_separated_audio": False,
+        "write_raw_audio": False,
+        "model_key": "separate_embed_model",
+        "model_config": {
+            "sample_rate": 32000,
+            "taxonomy_model_tf_config": {
+                "model_path": emb_model_checkpoint_path,
+                "window_size_s": 5.0,
+                "hop_size_s": 5.0,
+                "sample_rate": 32000,
+            },
+            "separator_model_tf_config": {
+                "model_path": sep_model_checkpoint_path,
+                "sample_rate": 32000,
+                "frame_size": 32000,
+            },
+        },
+    }
+    return config

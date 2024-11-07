@@ -1,7 +1,18 @@
 """code adapted from https://github.com/pytorch/vision/blob/main/torchvision/models/mobilenetv3.py"""
 
 from functools import partial
-from typing import Any, Callable, List, Optional, Sequence, Tuple, Union, Mapping, Dict, TypeVar
+from typing import (
+    Any,
+    Callable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    Mapping,
+    Dict,
+    TypeVar,
+)
 from types import FunctionType
 import torch
 from torch import nn, Tensor
@@ -9,6 +20,7 @@ import warnings
 import collections
 from itertools import repeat
 from enum import Enum
+
 try:
     from torch.hub import load_state_dict_from_url  # noqa: 401
 except ImportError:
@@ -24,12 +36,16 @@ __all__ = [
 
 V = TypeVar("V")
 
+
 def _ovewrite_named_param(kwargs: Dict[str, Any], param: str, new_value: V) -> None:
     if param in kwargs:
         if kwargs[param] != new_value:
-            raise ValueError(f"The parameter '{param}' expected value {new_value} but got {kwargs[param]} instead.")
+            raise ValueError(
+                f"The parameter '{param}' expected value {new_value} but got {kwargs[param]} instead."
+            )
     else:
         kwargs[param] = new_value
+
 
 class WeightsEnum(Enum):
     """
@@ -70,6 +86,7 @@ class WeightsEnum(Enum):
     def meta(self):
         return self.value.meta
 
+
 def _make_ntuple(x: Any, n: int) -> Tuple[Any, ...]:
     """
     Make n-tuple from input x. If x is an iterable, then we just convert it to tuple.
@@ -83,6 +100,7 @@ def _make_ntuple(x: Any, n: int) -> Tuple[Any, ...]:
     if isinstance(x, collections.abc.Iterable):
         return tuple(x)
     return tuple(repeat(x, n))
+
 
 def _make_divisible(v: float, divisor: int, min_value: Optional[int] = None) -> int:
     """
@@ -98,6 +116,7 @@ def _make_divisible(v: float, divisor: int, min_value: Optional[int] = None) -> 
     if new_v < 0.9 * v:
         new_v += divisor
     return new_v
+
 
 class InvertedResidualConfig:
     # Stores information listed at Tables 1 and 2 of the MobileNetV3 paper
@@ -125,10 +144,9 @@ class InvertedResidualConfig:
     @staticmethod
     def adjust_channels(channels: int, width_mult: float):
         return _make_divisible(channels * width_mult, 8)
-    
+
 
 def _log_api_usage_once(obj: Any) -> None:
-
     """
     Logs API usage(module and name) within an organization.
     In a large ecosystem, it's often useful to track the PyTorch and
@@ -152,7 +170,8 @@ def _log_api_usage_once(obj: Any) -> None:
     if isinstance(obj, FunctionType):
         name = obj.__name__
     torch._C._log_api_usage_once(f"{module}.{name}")
-    
+
+
 class SqueezeExcitation(torch.nn.Module):
     """
     This block implements the Squeeze-and-Excitation block from https://arxiv.org/abs/1709.01507 (see Fig. 1).
@@ -190,7 +209,8 @@ class SqueezeExcitation(torch.nn.Module):
     def forward(self, input: Tensor) -> Tensor:
         scale = self._scale(input)
         return scale * input
-    
+
+
 class ConvNormActivation(torch.nn.Sequential):
     def __init__(
         self,
@@ -212,10 +232,16 @@ class ConvNormActivation(torch.nn.Sequential):
             if isinstance(kernel_size, int) and isinstance(dilation, int):
                 padding = (kernel_size - 1) // 2 * dilation
             else:
-                _conv_dim = len(kernel_size) if isinstance(kernel_size, Sequence) else len(dilation)
+                _conv_dim = (
+                    len(kernel_size)
+                    if isinstance(kernel_size, Sequence)
+                    else len(dilation)
+                )
                 kernel_size = _make_ntuple(kernel_size, _conv_dim)
                 dilation = _make_ntuple(dilation, _conv_dim)
-                padding = tuple((kernel_size[i] - 1) // 2 * dilation[i] for i in range(_conv_dim))
+                padding = tuple(
+                    (kernel_size[i] - 1) // 2 * dilation[i] for i in range(_conv_dim)
+                )
         if bias is None:
             bias = norm_layer is None
 
@@ -246,6 +272,7 @@ class ConvNormActivation(torch.nn.Sequential):
             warnings.warn(
                 "Don't use ConvNormActivation directly, please use Conv2dNormActivation and Conv3dNormActivation instead."
             )
+
 
 class Conv2dNormActivation(ConvNormActivation):
     """
@@ -296,19 +323,24 @@ class Conv2dNormActivation(ConvNormActivation):
             torch.nn.Conv2d,
         )
 
+
 class InvertedResidual(nn.Module):
     # Implemented as described at section 5 of MobileNetV3 paper
     def __init__(
         self,
         cnf: InvertedResidualConfig,
         norm_layer: Callable[..., nn.Module],
-        se_layer: Callable[..., nn.Module] = partial(SqueezeExcitation, scale_activation=nn.Hardsigmoid),
+        se_layer: Callable[..., nn.Module] = partial(
+            SqueezeExcitation, scale_activation=nn.Hardsigmoid
+        ),
     ):
         super().__init__()
         if not (1 <= cnf.stride <= 2):
             raise ValueError("illegal stride value")
 
-        self.use_res_connect = cnf.stride == 1 and cnf.input_channels == cnf.out_channels
+        self.use_res_connect = (
+            cnf.stride == 1 and cnf.input_channels == cnf.out_channels
+        )
 
         layers: List[nn.Module] = []
         activation_layer = nn.Hardswish if cnf.use_hs else nn.ReLU
@@ -346,7 +378,11 @@ class InvertedResidual(nn.Module):
         # project
         layers.append(
             Conv2dNormActivation(
-                cnf.expanded_channels, cnf.out_channels, kernel_size=1, norm_layer=norm_layer, activation_layer=None
+                cnf.expanded_channels,
+                cnf.out_channels,
+                kernel_size=1,
+                norm_layer=norm_layer,
+                activation_layer=None,
             )
         )
 
@@ -391,9 +427,16 @@ class MobileNetV3(nn.Module):
             raise ValueError("The inverted_residual_setting should not be empty")
         elif not (
             isinstance(inverted_residual_setting, Sequence)
-            and all([isinstance(s, InvertedResidualConfig) for s in inverted_residual_setting])
+            and all(
+                [
+                    isinstance(s, InvertedResidualConfig)
+                    for s in inverted_residual_setting
+                ]
+            )
         ):
-            raise TypeError("The inverted_residual_setting should be List[InvertedResidualConfig]")
+            raise TypeError(
+                "The inverted_residual_setting should be List[InvertedResidualConfig]"
+            )
 
         if block is None:
             block = InvertedResidual
@@ -407,7 +450,7 @@ class MobileNetV3(nn.Module):
         firstconv_output_channels = inverted_residual_setting[0].input_channels
         layers.append(
             Conv2dNormActivation(
-                1, #1 for spectrogram, 3 for RGB
+                1,  # 1 for spectrogram, 3 for RGB
                 firstconv_output_channels,
                 kernel_size=3,
                 stride=2,
@@ -443,7 +486,9 @@ class MobileNetV3(nn.Module):
             nn.Linear(last_channel, num_classes),
         )
         """
-        self.classifier = nn.Identity() if not classifier else nn.Linear(960, num_classes)
+        self.classifier = (
+            nn.Identity() if not classifier else nn.Linear(960, num_classes)
+        )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -459,7 +504,7 @@ class MobileNetV3(nn.Module):
 
     def _forward_impl(self, x: Tensor) -> Tensor:
         x = self.features(x)
-        
+
         """
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
@@ -479,13 +524,19 @@ class MobileNetV3(nn.Module):
 
 
 def _mobilenet_v3_conf(
-    arch: str, width_mult: float = 1.0, reduced_tail: bool = False, dilated: bool = False, **kwargs: Any
+    arch: str,
+    width_mult: float = 1.0,
+    reduced_tail: bool = False,
+    dilated: bool = False,
+    **kwargs: Any,
 ):
     reduce_divider = 2 if reduced_tail else 1
     dilation = 2 if dilated else 1
 
     bneck_conf = partial(InvertedResidualConfig, width_mult=width_mult)
-    adjust_channels = partial(InvertedResidualConfig.adjust_channels, width_mult=width_mult)
+    adjust_channels = partial(
+        InvertedResidualConfig.adjust_channels, width_mult=width_mult
+    )
 
     if arch == "mobilenet_v3_large":
         inverted_residual_setting = [
@@ -501,9 +552,29 @@ def _mobilenet_v3_conf(
             bneck_conf(80, 3, 184, 80, False, "HS", 1, 1),
             bneck_conf(80, 3, 480, 112, True, "HS", 1, 1),
             bneck_conf(112, 3, 672, 112, True, "HS", 1, 1),
-            bneck_conf(112, 5, 672, 160 // reduce_divider, True, "HS", 2, dilation),  # C4
-            bneck_conf(160 // reduce_divider, 5, 960 // reduce_divider, 160 // reduce_divider, True, "HS", 1, dilation),
-            bneck_conf(160 // reduce_divider, 5, 960 // reduce_divider, 160 // reduce_divider, True, "HS", 1, dilation),
+            bneck_conf(
+                112, 5, 672, 160 // reduce_divider, True, "HS", 2, dilation
+            ),  # C4
+            bneck_conf(
+                160 // reduce_divider,
+                5,
+                960 // reduce_divider,
+                160 // reduce_divider,
+                True,
+                "HS",
+                1,
+                dilation,
+            ),
+            bneck_conf(
+                160 // reduce_divider,
+                5,
+                960 // reduce_divider,
+                160 // reduce_divider,
+                True,
+                "HS",
+                1,
+                dilation,
+            ),
         ]
         last_channel = adjust_channels(1280 // reduce_divider)  # C5
     elif arch == "mobilenet_v3_small":
@@ -517,8 +588,26 @@ def _mobilenet_v3_conf(
             bneck_conf(40, 5, 120, 48, True, "HS", 1, 1),
             bneck_conf(48, 5, 144, 48, True, "HS", 1, 1),
             bneck_conf(48, 5, 288, 96 // reduce_divider, True, "HS", 2, dilation),  # C4
-            bneck_conf(96 // reduce_divider, 5, 576 // reduce_divider, 96 // reduce_divider, True, "HS", 1, dilation),
-            bneck_conf(96 // reduce_divider, 5, 576 // reduce_divider, 96 // reduce_divider, True, "HS", 1, dilation),
+            bneck_conf(
+                96 // reduce_divider,
+                5,
+                576 // reduce_divider,
+                96 // reduce_divider,
+                True,
+                "HS",
+                1,
+                dilation,
+            ),
+            bneck_conf(
+                96 // reduce_divider,
+                5,
+                576 // reduce_divider,
+                96 // reduce_divider,
+                True,
+                "HS",
+                1,
+                dilation,
+            ),
         ]
         last_channel = adjust_channels(1024 // reduce_divider)  # C5
     else:
@@ -540,19 +629,27 @@ def _mobilenet_v3(
     model = MobileNetV3(inverted_residual_setting, last_channel, **kwargs)
 
     if weights is not None:
-        model.load_state_dict(weights.get_state_dict(progress=progress, check_hash=True))
+        model.load_state_dict(
+            weights.get_state_dict(progress=progress, check_hash=True)
+        )
 
     return model
 
-inverted_residual_setting, last_channel = _mobilenet_v3_conf(arch="mobilenet_v3_large", dropout=0.0)
+
+inverted_residual_setting, last_channel = _mobilenet_v3_conf(
+    arch="mobilenet_v3_large", dropout=0.0
+)
+
 
 def mobilenetv3(**kwargs):
     model = MobileNetV3(inverted_residual_setting, last_channel, **kwargs)
     return model
 
+
 model_dim = {
-    'mobilenetv3': 960,
+    "mobilenetv3": 960,
 }
+
 
 class MinMaxNorm(nn.Module):
     def __init__(self):

@@ -22,11 +22,11 @@ _c = config_utils.callable_config
 
 
 def get_config() -> config_dict.ConfigDict:
-  """Create configuration dictionary for training."""
-  config = hubert_base_pq.get_config()
+    """Create configuration dictionary for training."""
+    config = hubert_base_pq.get_config()
 
-  # Add an intermediate quantizer (here at layer 6) in addition to the
-  # usual mel-spec quantizer (-2)
-  config.init_config.model_config.quantizer_points = (-2, 6)
+    # Add an intermediate quantizer (here at layer 6) in addition to the
+    # usual mel-spec quantizer (-2)
+    config.init_config.model_config.quantizer_points = (-2, 6)
 
-  return config
+    return config

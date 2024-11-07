@@ -23,17 +23,17 @@ _c = config_utils.callable_config
 
 
 def get_config() -> config_dict.ConfigDict:
-  """Create configuration dictionary for training."""
-  config = hubert_base_pq.get_config()
+    """Create configuration dictionary for training."""
+    config = hubert_base_pq.get_config()
 
-  conformer_config = hubert_presets.get_conformer_config(
-      atten_num_heads=12, num_blocks=16
-  )
+    conformer_config = hubert_presets.get_conformer_config(
+        atten_num_heads=12, num_blocks=16
+    )
 
-  config.init_config.model_config.late_feature_extractor = _c(
-      "conformer.Conformer", conformer_config
-  )
+    config.init_config.model_config.late_feature_extractor = _c(
+        "conformer.Conformer", conformer_config
+    )
 
-  config.init_config.model_config.readout_points = [0, 4, 8, 12, 15]
+    config.init_config.model_config.readout_points = [0, 4, 8, 12, 15]
 
-  return config
+    return config

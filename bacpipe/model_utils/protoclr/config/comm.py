@@ -42,8 +42,8 @@ class Comm(object):
 
     @property
     def head(self):
-        return 'Rank[{}/{}]'.format(self.rank, self.world_size)
-   
+        return "Rank[{}/{}]".format(self.rank, self.world_size)
+
     def is_main_process(self):
         return self.rank == 0
 

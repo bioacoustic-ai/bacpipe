@@ -21,7 +21,7 @@ from fairseq.models.wav2vec import (
     Wav2Vec2CtcConfig,
     Wav2Vec2Config,
     Wav2Vec2Model,
-    Wav2VecCtc
+    Wav2VecCtc,
 )
 from argparse import Namespace
 from fairseq import checkpoint_utils, tasks, utils
@@ -31,8 +31,10 @@ from . import FusedSegmentationMixin
 try:
     from torch import _assert
 except ImportError:
+
     def _assert(condition: bool, message: str):
         assert condition, message
+
 
 logger = logging.getLogger("animal2vec.hydra_train")
 
@@ -47,7 +49,9 @@ class Wav2Vec2CcasFinetuneConfig(Wav2Vec2CtcConfig):
     sample_rate: int = II("task.sample_rate")
     mixup_prob: float = 0.5
     mixing_window_length: float = 0.1
-    source_mixup: float = -1.  # Setting to negative values, effectively disables BC-Learning
+    source_mixup: float = (
+        -1.0
+    )  # Setting to negative values, effectively disables BC-Learning
     same_mixup: bool = True
     target_mixup: bool = True
     gain_mode: str = "A_weighting"
@@ -59,10 +63,7 @@ class Wav2VecCcasFinetune(Wav2VecCtc, FusedSegmentationMixin):
     @classmethod
     def build_model(cls, cfg: Wav2Vec2CcasFinetuneConfig, task: FairseqTask):
         """Build a new model instance."""
-        w2v_encoder = Wav2VecEncoderModOut(
-            cfg,
-            len(eval(cfg.unique_labels))
-        )
+        w2v_encoder = Wav2VecEncoderModOut(cfg, len(eval(cfg.unique_labels)))
         return cls(cfg, w2v_encoder)
 
     def get_logits(self, net_output, reshape=True):
@@ -238,9 +239,11 @@ class Wav2VecEncoderModOut(FairseqEncoder):
         self.cfg = cfg
 
         if cfg.w2v_args is not None:
-            model_use_focal_loss = getattr(cfg.w2v_args.criterion, "use_focal_loss",
-                                           getattr(cfg.w2v_args.model, "use_focal_loss",
-                                                   False))
+            model_use_focal_loss = getattr(
+                cfg.w2v_args.criterion,
+                "use_focal_loss",
+                getattr(cfg.w2v_args.model, "use_focal_loss", False),
+            )
             if cfg.load_pretrain_weights:
                 if model_use_focal_loss == cfg.use_focal_loss:
                     if getattr(cfg.w2v_args.task, "with_labels", False):
@@ -248,10 +251,13 @@ class Wav2VecEncoderModOut(FairseqEncoder):
                             "We are re-using the linear eval projection from pretrain "
                             "and resetting freeze_finetune_updates from {} to {}\n".format(
                                 self.freeze_finetune_updates,
-                                int(.1 * self.freeze_finetune_updates))
+                                int(0.1 * self.freeze_finetune_updates),
+                            )
                         )
                         self.proj = self.w2v_model.linear_eval_projection
-                        self.freeze_finetune_updates = int(.1 * self.freeze_finetune_updates)
+                        self.freeze_finetune_updates = int(
+                            0.1 * self.freeze_finetune_updates
+                        )
                 else:
                     logger.info(
                         "We are NOT re-using the linear eval projection from pretrain, as "
@@ -261,7 +267,9 @@ class Wav2VecEncoderModOut(FairseqEncoder):
                     )
 
     # adapted from https://github.com/mil-tokyo/bc_learning_sound/blob/master/utils.py
-    def compute_gain_torch(self, sound, fs=8_000, wl=0.1, min_db=-80.0, mode="A_weighting"):
+    def compute_gain_torch(
+        self, sound, fs=8_000, wl=0.1, min_db=-80.0, mode="A_weighting"
+    ):
         n_fft = round(fs * wl)
 
         if mode == "A_weighting":
@@ -269,17 +277,18 @@ class Wav2VecEncoderModOut(FairseqEncoder):
                 self.a_weight = {}
 
             if fs not in self.a_weight:
+
                 def a_weight(fs, n_fft, min_db=-80.0):
                     freq = np.linspace(0, fs // 2, n_fft // 2 + 1)
-                    freq_sq = freq ** 2
+                    freq_sq = freq**2
                     freq_sq[0] = 1.0
                     weight = 2.0 + 20.0 * (
-                            2 * np.log10(12194)
-                            + 2 * np.log10(freq_sq)
-                            - np.log10(freq_sq + 12194 ** 2)
-                            - np.log10(freq_sq + 20.6 ** 2)
-                            - 0.5 * np.log10(freq_sq + 107.7 ** 2)
-                            - 0.5 * np.log10(freq_sq + 737.9 ** 2)
+                        2 * np.log10(12194)
+                        + 2 * np.log10(freq_sq)
+                        - np.log10(freq_sq + 12194**2)
+                        - np.log10(freq_sq + 20.6**2)
+                        - 0.5 * np.log10(freq_sq + 107.7**2)
+                        - 0.5 * np.log10(freq_sq + 737.9**2)
                     )
                     weight = np.maximum(weight, min_db)
 
@@ -292,7 +301,7 @@ class Wav2VecEncoderModOut(FairseqEncoder):
         sound = sound.unfold(-1, n_fft, n_fft // 2)
 
         if mode == "RMSE":
-            sound = sound ** 2
+            sound = sound**2
             g = sound.mean(-1)
         elif mode == "A_weighting":
             w = torch.hann_window(n_fft, device=sound.device) * sound
@@ -343,21 +352,31 @@ class Wav2VecEncoderModOut(FairseqEncoder):
                     del state["model"][k]
             # print("\n\n\n ########## W2V ARGS ######### \n\n\n", cfg.w2v_args)
             if hasattr(model, "modality_encoders"):
-                if "modality_encoders.{}.encoder_mask".format(self.modality_type) not in state["model"]:
+                if (
+                    "modality_encoders.{}.encoder_mask".format(self.modality_type)
+                    not in state["model"]
+                ):
                     model.modality_encoders[self.modality_type].encoder_mask = None
                 elif not cfg.zero_mask:
                     model.modality_encoders[self.modality_type].encoder_mask = None
-                    del state["model"]["modality_encoders.{}.encoder_mask".format(self.modality_type)]
+                    del state["model"][
+                        "modality_encoders.{}.encoder_mask".format(self.modality_type)
+                    ]
 
                 for k in list(state["model"].keys()):
                     if k.startswith("modality_encoders.") and not k.startswith(
-                            "modality_encoders.{}".format(self.modality_type)
+                        "modality_encoders.{}".format(self.modality_type)
                     ):
                         del state["model"][k]
             load_dict = state["model"]
             model.load_state_dict(state["model"], strict=True)
         logger.info("Loading the following weights:")
-        logger.info(["Key: {}. Having Shape: {}".format(k, v.size()) for k, v in load_dict.items()])
+        logger.info(
+            [
+                "Key: {}. Having Shape: {}".format(k, v.size())
+                for k, v in load_dict.items()
+            ]
+        )
 
     def forward(self, source, padding_mask=None, target=None, **kwargs):
         # we use BC Learning:
@@ -398,9 +417,10 @@ class Wav2VecEncoderModOut(FairseqEncoder):
                         G1 = source.pow(2).mean(dim=-1).sqrt()
                     else:
                         G1, _ = self.compute_gain_torch(
-                            source, mode=self.cfg.gain_mode,
+                            source,
+                            mode=self.cfg.gain_mode,
                             fs=self.cfg.sample_rate,
-                            wl=self.cfg.mixing_window_length
+                            wl=self.cfg.mixing_window_length,
                         ).max(-1)
                         G1 = G1.to(dtype=source.dtype)
 
@@ -417,9 +437,9 @@ class Wav2VecEncoderModOut(FairseqEncoder):
                 mixed = (p * mixed_source) + (1 - p) * s2
 
                 if mix_mask is None:
-                    source = mixed / torch.sqrt(p ** 2 + (1 - p) ** 2)
+                    source = mixed / torch.sqrt(p**2 + (1 - p) ** 2)
                 else:
-                    source[mix_mask] = mixed / torch.sqrt(p ** 2 + (1 - p) ** 2)
+                    source[mix_mask] = mixed / torch.sqrt(p**2 + (1 - p) ** 2)
 
                 if target is not None and self.cfg.target_mixup:
                     r = r.unsqueeze(-1)
@@ -427,7 +447,8 @@ class Wav2VecEncoderModOut(FairseqEncoder):
                         target = target * r + (1 - r) * target[mixup_perm]
                     else:
                         target[mix_mask] = (
-                                target[mix_mask] * r + (1 - r) * target[mixup_perm][mix_mask]
+                            target[mix_mask] * r
+                            + (1 - r) * target[mixup_perm][mix_mask]
                         )
 
         w2v_args = {
@@ -457,10 +478,14 @@ class Wav2VecEncoderModOut(FairseqEncoder):
         else:
             target_layer_results = [l[0] for l in layer_results[-avg_layer:]]
         if not self.is_d2v_multi:  # transpose if w2v
-            target_layer_results = [tl.transpose(0, 1) for tl in target_layer_results]  # TBC -> BTC
+            target_layer_results = [
+                tl.transpose(0, 1) for tl in target_layer_results
+            ]  # TBC -> BTC
         # Average over transformer layers
         try:
-            x = (sum(target_layer_results) / len(target_layer_results)).to(res["x"].dtype)
+            x = (sum(target_layer_results) / len(target_layer_results)).to(
+                res["x"].dtype
+            )
         except ZeroDivisionError as e:
             print("\n len(target_layer_results)", len(target_layer_results))
             print("\n target_layer_results\n\n", target_layer_results)
@@ -478,7 +503,7 @@ class Wav2VecEncoderModOut(FairseqEncoder):
             "encoder_out": x,  # B x T x C
             "padding_mask": padding_mask,  # B x T,
             "layer_results": layer_results,
-            "target": target
+            "target": target,
         }
 
     def set_num_updates(self, num_updates):

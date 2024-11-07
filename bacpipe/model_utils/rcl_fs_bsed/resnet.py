@@ -1,9 +1,12 @@
 import torch.nn as nn
 
+
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
+    return nn.Conv2d(
+        in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False
+    )
+
 
 class BasicBlock(nn.Module):
     expansion = 1
@@ -20,7 +23,6 @@ class BasicBlock(nn.Module):
         self.maxpool = nn.MaxPool2d(stride)
         self.downsample = downsample
         self.stride = stride
-        
 
     def forward(self, x):
 
@@ -42,7 +44,7 @@ class BasicBlock(nn.Module):
         out += residual
         out = self.relu(out)
         out = self.maxpool(out)
-        
+
         return out
 
 
@@ -52,9 +54,9 @@ class ResNet(nn.Module):
         self.inplanes = 1
         super(ResNet, self).__init__()
 
-        self.layer1 = self._make_layer(block, 64, stride=(2,2))
-        self.layer2 = self._make_layer(block, 128, stride=(2,2))
-        self.layer3 = self._make_layer(block, 256, stride=(1,2))
+        self.layer1 = self._make_layer(block, 64, stride=(2, 2))
+        self.layer2 = self._make_layer(block, 128, stride=(2, 2))
+        self.layer3 = self._make_layer(block, 256, stride=(1, 2))
 
         if avg_pool:
             self.avgpool = nn.AvgPool2d(5, stride=1)
@@ -64,7 +66,9 @@ class ResNet(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
+                nn.init.kaiming_normal_(
+                    m.weight, mode="fan_out", nonlinearity="leaky_relu"
+                )
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -73,8 +77,13 @@ class ResNet(nn.Module):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=1, bias=False),
+                nn.Conv2d(
+                    self.inplanes,
+                    planes * block.expansion,
+                    kernel_size=1,
+                    stride=1,
+                    bias=False,
+                ),
                 nn.BatchNorm2d(planes * block.expansion),
             )
 

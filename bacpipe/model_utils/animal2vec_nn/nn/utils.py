@@ -18,9 +18,16 @@ import collections.abc
 import torch.nn as tnn
 import matplotlib.pyplot as plt
 from itertools import repeat, groupby
+
 # from tensorflow.image import decode_png
 from sklearn.metrics import classification_report, average_precision_score
-from scipy.ndimage import gaussian_filter1d, gaussian_laplace, minimum_filter1d, maximum_filter1d
+from scipy.ndimage import (
+    gaussian_filter1d,
+    gaussian_laplace,
+    minimum_filter1d,
+    maximum_filter1d,
+)
+
 # from skimage.filters import threshold_otsu
 # from intervaltree import IntervalTree
 from itertools import product, chain
@@ -39,6 +46,7 @@ from . import SincConv
 try:
     from torch import _assert
 except ImportError:
+
     def _assert(condition: bool, message: str):
         assert condition, message
 
@@ -69,11 +77,15 @@ to_ntuple = _ntuple
 # model = PatchEmbed(patch_size=(96, 2), img_size=(96, 200))
 # print(model(torch.zeros(size=(1, 1, 96, 200))).shape)
 
+
 def get_padding_value(kernel_size):
     kernel_sizes = (kernel_size,)
     from functools import reduce
     from operator import __add__
-    conv_padding = reduce(__add__, [(k // 2 + (k - 2 * (k // 2)) - 1, k // 2) for k in kernel_sizes[::-1]])
+
+    conv_padding = reduce(
+        __add__, [(k // 2 + (k - 2 * (k // 2)) - 1, k // 2) for k in kernel_sizes[::-1]]
+    )
     return conv_padding
 
 
@@ -90,7 +102,9 @@ def get_conv_size(size, k, p, d, s, dim=2):
     if dim == 2:
         if s[0] == s[1] == 1:
             return size
-        ww = np.floor((size[1] + 2 * p[1] - d[1] * (k[1] - 1) - 1) / s[1] + 1).astype(int)
+        ww = np.floor((size[1] + 2 * p[1] - d[1] * (k[1] - 1) - 1) / s[1] + 1).astype(
+            int
+        )
     else:
         if s[0] == 1:
             return size
@@ -98,9 +112,14 @@ def get_conv_size(size, k, p, d, s, dim=2):
     return hh, ww
 
 
-def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
-                     textcolors=("black", "white"),
-                     threshold=None, **textkw):
+def annotate_heatmap(
+    im,
+    data=None,
+    valfmt="{x:.2f}",
+    textcolors=("black", "white"),
+    threshold=None,
+    **textkw,
+):
     """
     A function to annotate a heatmap.
 
@@ -133,12 +152,11 @@ def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
     if threshold is not None:
         threshold = im.norm(threshold)
     else:
-        threshold = im.norm(data.max()) / 2.
+        threshold = im.norm(data.max()) / 2.0
 
     # Set default alignment to center, but allow it to be
     # overwritten by textkw.
-    kw = dict(horizontalalignment="center",
-              verticalalignment="center")
+    kw = dict(horizontalalignment="center", verticalalignment="center")
     kw.update(textkw)
 
     # Get the formatter in case a string is supplied
@@ -188,12 +206,28 @@ def plot_confusion_matrices(confusion_matrix, class_labels=None):
     ax.spines["right"].set_visible(False)
     ax.set_xticks(np.arange(num_classes))
     ax.set_yticks(np.arange(num_classes))
-    ax.text(-.17, .5, "Truth", rotation=90, ha="center", va="center",
-            transform=ax.transAxes, fontsize=30,
-            alpha=0.5)
-    ax.text(.5, -.1, "Prediction", rotation=0, ha="center", va="center",
-            transform=ax.transAxes, fontsize=30,
-            alpha=0.5)
+    ax.text(
+        -0.17,
+        0.5,
+        "Truth",
+        rotation=90,
+        ha="center",
+        va="center",
+        transform=ax.transAxes,
+        fontsize=30,
+        alpha=0.5,
+    )
+    ax.text(
+        0.5,
+        -0.1,
+        "Prediction",
+        rotation=0,
+        ha="center",
+        va="center",
+        transform=ax.transAxes,
+        fontsize=30,
+        alpha=0.5,
+    )
     cl = [c[:5] for c in class_labels]
     ax.set_xticklabels(cl, fontsize=20, alpha=0.25)
     ax.set_yticklabels(cl, fontsize=20, alpha=0.25)
@@ -212,7 +246,9 @@ def stack_to_numpy(tensor_list):
     return out_tensor.detach().cpu().numpy()
 
 
-def log_metrics(tensorboard_writer_method, model, stats, cfg, num_updates, train_str="train"):
+def log_metrics(
+    tensorboard_writer_method, model, stats, cfg, num_updates, train_str="train"
+):
     with torch.inference_mode():
         unique_labels = eval(cfg.task.unique_labels)
         use_segs = cfg.criterion.segmentation_metrics
@@ -222,13 +258,20 @@ def log_metrics(tensorboard_writer_method, model, stats, cfg, num_updates, train
             source_size = stats["_source_size"].val
 
         preds = np.where(probs < cfg.criterion.metric_threshold, 0, 1)
-        report = pandas.DataFrame(classification_report(labels.reshape(-1, labels.shape[-1]),
-                                                        preds.reshape(-1, preds.shape[-1]),
-                                                        target_names=unique_labels,
-                                                        zero_division=0,
-                                                        output_dict=True)).transpose()
-        logger.info("\n[Step {:06.0f}] Report on frame-wise metrics with {} as threshold:\n".format(
-            num_updates, cfg.criterion.metric_threshold))
+        report = pandas.DataFrame(
+            classification_report(
+                labels.reshape(-1, labels.shape[-1]),
+                preds.reshape(-1, preds.shape[-1]),
+                target_names=unique_labels,
+                zero_division=0,
+                output_dict=True,
+            )
+        ).transpose()
+        logger.info(
+            "\n[Step {:06.0f}] Report on frame-wise metrics with {} as threshold:\n".format(
+                num_updates, cfg.criterion.metric_threshold
+            )
+        )
         logger.info(report.to_markdown(tablefmt="rounded_outline"))
 
         if use_segs:
@@ -254,18 +297,27 @@ def log_metrics(tensorboard_writer_method, model, stats, cfg, num_updates, train
                 {
                     "target": torch.tensor(labels),
                     "seg_target_idx": seg_target_idx,
-                    "source_size": source_size
+                    "source_size": source_size,
                 },
-                torch.tensor(probs), method_dict,
-                method=cfg.criterion.method
+                torch.tensor(probs),
+                method_dict,
+                method=cfg.criterion.method,
             )
             seg_preds = np.where(pr < cfg.criterion.metric_threshold, 0, 1)
-            seg_report = pandas.DataFrame(classification_report(ta, seg_preds,
-                                                                target_names=unique_labels,
-                                                                zero_division=0,
-                                                                output_dict=True)).transpose()
-            logger.info("\n[Step {:06.0f}] Report on segmented metrics with {} as threshold:\n".format(
-                num_updates, cfg.criterion.metric_threshold))
+            seg_report = pandas.DataFrame(
+                classification_report(
+                    ta,
+                    seg_preds,
+                    target_names=unique_labels,
+                    zero_division=0,
+                    output_dict=True,
+                )
+            ).transpose()
+            logger.info(
+                "\n[Step {:06.0f}] Report on segmented metrics with {} as threshold:\n".format(
+                    num_updates, cfg.criterion.metric_threshold
+                )
+            )
             logger.info(seg_report.to_markdown(tablefmt="rounded_outline"))
 
         labels = labels.reshape(-1, labels.shape[-1])
@@ -273,18 +325,16 @@ def log_metrics(tensorboard_writer_method, model, stats, cfg, num_updates, train
         if callable(tensorboard_writer_method) and cfg.task.with_labels:
 
             tensorboard_writer = tensorboard_writer_method(train_str)
-            tensorboard_writer.add_pr_curve("micro_average",
-                                            labels,
-                                            probs,
-                                            global_step=num_updates)
+            tensorboard_writer.add_pr_curve(
+                "micro_average", labels, probs, global_step=num_updates
+            )
             map = average_precision_score(labels, probs)
             tensorboard_writer.add_scalar("mAP", map, num_updates)
 
             if use_segs:
-                tensorboard_writer.add_pr_curve("segmented_micro_average",
-                                                ta,
-                                                pr,
-                                                global_step=num_updates)
+                tensorboard_writer.add_pr_curve(
+                    "segmented_micro_average", ta, pr, global_step=num_updates
+                )
                 seg_map = average_precision_score(ta, pr)
                 tensorboard_writer.add_scalar("segmented_mAP", seg_map, num_updates)
 
@@ -294,46 +344,68 @@ def log_metrics(tensorboard_writer_method, model, stats, cfg, num_updates, train
             for class_idx, z in enumerate(zip(*zip_it)):
                 tensorboard_writer.add_pr_curve(
                     "class_{}_{}".format(class_idx, unique_labels[class_idx]),
-                    z[0], z[1], global_step=num_updates)
+                    z[0],
+                    z[1],
+                    global_step=num_updates,
+                )
                 if use_segs:
                     tensorboard_writer.add_pr_curve(
                         "seg_class_{}_{}".format(class_idx, unique_labels[class_idx]),
-                        z[2], z[3], global_step=num_updates)
+                        z[2],
+                        z[3],
+                        global_step=num_updates,
+                    )
 
-                    to_hist = z[4][z[4] != 0].detach().cpu().numpy().squeeze()  # non-zero IoUs
+                    to_hist = (
+                        z[4][z[4] != 0].detach().cpu().numpy().squeeze()
+                    )  # non-zero IoUs
                     if to_hist.size > 1:  # we need at least two elements
                         # For binning we use sklearns’ default, which is the
                         # maximum of the ‘Sturges’ and ‘Freedman Diaconis’ estimators
-                        tensorboard_writer.add_histogram("iou_{}_{}".format(class_idx, unique_labels[class_idx]),
-                                                         to_hist,
-                                                         global_step=num_updates,
-                                                         bins='auto')
-                    to_hist = z[5][z[5] != 0].detach().cpu().numpy().squeeze()  # non-zero splits
+                        tensorboard_writer.add_histogram(
+                            "iou_{}_{}".format(class_idx, unique_labels[class_idx]),
+                            to_hist,
+                            global_step=num_updates,
+                            bins="auto",
+                        )
+                    to_hist = (
+                        z[5][z[5] != 0].detach().cpu().numpy().squeeze()
+                    )  # non-zero splits
                     if to_hist.size > 1:  # we need at least two elements
                         # for splits and mergers, we use the nr. of unique vals as number of bins,
                         # as they are integer arrays, where we want a bin for every split and merger that happened.
-                        tensorboard_writer.add_histogram("splits_{}_{}".format(class_idx, unique_labels[class_idx]),
-                                                         to_hist,
-                                                         global_step=num_updates,
-                                                         bins=len(np.unique(to_hist)))
-                    to_hist = z[6][z[6] != 0].detach().cpu().numpy().squeeze()  # non-zero mergers
+                        tensorboard_writer.add_histogram(
+                            "splits_{}_{}".format(class_idx, unique_labels[class_idx]),
+                            to_hist,
+                            global_step=num_updates,
+                            bins=len(np.unique(to_hist)),
+                        )
+                    to_hist = (
+                        z[6][z[6] != 0].detach().cpu().numpy().squeeze()
+                    )  # non-zero mergers
                     if to_hist.size > 1:  # we need at least two elements
-                        tensorboard_writer.add_histogram("merged_{}_{}".format(class_idx, unique_labels[class_idx]),
-                                                         to_hist,
-                                                         global_step=num_updates,
-                                                         bins=len(np.unique(to_hist)))
+                        tensorboard_writer.add_histogram(
+                            "merged_{}_{}".format(class_idx, unique_labels[class_idx]),
+                            to_hist,
+                            global_step=num_updates,
+                            bins=len(np.unique(to_hist)),
+                        )
 
             for k, v in report.items():
                 if k in ["precision", "recall"]:
                     for kk, vv in v.items():
-                        tensorboard_writer.add_scalar("metrics/{}_{}".format(k, kk), vv,
-                                                      global_step=num_updates)
+                        tensorboard_writer.add_scalar(
+                            "metrics/{}_{}".format(k, kk), vv, global_step=num_updates
+                        )
             if use_segs:
                 for k, v in seg_report.items():
                     if k in ["precision", "recall"]:
                         for kk, vv in v.items():
-                            tensorboard_writer.add_scalar("metrics/segmented_{}_{}".format(k, kk), vv,
-                                                          global_step=num_updates)
+                            tensorboard_writer.add_scalar(
+                                "metrics/segmented_{}_{}".format(k, kk),
+                                vv,
+                                global_step=num_updates,
+                            )
             # mat = net_output["layer_results"]  # Heads x B x T x C
             # mat = mat.clone().detach().sum() / len(mat)  # Heads x B x T x C -> B x T x C
             # one_hot_labels = torch.tensor(labels).reshape([-1, len(unique_labels)]).argmax(-1)
@@ -346,7 +418,10 @@ def log_metrics(tensorboard_writer_method, model, stats, cfg, num_updates, train
         else:
             print(
                 "\n[Step {:06.0f}] We don't have a callable tensorboard_writer, so nothing is written out:\n".format(
-                    num_updates, cfg.criterion.metric_threshold), flush=True)
+                    num_updates, cfg.criterion.metric_threshold
+                ),
+                flush=True,
+            )
 
 
 def get_2d_sincos_pos_embed(embed_dim, grid_size, cls_token=False):
@@ -387,7 +462,7 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     assert embed_dim % 2 == 0
     omega = np.arange(embed_dim // 2, dtype=np.float64)
     omega /= embed_dim / 2.0
-    omega = 1.0 / 10000 ** omega  # (D/2,)
+    omega = 1.0 / 10000**omega  # (D/2,)
 
     pos = pos.reshape(-1)  # (M,)
     out = np.einsum("m,d->md", pos, omega)  # (M, D/2), outer product
@@ -409,10 +484,14 @@ def pad_left_right(signal, time, right_pad=False, length_given=False):
         return signal
     if right_pad:
         size_diff = time_len - signal.size(0)
-        padded_signal = torch.nn.functional.pad(signal, (0, size_diff), "constant", 0)[:len(time)]
+        padded_signal = torch.nn.functional.pad(signal, (0, size_diff), "constant", 0)[
+            : len(time)
+        ]
     else:
         size_diff = np.ceil((time_len - signal.size(0)) / 2).astype(int)
-        padded_signal = torch.nn.functional.pad(signal, (size_diff, size_diff), "constant", 0)[:len(time)]
+        padded_signal = torch.nn.functional.pad(
+            signal, (size_diff, size_diff), "constant", 0
+        )[: len(time)]
     return padded_signal
 
 
@@ -420,21 +499,24 @@ def get_intervalls(data, shift=0):
     # Group the array in segments with itertools groupby function
     grouped = (list(g) for _, g in groupby(enumerate(data), lambda t: t[1]))
     # Only add the interval if it is with values larger than 0
-    return [(g[0][0] + shift, min([len(data) - 1, g[-1][0] + shift])) for g in grouped if g[0][1] == 1]
+    return [
+        (g[0][0] + shift, min([len(data) - 1, g[-1][0] + shift]))
+        for g in grouped
+        if g[0][1] == 1
+    ]
 
 
 def avg_pooling(time, preds, method_dict):
     # Do the average pooling
     kernel_size = round(method_dict["fe_sample_rate"] * method_dict["sigma_s"])
-    avg_pool_op = torch.nn.AvgPool1d(
-        kernel_size=kernel_size,
-        stride=1
-    )
+    avg_pool_op = torch.nn.AvgPool1d(kernel_size=kernel_size, stride=1)
     avg_pooled_preds = avg_pool_op(preds.view(1, 1, -1))
     # Pad right with zeros to preserve array shape
     windowed_regions = pad_left_right(avg_pooled_preds.view(-1), time, right_pad=True)
     # Threshold to step function
-    flattened_regions = torch.where(windowed_regions < method_dict["metric_threshold"], 0., 1.)
+    flattened_regions = torch.where(
+        windowed_regions < method_dict["metric_threshold"], 0.0, 1.0
+    )
     # return intervals of ones
     return get_intervalls(flattened_regions, round(kernel_size / 2))
 
@@ -442,15 +524,14 @@ def avg_pooling(time, preds, method_dict):
 def max_pooling(time, preds, method_dict):
     # Do the average pooling
     kernel_size = round(method_dict["fe_sample_rate"] * method_dict["sigma_s"])
-    max_pool_op = torch.nn.MaxPool1d(
-        kernel_size=kernel_size,
-        stride=1
-    )
+    max_pool_op = torch.nn.MaxPool1d(kernel_size=kernel_size, stride=1)
     max_pooled_preds = max_pool_op(preds.view(1, 1, -1))
     # Pad right with zeros to preserve array shape
     windowed_regions = pad_left_right(max_pooled_preds.view(-1), time, right_pad=True)
     # Threshold to step function
-    flattened_regions = torch.where(windowed_regions < method_dict["metric_threshold"], 0., 1.)
+    flattened_regions = torch.where(
+        windowed_regions < method_dict["metric_threshold"], 0.0, 1.0
+    )
     # return intervals of ones
     return get_intervalls(flattened_regions, round(kernel_size / 2))
 
@@ -476,7 +557,7 @@ def fuse_to_segmented_predictions(time, preds, method_dict, method="avg"):
         idx_intervals = canny(
             time.clone().detach().cpu().numpy(),
             preds.clone().detach().cpu().numpy(),
-            method_dict
+            method_dict,
         )
     else:
         raise NotImplementedError("{} method not implemented".format(method))
@@ -515,10 +596,10 @@ def filter_indicators(signal, indicator, select=np.argmax, debug=False):
     start = None
     for idx in locations:
         if debug:
-            print(f'{idx} last {last}, {idx - last} : {idx - last > 1}')
+            print(f"{idx} last {last}, {idx - last} : {idx - last > 1}")
         if idx - last > 1:
             if start is not None:
-                stat_idx = select(signal[start:idx + 1])
+                stat_idx = select(signal[start : idx + 1])
                 ind_list.append(start + stat_idx)
             current = start = idx
         else:
@@ -528,7 +609,7 @@ def filter_indicators(signal, indicator, select=np.argmax, debug=False):
 
     # Handle last one
     if start is not None:
-        stat_idx = select(signal[start:locations[-1]])
+        stat_idx = select(signal[start : locations[-1]])
         ind_list.append(start + stat_idx)
 
     return ind_list
@@ -549,9 +630,9 @@ def canny(time_s, signal, method_dict):
     :param plot:  Plots to aid in interpretation
     :return:  regions of signal as Nx2 matrix of indices
     """
-    sigma_s = method_dict["sigma_s"],
-    maxfilt_s = method_dict["maxfilt_s"],
-    max_duration_s = method_dict["max_duration_s"],
+    sigma_s = (method_dict["sigma_s"],)
+    maxfilt_s = (method_dict["maxfilt_s"],)
+    max_duration_s = (method_dict["max_duration_s"],)
     lowP = method_dict["lowP"]
     N = signal.shape[0]
     adv_s = time_s[1] - time_s[0]
@@ -566,7 +647,7 @@ def canny(time_s, signal, method_dict):
 
     # Set the threshold to minimize the intra-class variance on a 2 class
     # problem (Otsu's method)
-    tau = 0#threshold_otsu(mag) BUG: threshold_otsu is not defined
+    tau = 0  # threshold_otsu(mag) BUG: threshold_otsu is not defined
 
     # indicator functions for where we exceed threshold
     # We store filter outputs that we might need again
@@ -593,8 +674,8 @@ def canny(time_s, signal, method_dict):
 
     # Find the points in min_list that are on either side of the max_list
     # Sometimes, these will be too far away
-    left = np.searchsorted(min_values, max_values, side='left') - 1
-    right = np.searchsorted(min_values, max_values, side='right')
+    left = np.searchsorted(min_values, max_values, side="left") - 1
+    right = np.searchsorted(min_values, max_values, side="right")
     intervals = np.vstack((min_values[left], min_values[right])).T
 
     # Some intervals will be duplicates due to multiple local maxima
@@ -604,7 +685,7 @@ def canny(time_s, signal, method_dict):
     # restrict the duration
     durations = np.diff(intervals, axis=1)
     if np.any(durations <= 0):
-        print('<=0 len assertions')
+        print("<=0 len assertions")
     maxN = max_values.size
     removeI = np.zeros((maxN,), dtype=np.bool_)
     idx = 1
@@ -619,7 +700,7 @@ def canny(time_s, signal, method_dict):
             # Peaks (max_values) between first:last resulted in duplicate ranges
             # due to undetected minima.  Merge peaks that are close to one
             # another and split the interval on ones that are farther apart
-            peaks = max_values[first:last + 1]
+            peaks = max_values[first : last + 1]
             spacing = np.diff(peaks)
             for current in range(len(spacing)):
                 target = first + current
@@ -641,8 +722,9 @@ def canny(time_s, signal, method_dict):
                 else:
                     # Remove smaller peak
                     # next_pk is True means second peak is larger
-                    next_pk = smoothed[max_values[target + 1]] > \
-                              smoothed[max_values[target]]
+                    next_pk = (
+                        smoothed[max_values[target + 1]] > smoothed[max_values[target]]
+                    )
                     # smaller treated as 0/1 offset
                     removeI[target + next_pk] = True
         idx += 1
@@ -656,7 +738,7 @@ def canny(time_s, signal, method_dict):
     # or we hit the next detection
     durations = np.diff(intervals, axis=1)
     if np.any(durations <= 0):
-        print('<=0 len assertions')
+        print("<=0 len assertions")
 
     too_long = np.where(durations * adv_s > max_duration_s)[0]
     if len(too_long):
@@ -681,7 +763,7 @@ def canny(time_s, signal, method_dict):
             intervals[idx, :] = [left_idx, right_idx]
 
     if np.any(durations <= 0):
-        print('<=0 len assertions')
+        print("<=0 len assertions")
 
     return intervals
 
@@ -707,12 +789,13 @@ class FusedSegmentationMixin:
         if both_seq_len != overlap:
             return overlap / (both_seq_len - overlap)
         else:
-            return 1.
+            return 1.0
 
-    def get_segmented_probs_and_targets(self, sample, probs, method_dict,
-                                        method="avg", focal_only=False):
+    def get_segmented_probs_and_targets(
+        self, sample, probs, method_dict, method="avg", focal_only=False
+    ):
         targets = sample["target"]
-        if False:#targets.dim() == probs.dim(): BUG IntervalTree is not defined
+        if False:  # targets.dim() == probs.dim(): BUG IntervalTree is not defined
             # The indices where an event happens in the target
             fused_targets = sample["seg_target_idx"]
             # Estimate these boundaries using the fuse_predict routine
@@ -720,7 +803,7 @@ class FusedSegmentationMixin:
                 sample_size=sample["source_size"],
                 probs=probs,
                 method_dict=method_dict,
-                method=method
+                method=method,
             )
             input_size = targets.size()
             # print(input_size)
@@ -739,12 +822,12 @@ class FusedSegmentationMixin:
             # of the framewise one -> 8 in this example.
 
             # Fill with 0
-            seg_target = torch.full(input_size,
-                                    fill_value=0, dtype=torch.long,
-                                    device=probs.device)
-            seg_probs = torch.full(input_size,
-                                   fill_value=0, dtype=torch.float,
-                                   device=probs.device)
+            seg_target = torch.full(
+                input_size, fill_value=0, dtype=torch.long, device=probs.device
+            )
+            seg_probs = torch.full(
+                input_size, fill_value=0, dtype=torch.float, device=probs.device
+            )
 
             # The max array size for 'seg_overlap_sizes' is half of the time axis
             # This is only reached if there is perfect overlap between preds and
@@ -756,9 +839,12 @@ class FusedSegmentationMixin:
             # and targets                                     [(0,1),(2,3),(4,5),(6,7)]
             # Only then we would end up with a 'seg_overlap_sizes' array with half the length
             # of the framewise one -> 4 in this example.
-            seg_iou = torch.full((bs, round(time / 2), num_classes),
-                                 fill_value=0, dtype=torch.float,
-                                 device=probs.device)
+            seg_iou = torch.full(
+                (bs, round(time / 2), num_classes),
+                fill_value=0,
+                dtype=torch.float,
+                device=probs.device,
+            )
 
             # We also track the number of times where a ground truth segment was predicted as
             # two, or more, predicted segments (splits), or when a predicted segment covered
@@ -768,12 +854,18 @@ class FusedSegmentationMixin:
             # split by the predictions / targets, like:
             # Pred:     1 1 1 0 1 1 1 0
             # Target:   1 0 1 0 1 0 1 0
-            seg_splits = torch.full((bs, int(np.floor(time / 3) * 2), num_classes),
-                                    fill_value=0, dtype=torch.long,
-                                    device=probs.device)
-            seg_mergers = torch.full((bs, int(np.floor(time / 3) * 2), num_classes),
-                                     fill_value=0, dtype=torch.long,
-                                     device=probs.device)
+            seg_splits = torch.full(
+                (bs, int(np.floor(time / 3) * 2), num_classes),
+                fill_value=0,
+                dtype=torch.long,
+                device=probs.device,
+            )
+            seg_mergers = torch.full(
+                (bs, int(np.floor(time / 3) * 2), num_classes),
+                fill_value=0,
+                dtype=torch.long,
+                device=probs.device,
+            )
 
             # Iterate across all classes in all samples
             for b, c in product(range(bs), range(num_classes)):
@@ -802,7 +894,9 @@ class FusedSegmentationMixin:
                     fu_pr.append(p_)
                 fused_preds[b][c] = fu_pr
                 ground_truth = IntervalTree.from_tuples(fused_targets[b][c])
-                predictions = IntervalTree.from_tuples([[x - (b * time) for x in tu] for tu in fused_preds[b][c]])
+                predictions = IntervalTree.from_tuples(
+                    [[x - (b * time) for x in tu] for tu in fused_preds[b][c]]
+                )
                 for x_gt in ground_truth:  # iterate through the ground truth
                     ol_pr = predictions.overlap(x_gt)
                     len_ol = len(ol_pr)
@@ -816,24 +910,30 @@ class FusedSegmentationMixin:
                             seg_iou[b, bi, c] = self.get_iou(x_gt, o)
 
                             # check if we have a high enough IoU to be counted as prediction
-                            positive_pred = seg_iou[b, bi, c] > method_dict["iou_threshold"]
+                            positive_pred = (
+                                seg_iou[b, bi, c] > method_dict["iou_threshold"]
+                            )
 
                             # if IoU is high enough and highest_likelihood is true
                             if positive_pred:
                                 valid_overlaps += 1  # true positive(s)
                                 seg_target[b, si, c] = 1
-                                seg_probs[b, si, c] = probs[b, o[0]: o[1], c].mean()
+                                seg_probs[b, si, c] = probs[b, o[0] : o[1], c].mean()
                             else:  # false positive(s), as IoU was not enough
                                 seg_target[b, si, c] = 0
-                                seg_probs[b, si, c] = probs[b, x_gt[0]: x_gt[1], c].mean()
+                                seg_probs[b, si, c] = probs[
+                                    b, x_gt[0] : x_gt[1], c
+                                ].mean()
                         if valid_overlaps > 1:  # we have a valid split
                             soi += 1
-                            seg_splits[b, soi, c] += valid_overlaps  # multiple preds for a single truth -> splits
+                            seg_splits[
+                                b, soi, c
+                            ] += valid_overlaps  # multiple preds for a single truth -> splits
 
                     else:  # current pred has no overlap with truth -> this is a false negative
                         si += 1
                         seg_target[b, si, c] = 1
-                        seg_probs[b, si, c] = probs[b, x_gt[0]: x_gt[1], c].mean()
+                        seg_probs[b, si, c] = probs[b, x_gt[0] : x_gt[1], c].mean()
 
                 for x_pr in predictions:  # iterate through all predictions
                     ol_gt = ground_truth.overlap(x_pr)
@@ -846,19 +946,30 @@ class FusedSegmentationMixin:
                                 valid_overlaps += 1
                         if valid_overlaps > 1:  # we have valid mergers
                             smi += 1
-                            seg_mergers[b, smi, c] += valid_overlaps  # multiple truths for a single preds -> merge
+                            seg_mergers[
+                                b, smi, c
+                            ] += valid_overlaps  # multiple truths for a single preds -> merge
 
-                    if len_ol == 0:  # truth has no overlap with pred -> this is a false positive
+                    if (
+                        len_ol == 0
+                    ):  # truth has no overlap with pred -> this is a false positive
                         si += 1
                         seg_target[b, si, c] = 0
-                        seg_probs[b, si, c] = probs[b, x_pr[0]: x_pr[1], c].mean()
+                        seg_probs[b, si, c] = probs[b, x_pr[0] : x_pr[1], c].mean()
 
-            return (self.prepare_shapes(x, False) for x in (seg_probs, seg_target, seg_iou, seg_splits, seg_mergers))
+            return (
+                self.prepare_shapes(x, False)
+                for x in (seg_probs, seg_target, seg_iou, seg_splits, seg_mergers)
+            )
         else:
-            raise NotImplementedError("'get_segmented_logits_and_targets' is currently"
-                                      "only implemented for non-one-hot targets")
+            raise NotImplementedError(
+                "'get_segmented_logits_and_targets' is currently"
+                "only implemented for non-one-hot targets"
+            )
 
-    def fuse_predict(self, sample_size, probs, method_dict, method="avg", multiplier=0, bs=None):
+    def fuse_predict(
+        self, sample_size, probs, method_dict, method="avg", multiplier=0, bs=None
+    ):
         # Build the time vector and reshape to account for a single file that is
         # sharded into a single batch
         # the base time is the overal length of a single segment (Default is 10s) times the number in the batch
@@ -877,15 +988,21 @@ class FusedSegmentationMixin:
             start_time = base_time * (0 + multiplier)
         end_time = base_time + start_time
         time_vector_length = probs.size(0) * probs.size(1)
-        time = torch.linspace(start_time, end_time, time_vector_length).view(probs.size(0), -1)
+        time = torch.linspace(start_time, end_time, time_vector_length).view(
+            probs.size(0), -1
+        )
 
         start_index = time_vector_length * (0 + multiplier)
         end_index = time_vector_length * (1 + multiplier)
         indexes = torch.arange(start_index, end_index).view(probs.size(0), -1)
         # Update the dictionary for the fusing routine
         fe_sample_rate = probs.size(1) / sample_size * self.cfg.sample_rate
-        method_dict.update({"fe_sample_rate": fe_sample_rate})  # Sampling rate of the feature extractor
-        method_dict.update({"sample_rate": self.cfg.sample_rate})  # Sampling rate of the original data
+        method_dict.update(
+            {"fe_sample_rate": fe_sample_rate}
+        )  # Sampling rate of the feature extractor
+        method_dict.update(
+            {"sample_rate": self.cfg.sample_rate}
+        )  # Sampling rate of the original data
 
         # This is the kernel size for all methods, if a sample is
         # smaller than that, we continue
@@ -900,22 +1017,26 @@ class FusedSegmentationMixin:
             if bp.dim() == 2:
                 for class_probs in bp.t():
                     ti, ii = fuse_to_segmented_predictions(
-                        bt, class_probs, method_dict, method=method)
+                        bt, class_probs, method_dict, method=method
+                    )
                     bti.append(ti)
                     # print("\n ii", ii)
                     # print("\n ind", ind)
                     # print("\n ind", ind)
                     # print("\n len(ind)", len(ind))
                     bii.append([[ind[x] for x in y] for y in ii])
-                    bli.append([class_probs[y[0]:y[1]].mean() for y in ii])
+                    bli.append([class_probs[y[0] : y[1]].mean() for y in ii])
             elif bp.dim() == 1:
                 ti, ii = fuse_to_segmented_predictions(
-                    bt, bp, method_dict, method=method)  # time intervals is in seconds
+                    bt, bp, method_dict, method=method
+                )  # time intervals is in seconds
                 bti.append(ti)
                 bii.append([[ind[x] for x in y] for y in ii])
-                bli.append([bp[y[0]:y[1]].mean() for y in ii])
+                bli.append([bp[y[0] : y[1]].mean() for y in ii])
             else:
-                raise NotImplementedError("Input dimensionality of {} is not supported".format(probs.dim()))
+                raise NotImplementedError(
+                    "Input dimensionality of {} is not supported".format(probs.dim())
+                )
             time_intervals.append(bti)
             idx_intervals.append(bii)
             likelihoods.append(bli)
@@ -924,7 +1045,7 @@ class FusedSegmentationMixin:
 
 
 def confusion(prediction, truth):
-    """ Returns the confusion matrix for the values in the `prediction` and `truth`
+    """Returns the confusion matrix for the values in the `prediction` and `truth`
     tensors, i.e. the amount of positions where the values of `prediction`
     and `truth` are
     - 1 and 1 (True Positive)
@@ -943,14 +1064,19 @@ def confusion(prediction, truth):
         #   0     where prediction is 0 and truth is 1 (False Negative)
 
         true_positives = torch.sum(confusion_vector == 1).item()
-        false_positives = torch.sum(confusion_vector == float('inf')).item()
+        false_positives = torch.sum(confusion_vector == float("inf")).item()
         true_negatives = torch.sum(torch.isnan(confusion_vector)).item()
         false_negatives = torch.sum(confusion_vector == 0).item()
 
         return true_positives, false_positives, true_negatives, false_negatives
 
     # did we pass multi class or not
-    tp, fp, tn, fn = 0, 0, 0, 0,
+    tp, fp, tn, fn = (
+        0,
+        0,
+        0,
+        0,
+    )
     if prediction.dim() == 2 and truth.dim() == 2:
         for pc, tc in zip(prediction.t(), truth.t()):  # iterate through the classes
             conf = conf_single_dim(pc, tc)
@@ -969,11 +1095,13 @@ def confusion(prediction, truth):
     return tp, fp, tn, fn
 
 
-def sigmoid_focal_loss(inputs: torch.Tensor,
-                       targets: torch.Tensor,
-                       alpha: float = 0.25,
-                       gamma: float = 2,
-                       reduction: str = "none") -> torch.Tensor:
+def sigmoid_focal_loss(
+    inputs: torch.Tensor,
+    targets: torch.Tensor,
+    alpha: float = 0.25,
+    gamma: float = 2,
+    reduction: str = "none",
+) -> torch.Tensor:
     """
     Loss used in RetinaNet for dense detection: https://arxiv.org/abs/1708.02002.
     Args:
@@ -995,7 +1123,9 @@ def sigmoid_focal_loss(inputs: torch.Tensor,
     inputs = inputs.float()
     targets = targets.float()
     p = torch.sigmoid(inputs)
-    ce_loss = tnn.functional.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+    ce_loss = tnn.functional.binary_cross_entropy_with_logits(
+        inputs, targets, reduction="none"
+    )
     p_t = p * targets + (1 - p) * (1 - targets)
     loss = ce_loss * ((1 - p_t) ** gamma)
 
@@ -1038,38 +1168,38 @@ class ConcatTensorMeter(Meter):
 
     @property
     def smoothed_value(self) -> float:
-        return 0.  # return a dummy value
+        return 0.0  # return a dummy value
 
 
 class ConvFeatureExtractionModel(tnn.Module):
     def __init__(
-            self,
-            conv_layers,
-            dropout: float = 0.0,
-            mode: str = "default",
-            conv_bias: bool = False,
-            sinc_input: bool = False,
-            apply_window_to_root: bool = False,
-            sample_rate=8000,
-            sinc_norm="layer_norm",
-            use_pswish=False
+        self,
+        conv_layers,
+        dropout: float = 0.0,
+        mode: str = "default",
+        conv_bias: bool = False,
+        sinc_input: bool = False,
+        apply_window_to_root: bool = False,
+        sample_rate=8000,
+        sinc_norm="layer_norm",
+        use_pswish=False,
     ):
         super().__init__()
         self.apply_window_to_root = apply_window_to_root
         assert mode in {"default", "layer_norm"}
 
         def block(
-                n_in,
-                n_out,
-                k,
-                stride,
-                is_layer_norm=False,
-                is_group_norm=False,
-                conv_bias=False,
-                sinc_input=False,
-                apply_window_to_root=False,
-                sinc_norm="layer_norm",
-                use_pswish=False
+            n_in,
+            n_out,
+            k,
+            stride,
+            is_layer_norm=False,
+            is_group_norm=False,
+            conv_bias=False,
+            sinc_input=False,
+            apply_window_to_root=False,
+            sinc_norm="layer_norm",
+            use_pswish=False,
         ):
             def make_conv():
                 if sinc_input or apply_window_to_root:
@@ -1080,28 +1210,36 @@ class ConvFeatureExtractionModel(tnn.Module):
                         sample_rate=sample_rate,
                         learnable_filters=apply_window_to_root and sinc_input,
                         apply_window_to_root=apply_window_to_root,
-                        return_abs=True if (sinc_norm == "pcen" or sinc_norm == "instance") else False
+                        return_abs=(
+                            True
+                            if (sinc_norm == "pcen" or sinc_norm == "instance")
+                            else False
+                        ),
                     )
                 else:
                     conv = tnn.Conv1d(
-                        n_in, n_out, k,
+                        n_in,
+                        n_out,
+                        k,
                         stride=stride,
                         bias=conv_bias,
-                        padding="same" if stride == 1 else np.ceil(stride / 2).astype(int)
+                        padding=(
+                            "same" if stride == 1 else np.ceil(stride / 2).astype(int)
+                        ),
                     )
                     tnn.init.kaiming_normal_(conv.weight)
                 return conv
 
             assert (
-                           is_layer_norm and is_group_norm
-                   ) == False, "layer norm and group norm are exclusive"
+                is_layer_norm and is_group_norm
+            ) == False, "layer norm and group norm are exclusive"
 
             if sinc_norm == "pcen":
                 _norm_ = Fp32PCEN(dim)
             elif sinc_norm == "instance":
-                _norm_ = Fp32InstanceNorm(dim, affine=True,
-                                          track_running_stats=False,
-                                          transpose_last=True)
+                _norm_ = Fp32InstanceNorm(
+                    dim, affine=True, track_running_stats=False, transpose_last=True
+                )
             else:
                 _norm_ = Fp32LayerNorm(dim, elementwise_affine=True)
 
@@ -1114,7 +1252,11 @@ class ConvFeatureExtractionModel(tnn.Module):
                         _norm_,
                         TransposeLast(),
                     ),
-                    PSwish(num_features=n_out) if ((sinc_input or apply_window_to_root) and use_pswish) else tnn.GELU(),
+                    (
+                        PSwish(num_features=n_out)
+                        if ((sinc_input or apply_window_to_root) and use_pswish)
+                        else tnn.GELU()
+                    ),
                 )
             elif is_group_norm:
                 return tnn.Sequential(
@@ -1124,11 +1266,7 @@ class ConvFeatureExtractionModel(tnn.Module):
                     tnn.GELU(),
                 )
             else:
-                return tnn.Sequential(
-                    make_conv(),
-                    tnn.Dropout(p=dropout),
-                    tnn.GELU()
-                )
+                return tnn.Sequential(make_conv(), tnn.Dropout(p=dropout), tnn.GELU())
 
         in_d = 1
         self.conv_layers = tnn.ModuleList()
@@ -1148,7 +1286,7 @@ class ConvFeatureExtractionModel(tnn.Module):
                     sinc_input=sinc_input and i == 0,
                     apply_window_to_root=apply_window_to_root and i == 0,
                     sinc_norm=sinc_norm if i == 0 else "layer_norm",
-                    use_pswish=use_pswish
+                    use_pswish=use_pswish,
                 )
             )
             in_d = dim
@@ -1226,16 +1364,16 @@ class PCEN(torch.nn.Module):
     """
 
     def __init__(
-            self,
-            input_size,
-            alpha: float = 0.96,
-            smooth_coef: float = 0.04,
-            delta: float = 2.0,
-            root: float = 2.0,
-            floor: float = 1e-12,
-            trainable: bool = True,
-            per_channel_smooth_coef: bool = True,
-            skip_transpose: bool = False,
+        self,
+        input_size,
+        alpha: float = 0.96,
+        smooth_coef: float = 0.04,
+        delta: float = 2.0,
+        root: float = 2.0,
+        floor: float = 1e-12,
+        trainable: bool = True,
+        per_channel_smooth_coef: bool = True,
+        skip_transpose: bool = False,
     ):
         super(PCEN, self).__init__()
         self._smooth_coef = smooth_coef
@@ -1273,16 +1411,20 @@ class PCEN(torch.nn.Module):
         """
         if not self.skip_transpose:
             x = x.transpose(1, -1)
-        alpha = torch.min(self.alpha.to(dtype=x.dtype, device=x.device),
-                          torch.tensor(1.0, dtype=x.dtype, device=x.device))
-        root = torch.max(self.root.to(dtype=x.dtype, device=x.device),
-                         torch.tensor(1.0, dtype=x.dtype, device=x.device))
+        alpha = torch.min(
+            self.alpha.to(dtype=x.dtype, device=x.device),
+            torch.tensor(1.0, dtype=x.dtype, device=x.device),
+        )
+        root = torch.max(
+            self.root.to(dtype=x.dtype, device=x.device),
+            torch.tensor(1.0, dtype=x.dtype, device=x.device),
+        )
         ema_smoother = self.ema(x)
         one_over_root = 1.0 / root
         output = (
-                         x / (self._floor + ema_smoother) ** alpha.view(1, -1, 1)
-                         + self.delta.view(1, -1, 1)
-                 ) ** one_over_root.view(1, -1, 1) - self.delta.view(
+            x / (self._floor + ema_smoother) ** alpha.view(1, -1, 1)
+            + self.delta.view(1, -1, 1)
+        ) ** one_over_root.view(1, -1, 1) - self.delta.view(
             1, -1, 1
         ) ** one_over_root.view(
             1, -1, 1
@@ -1326,12 +1468,12 @@ class ExponentialMovingAverage(torch.nn.Module):
     """
 
     def __init__(
-            self,
-            input_size: int,
-            coeff_init: float = 0.04,
-            per_channel: bool = False,
-            trainable: bool = True,
-            skip_transpose: bool = False,
+        self,
+        input_size: int,
+        coeff_init: float = 0.04,
+        per_channel: bool = False,
+        trainable: bool = True,
+        skip_transpose: bool = False,
     ):
         super(ExponentialMovingAverage, self).__init__()
         self._coeff_init = coeff_init
@@ -1339,7 +1481,9 @@ class ExponentialMovingAverage(torch.nn.Module):
         self.skip_transpose = skip_transpose
         self.trainable = trainable
         weights = (
-            torch.ones(input_size, dtype=torch.float32) if self._per_channel else torch.ones(1, dtype=torch.float32)
+            torch.ones(input_size, dtype=torch.float32)
+            if self._per_channel
+            else torch.ones(1, dtype=torch.float32)
         )
         self._weights = torch.nn.Parameter(
             weights * self._coeff_init, requires_grad=trainable
@@ -1348,10 +1492,10 @@ class ExponentialMovingAverage(torch.nn.Module):
     def forward(self, x):
         """Returns the normalized input tensor.
 
-       Arguments
-        ---------
-        x : torch.Tensor (batch, time, channels)
-            input to normalize.
+        Arguments
+         ---------
+         x : torch.Tensor (batch, time, channels)
+             input to normalize.
         """
         if not self.skip_transpose:
             x = x.transpose(1, -1)
@@ -1370,9 +1514,11 @@ class ExponentialMovingAverage(torch.nn.Module):
             results = results.permute(1, 2, 0)
             return results
 
-        output = scan(initial_state.to(dtype=x.dtype, device=x.device),
-                      x,
-                      w.to(dtype=x.dtype, device=x.device))
+        output = scan(
+            initial_state.to(dtype=x.dtype, device=x.device),
+            x,
+            w.to(dtype=x.dtype, device=x.device),
+        )
         if not self.skip_transpose:
             output = output.transpose(1, -1)
         return output.to(dtype=x.dtype, device=x.device)
@@ -1398,8 +1544,12 @@ class Fp32InstanceNorm(torch.nn.InstanceNorm1d):
             input = input.transpose(1, 2)
         output = torch.nn.functional.instance_norm(
             input.float(),
-            running_mean=self.running_mean.float() if self.running_mean is not None else None,
-            running_var=self.running_var.float() if self.running_var is not None else None,
+            running_mean=(
+                self.running_mean.float() if self.running_mean is not None else None
+            ),
+            running_var=(
+                self.running_var.float() if self.running_var is not None else None
+            ),
             weight=self.weight.float() if self.weight is not None else None,
             bias=self.bias.float() if self.bias is not None else None,
             use_input_stats=self.training or not self.track_running_stats,
@@ -1432,17 +1582,19 @@ class PSwish(tnn.Module):
         return x * self.p_swish_alpha * torch.sigmoid(self.p_swish_beta * x)
 
     def reset_parameters(self):
-        tnn.init.constant_(self.p_swish_alpha, val=2.)
+        tnn.init.constant_(self.p_swish_alpha, val=2.0)
         tnn.init.zeros_(self.p_swish_beta)
 
 
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
-        yield lst[i:i + n]
+        yield lst[i : i + n]
 
 
-def chunk_and_normalize(data, segment_length=10, sample_rate=8000, normalize=True, max_batch_size=16):
+def chunk_and_normalize(
+    data, segment_length=10, sample_rate=8000, normalize=True, max_batch_size=16
+):
     """
     This is a helper function that chunks an input array into segment_length long chunks
     and (optionally) normalizes each chunk to zero mean and unit variance.
@@ -1454,7 +1606,9 @@ def chunk_and_normalize(data, segment_length=10, sample_rate=8000, normalize=Tru
         # we need to split the input file into smaller segments
         batched_wav = list(data.split(seq_len))
         # The last segment will have a different length than the others. We right pad with zero
-        batched_wav[-1] = pad_left_right(batched_wav[-1], batched_wav[0], right_pad=True)
+        batched_wav[-1] = pad_left_right(
+            batched_wav[-1], batched_wav[0], right_pad=True
+        )
         # If the batched wav file is longer then our max batch_size, then chunk it
         if len(batched_wav) > max_batch_size:
             batched_wav = list(chunks(batched_wav, max_batch_size))
@@ -1471,6 +1625,8 @@ def chunk_and_normalize(data, segment_length=10, sample_rate=8000, normalize=Tru
                 batch = torch.stack(batch)  # stack the list of tensors
             elif batch.dim() == 1:  # split segments or single segment
                 batch = batch.view(1, -1)
-            b_.append([torch.nn.functional.layer_norm(x, x.shape).squeeze() for x in batch])
+            b_.append(
+                [torch.nn.functional.layer_norm(x, x.shape).squeeze() for x in batch]
+            )
         batched_wav = b_
     return batched_wav

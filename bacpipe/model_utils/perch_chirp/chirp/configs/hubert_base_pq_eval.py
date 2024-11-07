@@ -22,18 +22,20 @@ _c = config_utils.callable_config
 
 
 def get_config() -> config_dict.ConfigDict:
-  """Create configuration dictionary for training."""
-  config = hubert_base_pq.get_config()
-  config.init_config.workdir = ""
-  return config
+    """Create configuration dictionary for training."""
+    config = hubert_base_pq.get_config()
+    config.init_config.workdir = ""
+    return config
 
 
 def get_hyper(hyper):
-  return hyper.product([
-      hyper.sweep(
-          "config.eval_config.train_mode_at_eval", hyper.discrete([True, False])
-      ),
-      hyper.sweep(
-          "config.eval_config.mask_at_eval", hyper.discrete([True, False])
-      ),
-  ])
+    return hyper.product(
+        [
+            hyper.sweep(
+                "config.eval_config.train_mode_at_eval", hyper.discrete([True, False])
+            ),
+            hyper.sweep(
+                "config.eval_config.mask_at_eval", hyper.discrete([True, False])
+            ),
+        ]
+    )

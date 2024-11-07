@@ -159,7 +159,9 @@ class Data2VecMultiConfig(FairseqDataclass):
     conv_feature_layers: str = II("task.conv_feature_layers")
     mixup_prob: float = 0.5
     mixing_window_length: float = 0.1
-    source_mixup: float = -1.  # Setting to negative values, effectively disables BC-Learning
+    source_mixup: float = (
+        -1.0
+    )  # Setting to negative values, effectively disables BC-Learning
     same_mixup: bool = True
     target_mixup: bool = True
     gain_mode: str = "A_weighting"
@@ -169,14 +171,14 @@ class Data2VecMultiConfig(FairseqDataclass):
 @register_model("data2vec_multi", dataclass=Data2VecMultiConfig)
 class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
     def make_modality_encoder(
-            self,
-            cfg: D2vModalityConfig,
-            embed_dim: int,
-            make_block: Callable[[float], nn.ModuleList],
-            norm_layer: Callable[[int], nn.LayerNorm],
-            layer_norm_first: bool,
-            alibi_biases,
-            task,
+        self,
+        cfg: D2vModalityConfig,
+        embed_dim: int,
+        make_block: Callable[[float], nn.ModuleList],
+        norm_layer: Callable[[int], nn.LayerNorm],
+        layer_norm_first: bool,
+        alibi_biases,
+        task,
     ) -> ModalitySpecificEncoder:
         if cfg.type == Modality.AUDIO:
             enc_cls = AudioEncoder
@@ -203,9 +205,9 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
 
         if self.cfg.with_labels:
             self.final_dropout = torch.nn.Dropout(cfg.final_dropout)
-            self.linear_eval_projection = Linear(self.cfg.embed_dim,
-                                                 len(eval(self.cfg.unique_labels)),
-                                                 bias=True)
+            self.linear_eval_projection = Linear(
+                self.cfg.embed_dim, len(eval(self.cfg.unique_labels)), bias=True
+            )
             self.use_focal_loss = cfg.use_focal_loss
             self.metric_threshold = cfg.metric_threshold
             self.verbose_tensorboard_logging = cfg.verbose_tensorboard_logging
@@ -317,7 +319,12 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
         # logger.info(self.modality_encoders[mod.name].decoder)
 
         for pn, p in self.named_parameters():
-            if len(p.shape) == 1 or pn.endswith(".bias") or "alibi_scale" in pn or "p_swish" in pn:
+            if (
+                len(p.shape) == 1
+                or pn.endswith(".bias")
+                or "alibi_scale" in pn
+                or "p_swish" in pn
+            ):
                 p.optim_overrides = {"optimizer": {"weight_decay_scale": 0}}
             if cfg.decoder_group and "decoder" in pn:
                 p.param_group = "decoder"
@@ -388,8 +395,8 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
         super().set_num_updates(num_updates)
 
         if self.ema is not None and (
-                (self.num_updates == 0 and num_updates > 1)
-                or self.num_updates >= num_updates
+            (self.num_updates == 0 and num_updates > 1)
+            or self.num_updates >= num_updates
         ):
             pass
         elif self.training and self.ema is not None:
@@ -451,7 +458,9 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
                 y = y.reshape(-1)
         return y
 
-    def compute_gain_torch(self, sound, fs=8_000, wl=0.1, min_db=-80.0, mode="A_weighting"):
+    def compute_gain_torch(
+        self, sound, fs=8_000, wl=0.1, min_db=-80.0, mode="A_weighting"
+    ):
         n_fft = round(fs * wl)
 
         if mode == "A_weighting":
@@ -459,17 +468,18 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
                 self.a_weight = {}
 
             if fs not in self.a_weight:
+
                 def a_weight(fs, n_fft, min_db=-80.0):
                     freq = np.linspace(0, fs // 2, n_fft // 2 + 1)
-                    freq_sq = freq ** 2
+                    freq_sq = freq**2
                     freq_sq[0] = 1.0
                     weight = 2.0 + 20.0 * (
-                            2 * np.log10(12194)
-                            + 2 * np.log10(freq_sq)
-                            - np.log10(freq_sq + 12194 ** 2)
-                            - np.log10(freq_sq + 20.6 ** 2)
-                            - 0.5 * np.log10(freq_sq + 107.7 ** 2)
-                            - 0.5 * np.log10(freq_sq + 737.9 ** 2)
+                        2 * np.log10(12194)
+                        + 2 * np.log10(freq_sq)
+                        - np.log10(freq_sq + 12194**2)
+                        - np.log10(freq_sq + 20.6**2)
+                        - 0.5 * np.log10(freq_sq + 107.7**2)
+                        - 0.5 * np.log10(freq_sq + 737.9**2)
                     )
                     weight = np.maximum(weight, min_db)
 
@@ -482,7 +492,7 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
         sound = sound.unfold(-1, n_fft, n_fft // 2)
 
         if mode == "RMSE":
-            sound = sound ** 2
+            sound = sound**2
             g = sound.mean(-1)
         elif mode == "A_weighting":
             w = torch.hann_window(n_fft, device=sound.device) * sound
@@ -516,19 +526,19 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
         return cls(cfg, modalities, task=task, skip_ema=True)
 
     def forward(
-            self,
-            source,
-            target=None,
-            id=None,
-            mode=None,
-            padding_mask=None,
-            mask=True,
-            features_only=False,
-            force_remove_masked=False,
-            remove_extra_tokens=True,
-            precomputed_mask=None,
-            reduce=True,
-            **kwargs
+        self,
+        source,
+        target=None,
+        id=None,
+        mode=None,
+        padding_mask=None,
+        mask=True,
+        features_only=False,
+        force_remove_masked=False,
+        remove_extra_tokens=True,
+        precomputed_mask=None,
+        reduce=True,
+        **kwargs,
     ):
         # we use BC Learning:
         # Tokozume, Y., Ushiku, Y., & Harada, T. (2017).
@@ -567,9 +577,10 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
                         G1 = source.pow(2).mean(dim=-1).sqrt()
                     else:
                         G1, _ = self.compute_gain_torch(
-                            source, mode=self.cfg.gain_mode,
+                            source,
+                            mode=self.cfg.gain_mode,
                             fs=self.cfg.sample_rate,
-                            wl=self.cfg.mixing_window_length
+                            wl=self.cfg.mixing_window_length,
                         ).max(-1)
                         G1 = G1.to(dtype=source.dtype)
 
@@ -586,17 +597,22 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
                 mixed = (p * mixed_source) + (1 - p) * s2
 
                 if mix_mask is None:
-                    source = mixed / torch.sqrt(p ** 2 + (1 - p) ** 2)
+                    source = mixed / torch.sqrt(p**2 + (1 - p) ** 2)
                 else:
-                    source[mix_mask] = mixed / torch.sqrt(p ** 2 + (1 - p) ** 2)
+                    source[mix_mask] = mixed / torch.sqrt(p**2 + (1 - p) ** 2)
 
-                if target is not None and self.cfg.target_mixup and self.cfg.with_labels:
+                if (
+                    target is not None
+                    and self.cfg.target_mixup
+                    and self.cfg.with_labels
+                ):
                     r = r.unsqueeze(-1)
                     if mix_mask is None:
                         target = target * r + (1 - r) * target[mixup_perm]
                     else:
                         target[mix_mask] = (
-                                target[mix_mask] * r + (1 - r) * target[mixup_perm][mix_mask]
+                            target[mix_mask] * r
+                            + (1 - r) * target[mixup_perm][mix_mask]
                         )
         # print("\n mode pre:", mode, "\n")
         if mode is None:
@@ -651,9 +667,9 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
         layer_results = []
         for i, blk in enumerate(self.blocks):
             if (
-                    not self.training
-                    or self.cfg.layerdrop == 0
-                    or (np.random.random() > self.cfg.layerdrop)
+                not self.training
+                or self.cfg.layerdrop == 0
+                or (np.random.random() > self.cfg.layerdrop)
             ):
                 ab = masked_alibi_bias
                 if ab is not None and alibi_scale is not None:
@@ -680,10 +696,14 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
             # no gradient information will flow back to the model when pretraining
             avg_layer = self.average_top_k_layers
             # get everything but detach from main graph
-            target_layer_results = [l.clone().detach() for l in layer_results[-avg_layer:]]
+            target_layer_results = [
+                l.clone().detach() for l in layer_results[-avg_layer:]
+            ]
             # target_layer_results = [tl for tl.transpose(0, 1) in target_layer_results]  # TBC -> BTC
             # Average over transformer layers
-            x_lin_eval = (sum(target_layer_results) / len(target_layer_results)).to(x.dtype)
+            x_lin_eval = (sum(target_layer_results) / len(target_layer_results)).to(
+                x.dtype
+            )
             # print("\n layer_results sizes", [x.size() for x in layer_results])
             if self.norm is not None:
                 x_lin_eval = self.norm(x_lin_eval)
@@ -710,16 +730,18 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
             # print("\n x_lin_eval.size post decoding", x_lin_eval.size())
 
             x_lin_eval = self.final_dropout(x_lin_eval)
-            x_lin_eval = self.linear_eval_projection(x_lin_eval.to(dtype=x.dtype))  # Output Shape is BxTxClasses
+            x_lin_eval = self.linear_eval_projection(
+                x_lin_eval.to(dtype=x.dtype)
+            )  # Output Shape is BxTxClasses
             # print("\n x_lin_eval.size post projection", x_lin_eval.size())
 
         if features_only:
             if remove_extra_tokens:
-                x = x[:, feature_extractor.modality_cfg.num_extra_tokens:]
+                x = x[:, feature_extractor.modality_cfg.num_extra_tokens :]
                 if masked_padding_mask is not None:
                     masked_padding_mask = masked_padding_mask[
-                                          :, feature_extractor.modality_cfg.num_extra_tokens:
-                                          ]
+                        :, feature_extractor.modality_cfg.num_extra_tokens :
+                    ]
 
             return {
                 "x": x,
@@ -879,7 +901,7 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
                 cls_target = cls_target.repeat_interleave(self.cfg.clone_batch, 0)
             cls_pred = x[:, extra_tokens - 1]
             result["losses"]["cls"] = self.d2v_loss(cls_pred, cls_target) * (
-                    self.cfg.cls_loss * sample_size
+                self.cfg.cls_loss * sample_size
             )
 
         if self.cfg.recon_loss > 0:
@@ -890,7 +912,9 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
                 recon_target = (recon_target - mean) / (var + 1.0e-6) ** 0.5
 
                 if self.cfg.clone_batch > 1:
-                    recon_target = recon_target.repeat_interleave(self.cfg.clone_batch, 0)
+                    recon_target = recon_target.repeat_interleave(
+                        self.cfg.clone_batch, 0
+                    )
 
                 if masked_b is not None:
                     recon_target = recon_target[masked_b]
@@ -900,7 +924,7 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
                 recon = self.recon_proj(recon)
 
             result["losses"]["recon"] = (
-                    self.d2v_loss(recon, recon_target.float()) * self.cfg.recon_loss
+                self.d2v_loss(recon, recon_target.float()) * self.cfg.recon_loss
             )
 
         if self.cfg.d2v_loss > 0:
@@ -931,12 +955,13 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
 
             reduction = "none" if not reduce else "sum"
             if self.use_focal_loss:
-                linear_eval_loss = sigmoid_focal_loss(x_lin_eval, target,
-                                                      reduction=reduction)
+                linear_eval_loss = sigmoid_focal_loss(
+                    x_lin_eval, target, reduction=reduction
+                )
             else:
-                linear_eval_loss = torch.nn.functional.cross_entropy(x_lin_eval,
-                                                                     target.reshape(-1),
-                                                                     reduction=reduction)
+                linear_eval_loss = torch.nn.functional.cross_entropy(
+                    x_lin_eval, target.reshape(-1), reduction=reduction
+                )
 
             n_correct, total = self.compute_accuracy(x_lin_eval, target)
             tp, fp, tn, fn = self.compute_prec_rec_f1(x_lin_eval, target)
@@ -953,13 +978,15 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
                 # print("\n writing ", result["_predictions"].size(), "to results out dict \n")
                 result["_targets"] = target
                 if self.cfg.segmentation_metrics:
-                    result["_source_size"] = source.size(-1)  # needed for the fused metric routine
+                    result["_source_size"] = source.size(
+                        -1
+                    )  # needed for the fused metric routine
 
         suffix = "" if len(self.modalities) == 1 else f"_{mode}"
         with torch.no_grad():
             if encoder_mask is not None:
                 result["masked_pct"] = 1 - (
-                        encoder_mask.ids_keep.size(1) / encoder_mask.ids_restore.size(1)
+                    encoder_mask.ids_keep.size(1) / encoder_mask.ids_restore.size(1)
                 )
             for i, x in enumerate(xs):
                 n = f"pred_var{suffix}_{i}" if len(xs) > 1 else f"pred_var{suffix}"
@@ -993,11 +1020,11 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
         return result
 
     def forward_decoder(
-            self,
-            x,
-            feature_extractor,
-            decoder,
-            mask_info,
+        self,
+        x,
+        feature_extractor,
+        decoder,
+        mask_info,
     ):
         x = feature_extractor.decoder_input(x, mask_info)
         x = decoder(*x)
@@ -1074,11 +1101,10 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
             n_correct = torch.sum(preds.eq(target))
             total = torch.tensor(target.shape).prod()
         else:
-            lprobs = torch.nn.functional.log_softmax(logits, dim=-1,
-                                                     dtype=torch.float32)
-            n_correct = torch.sum(
-                lprobs.argmax(1).eq(target)
+            lprobs = torch.nn.functional.log_softmax(
+                logits, dim=-1, dtype=torch.float32
             )
+            n_correct = torch.sum(lprobs.argmax(1).eq(target))
             total = torch.sum(target)
 
         return n_correct.squeeze(), total.squeeze()
@@ -1100,19 +1126,19 @@ class Data2VecMultiModel(BaseFairseqModel, FusedSegmentationMixin):
         if dist.is_initialized():
             zc = torch.tensor(y.size(0)).cuda()
             zs = y.sum(dim=0)
-            zss = (y ** 2).sum(dim=0)
+            zss = (y**2).sum(dim=0)
 
             dist.all_reduce(zc)
             dist.all_reduce(zs)
             dist.all_reduce(zss)
 
-            var = zss / (zc - 1) - (zs ** 2) / (zc * (zc - 1))
+            var = zss / (zc - 1) - (zs**2) / (zc * (zc - 1))
             return torch.sqrt(var + 1e-6).mean()
         else:
             return torch.sqrt(y.var(dim=0) + 1e-6).mean()
 
     def extract_features(
-            self, source, mode=None, padding_mask=None, mask=False, remove_extra_tokens=True
+        self, source, mode=None, padding_mask=None, mask=False, remove_extra_tokens=True
     ):
         res = self.forward(
             source,

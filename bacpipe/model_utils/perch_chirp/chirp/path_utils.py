@@ -24,17 +24,17 @@ from etils import epath
 
 
 def get_absolute_path(relative_path: os.PathLike[str] | str) -> epath.Path:
-  """Returns the absolute epath.Path associated with the relative_path.
+    """Returns the absolute epath.Path associated with the relative_path.
 
-  Args:
-    relative_path: The relative path (w.r.t. root) to the resource.
+    Args:
+      relative_path: The relative path (w.r.t. root) to the resource.
 
-  Returns:
-    The absolute path to the resource.
-  """
-  file_path = epath.Path(__file__).parent / relative_path
-  return file_path
+    Returns:
+      The absolute path to the resource.
+    """
+    file_path = epath.Path(__file__).parent / relative_path
+    return file_path
 
 
 def open_file(relative_path: os.PathLike[str] | str, mode) -> TextIO | BinaryIO:
-  return open(get_absolute_path(relative_path), mode)
+    return open(get_absolute_path(relative_path), mode)

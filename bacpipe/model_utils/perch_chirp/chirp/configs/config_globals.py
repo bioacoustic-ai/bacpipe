@@ -37,23 +37,23 @@ import optax
 
 
 def get_globals() -> dict[str, Any]:
-  return {
-      "audio_utils": audio_utils,
-      "callbacks": callbacks,
-      "config_utils": config_utils,
-      "conformer": conformer,
-      "efficientnet": efficientnet,
-      "efficientnet_v2": efficientnet_v2,
-      "eval_lib": eval_lib,
-      "hubert": hubert,
-      "quantizers": quantizers,
-      "frontend": frontend,
-      "layers": layers,
-      "nn": nn,
-      "optax": optax,
-      "pipeline": pipeline,
-      "handcrafted_features": handcrafted_features,
-      "soundstream_unet": soundstream_unet,
-      "taxonomy_model": taxonomy_model,
-      "train_utils": train_utils,
-  }
+    return {
+        "audio_utils": audio_utils,
+        "callbacks": callbacks,
+        "config_utils": config_utils,
+        "conformer": conformer,
+        "efficientnet": efficientnet,
+        "efficientnet_v2": efficientnet_v2,
+        "eval_lib": eval_lib,
+        "hubert": hubert,
+        "quantizers": quantizers,
+        "frontend": frontend,
+        "layers": layers,
+        "nn": nn,
+        "optax": optax,
+        "pipeline": pipeline,
+        "handcrafted_features": handcrafted_features,
+        "soundstream_unet": soundstream_unet,
+        "taxonomy_model": taxonomy_model,
+        "train_utils": train_utils,
+    }
