@@ -16,7 +16,7 @@ def plot_embeddings(umap_embed_path):
         embed_x = embed['x']
         embed_y = embed['y']
         file_stem = Path(embed['metadata']['audio_files']).stem
-        plt.plot(embed_x, embed_y, 'o', label=file_stem)
+        plt.plot(embed_x, embed_y, 'o', label=file_stem, markersize=.5)
 
     plt.legend()
     plt.title('UMAP embeddings')

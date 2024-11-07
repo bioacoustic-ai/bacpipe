@@ -19,6 +19,6 @@ class ModelBaseClass:
         
     def window_audio(self, audio):
         num_frames = np.ceil(len(audio) / self.segment_length)
-        padded_audio =lb.util.fix_length(audio, size=int(num_frames*self.segment_length))
+        padded_audio =lb.util.fix_length(audio, size=int(num_frames*self.segment_length), mode='wrap')
         frames = lb.util.frame(padded_audio, frame_length=self.segment_length, hop_length=self.segment_length, axis=0, writeable=True)
         return frames
