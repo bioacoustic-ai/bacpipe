@@ -25,7 +25,9 @@ decorator==5.1.1
 dill==0.3.1.1
 dnspython==2.6.1
 docopt==0.6.2
+einops==0.8.0
 etils==1.9.4
+fairseq==0.12.2
 fastavro==1.9.7
 fasteners==0.19
 filelock==3.15.4
@@ -41,6 +43,7 @@ grpcio==1.64.1
 h11==0.14.0
 h5py==3.11.0
 hdfs==2.7.3
+hear21passt==0.0.26
 httpcore==1.0.5
 httplib2==0.22.0
 httptools==0.6.1
@@ -51,6 +54,7 @@ hydra-core==1.0.7
 idna==3.7
 importlib_metadata==7.1.0
 importlib_resources==6.4.5
+iniconfig==2.0.0
 itsdangerous==2.2.0
 jax==0.4.33
 jaxlib==0.4.33
@@ -101,8 +105,10 @@ optree==0.11.0
 orbax-checkpoint==0.6.4
 orjson==3.10.7
 packaging==24.1
+pandas==2.2.3
 pillow==10.3.0
 platformdirs==4.2.2
+pluggy==1.5.0
 pooch==1.8.2
 portalocker==2.10.1
 proto-plus==1.24.0
@@ -119,6 +125,7 @@ Pygments==2.18.0
 pymongo==4.10.1
 pynndescent==0.5.12
 pyparsing==3.1.2
+pytest==8.3.3
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 python-multipart==0.0.9
@@ -160,7 +167,7 @@ termcolor==2.4.0
 tf-keras==2.14.1
 tf-slim==1.1.0
 threadpoolctl==3.5.0
-timm==0.6.13
+timm==1.0.11
 tokenizers==0.20.1
 toolz==1.0.0
 torch==2.4.1
