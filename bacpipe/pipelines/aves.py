@@ -49,7 +49,7 @@ class Model(ModelBaseClass, nn.Module):
     @torch.inference_mode()
     def __call__(self, input):
         embeds = []
-        for batch in tqdm(input.split(BATCH_SIZE)):
+        for batch in input.split(BATCH_SIZE):
             out_raw = self.model.extract_features(batch)[0]
             # get final layer output
             out_raw = torch.stack(out_raw)[-1]
