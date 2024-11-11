@@ -1,0 +1,1 @@
+# Embeddings that are created using dimensionality reduction algorithms will automatically be saved here unless specified differently in bacpipe/config.yaml
