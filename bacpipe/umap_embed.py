@@ -1,5 +1,5 @@
 import yaml
-
+import json
 import logging
 import numpy as np
 from bacpipe.generate_embeddings import generate_embeddings
@@ -21,7 +21,8 @@ def get_embeddings(model_name, audio_dir,
         check_if_combination_exists=check_if_primary_combination_exists,
     )
     ld = generate_embeddings(
-        model_name="umap",
+        model_name=model_name,
+        dim_reduction_model="umap",
         audio_dir=audio_dir,
         check_if_combination_exists=check_if_secondary_combination_exists,
     )

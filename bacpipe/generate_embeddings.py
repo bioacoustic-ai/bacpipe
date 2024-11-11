@@ -14,13 +14,15 @@ class Loader:
     def __init__(
         self,
         check_if_combination_exists=True,
-        model_name="umap",
+        model_name=None,
+        dim_reduction_model=False,
         audio_dir=None,
         testing=False,
         **kwargs,
     ):
         self.model_name = model_name
         self.audio_dir = audio_dir
+        self.dim_reduction_model = dim_reduction_model
 
         with open("bacpipe/config.yaml", "r") as f:
             self.config = yaml.safe_load(f)
@@ -29,13 +31,14 @@ class Loader:
             setattr(self, key, val)
 
         self.check_if_combination_exists = check_if_combination_exists
-        if self.model_name == "umap":
+        if self.dim_reduction_model:
             self.embed_suffix = ".json"
         else:
             self.embed_suffix = ".npy"
 
+
         self.check_embeds_already_exist()
-        if self.combination_already_exists or self.model_name == "umap":
+        if self.combination_already_exists or self.dim_reduction_model:
             self.get_embeddings()
         else:
             self._get_audio_paths()
@@ -44,8 +47,6 @@ class Loader:
         if not self.combination_already_exists and not testing:
             self.embed_dir.mkdir(exist_ok=True, parents=True)
         else:
-            if self.model_name == "umap":
-                self.embed_dir = self.umap_embed_dir
             logger.debug(
                 "Combination of {} and {} already "
                 "exists -> using saved embeddings in {}".format(
@@ -55,11 +56,11 @@ class Loader:
 
     def check_embeds_already_exist(self):
         self.combination_already_exists = False
-        self.umap_embed_dir = False
+        self.dim_reduc_embed_dir = False
 
         if self.check_if_combination_exists:
-            if self.model_name == "umap":
-                existing_embed_dirs = list(Path(self.umap_parent_dir).iterdir())
+            if self.dim_reduction_model:
+                existing_embed_dirs = list(Path(self.dim_reduc_parent_dir).iterdir())
             else:
                 existing_embed_dirs = list(Path(self.embed_parent_dir).iterdir())
             if isinstance(self.check_if_combination_exists, str):
@@ -126,7 +127,7 @@ class Loader:
             if isinstance(val, str) and Path(val).is_dir():
                 setattr(self, key, Path(val))
         if self.model_name == "umap":
-            self.umap_embed_dir = folder
+            self.dim_reduc_embed_dir = folder
 
     def get_embeddings(self):
         embed_dir = self.get_embedding_dir()
@@ -137,14 +138,14 @@ class Loader:
             self.metadata_dict["files"].update(
                 {"embedding_files": [], "embedding_dimensions": []}
             )
-            self.embed_dir = Path(self.umap_parent_dir).joinpath(
+            self.embed_dir = Path(self.dim_reduc_parent_dir).joinpath(
                 self.get_timestamp_dir() + f"-{self.model_name}"
             )
 
     def get_embedding_dir(self):
-        if self.model_name == "umap":
+        if self.dim_reduction_model:
             if self.combination_already_exists:
-                self.embed_parent_dir = Path(self.umap_parent_dir)
+                self.embed_parent_dir = Path(self.dim_reduc_parent_dir)
             else:
                 self.embed_parent_dir = Path(self.embed_parent_dir)
                 self.embed_suffix = ".npy"
@@ -152,9 +153,9 @@ class Loader:
             return self.embed_dir
         self.audio_dir = Path(self.audio_dir)
 
-        if self.umap_embed_dir:
+        if self.dim_reduc_embed_dir:
             # check if they are compatible
-            return self.umap_embed_dir
+            return self.dim_reduc_embed_dir
 
         embed_dirs = [
             d
@@ -170,8 +171,12 @@ class Loader:
         pass
 
     def get_timestamp_dir(self):
+        if self.dim_reduction_model:
+            model_name = self.dim_reduction_model
+        else:
+            model_name = self.model_name
         return time.strftime(
-            "%Y-%m-%d_%H-%M___" + self.model_name + "-" + self.audio_dir.stem,
+            "%Y-%m-%d_%H-%M___" + model_name + "-" + self.audio_dir.stem,
             time.localtime(),
         )
 
@@ -192,37 +197,53 @@ class Loader:
             yaml.safe_dump(self.metadata_dict, f)
 
     def update_files(self):
-        if self.model_name == "umap":
+        if self.dim_reduction_model:
             self.files = [f for f in self.embed_dir.iterdir() if f.suffix == ".json"]
 
 
 class Embedder:
-    def __init__(self, model_name, **kwargs):
+    def __init__(self, model_name, dim_reduction_model=False, **kwargs):
         import yaml
 
         with open("bacpipe/config.yaml", "rb") as f:
             self.config = yaml.safe_load(f)
 
-        self.model_name = model_name
+        self.dim_reduction_model = dim_reduction_model
+        if dim_reduction_model:
+            self.dim_reduction_model = True
+            self.model_name = dim_reduction_model
+        else:
+            self.model_name = model_name
         self._init_model()
 
     def _init_model(self):
         module = importlib.import_module(f"bacpipe.pipelines.{self.model_name}")
         self.model = module.Model()
-
-    def get_embeddings_from_model(self, sample):
-        if isinstance(sample, np.ndarray):
-            samples = self.model.preprocess(sample)
-        else:
-            audio = self.model.load_and_resample(sample)
-            frames = self.model.window_audio(audio)
-            samples = self.model.preprocess(frames)
-        start = time.time()
-
-        batched_samples = self.model.init_dataloader(samples)
+        
+    def prepare_audio(self, sample):
+        audio = self.model.load_and_resample(sample)
+        frames = self.model.window_audio(audio)
+        return self.model.preprocess(frames)
+        
+    def get_embeddings_for_audio(self, sample):
+        batched_samples = self.model.init_dataloader(sample)
         embeds = self.model.batch_inference(batched_samples)
         if not isinstance(embeds, np.ndarray):
             embeds = embeds.numpy()
+        return embeds
+            
+    def get_reduced_dimensionality_embeddings(self, embeds):
+        samples = self.model.preprocess(embeds)
+        return self.model(samples)
+
+    def get_embeddings_from_model(self, sample):
+        
+        start = time.time()
+        if self.dim_reduction_model:
+            embeds = self.get_reduced_dimensionality_embeddings(sample)
+        else:
+            sample = self.prepare_audio(sample)
+            embeds = self.get_embeddings_for_audio(sample)
 
         logger.debug(f"{self.model_name} embeddings have shape: {embeds.shape}")
         logger.info(f"{self.model_name} inference took {time.time()-start:.2f}s.")
