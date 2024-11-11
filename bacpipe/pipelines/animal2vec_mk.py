@@ -1,5 +1,4 @@
 from fairseq import checkpoint_utils
-from tqdm import tqdm
 import numpy as np
 import torch
 from bacpipe.model_utils.animal2vec_nn.nn import chunk_and_normalize
@@ -7,7 +6,6 @@ from .utils import ModelBaseClass
 
 SAMPLE_RATE = 8000
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
-
 
 class Model(ModelBaseClass):
     def __init__(self, xeno_canto=False):
@@ -29,21 +27,10 @@ class Model(ModelBaseClass):
         self.model.eval()
 
     def preprocess(self, audio):
-        chunk = chunk_and_normalize(
-            torch.tensor(audio.reshape(1, -1)),
-            segment_length=self.segment_length / self.sr,
-            sample_rate=self.sr,
-            normalize=True,
-            max_batch_size=16,
-        )
-        return chunk[0]
+        return torch.stack([torch.nn.functional.layer_norm(x, x.shape).squeeze() for x in audio])
 
     @torch.inference_mode()
-    def __call__(self, input):
-        input = torch.from_numpy(np.array(input))
-        res = self.model(source=input, mode="AUDIO", features_only=True)
+    def __call__(self, batch):
+        res = self.model(source=batch, mode="AUDIO", features_only=True)
         embeds = res["layer_results"]
-        embeds = (
-            np.array([a.detach().numpy() for a in embeds]).mean(axis=0).mean(axis=1)
-        )
-        return embeds
+        return torch.stack(embeds).mean(0).mean(1) # mean over attention heads and segment length

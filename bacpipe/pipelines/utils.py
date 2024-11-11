@@ -1,9 +1,12 @@
 import yaml
 import librosa as lb
 import numpy as np
+import torchaudio as ta
+import torch
+from tqdm import tqdm
 
 MODEL_BASE_PATH = "bacpipe/models"
-
+GLOBAL_BATCH_SIZE = 16
 
 class ModelBaseClass:
     def __init__(self, sr, segment_length, **kwargs):
@@ -11,23 +14,31 @@ class ModelBaseClass:
             self.config = yaml.safe_load(f)
             self.sr = sr
             self.segment_length = segment_length
+            self.batch_size = int(segment_length*GLOBAL_BATCH_SIZE/100_000)
         for key, value in kwargs.items():
             setattr(self, key, value)
 
     def load_and_resample(self, path):
-        re_audio, sr = lb.load(path, sr=self.sr)
+        audio, sr = ta.load(path, normalize=True)
+        re_audio = ta.functional.resample(audio, sr, self.sr)
         return re_audio
 
     def window_audio(self, audio):
-        num_frames = np.ceil(len(audio) / self.segment_length)
+        num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
         padded_audio = lb.util.fix_length(
             audio, size=int(num_frames * self.segment_length), mode="reflect"
         )
-        frames = lb.util.frame(
-            padded_audio,
-            frame_length=self.segment_length,
-            hop_length=self.segment_length,
-            axis=0,
-            writeable=True,
-        )
+        frames = padded_audio.reshape([num_frames, self.segment_length])
+        if not isinstance(frames, torch.Tensor):
+            frames = torch.tensor(frames)
+        frames = frames.to(self.config['device'])
         return frames
+
+    def init_dataloader(self, audio):
+        return torch.utils.data.DataLoader(audio, batch_size=self.batch_size, shuffle=False)
+    
+    def batch_inference(self, batched_samples):
+        embeds = []
+        for batch in tqdm(batched_samples):
+            embeds.append(self.__call__(batch))
+        return torch.cat(embeds, axis=0)

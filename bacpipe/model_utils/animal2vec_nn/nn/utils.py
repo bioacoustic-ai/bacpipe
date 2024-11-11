@@ -1599,34 +1599,26 @@ def chunk_and_normalize(
     This is a helper function that chunks an input array into segment_length long chunks
     and (optionally) normalizes each chunk to zero mean and unit variance.
     """
-    data = data.squeeze()
-    assert data.ndim == 1
-    seq_len = round(segment_length * sample_rate)
-    if len(data) > seq_len:
-        # we need to split the input file into smaller segments
-        batched_wav = list(data.split(seq_len))
-        # The last segment will have a different length than the others. We right pad with zero
-        batched_wav[-1] = pad_left_right(
-            batched_wav[-1], batched_wav[0], right_pad=True
-        )
-        # If the batched wav file is longer then our max batch_size, then chunk it
-        if len(batched_wav) > max_batch_size:
-            batched_wav = list(chunks(batched_wav, max_batch_size))
-        else:
-            # place in list such that it is a single batch when passed to model
-            batched_wav = [batched_wav]
+    # data = data.squeeze()
+    # assert data.ndim == 1
+    # seq_len = round(segment_length * sample_rate)
+    if False:
+        if len(data) > seq_len:
+            # we need to split the input file into smaller segments
+            batched_wav = list(data.split(seq_len))
+            # The last segment will have a different length than the others. We right pad with zero
+            batched_wav[-1] = pad_left_right(
+                batched_wav[-1], batched_wav[0], right_pad=True
+            )
+            # If the batched wav file is longer then our max batch_size, then chunk it
+            if len(batched_wav) > max_batch_size:
+                batched_wav = list(chunks(batched_wav, max_batch_size))
+            else:
+                # place in list such that it is a single batch when passed to model
+                batched_wav = [batched_wav]
     else:
-        batched_wav = [data]
+        batched_wav = data
 
     if normalize:
-        b_ = []
-        for batch in batched_wav:
-            if not torch.is_tensor(batch):
-                batch = torch.stack(batch)  # stack the list of tensors
-            elif batch.dim() == 1:  # split segments or single segment
-                batch = batch.view(1, -1)
-            b_.append(
-                [torch.nn.functional.layer_norm(x, x.shape).squeeze() for x in batch]
-            )
-        batched_wav = b_
+        batched_wav = torch.stack([torch.nn.functional.layer_norm(x, x.shape).squeeze() for x in batched_wav])
     return batched_wav
