@@ -14,7 +14,8 @@ class ModelBaseClass:
             self.config = yaml.safe_load(f)
             self.sr = sr
             self.segment_length = segment_length
-            self.batch_size = int(segment_length*GLOBAL_BATCH_SIZE/100_000)
+            if segment_length:
+                self.batch_size = int(segment_length*GLOBAL_BATCH_SIZE/100_000)
         for key, value in kwargs.items():
             setattr(self, key, value)
 

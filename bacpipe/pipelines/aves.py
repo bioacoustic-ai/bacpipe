@@ -22,14 +22,14 @@ LENGTH_IN_SAMPLES = 16000
 
 
 class Model(ModelBaseClass, nn.Module):
-    def __init__(self):
+    def __init__(self, birdaves=False):
 
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         nn.Module.__init__(self)
 
         # reference: https://pytorch.org/audio/stable/_modules/torchaudio/models/wav2vec2/utils/import_fairseq.html
         base_path = "bacpipe/models"
-        if self.config["embedding_model"] == "birdaves":
+        if birdaves:
             model_config_path = f"{base_path}/birdaves/birdaves-bioxn-large.torchaudio.model_config.json"
             model_path = f"{base_path}/birdaves/birdaves-bioxn-large.torchaudio.pt"
         else:
@@ -44,20 +44,24 @@ class Model(ModelBaseClass, nn.Module):
         self.model.eval()
 
     def preprocess(self, audio):
-        return torch.from_numpy(audio)
+        return audio
 
     @torch.inference_mode()
     def __call__(self, input):
-        embeds = []
-        for batch in tqdm(input.split(BATCH_SIZE)):
-            out_raw = self.model.extract_features(batch)[0]
-            # get final layer output
-            out_raw = torch.stack(out_raw)[-1]
-            # mean pooling
-            out = out_raw.mean(axis=1)
-            embeds.append(out)
-        embeds = torch.cat(embeds)
-        return np.array(embeds)
+        out_raw = self.model.extract_features(input)[0]
+        out_raw = torch.stack(out_raw)[-1]
+        # mean pooling
+        return out_raw.mean(axis=1)
+        # embeds = []
+        # for batch in tqdm(input.split(BATCH_SIZE)):
+        #     out_raw = self.model.extract_features(batch)[0]
+        #     # get final layer output
+        #     out_raw = torch.stack(out_raw)[-1]
+        #     # mean pooling
+        #     out = out_raw.mean(axis=1)
+        #     embeds.append(out)
+        # embeds = torch.cat(embeds)
+        # return np.array(embeds)
 
 
 if __name__ == "__main__":
