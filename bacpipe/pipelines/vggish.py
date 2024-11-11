@@ -1,6 +1,7 @@
 import tensorflow_hub as hub
 import numpy as np
 from .utils import ModelBaseClass
+import tensorflow as tf
 
 
 SAMPLE_RATE = 16000
@@ -13,7 +14,7 @@ class Model(ModelBaseClass):
         self.model = hub.load("bacpipe/models/vggish")
 
     def preprocess(self, audio):
-        return (audio * 32767).astype(np.int16).reshape(1, -1).squeeze()
+        return tf.reshape(tf.convert_to_tensor(audio * 32767, dtype=tf.int16), (1, -1))
 
     def __call__(self, input):
-        return self.model(input).numpy()
+        return self.model(input[0].numpy())

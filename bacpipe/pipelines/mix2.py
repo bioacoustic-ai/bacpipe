@@ -21,11 +21,10 @@ class Model(ModelBaseClass):
         self.min_max_norm = MinMaxNorm()
 
     def preprocess(self, audio):
-        audio = torch.from_numpy(audio)
         audio = self.mel(audio)
         audio = self.ampl2db(audio)
         audio = self.min_max_norm(audio)
         return audio.unsqueeze(dim=1)
 
     def __call__(self, x):
-        return self.model(x).detach().numpy()
+        return self.model(x)

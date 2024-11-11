@@ -47,11 +47,11 @@ class Model(ModelBaseClass):
         self.model = self.model.to(DEVICE)
 
     def preprocess(self, audio):
-        mel = self.mel(torch.from_numpy(audio))
+        mel = self.mel(audio)
         mel = self.power_to_db(mel)
         mel = self.norm(mel)
         return mel
 
     def __call__(self, input):
         res = self.model(input.unsqueeze(1))
-        return res.detach().numpy()
+        return res

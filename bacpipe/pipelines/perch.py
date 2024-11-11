@@ -3,8 +3,7 @@ from bacpipe.model_utils.perch_chirp.chirp.inference.embed_lib import EmbedFn
 from bacpipe.model_utils.perch_chirp.chirp.projects.zoo.models import (
     get_preset_model_config,
 )
-import numpy as np
-import librosa as lb
+import tensorflow as tf
 
 from .utils import ModelBaseClass
 
@@ -13,10 +12,9 @@ LENGH_IN_SAMPLES = 160000
 
 
 class Model(ModelBaseClass):
-    def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGH_IN_SAMPLES)
+    def __init__(self, model_choice="perch_8", sr=SAMPLE_RATE, segment_length=LENGH_IN_SAMPLES):
+        super().__init__(sr=sr, segment_length=segment_length)
 
-        model_choice = "perch_8"
         config = config_dict.ConfigDict()
         config.embed_fn_config = config_dict.ConfigDict()
         config.embed_fn_config.model_config = config_dict.ConfigDict()
@@ -35,7 +33,7 @@ class Model(ModelBaseClass):
         self.model = embed_fn.embedding_model.embed
 
     def preprocess(self, audio):
-        return audio
+        return tf.convert_to_tensor(audio, dtype=tf.float32)
 
     def __call__(self, input):
         return self.model(input).embeddings.squeeze()

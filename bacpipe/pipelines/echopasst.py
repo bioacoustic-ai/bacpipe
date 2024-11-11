@@ -128,9 +128,9 @@ class Model(ModelBaseClass):
         )
 
     def preprocess(self, audio):
-        return self.preprocessor(torch.from_numpy(audio))
+        return self.preprocessor(audio)
 
     @torch.inference_mode()
     def __call__(self, input):
         classes, features = self.model.net(input.unsqueeze(1))
-        return features.detach().numpy()
+        return features

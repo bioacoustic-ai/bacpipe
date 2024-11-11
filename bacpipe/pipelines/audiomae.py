@@ -122,21 +122,17 @@ class Model(ModelBaseClass):
         self.model.load_state_dict(checkpoint_model)
         # manually initialize fc layer
         trunc_normal_(self.model.head.weight, std=2e-5)
+        
+        
+        self.audio_obj = AudiosetDataset(sr=SAMPLE_RATE, audio_conf=self.audio_conf_val)
 
-    def preprocess(self, audio, sr=SAMPLE_RATE):
-        # model.to(device)
-        audio = torch.from_numpy(audio)  # .view(1, -1)
-        audio_obj = AudiosetDataset(sr, audio_conf=self.audio_conf_val)
+    def preprocess(self, audio):
         processed_frame = []
         for frame in audio:
-            processed_frame.append(audio_obj.process(frame.view(1, -1)))
+            processed_frame.append(self.audio_obj.process(frame.view(1, -1)))
         processed_frame = torch.stack(processed_frame)
         return processed_frame.unsqueeze(dim=1)
 
     @torch.inference_mode()
     def __call__(self, input):
-        embeds = []
-        for batch in tqdm(input.split(BATCH_SIZE)):
-            embeds.append(self.model(batch))
-        embeds = torch.cat(embeds)
-        return embeds.detach().numpy()
+        return self.model(input)

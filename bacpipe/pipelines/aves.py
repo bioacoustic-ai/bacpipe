@@ -48,20 +48,15 @@ class Model(ModelBaseClass, nn.Module):
 
     @torch.inference_mode()
     def __call__(self, input):
-        out_raw = self.model.extract_features(input)[0]
-        out_raw = torch.stack(out_raw)[-1]
-        # mean pooling
-        return out_raw.mean(axis=1)
-        # embeds = []
-        # for batch in tqdm(input.split(BATCH_SIZE)):
-        #     out_raw = self.model.extract_features(batch)[0]
-        #     # get final layer output
-        #     out_raw = torch.stack(out_raw)[-1]
-        #     # mean pooling
-        #     out = out_raw.mean(axis=1)
-        #     embeds.append(out)
-        # embeds = torch.cat(embeds)
-        # return np.array(embeds)
+        embeds = []
+        for batch in tqdm(input.split(BATCH_SIZE)):
+            out_raw = self.model.extract_features(batch)[0]
+            # get final layer output
+            out_raw = torch.stack(out_raw)[-1]
+            # mean pooling
+            out = out_raw.mean(axis=1)
+            embeds.append(out)
+        return torch.cat(embeds)
 
 
 if __name__ == "__main__":

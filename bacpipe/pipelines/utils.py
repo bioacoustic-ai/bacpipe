@@ -12,12 +12,14 @@ class ModelBaseClass:
     def __init__(self, sr, segment_length, **kwargs):
         with open("bacpipe/config.yaml", "rb") as f:
             self.config = yaml.safe_load(f)
-            self.sr = sr
-            self.segment_length = segment_length
-            if segment_length:
-                self.batch_size = int(segment_length*GLOBAL_BATCH_SIZE/100_000)
+        
         for key, value in kwargs.items():
             setattr(self, key, value)
+            
+        self.sr = sr
+        self.segment_length = segment_length
+        if segment_length:
+            self.batch_size = int(100_000*GLOBAL_BATCH_SIZE/segment_length)
 
     def load_and_resample(self, path):
         audio, sr = ta.load(path, normalize=True)
@@ -36,10 +38,18 @@ class ModelBaseClass:
         return frames
 
     def init_dataloader(self, audio):
-        return torch.utils.data.DataLoader(audio, batch_size=self.batch_size, shuffle=False)
+        if 'tensorflow' in str(type(audio)):
+            import tensorflow as tf
+            return tf.data.Dataset.from_tensor_slices(audio).batch(self.batch_size)
+        elif 'torch' in str(type(audio)):
+            return torch.utils.data.DataLoader(audio, batch_size=self.batch_size, shuffle=False)
     
     def batch_inference(self, batched_samples):
         embeds = []
         for batch in tqdm(batched_samples):
             embeds.append(self.__call__(batch))
-        return torch.cat(embeds, axis=0)
+        if isinstance(embeds[0], torch.Tensor):
+            return torch.cat(embeds, axis=0)
+        else:
+            import tensorflow as tf
+            return tf.concat(embeds, axis=0)

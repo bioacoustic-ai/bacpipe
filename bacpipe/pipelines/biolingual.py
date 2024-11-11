@@ -21,17 +21,16 @@ class Model(ModelBaseClass):
         self.model = self.audio_classifier.model.get_audio_features
 
     def preprocess(self, audio):
-        features = self.audio_classifier.feature_extractor(
-            audio, sampling_rate=SAMPLE_RATE
-        )
-        aud_input = features["input_features"]
-        aud_input = torch.tensor(aud_input)
-        return aud_input
+        audio_input = []
+        for frame in audio:
+            features = self.audio_classifier.feature_extractor(
+                frame, sampling_rate=SAMPLE_RATE
+            )
+            audio_input.append(features["input_features"])
+        audio_input = np.array(audio_input)
+        audio_input = torch.from_numpy(audio_input)
+        return audio_input.squeeze(1)
 
     @torch.inference_mode()
     def __call__(self, input):
-        embeds = []
-        for batch in tqdm(input.split(BATCH_SIZE)):
-            embeds.append(self.model(batch))
-        embeds = torch.cat(embeds)
-        return np.array(embeds)
+        return self.model(input)

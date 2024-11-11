@@ -13,10 +13,10 @@ logger = logging.getLogger("bacpipe")
 class Loader:
     def __init__(
         self,
+        audio_dir,
         check_if_combination_exists=True,
         model_name=None,
         dim_reduction_model=False,
-        audio_dir=None,
         testing=False,
         **kwargs,
     ):
@@ -229,7 +229,10 @@ class Embedder:
         batched_samples = self.model.init_dataloader(sample)
         embeds = self.model.batch_inference(batched_samples)
         if not isinstance(embeds, np.ndarray):
-            embeds = embeds.numpy()
+            try:
+                embeds = embeds.numpy()
+            except:
+                embeds = embeds.detach().numpy()
         return embeds
             
     def get_reduced_dimensionality_embeddings(self, embeds):

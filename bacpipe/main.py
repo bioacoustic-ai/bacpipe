@@ -25,8 +25,3 @@ def get_embeddings(model_name, audio_dir,
             check_if_combination_exists=check_if_secondary_combination_exists,
         )
         plot_embeddings(ld.embed_dir)
-        embeds, divisions_array = [], []
-        for ind, file in enumerate(ld.files):
-            d = json.load(open(file))
-            arr = np.array([d["x"], d["x"]]).reshape([len(d["x"]), 2])
-            embeds.append(arr)

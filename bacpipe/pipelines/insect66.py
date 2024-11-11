@@ -73,12 +73,10 @@ class Model(ModelBaseClass):
         self.model.load_state_dict(state_dict, strict=False)
 
     def preprocess(self, audio):
-        audio = torch.from_numpy(audio)
         audio = audio[:, None, :]
 
         # (bs, channel, mel, time)
-        audio = self.model.wav2timefreq(audio)
-        return audio
+        return self.model.wav2timefreq(audio)
 
     @torch.inference_mode()
     def __call__(self, input):
