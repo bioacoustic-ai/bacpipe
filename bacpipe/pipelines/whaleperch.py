@@ -7,8 +7,12 @@ LENGH_IN_SAMPLES = 50_000
 
 class Model(Model):
     def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGH_IN_SAMPLES, model_choice="multispecies_whale")
-    
+        super().__init__(
+            sr=SAMPLE_RATE,
+            segment_length=LENGH_IN_SAMPLES,
+            model_choice="multispecies_whale",
+        )
+
     def __call__(self, input):
         embeds = []
         for frame in input:

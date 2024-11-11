@@ -33,6 +33,7 @@ embeddings = {}
 
 audio_dir = "bacpipe/evaluation/datasets/audio_test_files"
 
+
 def embedder_fn(loader, model_name):
     embedder = Embedder(model_name)
     input = loader.files[0]
@@ -40,7 +41,12 @@ def embedder_fn(loader, model_name):
 
 
 def loader_fn():
-    loader = Loader(audio_dir=audio_dir, check_if_combination_exists=False, model_name="aves", testing=True)
+    loader = Loader(
+        audio_dir=audio_dir,
+        check_if_combination_exists=False,
+        model_name="aves",
+        testing=True,
+    )
     assert loader.files is not None and len(loader.files) > 0
     return loader
 
@@ -62,6 +68,6 @@ def test_embedding_generation(model):
 def test_embedding_dimensions(model):
     assert embeddings[model].shape[-1] == embedding_dimensions[model]
 
-# test_embedding_generation('aves')
+
 # test_model('echopasst')
 # pytest -v --disable-warnings test_embedding_creation.py

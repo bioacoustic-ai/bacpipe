@@ -12,7 +12,9 @@ LENGH_IN_SAMPLES = 160000
 
 
 class Model(ModelBaseClass):
-    def __init__(self, model_choice="perch_8", sr=SAMPLE_RATE, segment_length=LENGH_IN_SAMPLES):
+    def __init__(
+        self, model_choice="perch_8", sr=SAMPLE_RATE, segment_length=LENGH_IN_SAMPLES
+    ):
         super().__init__(sr=sr, segment_length=segment_length)
 
         config = config_dict.ConfigDict()

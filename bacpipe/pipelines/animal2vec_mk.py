@@ -7,6 +7,7 @@ from .utils import ModelBaseClass
 SAMPLE_RATE = 8000
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
 
+
 class Model(ModelBaseClass):
     def __init__(self, xeno_canto=False):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
@@ -27,10 +28,14 @@ class Model(ModelBaseClass):
         self.model.eval()
 
     def preprocess(self, audio):
-        return torch.stack([torch.nn.functional.layer_norm(x, x.shape).squeeze() for x in audio])
+        return torch.stack(
+            [torch.nn.functional.layer_norm(x, x.shape).squeeze() for x in audio]
+        )
 
     @torch.inference_mode()
     def __call__(self, batch):
         res = self.model(source=batch, mode="AUDIO", features_only=True)
         embeds = res["layer_results"]
-        return torch.stack(embeds).mean(0).mean(1) # mean over attention heads and segment length
+        return (
+            torch.stack(embeds).mean(0).mean(1)
+        )  # mean over attention heads and segment length

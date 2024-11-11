@@ -122,8 +122,7 @@ class Model(ModelBaseClass):
         self.model.load_state_dict(checkpoint_model)
         # manually initialize fc layer
         trunc_normal_(self.model.head.weight, std=2e-5)
-        
-        
+
         self.audio_obj = AudiosetDataset(sr=SAMPLE_RATE, audio_conf=self.audio_conf_val)
 
     def preprocess(self, audio):

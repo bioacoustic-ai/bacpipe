@@ -1620,5 +1620,7 @@ def chunk_and_normalize(
         batched_wav = data
 
     if normalize:
-        batched_wav = torch.stack([torch.nn.functional.layer_norm(x, x.shape).squeeze() for x in batched_wav])
+        batched_wav = torch.stack(
+            [torch.nn.functional.layer_norm(x, x.shape).squeeze() for x in batched_wav]
+        )
     return batched_wav

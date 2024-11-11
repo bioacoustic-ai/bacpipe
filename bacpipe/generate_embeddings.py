@@ -36,7 +36,6 @@ class Loader:
         else:
             self.embed_suffix = ".npy"
 
-
         self.check_embeds_already_exist()
         if self.combination_already_exists or self.dim_reduction_model:
             self.get_embeddings()
@@ -219,12 +218,12 @@ class Embedder:
     def _init_model(self):
         module = importlib.import_module(f"bacpipe.pipelines.{self.model_name}")
         self.model = module.Model()
-        
+
     def prepare_audio(self, sample):
         audio = self.model.load_and_resample(sample)
         frames = self.model.window_audio(audio)
         return self.model.preprocess(frames)
-        
+
     def get_embeddings_for_audio(self, sample):
         batched_samples = self.model.init_dataloader(sample)
         embeds = self.model.batch_inference(batched_samples)
@@ -234,13 +233,13 @@ class Embedder:
             except:
                 embeds = embeds.detach().numpy()
         return embeds
-            
+
     def get_reduced_dimensionality_embeddings(self, embeds):
         samples = self.model.preprocess(embeds)
         return self.model(samples)
 
     def get_embeddings_from_model(self, sample):
-        
+
         start = time.time()
         if self.dim_reduction_model:
             embeds = self.get_reduced_dimensionality_embeddings(sample)
