@@ -2,8 +2,8 @@
 # audio_dir :       "/media/vincent/Extreme SSD/MA/20221019-Benoit/transfer_1780104_files_cfc5b86f/SABA01_201511_201604_SN275/resampled_2kHz/wav"
 
 # fixed path, embeddings will be stored here, DO NOT CHANGE
-embed_parent_dir :   "bacpipe/test_files/embeds"
-umap_parent_dir :   "bacpipe/test_files/umap_embeds"
+embed_parent_dir :   "bacpipe/evaluation/embeddings"
+dim_reduc_parent_dir :   "bacpipe/evaluation/dim_reduced_embeddings"
 
 
 # supported formats of audio files

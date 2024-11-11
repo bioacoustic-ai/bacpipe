@@ -3,3 +3,8 @@ bacpipe/models/*
 bacpipe/test*
 *__pycache__*
 .vscode
+
+bacpipe/evaluation/datasets/*
+bacpipe/evaluation/embeddings/*
+bacpipe/evaluation/dim_reduced_embeddings/*
+bacpipe/evaluation/results/*
