@@ -113,10 +113,7 @@ class Loader:
             "model_name": self.model_name,
             "audio_dir": str(self.audio_dir),
             "embed_dir": str(self.embed_dir),
-            "files": {
-                "audio_files": [],
-                "file_lengths (s)": [],
-            },
+            "files": {"audio_files": [], "file_lengths (s)": [], "preproc_shape": []},
         }
 
     def _get_metadata_dict(self, folder):
@@ -187,9 +184,12 @@ class Loader:
 
     def write_audio_file_to_metadata(self, file, embed):
         self.metadata_dict["files"]["audio_files"].append(file.stem + file.suffix)
-        self.metadata_dict["files"]["file_lengths (s)"].append(
-            embed.model.segment_length // embed.model.sr
-        )
+        if hasattr(embed, "file_length"):
+            self.metadata_dict["files"]["file_lengths (s)"].append(embed.file_length)
+        if hasattr(embed, "preprocessed_shape"):
+            self.metadata_dict["files"]["preproc_shape"].append(
+                embed.preprocessed_shape
+            )
 
     def write_metadata_file(self):
         with open(str(self.embed_dir.joinpath("metadata.yml")), "w") as f:
@@ -222,7 +222,10 @@ class Embedder:
     def prepare_audio(self, sample):
         audio = self.model.load_and_resample(sample)
         frames = self.model.window_audio(audio)
-        return self.model.preprocess(frames)
+        preprocessed_frames = self.model.preprocess(frames)
+        self.file_length = len(audio[0]) / self.model.sr
+        self.preprocessed_shape = tuple(preprocessed_frames.shape)
+        return preprocessed_frames
 
     def get_embeddings_for_audio(self, sample):
         batched_samples = self.model.init_dataloader(sample)
@@ -298,9 +301,9 @@ def generate_embeddings(save_files=True, **kwargs):
                 sample = ld.embed_read(file)
             else:
                 sample = file
-                ld.write_audio_file_to_metadata(file, embed)
-            embeds = embed.get_embeddings_from_model(sample)
-            embed.save_embeddings(idx, ld, file, embeds)
+            embeddings = embed.get_embeddings_from_model(sample)
+            ld.write_audio_file_to_metadata(file, embed)
+            embed.save_embeddings(idx, ld, file, embeddings)
         ld.write_metadata_file()
         ld.update_files()
     return ld
