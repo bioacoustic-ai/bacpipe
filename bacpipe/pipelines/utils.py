@@ -24,6 +24,8 @@ class ModelBaseClass:
 
     def load_and_resample(self, path):
         audio, sr = ta.load(path, normalize=True)
+        if audio.shape[0] > 1:
+            audio = audio.mean(axis=0).unsqueeze(0)
         re_audio = ta.functional.resample(audio, sr, self.sr)
         return re_audio
 
