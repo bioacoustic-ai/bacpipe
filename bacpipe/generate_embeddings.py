@@ -15,10 +15,12 @@ class Loader:
         self,
         check_if_combination_exists=True,
         model_name="umap",
+        audio_dir=None,
         testing=False,
         **kwargs,
     ):
         self.model_name = model_name
+        self.audio_dir = audio_dir
 
         with open("bacpipe/config.yaml", "r") as f:
             self.config = yaml.safe_load(f)
@@ -72,7 +74,7 @@ class Loader:
                 if (
                     self.model_name in d.stem
                     and Path(self.audio_dir).stem in d.stem
-                    and self.embedding_model in d.stem
+                    and self.model_name in d.stem
                 ):
 
                     num_files = len(
@@ -136,7 +138,7 @@ class Loader:
                 {"embedding_files": [], "embedding_dimensions": []}
             )
             self.embed_dir = Path(self.umap_parent_dir).joinpath(
-                self.get_timestamp_dir() + f"-{self.embedding_model}"
+                self.get_timestamp_dir() + f"-{self.model_name}"
             )
 
     def get_embedding_dir(self):
@@ -157,7 +159,7 @@ class Loader:
         embed_dirs = [
             d
             for d in self.embed_parent_dir.iterdir()
-            if self.audio_dir.stem in d.stem and self.embedding_model in d.stem
+            if self.audio_dir.stem in d.stem and self.model_name in d.stem
         ]
         # check if timestamp of umap is after timestamp of model embeddings
         embed_dirs.sort()
@@ -217,7 +219,8 @@ class Embedder:
             samples = self.model.preprocess(frames)
         start = time.time()
 
-        embeds = self.model(samples)
+        batched_samples = self.model.init_dataloader(samples)
+        embeds = self.model.batch_inference(batched_samples)
         if not isinstance(embeds, np.ndarray):
             embeds = embeds.numpy()
 

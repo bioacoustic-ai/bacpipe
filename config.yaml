@@ -1,0 +1,35 @@
+## MAIN VARS ##
+
+# PATHS:
+# define paths for your data, these are the standard directories, if you 
+# used the file condenser. If you do not have annotated data, and all of your
+# sound files are in one directory, change accordingly
+audio_dir :       "bacpipe/test_files/audio/audio_test_files"
+
+
+
+
+# CHOOSE FROM MODELS
+models : [
+    "animal2vec_xc",
+    "animal2vec_mk",
+    "audiomae",
+    "aves",
+    "biolingual",
+    "birdaves",
+    "birdnet",
+    "echopasst",
+    "hbdet",
+    "insect66",
+    "mix2",
+    "perch",
+    "protoclr",
+    "rcl_fs_bsed",
+    "surfperch",
+    "whaleperch",
+    "vggish",
+  ]
+
+
+# embedding model name
+embedding_model: ["aves"]

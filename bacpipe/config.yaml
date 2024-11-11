@@ -1,10 +1,4 @@
 ## MAIN VARS ##
-
-# PATHS:
-# define paths for your data, these are the standard directories, if you 
-# used the file condenser. If you do not have annotated data, and all of your
-# sound files are in one directory, change accordingly
-audio_dir :       "bacpipe/test_files/audio/audio_test_files"
 # audio_dir :       "/media/vincent/Extreme SSD/MA/20221019-Benoit/transfer_1780104_files_cfc5b86f/SABA01_201511_201604_SN275/resampled_2kHz/wav"
 
 # fixed path, embeddings will be stored here, DO NOT CHANGE
@@ -12,12 +6,11 @@ embed_parent_dir :   "bacpipe/test_files/embeds"
 umap_parent_dir :   "bacpipe/test_files/umap_embeds"
 
 
-# embedding model name
-embedding_model: 'rcl_fs_bsed'
-
 # supported formats of audio files
 audio_suffixes: ['.wav', '.WAV', '.aif', '.mp3']
 
+# specify your device ['cpu', 'cuda', ...]
+device: 'cpu'
 
 # UMAP settings
 n_neighbors : 50
