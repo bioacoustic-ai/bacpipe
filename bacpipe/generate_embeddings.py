@@ -179,16 +179,17 @@ class Loader:
     def embed_read(self, file):
         embeds = np.load(file)
         self.metadata_dict["files"]["embedding_files"].append(str(file))
-        self.metadata_dict["files"]["embedding_dimensions"].append(embeds.shape)
+        self.metadata_dict["files"]["embedding_dimensions"].append(str(embeds.shape))
         return embeds
 
     def write_audio_file_to_metadata(self, file, embed):
-        self.metadata_dict["files"]["audio_files"].append(file.stem + file.suffix)
-        if hasattr(embed, "file_length"):
+        if not self.dim_reduction_model:
+            self.metadata_dict["segment_length (samples)"] = embed.model.segment_length
+            self.metadata_dict["sample_rate (Hz)"] = embed.model.sr
+            self.metadata_dict["files"]["audio_files"].append(file.stem + file.suffix)
             self.metadata_dict["files"]["file_lengths (s)"].append(embed.file_length)
-        if hasattr(embed, "preprocessed_shape"):
             self.metadata_dict["files"]["preproc_shape"].append(
-                embed.preprocessed_shape
+                str(embed.preprocessed_shape)
             )
 
     def write_metadata_file(self):
@@ -258,7 +259,10 @@ class Embedder:
         file_dest = fileloader_obj.embed_dir.joinpath(file.stem + "_" + self.model_name)
         if file.suffix == ".npy":
             file_dest = str(file_dest) + ".json"
-            input_len = 3
+            input_len = (
+                fileloader_obj.metadata_dict["segment_length (samples)"]
+                / fileloader_obj.metadata_dict["sample_rate (Hz)"]
+            )
             save_embeddings_dict_with_timestamps(
                 file_dest, embeds, input_len, fileloader_obj, file_idx
             )
