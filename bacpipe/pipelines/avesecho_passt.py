@@ -119,7 +119,8 @@ class Model(ModelBaseClass):
         self.model.net = get_model_passt(arch="passt_s_kd_p16_128_ap486", n_classes=585)
         self.model.net.to("cpu")
         ckpnt = torch.load(
-            f"{MODEL_BASE_PATH}/echopasst/passt_bghani_202410.pt", weights_only=True
+            f"{MODEL_BASE_PATH}/avesecho_passt/passt_bghani_202410.pt",
+            weights_only=True,
         )
         self.model.load_state_dict(ckpnt)
 

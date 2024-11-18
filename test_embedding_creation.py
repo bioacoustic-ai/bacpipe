@@ -17,7 +17,7 @@ embedding_dimensions = {
     "biolingual": 512,
     "birdaves": 1024,
     "birdnet": 1024,
-    "echopasst": 768,
+    "avesecho_passt": 768,
     "hbdet": 2048,
     "insect66": 1280,
     "mix2": 960,
@@ -69,5 +69,5 @@ def test_embedding_dimensions(model):
     assert embeddings[model].shape[-1] == embedding_dimensions[model]
 
 
-# test_model('echopasst')
+# test_model('avesecho_passt')
 # pytest -v --disable-warnings test_embedding_creation.py
