@@ -3,9 +3,50 @@ BioAcoustic Collection Pipeline
 
 This repository aims to streamline the generation and testing of embeddings using a large variety of bioacoustic models. 
 
-Models currently include:
+# Installation
 
-## Available models
+### Create and activate your environment
+
+Create a virtual environment using python3.11 and virtualenv
+`python3.11 -m virtualenv env_bacpipe`
+
+activate the environment
+
+`source env_bacpipe/bin/activate`
+
+### Ensure you have the following before installing the requirements.
+- for `fairseq` to install you will need python headers:
+`sudo apt-get install python3.11-dev`
+- pip version 24.0 (`pip install pip==24.0`, omegaconf 2.0.6 has a non-standard dependency specifier PyYAML>=5.1.*. pip 24.1 will enforce this behaviour change and installation will thus fail.)
+
+### Install the dependencies once the prerequisites are satisfied.
+
+`pip install -r requirements.txt`
+
+### Test the installation you can execute the test suite. 
+
+By doing so you will also ensure that the directory structure for the model checkpoints will be created.
+
+`pytest -v --disable-warnings test_embedding_creation.py`
+
+### Add the model checkpoints that are not included by default.
+
+Download the ones that are available from [here](https://github.com/bioacoustic-ai/bacpipe/tree/main/bacpipe/pipelines) and create directories corresponding to the pipeline-names and place the checkpoints within them. 
+
+# Usage
+
+Modify the __config.yaml__ file in the root directory to specify the path to your __dataset__. Define what models to run by specifying the strings in the __embedding_model__ list (copy and paste as needed). If you want to run a dimensionality reduction model (currently only supporting UMAP), specify the name in the __dim_reduction_model__ variable.
+
+Once the configuration is complete, execute the run_pipeline.py file (make sure the environment is activated)
+`python run_pipeline.py` .
+
+While the scripts are executed, directories will be created in the __bacpipe.evaluation__ directory. Embeddings will be saved in __bacpipe.evaluation.embeddings__ and if selected, reduced dimensionality embeddings will be saved in __bacpipe.evaluation.dim_reduced_embeddings__. 
+
+Please raise issues if there are questions or bugs. Also, please cite the authors of the respective models, all models are referenced in the table below.
+
+
+# Available models
+Models currently include:
 
 |   Name|   ref paper|   ref code|   sampling rate|   input length| embedding dimension |
 |---|---|---|---|---|---|
@@ -27,22 +68,3 @@ Models currently include:
 |   WhalePerch       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   24 kHz|   5 s| 1280 |
 |   UMAP        |   [paper](https://arxiv.org/abs/1802.03426)   |   [code](https://github.com/lmcinnes/umap)    |   - |   - | |
 |   VGGish      |   [paper](https://ieeexplore.ieee.org/document/7952132)   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   16 kHz|   0.96 s| 128 |
-
-## Installation
-
-Create a virtual environment using python3.11 and virtualenv
-`python3.11 -m virtualenv env_bacpipe`
-
-activate the environment
-
-`source env_bacpipe/bin/activate`
-
-before installing the requirements, ensure you have the following:
-- for `fairseq` to install you will need python headers:
-`sudo apt-get install python3.11-dev`
-- pip version 24.0 (`pip install pip==24.0`, omegaconf 2.0.6 has a non-standard dependency specifier PyYAML>=5.1.*. pip 24.1 will enforce this behaviour change and installation will thus fail.)
-
-once the prerequisites are satisfied:
-
-`pip install -r requirements.txt`
-
