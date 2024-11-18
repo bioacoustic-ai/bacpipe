@@ -13,7 +13,9 @@ class Model(ModelBaseClass):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         self.model = mobilenetv3()
         dict = torch.load(
-            "bacpipe/models/mix2/mix2.pth", map_location="cpu", weights_only=True
+            self.MODEL_BASE_PATH + "/mix2/mix2.pth",
+            map_location="cpu",
+            weights_only=True,
         )
         self.model.load_state_dict(dict["encoder"])
         self.mel = MelSpectrogram(n_fft=512, hop_length=128, n_mels=128)

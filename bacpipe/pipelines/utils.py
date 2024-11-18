@@ -5,7 +5,7 @@ import torchaudio as ta
 import torch
 from tqdm import tqdm
 
-MODEL_BASE_PATH = "bacpipe/models"
+MODEL_BASE_PATH = "bacpipe/model_checkpoints"
 GLOBAL_BATCH_SIZE = 16
 
 

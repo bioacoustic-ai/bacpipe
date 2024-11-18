@@ -41,7 +41,7 @@ class Model(ModelBaseClass):
 
         self.model = cvt13()
         state_dict = torch.load(
-            "bacpipe/models/protoclr/protoclr_300.pth", map_location="cpu"
+            self.MODEL_BASE_PATH + "/protoclr/protoclr_300.pth", map_location="cpu"
         )
         self.model.load_state_dict(state_dict)
         self.model = self.model.to(DEVICE)

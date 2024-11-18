@@ -1,5 +1,5 @@
 env*
-bacpipe/models/*
+bacpipe/model_checkpoints/*
 bacpipe/test*
 *__pycache__*
 .vscode
