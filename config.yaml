@@ -32,7 +32,10 @@ models : [
 
 
 # embedding model name
-embedding_model: ["aves"]
+embedding_model: ["perch", "surfperch", "whaleperch"]
 
-# dimensionality reduction model name
+# dimensionality reduction model name.
+supported_models: [
+  "umap"
+]
 dim_reduction_model: None

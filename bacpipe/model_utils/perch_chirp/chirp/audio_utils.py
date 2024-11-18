@@ -26,7 +26,7 @@ import tempfile
 from typing import Callable, Generator, Sequence
 import warnings
 
-from bacpipe.model_utils.perch_chirp.chirp import path_utils
+# from bacpipe.model_utils.perch_chirp.chirp import path_utils
 from bacpipe.model_utils.perch_chirp.chirp import signal
 from etils import epath
 from jax import lax

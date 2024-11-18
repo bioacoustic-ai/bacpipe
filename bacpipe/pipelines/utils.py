@@ -5,7 +5,7 @@ import torchaudio as ta
 import torch
 from tqdm import tqdm
 
-MODEL_BASE_PATH = "bacpipe/models"
+MODEL_BASE_PATH = "bacpipe/model_checkpoints"
 GLOBAL_BATCH_SIZE = 16
 
 
@@ -17,6 +17,7 @@ class ModelBaseClass:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+        self.model_base_path = MODEL_BASE_PATH
         self.sr = sr
         self.segment_length = segment_length
         if segment_length:

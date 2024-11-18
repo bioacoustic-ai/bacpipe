@@ -2,12 +2,33 @@ from bacpipe.generate_embeddings import generate_embeddings, Loader, Embedder
 import numpy as np
 from pathlib import Path
 
+
+# INITIALIZATION
 # Find all models in the pipelines directory
 models = [
     mod.stem
     for mod in Path("bacpipe/pipelines").glob("*.py")
     if not mod.stem in ["__init__", "utils", "umap"]
 ]
+
+# Only test models whos checkpoints have been downloaded
+models_requiring_checkpoints = [
+    "animal2vec_mk",
+    "animal2vec_xc",
+    "audiomae",
+    "aves",
+    "avesecho_passt",
+    "birdaves",
+    "hbdet",
+    "insect66",
+    "mix2",
+    "protoclr",
+    "vggish",
+]
+for model in models_requiring_checkpoints:
+    if not Path(f"bacpipe/model_checkpoints/{model}").exists():
+        models.remove(model)
+
 
 embedding_dimensions = {
     "animal2vec_xc": 768,
@@ -32,6 +53,8 @@ embedding_dimensions = {
 embeddings = {}
 
 audio_dir = "bacpipe/evaluation/datasets/audio_test_files"
+
+# TESTING
 
 
 def embedder_fn(loader, model_name):

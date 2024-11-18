@@ -11,7 +11,7 @@ LENGH_IN_SAMPLES = int(0.96 * SAMPLE_RATE)
 class Model(ModelBaseClass):
     def __init__(self):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGH_IN_SAMPLES)
-        self.model = hub.load("bacpipe/models/vggish")
+        self.model = hub.load(self.model_base_path + "/vggish")
 
     def preprocess(self, audio):
         return tf.reshape(tf.convert_to_tensor(audio * 32767, dtype=tf.int16), (1, -1))

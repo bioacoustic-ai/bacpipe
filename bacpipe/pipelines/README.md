@@ -1,6 +1,6 @@
 # This directory contains all model-specific pipelines to generate embeddings
 
-## Available models
+# Available models
 
 |   Name|   paper|   code|   training|   CNN/Trafo| architecture | checkpoint link |
 |---|---|---|---|---|---|---|
@@ -156,3 +156,48 @@ see [repo](https://github.com/lmcinnes/umap)
 - trained on general audio
 
 VGGish is a model based on the [VGG](https://arxiv.org/pdf/1409.1556) architecture. The model is trained on audio from youtube videos (YouTube-8M)
+
+# Add a new model
+
+To add a new model, simply add a pipeline with the name of your model. Make sure your model follows the following criteria:
+
+- define the model specific __sampling rate__
+- define the model specific input __segment length__
+- define a class called "__Model__" which inherits the __ModelBaseClass__ from __bacpipe.utils__
+- define the __init__, preproc, and __call__ methods so that the model can be called
+- if necessary save the checkpoint in the __bacpipe.model_checkpoints__ dir with the name corresponding to the name of the model
+- if you need to import code where your specific model class is defined, create a directory in __bacpipe.model_utils__ corresponding to your model name "newmodel" and add all the necessary code in there
+
+Here is an example:
+
+```python 
+import torch
+from bacpipe.model_utils.newmodel.module import MyClass
+from .utils import ModelBaseClass
+
+SAMPLE_RATE = 12345
+LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
+
+
+class Model(ModelBaseClass):
+    def __init__(self):
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+        self.model = MyClass()
+        state_dict = torch.load(
+            self.model_base_path + "/newmodel/checkpoint_path.pth",
+            weights_only=True,
+        )
+        self.model.load_state_dict(state_dict)
+
+    def preprocess(self, audio): # audio is a torch.tensor object
+        # insert your preprocessing steps
+        return processed_audio
+
+    @torch.inference_mode()
+    def __call__(self, input):
+        embeddings = self.model(input)
+        return embeddings
+
+```
+
+Most of the models are based on pytorch. For tensorflow models, see __birdnet__, __hbdet__ or __vggish__.
