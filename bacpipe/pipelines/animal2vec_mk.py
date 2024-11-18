@@ -19,7 +19,7 @@ class Model(ModelBaseClass):
             self.segment_length = A2VXC.LENGTH_IN_SAMPLES
         else:
             path_to_pt_file = (
-                self.MODEL_BASE_PATH
+                self.model_base_path
                 + "/animal2vec_mk/animal2vec_large_finetuned_MeerKAT_240507.pt"
             )
         models, _ = checkpoint_utils.load_model_ensemble(

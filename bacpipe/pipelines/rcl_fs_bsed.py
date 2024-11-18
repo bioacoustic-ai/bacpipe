@@ -19,7 +19,7 @@ class Model(ModelBaseClass):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         self.model = ResNet()
         state_dict = torch.load(
-            self.MODEL_BASE_PATH + "/rcl_fs_bsed/bioacoustics_model.pth",
+            self.model_base_path + "/rcl_fs_bsed/bioacoustics_model.pth",
             weights_only=True,
         )
         enc_sd = state_dict["encoder"]

@@ -72,7 +72,7 @@ class Model(ModelBaseClass):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         self.nb_classes = 527
         self.model = "vit_base_patch16"
-        self.model_path = self.MODEL_BASE_PATH + "/audiomae/finetuned.pth"
+        self.model_path = self.model_base_path + "/audiomae/finetuned.pth"
         self.global_pool = True
 
         self.drop_path = 0.1

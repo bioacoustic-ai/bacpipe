@@ -17,7 +17,7 @@ class Model(ModelBaseClass):
     def __init__(self):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         model = tf.keras.models.load_model(
-            self.MODEL_BASE_PATH + "/birdnet", compile=False
+            self.model_base_path + "/birdnet", compile=False
         )
         self.model = tf.keras.Sequential(model.embeddings_model)
 

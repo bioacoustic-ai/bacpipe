@@ -13,7 +13,7 @@ class Model(ModelBaseClass):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         self.model = mobilenetv3()
         dict = torch.load(
-            self.MODEL_BASE_PATH + "/mix2/mix2.pth",
+            self.model_base_path + "/mix2/mix2.pth",
             map_location="cpu",
             weights_only=True,
         )
