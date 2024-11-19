@@ -12,8 +12,8 @@ def get_embeddings(
     model_name,
     audio_dir,
     dim_reduction_model="None",
-    check_if_primary_combination_exists=False,
-    check_if_secondary_combination_exists=False,
+    check_if_primary_combination_exists=True,
+    check_if_secondary_combination_exists=True,
 ):
     generate_embeddings(
         model_name=model_name,

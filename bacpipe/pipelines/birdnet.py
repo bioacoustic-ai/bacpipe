@@ -1,10 +1,4 @@
 import tensorflow as tf
-import numpy as np
-import librosa as lb
-import logging
-
-logger = logging.getLogger("bacpipe")
-logger.setLevel(level=logging.DEBUG)
 
 SAMPLE_RATE = 48000
 LENGTH_IN_SAMPLES = 144000

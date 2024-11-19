@@ -53,7 +53,9 @@ class ModelBaseClass:
 
     def batch_inference(self, batched_samples):
         embeds = []
-        for batch in tqdm(batched_samples):
+        for batch in tqdm(
+            batched_samples, desc=" processing batches", position=0, leave=False
+        ):
             embeds.append(self.__call__(batch))
         if isinstance(embeds[0], torch.Tensor):
             return torch.cat(embeds, axis=0)

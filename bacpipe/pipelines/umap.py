@@ -13,8 +13,10 @@ class Model(ModelBaseClass):
             random_state=self.config["random_state"],
         ).fit_transform
 
-    def preprocess(self, audio):
-        return audio
+    def preprocess(self, embeddings):
+        if not embeddings.shape[-1] == 2:
+            embeddings = embeddings.reshape([embeddings.shape[-1], 2])
+        return embeddings
 
     def __call__(self, input):
         return self.model(input)

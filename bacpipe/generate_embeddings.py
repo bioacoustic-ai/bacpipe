@@ -21,7 +21,7 @@ class Loader:
         **kwargs,
     ):
         self.model_name = model_name
-        self.audio_dir = audio_dir
+        self.audio_dir = Path(audio_dir)
         self.dim_reduction_model = dim_reduction_model
 
         with open("bacpipe/config.yaml", "r") as f:
@@ -69,33 +69,27 @@ class Loader:
                     )
                 ]
             existing_embed_dirs.sort()
-            for d in existing_embed_dirs[::-1]:
+            self._find_existing_embed_dir(existing_embed_dirs)
 
-                if (
-                    self.model_name in d.stem
-                    and Path(self.audio_dir).stem in d.stem
-                    and self.model_name in d.stem
-                ):
+    def _find_existing_embed_dir(self, existing_embed_dirs):
+        for d in existing_embed_dirs[::-1]:
 
-                    num_files = len(
-                        [f for f in d.iterdir() if f.suffix == self.embed_suffix]
-                    )
-                    num_audio_files = len(
-                        [
-                            f
-                            for f in Path(self.audio_dir).iterdir()
-                            if f.suffix in self.config["audio_suffixes"]
-                        ]
-                    )
+            if self.model_name in d.stem and Path(self.audio_dir).stem in d.stem:
 
-                    if num_audio_files == num_files:
+                num_files = len(
+                    [f for f in d.iterdir() if f.suffix == self.embed_suffix]
+                )
+                num_audio_files = len(self._get_audio_files())
+
+                if num_audio_files == num_files:
+                    if self.dim_reduction_model:
+                        return d
+                    else:
                         self.combination_already_exists = True
                         self._get_metadata_dict(d)
                         break
 
     def _get_audio_paths(self):
-        self.audio_dir = Path(self.audio_dir)
-
         self.files = self._get_audio_files()
 
         self.embed_dir = Path(self.embed_parent_dir).joinpath(self.get_timestamp_dir())
@@ -113,7 +107,7 @@ class Loader:
             "model_name": self.model_name,
             "audio_dir": str(self.audio_dir),
             "embed_dir": str(self.embed_dir),
-            "files": {"audio_files": [], "file_lengths (s)": [], "preproc_shape": []},
+            "files": {"audio_files": [], "file_lengths (s)": []},
         }
 
     def _get_metadata_dict(self, folder):
@@ -160,8 +154,7 @@ class Loader:
         ]
         # check if timestamp of umap is after timestamp of model embeddings
         embed_dirs.sort()
-        most_recent_emdbed_dir = embed_dirs[-1]
-        return most_recent_emdbed_dir
+        return self._find_existing_embed_dir(embed_dirs)
 
     def get_annotations(self):
         pass
@@ -182,15 +175,15 @@ class Loader:
         self.metadata_dict["files"]["embedding_dimensions"].append(str(embeds.shape))
         return embeds
 
-    def write_audio_file_to_metadata(self, file, embed):
+    def write_audio_file_to_metadata(self, index, file, embed):
         if not self.dim_reduction_model:
-            self.metadata_dict["segment_length (samples)"] = embed.model.segment_length
-            self.metadata_dict["sample_rate (Hz)"] = embed.model.sr
-            self.metadata_dict["files"]["audio_files"].append(file.stem + file.suffix)
+            if index == 0:
+                self.metadata_dict["segment_length (samples)"] = (
+                    embed.model.segment_length
+                )
+                self.metadata_dict["sample_rate (Hz)"] = embed.model.sr
+            self.metadata_dict["files"]["audio_files"].append(str(file))
             self.metadata_dict["files"]["file_lengths (s)"].append(embed.file_length)
-            self.metadata_dict["files"]["preproc_shape"].append(
-                str(embed.preprocessed_shape)
-            )
 
     def write_metadata_file(self):
         with open(str(self.embed_dir.joinpath("metadata.yml")), "w") as f:
@@ -297,17 +290,33 @@ def save_embeddings_dict_with_timestamps(
 
 
 def generate_embeddings(save_files=True, **kwargs):
-    ld = Loader(**kwargs)
-    if not ld.combination_already_exists:
-        embed = Embedder(**kwargs)
-        for idx, file in tqdm(enumerate(ld.files)):
-            if file.suffix == ".npy":
-                sample = ld.embed_read(file)
-            else:
-                sample = file
-            embeddings = embed.get_embeddings_from_model(sample)
-            ld.write_audio_file_to_metadata(file, embed)
-            embed.save_embeddings(idx, ld, file, embeddings)
-        ld.write_metadata_file()
-        ld.update_files()
-    return ld
+    if "model_name" in kwargs:
+        print(f"\nGenerating embeddings for {kwargs['model_name']}\n")
+    else:
+        raise ValueError("model_name not provided in kwargs.")
+    try:
+        ld = Loader(**kwargs)
+        if not ld.combination_already_exists:
+            embed = Embedder(**kwargs)
+            for idx, file in enumerate(
+                tqdm(ld.files, desc="processing files", position=1)
+            ):
+                if file.suffix == ".npy":
+                    sample = ld.embed_read(file)
+                else:
+                    sample = file
+                embeddings = embed.get_embeddings_from_model(sample)
+                ld.write_audio_file_to_metadata(idx, file, embed)
+                embed.save_embeddings(idx, ld, file, embeddings)
+            ld.write_metadata_file()
+            ld.update_files()
+        return ld
+    except KeyboardInterrupt:
+        if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
+            print("KeyboardInterrupt: Exiting and deleting created embeddings.")
+            import shutil
+
+            shutil.rmtree(ld.embed_dir)
+        import sys
+
+        sys.exit()
