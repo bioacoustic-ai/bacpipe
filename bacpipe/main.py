@@ -1,9 +1,7 @@
-import yaml
-import json
 import logging
 import numpy as np
 from bacpipe.generate_embeddings import generate_embeddings
-from bacpipe.visualize_umaps import plot_embeddings
+from bacpipe.visualize import plot_embeddings
 
 logger = logging.getLogger("bacpipe")
 
@@ -13,7 +11,7 @@ def get_embeddings(
     audio_dir,
     dim_reduction_model="None",
     check_if_primary_combination_exists=True,
-    check_if_secondary_combination_exists=True,
+    check_if_secondary_combination_exists=False,
 ):
     generate_embeddings(
         model_name=model_name,
