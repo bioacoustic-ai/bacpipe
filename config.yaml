@@ -33,10 +33,27 @@ models : [
 
 
 # embedding model name
-embedding_model: ["perch", "surfperch", "whaleperch"]
+embedding_model: [
+    "animal2vec_xc",
+    "audiomae",
+    "aves",
+    "biolingual",
+    "birdaves",
+    "birdnet",
+    "avesecho_passt",
+    "hbdet",
+    "insect66",
+    "mix2",
+    "perch",
+    "protoclr",
+    "rcl_fs_bsed",
+    "surfperch",
+    "whaleperch",
+    "animal2vec_mk",
+    "vggish"]
 
 # dimensionality reduction model name.
 supported_models: [
   "umap"
 ]
-dim_reduction_model: None
+dim_reduction_model: "umap"

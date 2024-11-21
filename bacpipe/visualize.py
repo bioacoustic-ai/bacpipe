@@ -43,7 +43,7 @@ def plot_embeddings(umap_embed_path, axes=False, fig=False):
     else:
         axes.legend()
         axes.set_title("UMAP embeddings")
-        fig.savefig(umap_embed_path.joinpath("umap_embed.png"))
+        fig.savefig(umap_embed_path.joinpath("umap_embed.png"), dpi=300)
 
 
 def data_split_by_labels(embeds_dict):
@@ -76,13 +76,18 @@ def return_rows_cols(num):
         return 2, 3
     elif num > 6 and num <= 9:
         return 3, 3
-    elif num > 10 and num <= 16:
+    elif num > 9 and num <= 16:
         return 4, 4
+    elif num > 16 and num <= 20:
+        return 4, 5
 
 
 def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
     rows, cols = return_rows_cols(len(embedding_models))
     fig, axes = plt.subplots(rows, cols, figsize=(12, 8))
+    fig.subplots_adjust(
+        left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4
+    )
     for idx, model in enumerate(embedding_models):
         ld = Loader(
             audio_dir, model_name=model, dim_reduction_model=dim_reduction_model
@@ -93,5 +98,6 @@ def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
         axes.flatten()[idx].set_title(f"{model}")
         if idx == 0:
             axes.flatten()[0].legend()
-    fig.suptitle(f"Comparison of {dim_reduction_model} embeddings")
+    # fig.tight_layout()
+    fig.suptitle(f"Comparison of {dim_reduction_model} embeddings", fontweight="bold")
     fig.savefig(ld.embed_dir.joinpath("comp_fig.png"), dpi=300)
