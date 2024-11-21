@@ -62,4 +62,5 @@ class ModelBaseClass:
         else:
             import tensorflow as tf
 
-            return tf.concat(embeds, axis=0)
+            return_embeds = tf.concat(embeds, axis=0).numpy().squeeze()
+            return return_embeds

@@ -3,7 +3,7 @@
 
 # fixed path, embeddings will be stored here, DO NOT CHANGE
 embed_parent_dir :   "bacpipe/evaluation/embeddings"
-dim_reduc_parent_dir :   "bacpipe/evaluation/dim_reduced_embeddings/umap_nn50"
+dim_reduc_parent_dir :   "bacpipe/evaluation/dim_reduced_embeddings"
 
 # To avoid creating embeddings when configurations are still being tested, this is set to True. 
 # Set to False if you want to keep embeddings even if the process is interrupted.

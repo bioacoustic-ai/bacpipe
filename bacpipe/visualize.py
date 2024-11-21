@@ -52,21 +52,18 @@ def data_split_by_labels(embeds_dict):
         index = 0
         split_data = {}
         idx_increment = lambda x: meta.embedding_dimensions[x][0]
+        concat = lambda x, x1: np.concatenate([x, x1])
         for idx, file in enumerate(meta.embedding_files):
             parent_dir = Path(file).relative_to(meta.embed_dir).parent.stem
             if not parent_dir in split_data:
                 split_data[parent_dir] = {"x": [], "y": []}
 
             for k in split_data[parent_dir].keys():
-                split_data[parent_dir][k].append(
-                    np.stack(
-                        embeds_dict[k][index : index + idx_increment(idx)], axis=-1
-                    )
+                split_data[parent_dir][k] = concat(
+                    split_data[parent_dir][k],
+                    embeds_dict[k][index : index + idx_increment(idx)],
                 )
             index += idx_increment(idx)
-        for label in split_data:
-            for k in split_data[parent_dir].keys():
-                split_data[label][k] = np.stack(split_data[label][k], axis=-1)[0]
 
         return split_data
 

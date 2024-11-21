@@ -321,7 +321,6 @@ def generate_embeddings(save_files=True, **kwargs):
         raise ValueError("model_name not provided in kwargs.")
     try:
         ld = Loader(**kwargs)
-        embeddings = []
         if not ld.combination_already_exists:
             embed = Embedder(**kwargs)
             for idx, file in enumerate(
@@ -333,11 +332,13 @@ def generate_embeddings(save_files=True, **kwargs):
                     ld.write_audio_file_to_metadata(idx, file, embed)
                     embed.save_embeddings(idx, ld, file, embeddings)
                 else:
-                    embeddings.append(ld.embed_read(idx, file))
+                    if idx == 0:
+                        embeddings = ld.embed_read(idx, file)
+                    else:
+                        embeddings = np.concatenate(
+                            [embeddings, ld.embed_read(idx, file)]
+                        )
             if ld.dim_reduction_model:
-                embeddings = np.reshape(
-                    embeddings, newshape=(-1, np.array(embeddings).shape[-1])
-                )
                 dim_reduced_embeddings = embed.get_embeddings_from_model(embeddings)
                 embed.save_embeddings(idx, ld, file, dim_reduced_embeddings)
             ld.write_metadata_file()
