@@ -4,8 +4,7 @@
 # define paths for your data, these are the standard directories, if you 
 # used the file condenser. If you do not have annotated data, and all of your
 # sound files are in one directory, change accordingly
-# audio_dir :       "bacpipe/evaluation/datasets/audio_test_files"
-audio_dir :       "/home/siriussound/Data/BuroojCallTypeData"
+audio_dir :       "bacpipe/evaluation/datasets/audio_test_files"
 
 
 
@@ -33,24 +32,7 @@ models : [
 
 
 # embedding model name
-embedding_model: [
-    "animal2vec_xc",
-    "audiomae",
-    "aves",
-    "biolingual",
-    "birdaves",
-    "birdnet",
-    "avesecho_passt",
-    "hbdet",
-    "insect66",
-    "mix2",
-    "perch",
-    "protoclr",
-    "rcl_fs_bsed",
-    "surfperch",
-    "whaleperch",
-    "animal2vec_mk",
-    "vggish"]
+embedding_model: ["audiomae"]
 
 # dimensionality reduction model name.
 supported_models: [
