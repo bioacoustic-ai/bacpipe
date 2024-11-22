@@ -102,6 +102,7 @@ class Loader:
             [files_list.append(ll) for ll in self.audio_dir.rglob(f"*{string}")]
             for string in self.config["audio_suffixes"]
         ]
+        assert len(files_list) > 0, "No audio files found in audio_dir."
         return files_list
 
     def _init_metadata_dict(self):
@@ -176,7 +177,8 @@ class Loader:
 
     def embed_read(self, index, file):
         embeds = np.load(file)
-        self.metadata_dict["files"]["embedding_files"].append(str(file))
+        rel_file_path = Path(file).relative_to(self.metadata_dict["embed_dir"])
+        self.metadata_dict["files"]["embedding_files"].append(str(rel_file_path))
         if len(embeds.shape) == 1:
             embeds = np.expand_dims(embeds, axis=0)
         self.metadata_dict["files"]["embedding_dimensions"].append(embeds.shape)
@@ -186,7 +188,8 @@ class Loader:
         if index == 0:
             self.metadata_dict["segment_length (samples)"] = embed.model.segment_length
             self.metadata_dict["sample_rate (Hz)"] = embed.model.sr
-        self.metadata_dict["files"]["audio_files"].append(str(file))
+        rel_file_path = Path(file).relative_to(self.audio_dir)
+        self.metadata_dict["files"]["audio_files"].append(str(rel_file_path))
         self.metadata_dict["files"]["file_lengths (s)"].append(embed.file_length)
 
     def write_metadata_file(self):
@@ -282,12 +285,14 @@ class Embedder:
 def save_embeddings_dict_with_timestamps(
     file_dest, embeds, input_len, loader_obj, f_idx
 ):
-    length = embeds.shape[0]
-    lin_array = np.arange(0, length * input_len, input_len)
+
+    t_stamps = []
+    for num_segments, _ in loader_obj.metadata_dict["files"]["embedding_dimensions"]:
+        [t_stamps.append(t) for t in np.arange(0, num_segments * input_len, input_len)]
     d = {
         var: embeds[:, i].tolist() for i, var in zip(range(embeds.shape[1]), ["x", "y"])
     }
-    d["timestamp"] = lin_array.tolist()
+    d["timestamp"] = t_stamps
     if PARENT_DIR_IS_LABEL:
         d["label"] = [
             par.relative_to(loader_obj.metadata_dict["embed_dir"]).parent.stem
@@ -344,7 +349,7 @@ def generate_embeddings(save_files=True, **kwargs):
             ld.write_metadata_file()
             ld.update_files()
         return ld
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, AssertionError):
         if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
             print("KeyboardInterrupt: Exiting and deleting created embeddings.")
             import shutil

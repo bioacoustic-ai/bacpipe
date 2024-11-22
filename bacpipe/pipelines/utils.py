@@ -56,7 +56,10 @@ class ModelBaseClass:
         for batch in tqdm(
             batched_samples, desc=" processing batches", position=0, leave=False
         ):
-            embeds.append(self.__call__(batch))
+            embedding = self.__call__(batch)
+            if isinstance(embedding, torch.Tensor) and embedding.dim() == 1:
+                embedding = embedding.unsqueeze(0)
+            embeds.append(embedding)
         if isinstance(embeds[0], torch.Tensor):
             return torch.cat(embeds, axis=0)
         else:

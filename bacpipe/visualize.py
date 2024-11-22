@@ -54,7 +54,7 @@ def data_split_by_labels(embeds_dict):
         idx_increment = lambda x: meta.embedding_dimensions[x][0]
         concat = lambda x, x1: np.concatenate([x, x1])
         for idx, file in enumerate(meta.embedding_files):
-            parent_dir = Path(file).relative_to(meta.embed_dir).parent.stem
+            parent_dir = Path(file).parent.stem
             if not parent_dir in split_data:
                 split_data[parent_dir] = {"x": [], "y": []}
 
@@ -69,7 +69,9 @@ def data_split_by_labels(embeds_dict):
 
 
 def return_rows_cols(num):
-    if num > 3 and num <= 6:
+    if num <= 3:
+        return 1, 3
+    elif num > 3 and num <= 6:
         return 2, 3
     elif num > 6 and num <= 9:
         return 3, 3
