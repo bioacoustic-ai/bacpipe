@@ -27,9 +27,9 @@ class Model(ModelBaseClass, nn.Module):
             model_path = f"{base_path}/birdaves/birdaves-bioxn-large.torchaudio.pt"
         else:
             model_config_path = (
-                f"{base_path}/aves/aves-base-bio.torchaudio.model_config.json"
+                f"{base_path}/aves_especies/aves-base-bio.torchaudio.model_config.json"
             )
-            model_path = f"{base_path}/aves/aves-base-bio.torchaudio.pt"
+            model_path = f"{base_path}/aves_especies/aves-base-bio.torchaudio.pt"
         model_config = json.load(open(model_config_path, "r"))
         self.model = wav2vec2_model(**model_config, aux_num_out=None)
         self.model.load_state_dict(torch.load(model_path))

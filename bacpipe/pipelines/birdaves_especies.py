@@ -1,4 +1,4 @@
-from .aves import Model
+from .aves_especies import Model
 
 
 class Model(Model):

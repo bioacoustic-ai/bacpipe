@@ -1,4 +1,4 @@
-from .perch import Model
+from .perch_bird import Model
 import numpy as np
 
 SAMPLE_RATE = 24_000
