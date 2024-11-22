@@ -12,29 +12,29 @@
 audio_dir :       "bacpipe/evaluation/datasets/audio_test_files"
 
 # CHOOSE FROM MODELS
-models : [
+available_models : [
     "animal2vec_xc",
     "animal2vec_mk",
     "audiomae",
-    "aves",
+    "aves_especies",
     "biolingual",
-    "birdaves",
+    "birdaves_especies",
     "birdnet",
     "avesecho_passt",
     "hbdet",
     "insect66",
+    "perch_bird",
     "mix2",
-    "perch",
     "protoclr",
     "rcl_fs_bsed",
     "surfperch",
-    "whaleperch",
+    "google_whale",
     "vggish",
   ]
 
 
 # embedding model name
-embedding_model: ["audiomae"]
+embedding_model: ["birdnet"]
 
 # dimensionality reduction model name.
 supported_models: [
