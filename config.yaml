@@ -38,6 +38,9 @@ embedding_model: ["birdnet"]
 
 # dimensionality reduction model name.
 supported_models: [
+  "pca",
+  "sparse_pca",
+  "t_sne",
   "umap"
 ]
 dim_reduction_model: "umap"
