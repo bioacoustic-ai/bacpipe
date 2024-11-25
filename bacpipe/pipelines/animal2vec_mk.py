@@ -11,6 +11,7 @@ LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
 class Model(ModelBaseClass):
     def __init__(self, xeno_canto=False):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+        self.batch_size = 8
         if xeno_canto:
             from . import animal2vec_xc as A2VXC
 

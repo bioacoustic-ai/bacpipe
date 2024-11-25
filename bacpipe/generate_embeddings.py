@@ -76,6 +76,10 @@ class Loader:
         for d in existing_embed_dirs[::-1]:
 
             if self.model_name in d.stem and Path(self.audio_dir).stem in d.stem:
+                with open(d.joinpath("metadata.yml"), "r") as f:
+                    mdata = yaml.safe_load(f)
+                    if not self.model_name == mdata["model_name"]:
+                        continue
 
                 if self.dim_reduction_model:
                     if self.dim_reduction_model in d.stem:

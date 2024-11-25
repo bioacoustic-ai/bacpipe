@@ -23,8 +23,10 @@ class Model(ModelBaseClass, nn.Module):
         # reference: https://pytorch.org/audio/stable/_modules/torchaudio/models/wav2vec2/utils/import_fairseq.html
         base_path = self.model_base_path
         if birdaves:
-            model_config_path = f"{base_path}/birdaves/birdaves-bioxn-large.torchaudio.model_config.json"
-            model_path = f"{base_path}/birdaves/birdaves-bioxn-large.torchaudio.pt"
+            model_config_path = f"{base_path}/birdaves_especies/birdaves-bioxn-large.torchaudio.model_config.json"
+            model_path = (
+                f"{base_path}/birdaves_especies/birdaves-bioxn-large.torchaudio.pt"
+            )
         else:
             model_config_path = (
                 f"{base_path}/aves_especies/aves-base-bio.torchaudio.model_config.json"
