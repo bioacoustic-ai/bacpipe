@@ -1,0 +1,14 @@
+{
+    "experiment_name": "species",
+    "dataset_csv_path": "bacpipe/bacpipe/evaluation/datasets/benchmark/tasks/dataset_9species.csv",
+    "Num_classes": 7,
+    "labels_to_index": {
+        "greywolf": 0,
+        "eagleowl": 1,
+        "hyrax": 2,
+        "chiffchaff": 3,
+        "littleowl": 4,
+        "pipit": 5,
+        "hyena": 6
+    }
+}

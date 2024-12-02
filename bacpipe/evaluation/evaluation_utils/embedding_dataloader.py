@@ -6,7 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 
 
-class EmbeddingsWith3LevelsHierarchicalLabels(Dataset):
+class EmbeddingTaskLoader(Dataset):
 
     ''' dataset of precomputed embeddings with hierarchical labels.
     embeddings_model refers to the name of the pretrained model that generated the embeddings: vggish, openl3, wav2vec, Birdnet....'''
