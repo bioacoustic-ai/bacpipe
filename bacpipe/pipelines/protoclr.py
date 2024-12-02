@@ -46,7 +46,8 @@ class Model(ModelBaseClass):
             weights_only=True,
         )
         self.model.load_state_dict(state_dict)
-        self.model = self.model.to(DEVICE)
+        self.model.to(DEVICE)
+        self.model.eval()
 
     def preprocess(self, audio):
         mel = self.mel(audio)
