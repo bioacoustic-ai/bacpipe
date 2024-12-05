@@ -223,6 +223,7 @@ class Embedder:
     def _init_model(self):
         module = importlib.import_module(f"bacpipe.pipelines.{self.model_name}")
         self.model = module.Model()
+        self.model.prepare_inference()
 
     def prepare_audio(self, sample):
         audio = self.model.load_and_resample(sample)

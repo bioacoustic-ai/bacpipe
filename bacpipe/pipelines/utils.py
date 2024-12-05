@@ -23,6 +23,12 @@ class ModelBaseClass:
         if segment_length:
             self.batch_size = int(100_000 * GLOBAL_BATCH_SIZE / segment_length)
 
+    def prepare_inference(self):
+        try:
+            self.model.eval()
+        except AttributeError:
+            pass
+
     def load_and_resample(self, path):
         audio, sr = ta.load(path, normalize=True)
         if audio.shape[0] > 1:
@@ -47,6 +53,7 @@ class ModelBaseClass:
 
             return tf.data.Dataset.from_tensor_slices(audio).batch(self.batch_size)
         elif "torch" in str(type(audio)):
+
             return torch.utils.data.DataLoader(
                 audio, batch_size=self.batch_size, shuffle=False
             )

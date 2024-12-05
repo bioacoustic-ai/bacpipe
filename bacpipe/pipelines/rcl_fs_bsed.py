@@ -35,6 +35,7 @@ class Model(ModelBaseClass):
             n_mels=N_MELS,
         )
         self.power_to_db = T.AmplitudeToDB()
+        self.model.eval()
 
     def preprocess(self, audio):
         mel = self.mel(torch.tensor(audio))

@@ -8,8 +8,40 @@ from bacpipe.generate_embeddings import Loader
 split_by_folder = True
 
 
+def get_centroid(data):
+    return np.mean(data["x"]), np.mean(data["y"])
+
+
+def get_ari_and_ami(split_data, centroids):
+    from sklearn.metrics import adjusted_rand_score as ari_score
+    from sklearn.metrics import adjusted_mutual_info_score as ami_score
+
+    preds = []
+    labels = []
+    acc_idx = 0
+    n_labels = np.arange(len(split_data))
+    label_dict = {k: v for k, v in zip(split_data.keys(), n_labels)}
+    for label in split_data:
+        for i in range(len(split_data[label]["x"])):
+            p = {}
+            for c_label, centroid in centroids.items():
+                p[c_label] = np.linalg.norm(
+                    np.array(centroid)
+                    - np.array(
+                        [(split_data[label]["x"][i]), (split_data[label]["y"][i])]
+                    )
+                )
+            preds.append(label_dict[list(p.keys())[np.argmin(list(p.values()))]])
+            labels.append(label_dict[label])
+            acc_idx += 1
+    ari = ari_score(labels, preds)
+    ami = ami_score(labels, preds)
+    return {"ARI": ari, "AMI": ami}
+
+
 def plot_embeddings(umap_embed_path, axes=False, fig=False):
     files = umap_embed_path.iterdir()
+    centroids = {}
     for file in files:
         if file.suffix == ".json":
             with open(file, "r") as f:
@@ -32,6 +64,11 @@ def plot_embeddings(umap_embed_path, axes=False, fig=False):
                 label=label,
                 markersize=0.5,
             )
+            centroids[label] = get_centroid(split_data[label])
+            axes.plot(
+                centroids[label][0], centroids[label][1], "x", label=f"{label} centroid"
+            )
+        clustering_dict = get_ari_and_ami(split_data, centroids)
     else:
         embed_x = embeds_dict["x"]
         embed_y = embeds_dict["y"]
@@ -39,7 +76,7 @@ def plot_embeddings(umap_embed_path, axes=False, fig=False):
         axes.plot(embed_x, embed_y, "o", label=file_stem, markersize=0.5)
 
     if return_axes:
-        return axes
+        return axes, clustering_dict
     else:
         axes.legend()
         axes.set_title("UMAP embeddings")
@@ -83,20 +120,27 @@ def return_rows_cols(num):
 
 def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
     rows, cols = return_rows_cols(len(embedding_models))
+    clust_dict = {}
     fig, axes = plt.subplots(rows, cols, figsize=(12, 8))
     fig.subplots_adjust(
-        left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4
+        left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.9
     )
     for idx, model in enumerate(embedding_models):
         ld = Loader(
             audio_dir, model_name=model, dim_reduction_model=dim_reduction_model
         )
-        axes.flatten()[idx] = plot_embeddings(
+        axes.flatten()[idx], clust_dict[model] = plot_embeddings(
             ld.embed_dir, axes=axes.flatten()[idx], fig=fig
         )
-        axes.flatten()[idx].set_title(f"{model}")
-        if idx == 0:
-            axes.flatten()[0].legend()
+        metric_str = ", ".join([f"{k}={v:.3f}" for k, v in clust_dict[model].items()])
+        axes.flatten()[idx].set_title(f"{model}\n{metric_str}")
     # fig.tight_layout()
+    new_order = [
+        k[0] for k in sorted(clust_dict.items(), key=lambda kv: kv[1]["ARI"])[::-1]
+    ]
+    positions = {mod: ax.get_position() for mod, ax in zip(new_order, axes.flatten())}
+    for model, ax in zip(embedding_models, axes.flatten()):
+        ax.set_position(positions[model])
+    # plt.legend(loc='lower left', ncol=6, bbox_to_anchor=(0, 0, 1, 1))
     fig.suptitle(f"Comparison of {dim_reduction_model} embeddings", fontweight="bold")
     fig.savefig(ld.embed_dir.joinpath("comp_fig.png"), dpi=300)

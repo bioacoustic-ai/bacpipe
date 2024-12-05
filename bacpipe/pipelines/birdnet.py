@@ -19,4 +19,4 @@ class Model(ModelBaseClass):
         return tf.convert_to_tensor(audio, dtype=tf.float32)
 
     def __call__(self, input):
-        return self.model(input)
+        return self.model(input, training=False)
