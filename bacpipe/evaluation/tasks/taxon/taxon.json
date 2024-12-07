@@ -2,7 +2,7 @@
     "task_name": "Taxon",
     "dataset_csv_path": "bacpipe/bacpipe/evaluation/datasets/benchmark/tasks/dataset_9species.csv",
     "Num_classes": 2,
-    "labels_to_index": {
+    "label_to_index": {
         "bird": 0,
         "mammalia": 1
     }

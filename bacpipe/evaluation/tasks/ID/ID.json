@@ -1,9 +1,12 @@
 {
     "task_name": "ID",
+    "learning_rate": 0.001,
+    "batch_size": 64,
+    "num_epochs": 100,
     "dataset_csv_path": "bacpipe/bacpipe/evaluation/datasets/benchmark/tasks/dataset_9species.csv",
     "Num_classes": 66,
     "labels": "hierarchical_labels",
-    "labels_to_index": {
+    "label_to_index": {
         "mammalia_hyrax_18": 0,
         "bird_chiffchaff_PC1110": 1,
         "bird_pipit_0911": 2,

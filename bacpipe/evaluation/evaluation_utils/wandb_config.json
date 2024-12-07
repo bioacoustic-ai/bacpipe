@@ -1,0 +1,6 @@
+
+{
+    "wandb_project_name": "Eval_pretained_embeddings",
+    "save_trained_lp": "True", 
+    "save_checkpoint_path": "bacpipe/bacpipe/evaluation/evaluation_utils/checkpoints/" 
+}

@@ -15,7 +15,7 @@ class EmbeddingTaskLoader(Dataset):
         self.items_list = list(self.dataset.wavfilename)
         self.features_folder = embeddings_path
         self.pretrained_model_name = pretrained_model_name
-        self.labels = target_labels
+        self.labels = list(self.dataset[target_labels])
         self.label2index = label2index
 
     def __len__(self):

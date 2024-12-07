@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 import wandb
+import json
+
+# define class linear_probe
 
 class LinearProbe(nn.Module):
     def __init__(self, in_dim, out_dim):
@@ -9,17 +12,16 @@ class LinearProbe(nn.Module):
 
     def forward(self, x):
         return self.fc(x)
+    
 
 
+def train_linear_probe(linear_probe, train_dataloader, configs, device_str, wandb_configs_path=''):
 
-def train_linear_probe(linear_probe, train_dataloader, configs):   #getting data from dataloader is set for ID task only! for now...
+    if wandb_configs_path:
+        wandb_configs = json.load(open(wandb_configs_path, 'r'))
+        wandb.init(project=wandb_configs["wandb_project_name"]) 
 
-    if configs["wandb_log"]:
-        wandb.init(project=configs["wandb_project_name"], settings=wandb.Settings(init_timeout=120))
-
-    device = torch.device(configs["device"])
-
-
+    device = torch.device(device_str)
     linear_probe = linear_probe.to(device)
 
     # Define optimizer and loss function
@@ -30,25 +32,19 @@ def train_linear_probe(linear_probe, train_dataloader, configs):   #getting data
     for epoch in range(configs["num_epochs"]):
         linear_probe.train()
         print(f"Epoch {epoch+1}/{configs['num_epochs']}")
-
-        running_loss = 0
+        running_loss = 0.0
         correct_train = 0
         total_train = 0
 
-        for embeddings, y, labels, filename in train_dataloader:
-            embeddings = embeddings.to(device)
-
-            # print(labels)
-            # print(y)
-            # print(embeddings.shape)
-            y = y.to(device)
-
+        for embeddings, y, labels, filename in train_dataloader:  
+            embeddings, y = embeddings.to(device), y.to(device)
+            
             # Forward pass through linear probe
             outputs = linear_probe(embeddings)
-
+            
             # Compute loss
             loss = criterion(outputs, y)
-
+            
             # Backward pass and optimization
             optimizer.zero_grad()
             loss.backward()
@@ -64,36 +60,40 @@ def train_linear_probe(linear_probe, train_dataloader, configs):   #getting data
         train_loss = running_loss / len(train_dataloader.dataset)
         train_accuracy = 100 * correct_train / total_train
 
-        if configs["wandb_log"]:
+        print(f"Epoch {epoch + 1}/{configs['num_epochs']}, Loss: {train_loss}, Accuracy: {train_accuracy}")
+        
+        if wandb_configs_path:
             wandb.log({
                 "train_loss": train_loss,
                 "train_accuracy": train_accuracy,
             })
-
         print(f"Epoch [{epoch+1}/{configs['num_epochs']}], Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.2f}%")
-
-    torch.save(linear_probe.state_dict(), "linear_probe.pth")
+        # if wandb_configs['save_trained_lp']:
+        #     torch.save(linear_probe.state_dict(), wandb_configs["save_checkpoint_path"]+"_linear_probe.pt")
+        
     return linear_probe
 
 
 
 
 
-def inference_with_linear_probe(linear_probe, test_dataloader, configs):
-    device = torch.device(configs["device"])
+def inference_with_linear_probe(linear_probe, test_dataloader, device_str):
+    device = torch.device(device_str)
     linear_probe = linear_probe.to(device)
 
     linear_probe.eval()
-
     predictions = []
+    gt_indexes = []
 
-    for embeddings, y, labels, filenames in test_dataloader:
+
+
+    for embeddings, y, _ , _ in test_dataloader:
         embeddings, y = embeddings.to(device), y.to(device)
-
-        # Forward pass through linear probe
+        
         outputs = linear_probe(embeddings)
-
+        
         _, predicted = torch.max(outputs, 1)
         predictions.append(predicted.item())
+        gt_indexes.append(y.item())
 
-    return predictions, y
+    return predictions, gt_indexes
