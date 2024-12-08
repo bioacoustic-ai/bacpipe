@@ -6,6 +6,7 @@ from torch.nn.functional import softmax
 
 # define class linear_probe
 
+
 class LinearProbe(nn.Module):
     def __init__(self, in_dim, out_dim):
         super(LinearProbe, self).__init__()
@@ -13,14 +14,15 @@ class LinearProbe(nn.Module):
 
     def forward(self, x):
         return self.fc(x)
-    
 
 
-def train_linear_probe(linear_probe, train_dataloader, configs, device_str, wandb_configs_path=''):
+def train_linear_probe(
+    linear_probe, train_dataloader, configs, device_str, wandb_configs_path=""
+):
 
     if wandb_configs_path:
-        wandb_configs = json.load(open(wandb_configs_path, 'r'))
-        wandb.init(project=wandb_configs["wandb_project_name"]) 
+        wandb_configs = json.load(open(wandb_configs_path, "r"))
+        wandb.init(project=wandb_configs["wandb_project_name"])
 
     device = torch.device(device_str)
     linear_probe = linear_probe.to(device)
@@ -37,20 +39,19 @@ def train_linear_probe(linear_probe, train_dataloader, configs, device_str, wand
         correct_train = 0
         total_train = 0
 
-        for embeddings, y, labels, filename in train_dataloader:  
+        for embeddings, y, labels, filename in train_dataloader:
             embeddings, y = embeddings.to(device), y.to(device)
-            
+
             # Forward pass through linear probe
             outputs = linear_probe(embeddings)
-            
+
             # Compute loss
             loss = criterion(outputs, y)
-            
+
             # Backward pass and optimization
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
 
             # Track training loss and accuracy
             running_loss += loss.item() * embeddings.size(0)
@@ -62,20 +63,21 @@ def train_linear_probe(linear_probe, train_dataloader, configs, device_str, wand
         train_accuracy = 100 * correct_train / total_train
 
         # print(f"Epoch {epoch + 1}/{configs['num_epochs']}, Loss: {train_loss}, Accuracy: {train_accuracy}")
-        
+
         if wandb_configs_path:
-            wandb.log({
-                "train_loss": train_loss,
-                "train_accuracy": train_accuracy,
-            })
-        print(f"Epoch [{epoch+1}/{configs['num_epochs']}], Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.2f}%")
+            wandb.log(
+                {
+                    "train_loss": train_loss,
+                    "train_accuracy": train_accuracy,
+                }
+            )
+        print(
+            f"Epoch [{epoch+1}/{configs['num_epochs']}], Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.2f}%"
+        )
         # if wandb_configs['save_trained_lp']:
         #     torch.save(linear_probe.state_dict(), wandb_configs["save_checkpoint_path"]+"_linear_probe.pt")
-        
+
     return linear_probe
-
-
-
 
 
 def inference_with_linear_probe(linear_probe, test_dataloader, device_str):
@@ -87,16 +89,15 @@ def inference_with_linear_probe(linear_probe, test_dataloader, device_str):
     gt_indexes = []
     probabilities = []
 
-
-    for embeddings, y, _ , _ in test_dataloader:
+    for embeddings, y, _, _ in test_dataloader:
         embeddings, y = embeddings.to(device), y.to(device)
-        
+
         outputs = linear_probe(embeddings)
         probs = softmax(outputs, dim=1).detach().cpu().numpy()
-        
+
         _, predicted = torch.max(outputs, 1)
         predictions.extend(predicted.cpu().numpy().tolist())
         gt_indexes.extend(y.cpu().numpy().tolist())
         probabilities.extend(probs)
 
-    return predictions,  gt_indexes, probabilities
+    return predictions, gt_indexes, probabilities
