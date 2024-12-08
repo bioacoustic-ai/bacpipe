@@ -10,7 +10,7 @@ from evaluation_utils.evaluation_metrics import compute_metrics, build_results_r
 import torch
 
 
-def evaluating_on_task(task_name='ID',   pretrained_model='birdnet',embeddings_size=1024,  embeddings_path='bacpipe/bacpipe/evaluation/embeddings', task_config_path='bacpipe/bacpipe/evaluation/tasks/ID/ID.json', device_str = 'cuda'):
+def evaluating_on_task(task_name='ID',   pretrained_model='birdnet',embeddings_size=1024,  embeddings_path='bacpipe/bacpipe/evaluation/embeddings', task_config_path='bacpipe/bacpipe/evaluation/tasks/ID/ID.json', device_str = 'cuda', wandb_configs_path='bacpipe/bacpipe/evaluation/evaluation_utils/wandb_config.json'):
     ''' 
     trains a linear probe and predicts on test set for the given task. 
 
@@ -52,7 +52,7 @@ def evaluating_on_task(task_name='ID',   pretrained_model='birdnet',embeddings_s
 
 
     lp = LinearProbe(in_dim=embeddings_size, out_dim=config["Num_classes"]).to(device)
-    lp= train_linear_probe(lp, training_generator, config, device, wandb_configs_path='/homes/in304/Pretrained-embeddings-for-Bioacoustics/bacpipe/bacpipe/evaluation/evaluation_utils/wandb_config.json')
+    lp= train_linear_probe(lp, training_generator, config, device, wandb_configs_path)
 
     predictions, gt_indexes, probability_scores = inference_with_linear_probe(lp, test_generator, device)
     # compute the evaluation metrics
