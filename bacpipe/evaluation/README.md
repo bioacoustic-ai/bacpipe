@@ -1,4 +1,4 @@
-# Evaluation scripts and data to analyze model performance
+# WORK IN PROGRESS   Evaluation scripts and data to analyze model performance
 
 
 Models' performance is measured on 3 predefined audio tasks: animal ID classification, Species classification and Taxon classification. 
@@ -18,7 +18,7 @@ Some pretrained models are naturally better at certain tasks given their trainin
 
 
 ## structure:
-   * eval.py : main script calling the 3 main evaluation steps on the 3 tasks and defined model. 
+   * TODO: eval.py : main script calling the 3 main evaluation steps on the 3 tasks and defined model. 
    
    * classification.py, clustering_eval.py and visualisation.py : scripts to run specific evaluation steps.
    
@@ -36,5 +36,27 @@ Some pretrained models are naturally better at certain tasks given their trainin
 
 1) download the data
 2) extract embeddings
-3) review configs <---- to CHECK
-4) run eval.py
+3) review configs: most configurations are defined in the tasks config files in '/evaluation/tasks/'
+num_epochs,
+
+learning rate, 
+
+batch size etc..
+  
+5) user defined configs are defined when tcalling of the main funtion in classification.py. these are:
+
+   device: where to run the process.
+
+   embeddings_path: where to read the pre-extracted embeddings from.
+
+   task_name: what is the task to be run  (example:'ID')
+
+   pretrained_model: what is the pretrained model to use (example:'birdnet')
+
+   embeddings_size = 1024  #TODO read directly from the models' properties. 
+6) run classification.py
+the file is set to run classification on th eID task and produce a report from the evaluation metrics.
+
+
+
+
