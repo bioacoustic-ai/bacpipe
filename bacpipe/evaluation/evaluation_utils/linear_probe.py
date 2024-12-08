@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import wandb
 import json
+from torch.nn.functional import softmax
 
 # define class linear_probe
 
@@ -60,7 +61,7 @@ def train_linear_probe(linear_probe, train_dataloader, configs, device_str, wand
         train_loss = running_loss / len(train_dataloader.dataset)
         train_accuracy = 100 * correct_train / total_train
 
-        print(f"Epoch {epoch + 1}/{configs['num_epochs']}, Loss: {train_loss}, Accuracy: {train_accuracy}")
+        # print(f"Epoch {epoch + 1}/{configs['num_epochs']}, Loss: {train_loss}, Accuracy: {train_accuracy}")
         
         if wandb_configs_path:
             wandb.log({
@@ -84,16 +85,18 @@ def inference_with_linear_probe(linear_probe, test_dataloader, device_str):
     linear_probe.eval()
     predictions = []
     gt_indexes = []
-
+    probabilities = []
 
 
     for embeddings, y, _ , _ in test_dataloader:
         embeddings, y = embeddings.to(device), y.to(device)
         
         outputs = linear_probe(embeddings)
+        probs = softmax(outputs, dim=1).detach().cpu().numpy()
         
         _, predicted = torch.max(outputs, 1)
-        predictions.append(predicted.item())
-        gt_indexes.append(y.item())
+        predictions.extend(predicted.cpu().numpy().tolist())
+        gt_indexes.extend(y.cpu().numpy().tolist())
+        probabilities.extend(probs)
 
-    return predictions, gt_indexes
+    return predictions,  gt_indexes, probabilities

@@ -54,11 +54,11 @@ def micro_accuracy(y_true, y_pred):
     return metrics.accuracy_score(y_true, y_pred)
 
 #  Area under the ROC curve
-def auc(y_true, y_pred):
+def auc(y_true, probability_scores):
     '''
     Compute the AUC
     '''
-    return metrics.roc_auc_score(y_true, y_pred)
+    return metrics.roc_auc_score(y_true, probability_scores, multi_class='ovr' )
 
 #  macro f1 score
 def macro_f1(y_true, y_pred):
@@ -81,16 +81,15 @@ def micro_f1(y_true, y_pred):
 
 
 
-def compute_metrics(y_pred, y_true, label2index):
+def compute_metrics(y_pred, y_true, probability_scores, label2index):
     '''
     Compute the evaluation metrics
     '''
     
-
     overall_metrics = {
         'macro_accuracy': macro_accuracy(y_true, y_pred),
         'micro_accuracy': micro_accuracy(y_true, y_pred),
-        'auc': auc(y_true, y_pred),
+        'auc': auc(y_true, probability_scores),
         'macro_f1': macro_f1(y_true, y_pred),
         'micro_f1': micro_f1(y_true, y_pred)
     }
@@ -108,24 +107,27 @@ def compute_metrics(y_pred, y_true, label2index):
 #     return
 
 
-def build_results_report(task_name, pretrained_model_name, overall_metrics, per_class_metrics):
+def build_results_report(task_name, pretrained_model_name, overall_metrics, per_class_metrics, save_path = 'bacpipe/bacpipe/evaluation/results/metrics'):
     '''
     Build a results report
     '''
-    report = f'''
-    Overall Metrics:
-    Macro Accuracy: {overall_metrics['macro_accuracy']}
-    Micro Accuracy: {overall_metrics['micro_accuracy']}
-    AUC: {overall_metrics['auc']}
-    Macro F1: {overall_metrics['macro_f1']}
-    Micro F1: {overall_metrics['micro_f1']}
-    '''
-    report += '\n\nPer Class Metrics:\n'
+
+    report = {}
+
+    report['Overall Metrics:'] = {
+        'Macro Accuracy': overall_metrics['macro_accuracy'],
+        'Micro Accuracy': overall_metrics['micro_accuracy'],
+        'AUC': overall_metrics['auc'],
+        'Macro F1': overall_metrics['macro_f1'],
+        'Micro F1': overall_metrics['micro_f1']
+    }
+
+    report['Per Class Metrics:'] = {}
     for label, accuracy in per_class_metrics.items():
-        report += f'{label}: {accuracy}\n'
+        report['Per Class Metrics:'][label] = accuracy
 
     # save the report as json
-    with open(f'classsification_results_{task_name}_{pretrained_model_name}.json', 'w') as f:
+    with open(save_path+'/classsification_results_'+task_name+'_'+pretrained_model_name+'.json', 'w')as f:
         json.dump(report, f)
 
     return

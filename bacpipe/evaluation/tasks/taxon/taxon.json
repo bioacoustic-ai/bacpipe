@@ -4,6 +4,6 @@
     "Num_classes": 2,
     "label_to_index": {
         "bird": 0,
-        "mammalia": 1
+        "mammal": 1
     }
 }
