@@ -2,6 +2,8 @@ from bacpipe.generate_embeddings import generate_embeddings, Loader, Embedder
 import numpy as np
 from pathlib import Path
 
+
+# INITIALIZATION
 # Find all models in the pipelines directory
 models = [
     mod.stem
@@ -9,29 +11,50 @@ models = [
     if not mod.stem in ["__init__", "utils", "umap"]
 ]
 
+# Only test models whos checkpoints have been downloaded
+models_requiring_checkpoints = [
+    "animal2vec_mk",
+    "animal2vec_xc",
+    "audiomae",
+    "aves_especies",
+    "avesecho_passt",
+    "birdaves_especies",
+    "hbdet",
+    "insect66",
+    "mix2",
+    "protoclr",
+    "vggish",
+]
+for model in models_requiring_checkpoints:
+    if not Path(f"bacpipe/model_checkpoints/{model}").exists():
+        models.remove(model)
+
+
 embedding_dimensions = {
     "animal2vec_xc": 768,
     "animal2vec_mk": 1024,
     "audiomae": 768,
-    "aves": 768,
+    "aves_especies": 768,
     "biolingual": 512,
-    "birdaves": 1024,
+    "birdaves_especies": 1024,
     "birdnet": 1024,
-    "echopasst": 768,
+    "avesecho_passt": 768,
     "hbdet": 2048,
     "insect66": 1280,
     "mix2": 960,
-    "perch": 1280,
+    "perch_bird": 1280,
     "protoclr": 384,
     "rcl_fs_bsed": 2048,
     "surfperch": 1280,
-    "whaleperch": 1280,
+    "google_whale": 1280,
     "vggish": 128,
 }
 
 embeddings = {}
 
 audio_dir = "bacpipe/evaluation/datasets/audio_test_files"
+
+# TESTING
 
 
 def embedder_fn(loader, model_name):
@@ -69,5 +92,5 @@ def test_embedding_dimensions(model):
     assert embeddings[model].shape[-1] == embedding_dimensions[model]
 
 
-# test_model('echopasst')
+# test_model('avesecho_passt')
 # pytest -v --disable-warnings test_embedding_creation.py

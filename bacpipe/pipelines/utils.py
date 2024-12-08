@@ -5,7 +5,7 @@ import torchaudio as ta
 import torch
 from tqdm import tqdm
 
-MODEL_BASE_PATH = "bacpipe/models"
+MODEL_BASE_PATH = "bacpipe/model_checkpoints"
 GLOBAL_BATCH_SIZE = 16
 
 
@@ -17,10 +17,17 @@ class ModelBaseClass:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+        self.model_base_path = MODEL_BASE_PATH
         self.sr = sr
         self.segment_length = segment_length
         if segment_length:
             self.batch_size = int(100_000 * GLOBAL_BATCH_SIZE / segment_length)
+
+    def prepare_inference(self):
+        try:
+            self.model.eval()
+        except AttributeError:
+            pass
 
     def load_and_resample(self, path):
         audio, sr = ta.load(path, normalize=True)
@@ -46,17 +53,24 @@ class ModelBaseClass:
 
             return tf.data.Dataset.from_tensor_slices(audio).batch(self.batch_size)
         elif "torch" in str(type(audio)):
+
             return torch.utils.data.DataLoader(
                 audio, batch_size=self.batch_size, shuffle=False
             )
 
     def batch_inference(self, batched_samples):
         embeds = []
-        for batch in tqdm(batched_samples):
-            embeds.append(self.__call__(batch))
+        for batch in tqdm(
+            batched_samples, desc=" processing batches", position=0, leave=False
+        ):
+            embedding = self.__call__(batch)
+            if isinstance(embedding, torch.Tensor) and embedding.dim() == 1:
+                embedding = embedding.unsqueeze(0)
+            embeds.append(embedding)
         if isinstance(embeds[0], torch.Tensor):
             return torch.cat(embeds, axis=0)
         else:
             import tensorflow as tf
 
-            return tf.concat(embeds, axis=0)
+            return_embeds = tf.concat(embeds, axis=0).numpy().squeeze()
+            return return_embeds

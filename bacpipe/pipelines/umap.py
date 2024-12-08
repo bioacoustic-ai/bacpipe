@@ -2,19 +2,23 @@ from .utils import ModelBaseClass
 import umap
 
 
+# UMAP settings
+umap_config = {
+    "n_neighbors": 15,
+    "min_dist": 0.1,
+    "n_components": 2,
+    "metric": "euclidean",
+    "random_state": 42,
+}
+
+
 class Model(ModelBaseClass):
     def __init__(self):
         super().__init__(sr=None, segment_length=None)
-        self.model = umap.UMAP(
-            n_neighbors=self.config["n_neighbors"],
-            n_components=self.config["n_components"],
-            min_dist=self.config["min_dist"],
-            metric=self.config["metric"],
-            random_state=self.config["random_state"],
-        ).fit_transform
+        self.model = umap.UMAP(**umap_config).fit_transform
 
-    def preprocess(self, audio):
-        return audio
+    def preprocess(self, embeddings):
+        return embeddings
 
     def __call__(self, input):
         return self.model(input)

@@ -3,6 +3,7 @@ bacpipe/model_checkpoints/*
 bacpipe/test*
 *__pycache__*
 .vscode
+config.yaml
 
 bacpipe/evaluation/datasets/*
 bacpipe/evaluation/embeddings/*

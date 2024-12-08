@@ -11,6 +11,7 @@ LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
 class Model(ModelBaseClass):
     def __init__(self, xeno_canto=False):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+        self.batch_size = 8
         if xeno_canto:
             from . import animal2vec_xc as A2VXC
 
@@ -19,7 +20,8 @@ class Model(ModelBaseClass):
             self.segment_length = A2VXC.LENGTH_IN_SAMPLES
         else:
             path_to_pt_file = (
-                "bacpipe/models/animal2vec/animal2vec_large_finetuned_MeerKAT_240507.pt"
+                self.model_base_path
+                + "/animal2vec_mk/animal2vec_large_finetuned_MeerKAT_240507.pt"
             )
         models, _ = checkpoint_utils.load_model_ensemble(
             [path_to_pt_file]

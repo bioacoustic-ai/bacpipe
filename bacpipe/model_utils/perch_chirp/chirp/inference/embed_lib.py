@@ -25,7 +25,8 @@ from absl import logging
 import apache_beam as beam
 import audioread
 from bacpipe.model_utils.perch_chirp.chirp import audio_utils
-from bacpipe.model_utils.perch_chirp.chirp import path_utils
+
+# from bacpipe.model_utils.perch_chirp.chirp import path_utils
 from bacpipe.model_utils.perch_chirp.chirp.inference import tf_examples
 from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import models
 from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import zoo_interface

@@ -19,7 +19,8 @@ class Model(ModelBaseClass):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         self.model = ResNet()
         state_dict = torch.load(
-            "bacpipe/models/rcl_fs_bsed/bioacoustics_model.pth", weights_only=True
+            self.model_base_path + "/rcl_fs_bsed/bioacoustics_model.pth",
+            weights_only=True,
         )
         enc_sd = state_dict["encoder"]
         drop_keys = ["lin.0.weight", "lin.0.bias", "lin.2.weight", "lin.2.bias"]
@@ -34,6 +35,7 @@ class Model(ModelBaseClass):
             n_mels=N_MELS,
         )
         self.power_to_db = T.AmplitudeToDB()
+        self.model.eval()
 
     def preprocess(self, audio):
         mel = self.mel(torch.tensor(audio))

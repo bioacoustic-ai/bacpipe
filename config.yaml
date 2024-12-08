@@ -1,38 +1,46 @@
-## MAIN VARS ##
+#################### CONFIGURATION FILE ####################
+# This file contains the configuration for the audio data path,
+# the embedding model, and the dimensionality reduction model.
+#
+# The embedding model must be a list either of one or multiple models.
+# 
+# The dimensionality reduction model must be just one of the supported models.
+
 
 # PATHS:
-# define paths for your data, these are the standard directories, if you 
-# used the file condenser. If you do not have annotated data, and all of your
-# sound files are in one directory, change accordingly
+# define paths for your audio data
 audio_dir :       "bacpipe/evaluation/datasets/audio_test_files"
 
-
-
-
 # CHOOSE FROM MODELS
-models : [
+available_models : [
     "animal2vec_xc",
     "animal2vec_mk",
     "audiomae",
-    "aves",
+    "aves_especies",
     "biolingual",
-    "birdaves",
+    "birdaves_especies",
     "birdnet",
-    "echopasst",
+    "avesecho_passt",
     "hbdet",
     "insect66",
+    "perch_bird",
     "mix2",
-    "perch",
     "protoclr",
     "rcl_fs_bsed",
     "surfperch",
-    "whaleperch",
+    "google_whale",
     "vggish",
   ]
 
 
 # embedding model name
-embedding_model: ["aves"]
+embedding_model: ["birdnet"]
 
-# dimensionality reduction model name
-dim_reduction_model: None
+# dimensionality reduction model name.
+supported_models: [
+  "pca",
+  "sparse_pca",
+  "t_sne",
+  "umap"
+]
+dim_reduction_model: "umap"
