@@ -188,10 +188,11 @@ class Loader:
         self.metadata_dict["files"]["embedding_dimensions"].append(embeds.shape)
         return embeds
 
-    def write_audio_file_to_metadata(self, index, file, embed):
+    def write_audio_file_to_metadata(self, index, file, embed, embed_size):
         if index == 0:
             self.metadata_dict["segment_length (samples)"] = embed.model.segment_length
             self.metadata_dict["sample_rate (Hz)"] = embed.model.sr
+            self.metadata_dict["embedding_size"] = embed_size
         rel_file_path = Path(file).relative_to(self.audio_dir)
         self.metadata_dict["files"]["audio_files"].append(str(rel_file_path))
         self.metadata_dict["files"]["file_lengths (s)"].append(embed.file_length)
@@ -339,7 +340,9 @@ def generate_embeddings(save_files=True, **kwargs):
                 if not ld.dim_reduction_model:
                     sample = file
                     embeddings = embed.get_embeddings_from_model(sample)
-                    ld.write_audio_file_to_metadata(idx, file, embed)
+                    ld.write_audio_file_to_metadata(
+                        idx, file, embed, embeddings.shape[-1]
+                    )
                     embed.save_embeddings(idx, ld, file, embeddings)
                 else:
                     if idx == 0:
