@@ -13,7 +13,7 @@ def get_embeddings(
     check_if_primary_combination_exists=True,
     check_if_secondary_combination_exists=True,
 ):
-    generate_embeddings(
+    ld = generate_embeddings(
         model_name=model_name,
         audio_dir=audio_dir,
         check_if_combination_exists=check_if_primary_combination_exists,
@@ -26,3 +26,4 @@ def get_embeddings(
             check_if_combination_exists=check_if_secondary_combination_exists,
         )
         plot_embeddings(ld.embed_dir)
+    return ld

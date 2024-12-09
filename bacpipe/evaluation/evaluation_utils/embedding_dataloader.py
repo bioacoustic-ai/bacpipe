@@ -14,24 +14,31 @@ class EmbeddingTaskLoader(Dataset):
         self,
         partition_dataframe,
         pretrained_model_name,
-        embeddings_path,
+        loader_object,
         target_labels,
         label2index={},
     ):
         self.dataset = partition_dataframe
-        self.items_list = list(self.dataset.wavfilename)
-        self.features_folder = embeddings_path
+        self.features_folder = loader_object.embed_dir
+        all_embedding_files = loader_object.files
+        if not len(all_embedding_files) == len(self.dataset):
+            self.embed_files = [
+                f
+                for f in all_embedding_files
+                if f.stem.replace(f"_{pretrained_model_name}", ".wav")
+                in list(self.dataset.wavfilename)
+            ]
         self.pretrained_model_name = pretrained_model_name
         self.labels = list(self.dataset[target_labels])
         self.label2index = label2index
 
     def __len__(self):
-        return len(self.items_list)
+        return len(self.embed_files)
 
     def __getitem__(self, idx):
-        filename = (
-            self.items_list[idx][0:-4] + "_" + self.pretrained_model_name + ".npy"
-        )  # TODO check if we are using the name of the pretrained model on the file name
-        X = np.load(os.path.join(self.features_folder, filename))
+        X = np.load(self.embed_files[idx])
         y = self.label2index[self.labels[idx]]
-        return X, y, self.labels[idx], filename
+        return X, y, self.labels[idx], self.embed_files[idx].stem
+
+
+# TODO handle different embedding sizes

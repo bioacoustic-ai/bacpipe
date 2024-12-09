@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import wandb
 import json
 from torch.nn.functional import softmax
 
@@ -19,10 +18,6 @@ class LinearProbe(nn.Module):
 def train_linear_probe(
     linear_probe, train_dataloader, configs, device_str, wandb_configs_path=""
 ):
-
-    if wandb_configs_path:
-        wandb_configs = json.load(open(wandb_configs_path, "r"))
-        wandb.init(project=wandb_configs["wandb_project_name"])
 
     device = torch.device(device_str)
     linear_probe = linear_probe.to(device)
@@ -64,18 +59,9 @@ def train_linear_probe(
 
         # print(f"Epoch {epoch + 1}/{configs['num_epochs']}, Loss: {train_loss}, Accuracy: {train_accuracy}")
 
-        if wandb_configs_path:
-            wandb.log(
-                {
-                    "train_loss": train_loss,
-                    "train_accuracy": train_accuracy,
-                }
-            )
         print(
             f"Epoch [{epoch+1}/{configs['num_epochs']}], Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.2f}%"
         )
-        # if wandb_configs['save_trained_lp']:
-        #     torch.save(linear_probe.state_dict(), wandb_configs["save_checkpoint_path"]+"_linear_probe.pt")
 
     return linear_probe
 
