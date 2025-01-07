@@ -5,7 +5,7 @@
     "num_epochs": 10,
     "dataset_csv_path": "bacpipe/evaluation/datasets/benchmark/dataset_9species.csv",
     "Num_classes": 66,
-    "labels": "hierarchical_labels",
+    "label_type": "hierarchical_labels",
     "label_to_index": {
         "mammal_hyrax_18": 0,
         "bird_chiffchaff_PC1110": 1,

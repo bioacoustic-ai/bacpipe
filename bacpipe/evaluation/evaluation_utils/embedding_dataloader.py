@@ -20,6 +20,9 @@ class EmbeddingTaskLoader(Dataset):
     ):
         self.dataset = partition_dataframe
         self.features_folder = loader_object.embed_dir
+        self.embeds_per_file = [
+            e[0] for e in loader_object.metadata_dict["files"]["embedding_dimensions"]
+        ]
         all_embedding_files = loader_object.files
         if not len(all_embedding_files) == len(self.dataset):
             self.embed_files = [

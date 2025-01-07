@@ -1,6 +1,6 @@
 import json
 import pandas as pd
-import yaml
+import numpy as np
 
 
 from .evaluation_utils.embedding_dataloader import EmbeddingTaskLoader
@@ -40,26 +40,40 @@ def evaluating_on_task(
     dataset_path = config["dataset_csv_path"]
     data = pd.read_csv(dataset_path)
 
+    # deduplicate
+    data = data[~data.duplicated()]
+
     # train linear probe
-    train_df = data[data["predefined_set"] == "train"]
+    embeds_per_file = [
+        e[0] for e in loader_object.metadata_dict["files"]["embedding_dimensions"]
+    ]
+    embed_files = [
+        (f, f.stem.replace(f"_{model_name}", ".wav"))
+        for f in loader_object.files
+        if f.stem.replace(f"_{model_name}", ".wav") in list(data.wavfilename)
+    ]
+    # also irgendwie ist die csv bisschen messy
+    # ich will hier erstmal n dataframe brauchen wo alles geordnet ist
+    # und dann kann ich easy das durch interaten.
 
     train_data = EmbeddingTaskLoader(
-        partition_dataframe=train_df,
-        pretrained_model_name=model_name,
+        df=data,
+        set_name="train",
+        model_name=model_name,
         loader_object=loader_object,
-        target_labels=config["labels"],
+        target_labels=config["label_type"],
         label2index=config["label_to_index"],
     )
     training_generator = torch.utils.data.DataLoader(
         train_data, batch_size=config["batch_size"], shuffle=True, drop_last=True
     )
 
-    test_df = data[data["predefined_set"] == "test"]
     test_data = EmbeddingTaskLoader(
-        partition_dataframe=test_df,
-        pretrained_model_name=model_name,
+        df=data,
+        set_name="test",
+        del_name=model_name,
         loader_object=loader_object,
-        target_labels=config["labels"],
+        target_labels=config["label_type"],
         label2index=config["label_to_index"],
     )
     test_generator = torch.utils.data.DataLoader(

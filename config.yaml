@@ -44,3 +44,9 @@ supported_models: [
   "umap"
 ]
 dim_reduction_model: "umap"
+
+# specify the evaluation task to be performed
+supported_evaluation_tasks: [
+  "ID",
+]
+evaluation_task: None

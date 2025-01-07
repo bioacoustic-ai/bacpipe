@@ -1,7 +1,6 @@
 import logging
-import numpy as np
 from bacpipe.generate_embeddings import generate_embeddings
-from bacpipe.visualize import plot_embeddings
+from bacpipe.evaluation.visualization import plot_embeddings
 
 logger = logging.getLogger("bacpipe")
 
@@ -13,17 +12,17 @@ def get_embeddings(
     check_if_primary_combination_exists=True,
     check_if_secondary_combination_exists=True,
 ):
-    ld = generate_embeddings(
+    loader_embeddings = generate_embeddings(
         model_name=model_name,
         audio_dir=audio_dir,
         check_if_combination_exists=check_if_primary_combination_exists,
     )
-    if dim_reduction_model != "None":
-        ld = generate_embeddings(
+    if not dim_reduction_model == "None":
+        loader_dim_reduced = generate_embeddings(
             model_name=model_name,
             dim_reduction_model=dim_reduction_model,
             audio_dir=audio_dir,
             check_if_combination_exists=check_if_secondary_combination_exists,
         )
-        plot_embeddings(ld.embed_dir)
-    return ld
+        plot_embeddings(loader_dim_reduced.embed_dir)
+    return loader_embeddings
