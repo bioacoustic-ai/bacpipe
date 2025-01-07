@@ -121,6 +121,7 @@ class Model(ModelBaseClass):
         ckpnt = torch.load(
             f"{MODEL_BASE_PATH}/avesecho_passt/passt_bghani_202410.pt",
             weights_only=True,
+            map_location=torch.device('cpu')
         )
         self.model.load_state_dict(ckpnt)
 

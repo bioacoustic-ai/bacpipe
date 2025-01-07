@@ -15,6 +15,10 @@ def get_centroid(data):
 def get_ari_and_ami(split_data, centroids):
     from sklearn.metrics import adjusted_rand_score as ari_score
     from sklearn.metrics import adjusted_mutual_info_score as ami_score
+    from sklearn.metrics import silhouette_score
+
+    x = []
+    y = []
 
     preds = []
     labels = []
@@ -22,6 +26,9 @@ def get_ari_and_ami(split_data, centroids):
     n_labels = np.arange(len(split_data))
     label_dict = {k: v for k, v in zip(split_data.keys(), n_labels)}
     for label in split_data:
+        x.append(split_data[label]["x"])
+        y.append(split_data[label]["y"])
+
         for i in range(len(split_data[label]["x"])):
             p = {}
             for c_label, centroid in centroids.items():
@@ -36,10 +43,16 @@ def get_ari_and_ami(split_data, centroids):
             acc_idx += 1
     ari = ari_score(labels, preds)
     ami = ami_score(labels, preds)
-    return {"ARI": ari, "AMI": ami}
+
+    # Silhouette Score
+    x = np.concatenate(x, axis=0)
+    y = np.concatenate(y, axis=0)
+    data = np.column_stack((x, y))
+    ss = silhouette_score(data, labels)
+    return {"ARI": ari, "AMI": ami, "Silhouette Score": ss}
 
 
-def plot_embeddings(umap_embed_path, axes=False, fig=False):
+def plot_embeddings(umap_embed_path, dim_reduction_model, axes=False, fig=False):
     files = umap_embed_path.iterdir()
     centroids = {}
     for file in files:
@@ -74,13 +87,14 @@ def plot_embeddings(umap_embed_path, axes=False, fig=False):
         embed_y = embeds_dict["y"]
         file_stem = Path(embeds_dict["metadata"]["audio_files"]).stem
         axes.plot(embed_x, embed_y, "o", label=file_stem, markersize=0.5)
-
     if return_axes:
         return axes, clustering_dict
     else:
+        print(clustering_dict)
+        print(f"See figures at {umap_embed_path.joinpath('embed.png')}")
         axes.legend()
-        axes.set_title("UMAP embeddings")
-        fig.savefig(umap_embed_path.joinpath("umap_embed.png"), dpi=300)
+        axes.set_title(f"{dim_reduction_model.upper()} embeddings")
+        fig.savefig(umap_embed_path.joinpath("embed.png"), dpi=300)
 
 
 def data_split_by_labels(embeds_dict):
@@ -130,7 +144,7 @@ def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
             audio_dir, model_name=model, dim_reduction_model=dim_reduction_model
         )
         axes.flatten()[idx], clust_dict[model] = plot_embeddings(
-            ld.embed_dir, axes=axes.flatten()[idx], fig=fig
+            ld.embed_dir, dim_reduction_model, axes=axes.flatten()[idx], fig=fig
         )
         metric_str = ", ".join([f"{k}={v:.3f}" for k, v in clust_dict[model].items()])
         axes.flatten()[idx].set_title(f"{model}\n{metric_str}")
