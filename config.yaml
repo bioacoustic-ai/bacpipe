@@ -9,7 +9,7 @@
 
 # PATHS:
 # define paths for your audio data
-audio_dir :       "bacpipe/evaluation/datasets/subset"
+audio_dir :       "bacpipe/evaluation/datasets/audio_test_files"
 
 # CHOOSE FROM MODELS
 available_models : [

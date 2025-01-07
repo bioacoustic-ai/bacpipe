@@ -8,7 +8,7 @@ from pathlib import Path
 models = [
     mod.stem
     for mod in Path("bacpipe/pipelines").glob("*.py")
-    if not mod.stem in ["__init__", "utils", "umap"]
+    if not mod.stem in ["__init__", "utils", "umap", "pca", "t_sne", "sparse_pca"]
 ]
 
 # Only test models whos checkpoints have been downloaded
