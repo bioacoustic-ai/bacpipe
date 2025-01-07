@@ -9,7 +9,7 @@
 
 # PATHS:
 # define paths for your audio data
-audio_dir :       "bacpipe/evaluation/datasets/audio_test_files"
+audio_dir :       "bacpipe/evaluation/datasets/subset"
 
 # CHOOSE FROM MODELS
 available_models : [
@@ -34,7 +34,7 @@ available_models : [
 
 
 # embedding model name
-embedding_model: ["birdnet"]
+embedding_model: ["perch_bird"]
 
 # dimensionality reduction model name.
 supported_models: [
