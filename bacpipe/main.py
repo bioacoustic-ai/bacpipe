@@ -25,5 +25,5 @@ def get_embeddings(
             check_if_combination_exists=check_if_secondary_combination_exists,
         )
         print("Generating results...")
-        plot_embeddings(loader_embeddings.embed_dir, dim_reduction_model)
+        plot_embeddings(loader_dim_reduced.embed_dir, dim_reduction_model)
     return loader_embeddings
