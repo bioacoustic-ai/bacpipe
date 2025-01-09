@@ -108,7 +108,7 @@ def build_results_report(
     pretrained_model_name,
     overall_metrics,
     per_class_metrics,
-    save_path="bacpipe/bacpipe/evaluation/results/metrics",
+    save_path="bacpipe/evaluation/results/metrics",
 ):
     """
     Build a results report

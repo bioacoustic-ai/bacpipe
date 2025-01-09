@@ -47,19 +47,23 @@ def evaluating_on_task(
     embeds_per_file = [
         e[0] for e in loader_object.metadata_dict["files"]["embedding_dimensions"]
     ]
-    embed_files = [
-        (f, f.stem.replace(f"_{model_name}", ".wav"))
-        for f in loader_object.files
-        if f.stem.replace(f"_{model_name}", ".wav") in list(data.wavfilename)
-    ]
+    link_embed2wavfile = np.array(
+        [
+            (f, f.stem.replace(f"_{model_name}", ".wav"))
+            for f in loader_object.files
+            if f.stem.replace(f"_{model_name}", ".wav") in list(data.wavfilename)
+        ]
+    )
     # also irgendwie ist die csv bisschen messy
     # ich will hier erstmal n dataframe brauchen wo alles geordnet ist
     # und dann kann ich easy das durch interaten.
+    clean_df = data[data.wavfilename.isin(link_embed2wavfile[:, 1])]
 
     train_data = EmbeddingTaskLoader(
-        df=data,
+        partition_dataframe=clean_df,
+        embed2wavfile_mapper=link_embed2wavfile,
         set_name="train",
-        model_name=model_name,
+        pretrained_model_name=model_name,
         loader_object=loader_object,
         target_labels=config["label_type"],
         label2index=config["label_to_index"],
@@ -69,9 +73,10 @@ def evaluating_on_task(
     )
 
     test_data = EmbeddingTaskLoader(
-        df=data,
+        partition_dataframe=clean_df,
+        embed2wavfile_mapper=link_embed2wavfile,
         set_name="test",
-        del_name=model_name,
+        pretrained_model_name=model_name,
         loader_object=loader_object,
         target_labels=config["label_type"],
         label2index=config["label_to_index"],

@@ -150,7 +150,7 @@ def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
             audio_dir, model_name=model, dim_reduction_model=dim_reduction_model
         )
         axes.flatten()[idx], clust_dict[model] = plot_embeddings(
-            ld.embed_dir, axes=axes.flatten()[idx], fig=fig
+            ld.embed_dir, dim_reduction_model, axes=axes.flatten()[idx], fig=fig
         )
         metric_str = ", ".join([f"{k}={v:.3f}" for k, v in clust_dict[model].items()])
         axes.flatten()[idx].set_title(f"{model}\n{metric_str}")

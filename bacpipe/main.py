@@ -24,6 +24,6 @@ def get_embeddings(
             audio_dir=audio_dir,
             check_if_combination_exists=check_if_secondary_combination_exists,
         )
-        print("Generating results...")
+        print("Visualizing results ...")
         plot_embeddings(loader_dim_reduced.embed_dir, dim_reduction_model)
     return loader_embeddings
