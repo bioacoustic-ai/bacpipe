@@ -138,6 +138,8 @@ def return_rows_cols(num):
 
 
 def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
+    if dim_reduction_model == "None":
+        return
     rows, cols = return_rows_cols(len(embedding_models))
     clust_dict = {}
     fig, axes = plt.subplots(rows, cols, figsize=(12, 8))
