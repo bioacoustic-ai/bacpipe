@@ -27,18 +27,13 @@ class EmbeddingTaskLoader(Dataset):
             ]
         else:
             self.dataset = partition_dataframe
+
+        print(
+            f"Found {len(self.dataset)} samples in the {set_name} set with "
+            f"{len(self.dataset[target_labels].unique())} unique labels."
+        )
+
         self.features_folder = loader_object.embed_dir
-        # self.embeds_per_file = [
-        #     e[0] for e in loader_object.metadata_dict["files"]["embedding_dimensions"]
-        # ]
-        # all_embedding_files = loader_object.files
-        # if not len(all_embedding_files) == len(self.dataset):
-        #     self.embed_files = [
-        #         f
-        #         for f in all_embedding_files
-        #         if f.stem.replace(f"_{pretrained_model_name}", ".wav")
-        #         in list(self.dataset.wavfilename)
-        #     ]
         self.embed2wavfile_mapper = embed2wavfile_mapper
         self.sound_files = list(self.dataset.wavfilename)
         self.pretrained_model_name = pretrained_model_name
@@ -52,7 +47,7 @@ class EmbeddingTaskLoader(Dataset):
         sound_file = self.sound_files[idx]
         embd_idx = np.where(self.embed2wavfile_mapper[:, 1] == sound_file)[0][0]
         embed_file = self.embed2wavfile_mapper[embd_idx, 0]
-        X = np.load(embed_file)  # TODO average embeddings if multiple
+        X = np.load(embed_file)
         if X.shape[0] > 1:
             X = np.mean(X, axis=0)
         else:

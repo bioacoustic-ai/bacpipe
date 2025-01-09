@@ -8,4 +8,4 @@ config.yaml
 bacpipe/evaluation/datasets/*
 bacpipe/evaluation/embeddings/*
 bacpipe/evaluation/dim_reduced_embeddings/*
-bacpipe/evaluation/results/*
+bacpipe/evaluation/task_results/*

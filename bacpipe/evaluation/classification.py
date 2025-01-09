@@ -1,6 +1,8 @@
 import json
 import pandas as pd
 import numpy as np
+from pathlib import Path
+import yaml
 
 
 from .evaluation_utils.embedding_dataloader import EmbeddingTaskLoader
@@ -9,14 +11,68 @@ from .evaluation_utils.linear_probe import (
     train_linear_probe,
     inference_with_linear_probe,
 )
-from .evaluation_utils.evaluation_metrics import compute_metrics, build_results_report
+from .evaluation_utils.evaluation_metrics import compute_task_metrics
 
 import torch
 
+with open("bacpipe/config.yaml", "rb") as f:
+    bacpipe_settings = yaml.safe_load(f)
 
-def evaluating_on_task(
-    task_name, model_name, loader_object, task_config_path, device_str
+
+def gen_loader_obj(
+    set_name, clean_df, link_embed2wavfile, model_name, loader_object, task_config
 ):
+
+    loader = EmbeddingTaskLoader(
+        partition_dataframe=clean_df,
+        embed2wavfile_mapper=link_embed2wavfile,
+        set_name=set_name,
+        pretrained_model_name=model_name,
+        loader_object=loader_object,
+        target_labels=task_config["label_type"],
+        label2index=task_config["label_to_index"],
+    )
+
+    loader_generator = torch.utils.data.DataLoader(
+        loader, batch_size=task_config["batch_size"], shuffle=False, drop_last=False
+    )
+    return loader_generator
+
+
+def link_embeds_to_wavfiles(model_name, loader_object, data):
+    return np.array(
+        [
+            (f, f.stem.replace(f"_{model_name}", ".wav"))
+            for f in loader_object.files
+            if f.stem.replace(f"_{model_name}", ".wav") in list(data.wavfilename)
+        ]
+    )
+
+
+def load_and_clean_data(task_name, model_name, loader_object):
+    task_config_path = (
+        Path(bacpipe_settings["task_config_files"])
+        .joinpath(task_name)
+        .joinpath("config.json")
+    )
+
+    with open(task_config_path, "r") as f:
+        task_config = json.load(f)
+
+    # load dataset
+    dataset_path = task_config["dataset_csv_path"]
+    data = pd.read_csv(dataset_path)
+
+    data = data[~data.duplicated()]
+
+    link_embed2wavfile = link_embeds_to_wavfiles(model_name, loader_object, data)
+
+    # ensure that only lines are kept that have a corresponding wav file
+    clean_df = data[data.wavfilename.isin(link_embed2wavfile[:, 1])]
+    return clean_df, link_embed2wavfile, task_config
+
+
+def evaluate_on_task(task_name, model_name, loader_object):
     """
     trains a linear probe and predicts on test set for the given task.
 
@@ -28,104 +84,27 @@ def evaluating_on_task(
             overall and per class evaluation metrics.
 
     """
-
-    # read config.json
-    config = json.load(open(task_config_path, "r"))
-    # pretrained_model = config["pretrained_model_name"]
-
-    # device = torch.device(device)
-    device = torch.device(device_str if torch.cuda.is_available() else "cpu")
-
-    # load dataset
-    dataset_path = config["dataset_csv_path"]
-    data = pd.read_csv(dataset_path)
-
-    # deduplicate
-    data = data[~data.duplicated()]
-
-    # train linear probe
-    embeds_per_file = [
-        e[0] for e in loader_object.metadata_dict["files"]["embedding_dimensions"]
-    ]
-    link_embed2wavfile = np.array(
-        [
-            (f, f.stem.replace(f"_{model_name}", ".wav"))
-            for f in loader_object.files
-            if f.stem.replace(f"_{model_name}", ".wav") in list(data.wavfilename)
-        ]
-    )
-    # also irgendwie ist die csv bisschen messy
-    # ich will hier erstmal n dataframe brauchen wo alles geordnet ist
-    # und dann kann ich easy das durch interaten.
-    clean_df = data[data.wavfilename.isin(link_embed2wavfile[:, 1])]
-
-    train_data = EmbeddingTaskLoader(
-        partition_dataframe=clean_df,
-        embed2wavfile_mapper=link_embed2wavfile,
-        set_name="train",
-        pretrained_model_name=model_name,
-        loader_object=loader_object,
-        target_labels=config["label_type"],
-        label2index=config["label_to_index"],
-    )
-    training_generator = torch.utils.data.DataLoader(
-        train_data, batch_size=config["batch_size"], shuffle=True, drop_last=True
+    clean_df, link_embed2wavfile, task_config = load_and_clean_data(
+        task_name, model_name, loader_object
     )
 
-    test_data = EmbeddingTaskLoader(
-        partition_dataframe=clean_df,
-        embed2wavfile_mapper=link_embed2wavfile,
-        set_name="test",
-        pretrained_model_name=model_name,
-        loader_object=loader_object,
-        target_labels=config["label_type"],
-        label2index=config["label_to_index"],
+    # generate the loaders
+    train_gen = gen_loader_obj(
+        "train", clean_df, link_embed2wavfile, model_name, loader_object, task_config
     )
-    test_generator = torch.utils.data.DataLoader(
-        test_data, batch_size=config["batch_size"], shuffle=False, drop_last=False
+    test_gen = gen_loader_obj(
+        "test", clean_df, link_embed2wavfile, model_name, loader_object, task_config
     )
+
     embed_size = loader_object.metadata_dict["embedding_size"]
 
-    lp = LinearProbe(in_dim=embed_size, out_dim=config["Num_classes"]).to(device)
-    lp = train_linear_probe(lp, training_generator, config, device)
+    lp = LinearProbe(in_dim=embed_size, out_dim=task_config["Num_classes"])
+    lp = train_linear_probe(lp, train_gen, task_config)
 
-    predictions, gt_indexes, probability_scores = inference_with_linear_probe(
-        lp, test_generator, device
-    )
-    # compute the evaluation metrics
+    y_pred, y_true, probability_scores = inference_with_linear_probe(lp, test_gen)
 
-    overall_metrics, per_class_metrics = compute_metrics(
-        predictions, gt_indexes, probability_scores, config["label_to_index"]
+    overall_metrics, per_class_metrics, items_per_class = compute_task_metrics(
+        y_pred, y_true, probability_scores, task_config["label_to_index"]
     )
 
-    return predictions, overall_metrics, per_class_metrics
-
-
-if __name__ == "__main__":
-    # example usage
-    task_name = "ID"  # TODO: remove from evaluation function arguments?
-    pretrained_model = "birdnet"
-    embeddings_size = 1024  # TODO:  remove from function arguments, should be read from the model specific configs
-    device = "cuda:0"  # TODO: remove from function arguments?
-
-    task_config_path = "/homes/in304/Pretrained-embeddings-for-Bioacoustics/bacpipe/bacpipe/evaluation/tasks/ID/ID.json"
-    # TODO embeddings_path = os.path.join('/homes/in304/Pretrained-embeddings-for-Bioacoustics/bacpipe/bacpipe/evaluation/embeddings', pretrained_model)
-    embeddings_path = (
-        "/import/c4dm-datasets-ext/animal_id_FEBdataset/pretrained_embeddings/birdnet"
-    )
-
-    predictions, overall_metrics, per_class_metrics = evaluating_on_task(
-        task_name,
-        pretrained_model,
-        embeddings_size,
-        embeddings_path,
-        task_config_path,
-        device,
-    )
-    print(predictions)
-    print(overall_metrics)
-    print(per_class_metrics)
-
-    build_results_report(
-        task_name, pretrained_model, overall_metrics, per_class_metrics
-    )
+    return overall_metrics, per_class_metrics, items_per_class

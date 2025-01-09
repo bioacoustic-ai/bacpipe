@@ -9,8 +9,8 @@
 
 # PATHS:
 # define paths for your audio data
-audio_dir :       "bacpipe/evaluation/datasets/audio_test_files"
-# audio_dir :       "/home/siriussound/Data/id_task_data"
+# audio_dir :       "bacpipe/evaluation/datasets/audio_test_files"
+audio_dir :       "/home/siriussound/Data/id_task_data"
 
 # CHOOSE FROM MODELS
 available_models : [
@@ -35,7 +35,7 @@ available_models : [
 
 
 # embedding model name
-embedding_model: ["animal2vec_xc"]
+embedding_model: ["birdnet"]
 
 # dimensionality reduction model name.
 supported_models: [
@@ -50,4 +50,4 @@ dim_reduction_model: None
 supported_evaluation_tasks: [
   "ID",
 ]
-evaluation_task: None
+evaluation_task: "ID"

@@ -24,6 +24,10 @@ def get_embeddings(
             audio_dir=audio_dir,
             check_if_combination_exists=check_if_secondary_combination_exists,
         )
-        print("Visualizing results ...")
+        print(
+            "### Generating visualizations of embeddings using "
+            f"{dim_reduction_model}. Plots are saved in "
+            f"{loader_dim_reduced.embed_dir} ###"
+        )
         plot_embeddings(loader_dim_reduced.embed_dir, dim_reduction_model)
     return loader_embeddings

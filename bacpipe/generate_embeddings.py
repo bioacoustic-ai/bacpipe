@@ -92,6 +92,10 @@ class Loader:
                     if num_audio_files == num_files:
                         self.combination_already_exists = True
                         self._get_metadata_dict(d)
+                        print(
+                            "\n### Embeddings already exist. "
+                            f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
+                        )
                         break
 
     def _get_audio_paths(self):
@@ -322,11 +326,11 @@ def save_embeddings_dict_with_timestamps(
 def generate_embeddings(save_files=True, **kwargs):
     if "dim_reduction_model" in kwargs:
         print(
-            f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model']} ######\n"
+            f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"
         )
     elif "model_name" in kwargs:
         print(
-            f"\n\n\n###### Generating embeddings using {kwargs['model_name']} ######\n"
+            f"\n\n\n###### Generating embeddings using {kwargs['model_name'].upper()} ######\n"
         )
     else:
         raise ValueError("model_name not provided in kwargs.")

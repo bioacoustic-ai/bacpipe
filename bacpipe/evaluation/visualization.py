@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from types import SimpleNamespace
 from bacpipe.generate_embeddings import Loader
+import yaml
+
+with open("bacpipe/config.yaml", "rb") as f:
+    bacpipe_settings = yaml.safe_load(f)
 
 split_by_folder = True
 
@@ -96,8 +100,6 @@ def plot_embeddings(umap_embed_path, dim_reduction_model, axes=False, fig=False)
     if return_axes:
         return axes, clustering_dict
     else:
-        print(clustering_dict)
-        print(f"See figures at {umap_embed_path.joinpath('embed.png')}")
         axes.legend()
         axes.set_title(f"{dim_reduction_model.upper()} embeddings")
         fig.savefig(umap_embed_path.joinpath("embed.png"), dpi=300)
@@ -139,8 +141,6 @@ def return_rows_cols(num):
 
 
 def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
-    if dim_reduction_model == "None":
-        return
     rows, cols = return_rows_cols(len(embedding_models))
     clust_dict = {}
     fig, axes = plt.subplots(rows, cols, figsize=(12, 8))
@@ -166,3 +166,32 @@ def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
     # plt.legend(loc='lower left', ncol=6, bbox_to_anchor=(0, 0, 1, 1))
     fig.suptitle(f"Comparison of {dim_reduction_model} embeddings", fontweight="bold")
     fig.savefig(ld.embed_dir.joinpath("comp_fig.png"), dpi=300)
+
+
+def visualize_task_results(task_name, model_name, overall_metrics, per_class_metrics):
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    cmap = plt.cm.tab10
+    colors = cmap(np.arange(len(per_class_metrics.values())) % cmap.N)
+    ax.bar(
+        per_class_metrics.keys(),
+        per_class_metrics.values(),
+        width=0.5,
+        color=colors,
+    )
+    metrics = "".join([f"{k}: {v:.3f} | " for k, v in overall_metrics.items()])
+    fig.suptitle(
+        f"Per Class Metrics for {task_name} "
+        f"classification with {model_name.upper()} embeddings\n"
+        f"{metrics}"
+    )
+    ax.set_ylabel("Accuracy")
+    ax.set_xlabel("Classes")
+    ax.set_xticks(range(len(per_class_metrics)))
+    ax.set_xticklabels(per_class_metrics.keys(), rotation=90)
+    fig.subplots_adjust(bottom=0.3)
+    fig.savefig(
+        Path(bacpipe_settings["task_results_dir"])
+        .joinpath("plots")
+        .joinpath(f"classsification_results_{task_name}_{model_name}.png"),
+        dpi=300,
+    )

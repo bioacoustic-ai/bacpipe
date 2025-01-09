@@ -1,38 +1,29 @@
 import sklearn.metrics as metrics
 import json
+from pathlib import Path
+import yaml
 
-
-def map_index_to_label(index, label2index):
-    """
-    Map the index to the label
-    """
-    for label, idx in label2index.items():
-        if idx == index:
-            return label
-    return None
-
-
+with open("bacpipe/config.yaml", "rb") as f:
+    bacpipe_settings = yaml.safe_load(f)
 #  compute the evaluation metrics for classification based predictions
 
 
 #  accuracy per class
-def accuracy_per_class(y_true, y_pred, label2index):
+def accuracy_per_class(y_true, y_pred, label2index, items_per_class):
     """
     Compute the accuracy per class
     """
 
-    accuracy_per_class_index = {}
-    for i in range(len(label2index)):
-        accuracy_per_class_index[i] = 0
+    acc_per_cls_idx = {class_idx: 0 for class_idx in label2index.values()}
 
-    for i in range(len(y_true)):
-        if y_true[i] == y_pred[i]:
-            accuracy_per_class_index[y_true[i]] += 1
+    for pred_class, true_class in zip(y_pred, y_true):
+        if pred_class == true_class:
+            acc_per_cls_idx[true_class] += 1
 
-    accuracy_per_class = {}
-    for i in range(len(label2index)):
-        label = map_index_to_label(i, label2index)
-        accuracy_per_class[label] = accuracy_per_class_index[i] / y_true.count(i)
+    accuracy_per_class = {
+        class_label: acc_per_cls_idx[class_idx] / items_per_class[class_idx]
+        for class_label, class_idx in label2index.items()
+    }
 
     return accuracy_per_class
 
@@ -77,7 +68,7 @@ def micro_f1(y_true, y_pred):
     return metrics.f1_score(y_true, y_pred, average="micro")
 
 
-def compute_metrics(y_pred, y_true, probability_scores, label2index):
+def compute_task_metrics(y_pred, y_true, probability_scores, label2index):
     """
     Compute the evaluation metrics
     """
@@ -89,10 +80,14 @@ def compute_metrics(y_pred, y_true, probability_scores, label2index):
         "macro_f1": macro_f1(y_true, y_pred),
         "micro_f1": micro_f1(y_true, y_pred),
     }
+    items_per_class = {
+        class_idx: y_true.count(class_idx) for class_idx in label2index.values()
+    }
+    per_class_accuracy = accuracy_per_class(
+        y_true, y_pred, label2index, items_per_class
+    )
 
-    per_class_accuracy = accuracy_per_class(y_true, y_pred, label2index)
-
-    return overall_metrics, per_class_accuracy
+    return overall_metrics, per_class_accuracy, items_per_class
 
 
 # def compute_metrics_per_level_above():
@@ -104,11 +99,7 @@ def compute_metrics(y_pred, y_true, probability_scores, label2index):
 
 
 def build_results_report(
-    task_name,
-    pretrained_model_name,
-    overall_metrics,
-    per_class_metrics,
-    save_path="bacpipe/evaluation/results/metrics",
+    task_name, model_name, overall_metrics, per_class_metrics, items_per_class
 ):
     """
     Build a results report
@@ -124,20 +115,18 @@ def build_results_report(
         "Micro F1": overall_metrics["micro_f1"],
     }
 
-    report["Per Class Metrics:"] = {}
-    for label, accuracy in per_class_metrics.items():
-        report["Per Class Metrics:"][label] = accuracy
+    report["Per Class Metrics:"] = {
+        label: accuracy for label, accuracy in per_class_metrics.items()
+    }
 
+    report["Items per Class:"] = {
+        label: items for label, items in items_per_class.items()
+    }
+
+    save_dir = Path(bacpipe_settings["task_results_dir"]).joinpath("metrics")
+    save_path = save_dir.joinpath(
+        f"classsification_results_{task_name}_{model_name}.json"
+    )
     # save the report as json
-    with open(
-        save_path
-        + "/classsification_results_"
-        + task_name
-        + "_"
-        + pretrained_model_name
-        + ".json",
-        "w",
-    ) as f:
+    with open(save_path, "w") as f:
         json.dump(report, f)
-
-    return
