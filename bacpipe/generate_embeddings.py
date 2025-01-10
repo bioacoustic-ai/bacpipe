@@ -208,6 +208,8 @@ class Loader:
     def update_files(self):
         if self.dim_reduction_model:
             self.files = [f for f in self.embed_dir.iterdir() if f.suffix == ".json"]
+        else:
+            self.files = list(self.embed_dir.rglob("*.npy"))
 
 
 class Embedder:
