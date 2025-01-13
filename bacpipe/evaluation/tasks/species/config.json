@@ -1,9 +1,11 @@
 {
     "experiment_name": "species",
-    "dataset_csv_path": "bacpipe/bacpipe/evaluation/datasets/benchmark/tasks/dataset_9species.csv",
+    "dataset_csv_path": "bacpipe/evaluation/datasets/benchmark/dataset_9species.csv",
     "Num_classes": 7,
-    "lr": 0.001,
+    "learning_rate": 0.001,
     "batch_size": 64,
+    "num_epochs": 10,
+    "label_type": "species",
     "label_to_index": {
         "greywolf": 0,
         "eagleowl": 1,

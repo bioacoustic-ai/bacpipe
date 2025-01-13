@@ -2,6 +2,7 @@ import sklearn.metrics as metrics
 import json
 from pathlib import Path
 import yaml
+import numpy as np
 
 with open("bacpipe/config.yaml", "rb") as f:
     bacpipe_settings = yaml.safe_load(f)
@@ -49,6 +50,8 @@ def auc(y_true, probability_scores):
     """
     Compute the AUC
     """
+    if len(np.unique(y_true)) == 2:
+        probability_scores = np.array(probability_scores)[:, 1]
     return metrics.roc_auc_score(y_true, probability_scores, multi_class="ovr")
 
 

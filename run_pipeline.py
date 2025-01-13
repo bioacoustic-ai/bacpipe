@@ -17,7 +17,7 @@ for model_name in config["embedding_model"]:
         task_name = config["evaluation_task"]
         print(
             "\n#### Training linear probe to evaluate embeddings on the "
-            f"classification task {task_name}. ####"
+            f"classification task {task_name.upper()}. ####"
         )
 
         overall_metrics, per_class_metrics, items_per_class = evaluate_on_task(

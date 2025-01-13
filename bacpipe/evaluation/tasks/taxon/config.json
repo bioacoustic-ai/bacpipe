@@ -1,7 +1,11 @@
 {
     "task_name": "Taxon",
-    "dataset_csv_path": "bacpipe/bacpipe/evaluation/datasets/benchmark/tasks/dataset_9species.csv",
+    "learning_rate": 0.001,
+    "batch_size": 64,
+    "num_epochs": 10,
+    "dataset_csv_path": "bacpipe/evaluation/datasets/benchmark/dataset_9species.csv",
     "Num_classes": 2,
+    "label_type": "taxon",
     "label_to_index": {
         "bird": 0,
         "mammal": 1
