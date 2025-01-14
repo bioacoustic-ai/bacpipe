@@ -7,7 +7,7 @@ This repository aims to streamline the generation and testing of embeddings usin
 
 ### Create and activate your environment
 
-Create a virtual environment using python3.11 and virtualenv
+Create a virtual environment using python3.11 or python3.10 and virtualenv
 `python3.11 -m virtualenv env_bacpipe`
 
 activate the environment
@@ -23,11 +23,19 @@ activate the environment
 
 `pip install -r requirements.txt`
 
+#### For Windows use the windows-specific requirements
+
+`pip install -r requirements_windows.txt`
+
+If you do not have admin rights and encounter a `permission denied` error when using `pip install`, use `python -m pip install ...` instead.
+
 ### Test the installation you can execute the test suite. 
 
 By doing so you will also ensure that the directory structure for the model checkpoints will be created.
 
 `pytest -v --disable-warnings test_embedding_creation.py`
+
+Again, for windows in case of restricted permissions, use `python -m pytest -v --disable-warnings test_embedding_creation.py`.
 
 ### Add the model checkpoints that are not included by default.
 
