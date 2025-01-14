@@ -1,5 +1,7 @@
 from fairseq import checkpoint_utils
+import numpy as np
 import torch
+from bacpipe.model_utils.animal2vec_nn.nn import chunk_and_normalize
 from .utils import ModelBaseClass
 
 SAMPLE_RATE = 8000

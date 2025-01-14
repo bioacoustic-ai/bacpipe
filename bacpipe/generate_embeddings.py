@@ -363,7 +363,7 @@ def generate_embeddings(save_files=True, **kwargs):
             ld.write_metadata_file()
             ld.update_files()
         return ld
-    except (KeyboardInterrupt, AssertionError):
+    except KeyboardInterrupt:
         if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
             print("KeyboardInterrupt: Exiting and deleting created embeddings.")
             import shutil
