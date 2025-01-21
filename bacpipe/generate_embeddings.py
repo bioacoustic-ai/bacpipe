@@ -125,7 +125,15 @@ class Loader:
         with open(folder.joinpath("metadata.yml"), "r") as f:
             self.metadata_dict = yaml.safe_load(f)
         for key, val in self.metadata_dict.items():
-            if isinstance(val, str) and Path(val).is_dir():
+            if isinstance(val, str):
+                if not Path(val).is_dir():
+                    if key == "embed_dir":
+                        val = folder.parent.joinpath(Path(val).stem)
+                    elif key == "audio_dir":
+                        print(
+                            "The audio files are no longer where they used to be "
+                            "during the previous run. This might cause a problem."
+                        )
                 setattr(self, key, Path(val))
         if self.model_name == "umap":
             self.dim_reduc_embed_dir = folder

@@ -18,6 +18,11 @@ def get_embeddings(
         check_if_combination_exists=check_if_primary_combination_exists,
     )
     if not dim_reduction_model == "None":
+
+        assert len(loader_embeddings.files) > 1, (
+            "Too few files to perform dimensionality reduction. "
+            + "Are you sure you have selected the right data?"
+        )
         loader_dim_reduced = generate_embeddings(
             model_name=model_name,
             dim_reduction_model=dim_reduction_model,

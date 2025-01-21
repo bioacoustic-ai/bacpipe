@@ -19,6 +19,10 @@ for model_name in config["embedding_model"]:
             "\n#### Training linear probe to evaluate embeddings on the "
             f"classification task {task_name.upper()}. ####"
         )
+        assert len(loader_obj.files) > 1, (
+            "Too few files to evaluate embeddings with linear probe. "
+            + "Are you sure you have selected the right data?"
+        )
 
         overall_metrics, per_class_metrics, items_per_class = evaluate_on_task(
             task_name, model_name, loader_obj
@@ -30,9 +34,9 @@ for model_name in config["embedding_model"]:
         visualize_task_results(
             task_name, model_name, overall_metrics, per_class_metrics
         )
-    if not config["dim_reduction_model"] == "None":
-        plot_comparison(
-            config["audio_dir"],
-            config["embedding_model"],
-            config["dim_reduction_model"],
-        )
+if not config["dim_reduction_model"] == "None" and len(config["embedding_model"]) > 1:
+    plot_comparison(
+        config["audio_dir"],
+        config["embedding_model"],
+        config["dim_reduction_model"],
+    )

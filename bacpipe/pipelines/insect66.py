@@ -67,10 +67,11 @@ class Model(ModelBaseClass):
 
         checkpoint = torch.jit.load(f"{MODEL_BASE_PATH}/insect66/model_traced.pt")
         state_dict = checkpoint.state_dict()
+        for k in ["wav2img.0.spectrogram.window", "wav2img.0.mel_scale.fb"]:
+            state_dict[k.replace("wav2img", "wav2timefreq")] = state_dict.pop(k)
 
-        net = SpectrogramCNN(cfg)
-        self.model = net.eval().to("cpu")
-        self.model.load_state_dict(state_dict, strict=False)
+        self.model = SpectrogramCNN(cfg)
+        self.model.load_state_dict(state_dict)
 
     def preprocess(self, audio):
         audio = audio[:, None, :]
