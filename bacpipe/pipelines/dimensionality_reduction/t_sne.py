@@ -1,4 +1,4 @@
-from .utils import ModelBaseClass
+from ..utils import ModelBaseClass
 from sklearn.manifold import TSNE
 
 

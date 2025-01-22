@@ -5,7 +5,7 @@ import torch
 import timm
 import torch.nn as nn
 import torchaudio as ta
-from .utils import ModelBaseClass, MODEL_BASE_PATH
+from ..utils import ModelBaseClass, MODEL_BASE_PATH
 
 SAMPLE_RATE = 44100
 LENGTH_IN_SAMPLES = int(5.5 * SAMPLE_RATE)

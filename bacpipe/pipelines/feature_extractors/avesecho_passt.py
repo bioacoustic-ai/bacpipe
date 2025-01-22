@@ -1,5 +1,5 @@
 from hear21passt.base import get_basic_model, get_model_passt
-from .utils import ModelBaseClass, MODEL_BASE_PATH
+from ..utils import ModelBaseClass, MODEL_BASE_PATH
 import torch.nn as nn
 import torchaudio
 import torch

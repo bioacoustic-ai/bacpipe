@@ -5,7 +5,7 @@ from bacpipe.model_utils.perch_chirp.chirp.projects.zoo.models import (
 )
 import tensorflow as tf
 
-from .utils import ModelBaseClass
+from ..utils import ModelBaseClass
 
 SAMPLE_RATE = 32000
 LENGH_IN_SAMPLES = 160000

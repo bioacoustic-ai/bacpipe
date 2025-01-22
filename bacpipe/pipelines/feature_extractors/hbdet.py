@@ -17,7 +17,7 @@ import tensorflow as tf
 import librosa as lb
 from tensorflow_addons import metrics
 import collections
-from .utils import ModelBaseClass
+from ..utils import ModelBaseClass
 
 SAMPLE_RATE = 2000
 LENGTH_IN_SAMPLES = 7755

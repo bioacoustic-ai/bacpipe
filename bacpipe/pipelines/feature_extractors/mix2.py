@@ -5,7 +5,7 @@ import torch
 SAMPLE_RATE = 16000
 LENGTH_IN_SAMPLES = int(3 * SAMPLE_RATE)
 
-from .utils import ModelBaseClass
+from ..utils import ModelBaseClass
 
 
 class Model(ModelBaseClass):

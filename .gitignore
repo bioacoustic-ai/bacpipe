@@ -1,11 +1,16 @@
+# don't track environment files, model checkpoints, test files, and vscode settings
 env*
 bacpipe/model_checkpoints/*
-bacpipe/test*
+bacpipe/tests/.pytest*
 *__pycache__*
 .vscode
 config.yaml
 
+# ignore datasets, embeddings, and task results
 bacpipe/evaluation/datasets/*
 bacpipe/evaluation/embeddings/*
 bacpipe/evaluation/dim_reduced_embeddings/*
 bacpipe/evaluation/task_results/*
+
+# track all Readme files, including the ones in subdirectories
+!**/README.md

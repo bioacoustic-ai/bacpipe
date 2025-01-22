@@ -1,7 +1,7 @@
 import torch
 from transformers import pipeline
 import librosa as lb
-from .utils import ModelBaseClass
+from ..utils import ModelBaseClass
 import numpy as np
 from tqdm import tqdm
 

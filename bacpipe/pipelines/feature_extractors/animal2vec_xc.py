@@ -1,5 +1,5 @@
 from .animal2vec_mk import Model as A2VMK
-from .utils import MODEL_BASE_PATH
+from ..utils import MODEL_BASE_PATH
 
 SAMPLE_RATE = 24_000
 LENGTH_IN_SAMPLES = int(5 * SAMPLE_RATE)

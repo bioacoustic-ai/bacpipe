@@ -3,7 +3,7 @@ import tensorflow as tf
 SAMPLE_RATE = 48000
 LENGTH_IN_SAMPLES = 144000
 
-from .utils import ModelBaseClass
+from ..utils import ModelBaseClass
 
 
 class Model(ModelBaseClass):

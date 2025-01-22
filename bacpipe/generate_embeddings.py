@@ -24,6 +24,7 @@ class Loader:
         self.model_name = model_name
         self.audio_dir = Path(audio_dir)
         self.dim_reduction_model = dim_reduction_model
+        self.testing = testing
 
         with open("bacpipe/config.yaml", "r") as f:
             self.config = yaml.safe_load(f)
@@ -140,6 +141,8 @@ class Loader:
 
     def get_embeddings(self):
         embed_dir = self.get_embedding_dir()
+        if self.testing:
+            embed_dir = Path("bacpipe/evaluation/datasets/embedding_test_files")
         self.files = [f for f in embed_dir.rglob(f"*{self.embed_suffix}")]
         self.files.sort()
 
@@ -236,7 +239,14 @@ class Embedder:
         self._init_model()
 
     def _init_model(self):
-        module = importlib.import_module(f"bacpipe.pipelines.{self.model_name}")
+        if self.dim_reduction_model:
+            module = importlib.import_module(
+                f"bacpipe.pipelines.dimensionality_reduction.{self.model_name}"
+            )
+        else:
+            module = importlib.import_module(
+                f"bacpipe.pipelines.feature_extractors.{self.model_name}"
+            )
         self.model = module.Model()
         self.model.prepare_inference()
 

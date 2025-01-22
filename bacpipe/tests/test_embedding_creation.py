@@ -7,7 +7,7 @@ from pathlib import Path
 # Find all models in the pipelines directory
 models = [
     mod.stem
-    for mod in Path("bacpipe/pipelines").glob("*.py")
+    for mod in Path("bacpipe/pipelines/feature_extractors").glob("*.py")
     if not mod.stem in ["__init__", "utils", "umap", "pca", "t_sne", "sparse_pca"]
 ]
 

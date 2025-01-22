@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import yaml
 import torch
 from .insect66 import SpectrogramCNN
-from .utils import ModelBaseClass, MODEL_BASE_PATH
+from ..utils import ModelBaseClass, MODEL_BASE_PATH
 
 SAMPLE_RATE = 44100
 LENGTH_IN_SAMPLES = int(5.5 * SAMPLE_RATE)

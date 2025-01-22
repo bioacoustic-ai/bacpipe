@@ -1,6 +1,6 @@
 import tensorflow_hub as hub
 import numpy as np
-from .utils import ModelBaseClass
+from ..utils import ModelBaseClass
 import tensorflow as tf
 
 
