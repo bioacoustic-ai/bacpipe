@@ -27,7 +27,7 @@ activate the environment
 
 By doing so you will also ensure that the directory structure for the model checkpoints will be created.
 
-`pytest -v --disable-warnings test_embedding_creation.py`
+`python -m pytest -v bacpipe/tests/test_reducing_dimensions.py bacpipe/tests/test_embedding_creation.py`
 
 ### Add the model checkpoints that are not included by default.
 
