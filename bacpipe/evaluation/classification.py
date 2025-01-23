@@ -49,7 +49,21 @@ def link_embeds_to_wavfiles(model_name, loader_object, data):
     )
 
 
-def load_and_clean_data(task_name, model_name, loader_object):
+def define_data_for_testing(task_config, **kwargs):
+    dataset_path = "bacpipe/evaluation/datasets/embedding_test_files/test_task.csv"
+    data = pd.read_csv(dataset_path)
+    if kwargs["testing"] == "ID":
+        labels = data.hierarchical_labels.unique()
+    elif kwargs["testing"] == "species":
+        labels = data.species.unique()
+    elif kwargs["testing"] == "taxon":
+        labels = data.taxon.unique()
+    task_config["label_to_index"] = {x: i for i, x in enumerate(labels)}
+    task_config["Num_classes"] = len(labels)
+    return data, task_config
+
+
+def load_and_clean_data(task_name, model_name, loader_object, **kwargs):
     task_config_path = (
         Path(bacpipe_settings["task_config_files"])
         .joinpath(task_name)
@@ -60,8 +74,11 @@ def load_and_clean_data(task_name, model_name, loader_object):
         task_config = json.load(f)
 
     # load dataset
-    dataset_path = task_config["dataset_csv_path"]
-    data = pd.read_csv(dataset_path)
+    if "testing" in kwargs:
+        data, task_config = define_data_for_testing(task_config, **kwargs)
+    else:
+        dataset_path = task_config["dataset_csv_path"]
+        data = pd.read_csv(dataset_path)
 
     data = data[~data.duplicated()]
 
@@ -72,7 +89,7 @@ def load_and_clean_data(task_name, model_name, loader_object):
     return clean_df, link_embed2wavfile, task_config
 
 
-def evaluate_on_task(task_name, model_name, loader_object):
+def evaluate_on_task(task_name, model_name, loader_object, **kwargs):
     """
     trains a linear probe and predicts on test set for the given task.
 
@@ -85,7 +102,7 @@ def evaluate_on_task(task_name, model_name, loader_object):
 
     """
     clean_df, link_embed2wavfile, task_config = load_and_clean_data(
-        task_name, model_name, loader_object
+        task_name, model_name, loader_object, **kwargs
     )
 
     # generate the loaders

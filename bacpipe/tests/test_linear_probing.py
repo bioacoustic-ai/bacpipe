@@ -8,7 +8,7 @@ embed_dir = Path("bacpipe/evaluation/datasets/embedding_test_files")
 
 embeddings = {}
 
-tasks = ["ID", "spcies", "taxon"]
+tasks = ["ID", "species", "taxon"]
 
 
 def loader_fn():
@@ -25,7 +25,7 @@ def loader_fn():
 
 # Define the pytest_generate_tests hook to generate test cases
 def pytest_generate_tests(metafunc):
-    if "model" in metafunc.fixturenames:
+    if "task" in metafunc.fixturenames:
         # Generate test cases based on the test_data list
         metafunc.parametrize("task", tasks)
 
@@ -34,8 +34,8 @@ def test_task_evaluation(task):
     loader = loader_fn()
     # for task in tasks:
     overall_metrics, per_class_metrics, items_per_class = evaluate_on_task(
-        task, "avesecho_passt", loader, testing=True
+        task, "avesecho_passt", loader, testing=task
     )
 
 
-test_task_evaluation("ID")
+test_task_evaluation("species")

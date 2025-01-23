@@ -19,7 +19,8 @@ def train_linear_probe(
     linear_probe, train_dataloader, task_config, device_str="cuda:0"
 ):
 
-    device = torch.device(device_str if torch.cuda.is_available() else "cpu")
+    # device = torch.device(device_str if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     linear_probe = linear_probe.to(device)
 
     # Define optimizer and loss function
