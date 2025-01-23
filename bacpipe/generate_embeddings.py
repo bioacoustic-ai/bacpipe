@@ -26,7 +26,7 @@ class Loader:
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
 
-        with open("bacpipe/config.yaml", "r") as f:
+        with open("bacpipe/path_settings.yaml", "r") as f:
             self.config = yaml.safe_load(f)
 
         for key, val in self.config.items():
@@ -227,7 +227,7 @@ class Embedder:
     def __init__(self, model_name, dim_reduction_model=False, **kwargs):
         import yaml
 
-        with open("bacpipe/config.yaml", "rb") as f:
+        with open("bacpipe/path_settings.yaml", "rb") as f:
             self.config = yaml.safe_load(f)
 
         self.dim_reduction_model = dim_reduction_model

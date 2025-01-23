@@ -1,18 +1,9 @@
 {
-    "experiment_name": "species",
+    "task_name": "species",
     "dataset_csv_path": "bacpipe/evaluation/datasets/benchmark/dataset_9species.csv",
     "Num_classes": 7,
     "learning_rate": 0.001,
     "batch_size": 64,
     "num_epochs": 10,
-    "label_type": "species",
-    "label_to_index": {
-        "greywolf": 0,
-        "eagleowl": 1,
-        "hyrax": 2,
-        "chiffchaff": 3,
-        "littleowl": 4,
-        "pipit": 5,
-        "hyena": 6
-    }
+    "label_type": "species"
 }

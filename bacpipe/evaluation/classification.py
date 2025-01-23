@@ -5,17 +5,17 @@ from pathlib import Path
 import yaml
 
 
-from .evaluation_utils.embedding_dataloader import EmbeddingTaskLoader
-from .evaluation_utils.linear_probe import (
+from .classification_utils.embedding_dataloader import EmbeddingTaskLoader
+from .classification_utils.linear_probe import (
     LinearProbe,
     train_linear_probe,
     inference_with_linear_probe,
 )
-from .evaluation_utils.evaluation_metrics import compute_task_metrics
+from .classification_utils.evaluation_metrics import compute_task_metrics
 
 import torch
 
-with open("bacpipe/config.yaml", "rb") as f:
+with open("bacpipe/path_settings.yaml", "rb") as f:
     bacpipe_settings = yaml.safe_load(f)
 
 
@@ -49,18 +49,16 @@ def link_embeds_to_wavfiles(model_name, loader_object, data):
     )
 
 
-def define_data_for_testing(task_config, **kwargs):
-    dataset_path = "bacpipe/evaluation/datasets/embedding_test_files/test_task.csv"
-    data = pd.read_csv(dataset_path)
-    if kwargs["testing"] == "ID":
+def define_labels_for_task(data, task_config):
+    if task_config["task_name"] == "ID":
         labels = data.hierarchical_labels.unique()
-    elif kwargs["testing"] == "species":
+    elif task_config["task_name"] == "species":
         labels = data.species.unique()
-    elif kwargs["testing"] == "taxon":
+    elif task_config["task_name"] == "taxon":
         labels = data.taxon.unique()
     task_config["label_to_index"] = {x: i for i, x in enumerate(labels)}
     task_config["Num_classes"] = len(labels)
-    return data, task_config
+    return task_config
 
 
 def load_and_clean_data(task_name, model_name, loader_object, **kwargs):
@@ -75,10 +73,12 @@ def load_and_clean_data(task_name, model_name, loader_object, **kwargs):
 
     # load dataset
     if "testing" in kwargs:
-        data, task_config = define_data_for_testing(task_config, **kwargs)
+        dataset_path = "bacpipe/evaluation/datasets/embedding_test_files/test_task.csv"
     else:
         dataset_path = task_config["dataset_csv_path"]
-        data = pd.read_csv(dataset_path)
+    data = pd.read_csv(dataset_path)
+
+    task_config = define_labels_for_task(data, task_config)
 
     data = data[~data.duplicated()]
 

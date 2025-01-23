@@ -7,7 +7,7 @@ from bacpipe.generate_embeddings import Loader
 import yaml
 from .clustering import get_centroid, get_ari_and_ami
 
-with open("bacpipe/config.yaml", "rb") as f:
+with open("bacpipe/path_settings.yaml", "rb") as f:
     bacpipe_settings = yaml.safe_load(f)
 
 SPLIT_BY_FOLDER = True
@@ -43,6 +43,8 @@ def plot_embeddings(umap_embed_path, dim_reduction_model, axes=False, fig=False)
                 centroids[label][0], centroids[label][1], "x", label=f"{label} centroid"
             )
         clustering_dict = get_ari_and_ami(split_data, centroids)
+        with open(umap_embed_path.joinpath("clustering_metrics.json"), "w") as f:
+            json.dump(clustering_dict, f)
     else:
         embed_x = embeds_dict["x"]
         embed_y = embeds_dict["y"]

@@ -1,6 +1,6 @@
 # Embeddings directory 
 
-### Embeddings that are created will automatically be saved here unless specified differently in bacpipe/config.yaml
+### Embeddings that are created will automatically be saved here unless specified differently in bacpipe/path_settings.yaml
 
 By default the naming conventions for the embedding directories is:
 

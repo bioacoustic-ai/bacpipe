@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml
 import numpy as np
 
-with open("bacpipe/config.yaml", "rb") as f:
+with open("bacpipe/path_settings.yaml", "rb") as f:
     bacpipe_settings = yaml.safe_load(f)
 #  compute the evaluation metrics for classification based predictions
 
