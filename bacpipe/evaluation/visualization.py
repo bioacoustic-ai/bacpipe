@@ -149,3 +149,66 @@ def visualize_task_results(task_name, model_name, overall_metrics, per_class_met
         .joinpath(f"classsification_results_{task_name}_{model_name}.png"),
         dpi=300,
     )
+    plt.close(fig)
+
+
+def visualise_classification_results_across_models(
+    task_name, models_list, overall_metrics_dict, per_class_metrics_dict
+):
+    num_classes = len(next(iter(per_class_metrics_dict.values())).keys())
+    fig_width = max(12, num_classes * 0.5)  
+    fig, ax = plt.subplots(1, 1, figsize=(fig_width, 8))
+
+    cmap = plt.cm.tab10
+    model_colors = cmap(np.arange(len(models_list)) % cmap.N)
+
+  
+    base_markers = ['o', 's', '^', 'D', 'P', 'X', '*', 'h', 'H', '<', '>', 'v', '|', '_']
+    extended_markers = base_markers * ((len(models_list) // len(base_markers)) + 1)
+
+
+    all_classes = sorted(list(next(iter(per_class_metrics_dict.values())).keys()))
+
+    for i, model_name in enumerate(models_list):
+        per_class_metrics = per_class_metrics_dict[model_name]
+        per_class_values = [per_class_metrics[cls] for cls in all_classes]
+
+
+        ax.scatter(
+            np.arange(len(all_classes)),
+            per_class_values,
+            color=model_colors[i],
+            label=f"{model_name.upper()} (accuracy: {overall_metrics_dict[model_name]:.3f})",
+            marker=extended_markers[i],
+            s=100, 
+        )
+
+
+        ax.plot(
+            np.arange(len(all_classes)),
+            per_class_values,
+            color=model_colors[i],
+            linestyle='-',  # Solid line
+            linewidth=1.5,
+        )
+
+
+    fig.suptitle(
+        f"Per Class Metrics for {task_name} Classification Across Models",
+        fontsize=14,
+    )
+    ax.set_ylabel("Accuracy")
+    ax.set_xlabel("Classes")
+    ax.set_xticks(np.arange(len(all_classes)))
+    ax.set_xticklabels(all_classes, rotation=90)
+
+    ax.legend(loc='upper left', bbox_to_anchor=(1.05, 1), title="Models", fontsize=10)
+
+    fig.subplots_adjust(right=0.75, bottom=0.3)
+    fig.savefig(
+        Path(bacpipe_settings["task_results_dir"])
+        .joinpath("plots")
+        .joinpath(f"classsification_results_{task_name}_across_models.png"),
+        dpi=300,
+    )
+    plt.close(fig)
