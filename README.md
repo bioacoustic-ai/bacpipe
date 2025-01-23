@@ -3,6 +3,9 @@ BioAcoustic Collection Pipeline
 
 This repository aims to streamline the generation and testing of embeddings using a large variety of bioacoustic models. 
 
+The below image shows a comparison of umap embeddings based on 16 different bioacoustic models. The models are being evaluated on the DCASE Task 5 Few-Shot learning dataset. This repository is an attempt to enable a comparison of bioacoustic models based on their embedding spaces, rather than their classification results.
+![](src/ComparisonPlot.png)
+
 # Installation
 
 ### Create and activate your environment
@@ -33,7 +36,7 @@ If you do not have admin rights and encounter a `permission denied` error when u
 
 By doing so you will also ensure that the directory structure for the model checkpoints will be created.
 
-`pytest -v --disable-warnings test_embedding_creation.py`
+`python -m pytest -v bacpipe/tests/test_reducing_dimensions.py bacpipe/tests/test_embedding_creation.py`
 
 Again, for windows in case of restricted permissions, use `python -m pytest -v --disable-warnings test_embedding_creation.py`.
 
@@ -43,17 +46,23 @@ Download the ones that are available from [here](https://github.com/bioacoustic-
 
 # Usage
 
-Modify the __config.yaml__ file in the root directory to specify the path to your __dataset__. Define what models to run by specifying the strings in the __embedding_model__ list (copy and paste as needed). If you want to run a dimensionality reduction model (currently only supporting UMAP), specify the name in the __dim_reduction_model__ variable.
+Modify the [config.yaml](config.yaml) file in the root directory to specify the path to your `dataset`. Define what models to run by specifying the strings in the `embedding_model` list (copy and paste as needed). If you want to run a dimensionality reduction model, specify the name in the `dim_reduction_model` variable.
 
 Once the configuration is complete, execute the run_pipeline.py file (make sure the environment is activated)
 `python run_pipeline.py` .
 
-While the scripts are executed, directories will be created in the __bacpipe.evaluation__ directory. Embeddings will be saved in __bacpipe.evaluation.embeddings__ and if selected, reduced dimensionality embeddings will be saved in __bacpipe.evaluation.dim_reduced_embeddings__. 
+While the scripts are executed, directories will be created in the `bacpipe/evaluation` directory. Embeddings will be saved in `bacpipe/evaluation/embeddings` (see [here](bacpipe/evaluation/embeddings/README.md) for more info) and if selected, reduced dimensionality embeddings will be saved in `bacpipe/evaluation/dim_reduced_embeddings` (see [here](bacpipe/evaluation/dim_reduced_embeddings/README.md) for more infor) . 
 
-Please raise issues if there are questions or bugs. Also, please cite the authors of the respective models, all models are referenced in the table below.
+# Evaluation
+
+Evaluation of the models is possible in different ways, which is all explained  [here](bacpipe/evaluation/README.md). 
+
 
 
 # Available models
+
+The models all have their model specific code to ensure inference runs smoothly. More info on the models and their pipelines can be found [here](bacpipe/pipelines/README.md).
+
 Models currently include:
 
 |   Name|   ref paper|   ref code|   sampling rate|   input length| embedding dimension |
@@ -68,6 +77,7 @@ Models currently include:
 |   AvesEcho_PASST   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   32 kHz|   3 s| 768 |
 |   HumpbackNET |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s| 2048|
 |   Insect66NET |   paper   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   44.1 kHz|   5.5 s| 1280 |
+|   Insect459NET |   paper   |   pending    |   44.1 kHz|   5.5 s| 1280 |
 |   Mix2        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   16 kHz|   3 s| 960 |
 |   Perch_Bird       |   [paper](https://www.nature.com/articles/s41598-023-49989-z.epdf)   |   [code](https://github.com/google-research/perch)    |   32 kHz|   5 s| 1280 |
 |   ProtoCLR     |   [paper](https://arxiv.org/pdf/2409.08589)   |   [code](https://github.com/ilyassmoummad/ProtoCLR)    |   16 kHz|   6 s| 384 |
@@ -75,3 +85,12 @@ Models currently include:
 |   SurfPerch       |   [paper](https://arxiv.org/abs/2404.16436)   |   [code](https://www.kaggle.com/models/google/surfperch)    |   32 kHz|   5 s| 1280 |
 |   Google_Whale       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   24 kHz|   5 s| 1280 |
 |   VGGish      |   [paper](https://ieeexplore.ieee.org/document/7952132)   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   16 kHz|   0.96 s| 128 |
+
+
+# Known issues
+
+Given that this repository compiles a large number of very different deep learning models wich different requirements, some issues have been noted. 
+
+Please raise issues if there are questions or bugs. 
+
+Also, please cite the authors of the respective models, all models are referenced in the table above.

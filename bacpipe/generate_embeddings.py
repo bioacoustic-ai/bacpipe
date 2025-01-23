@@ -24,8 +24,9 @@ class Loader:
         self.model_name = model_name
         self.audio_dir = Path(audio_dir)
         self.dim_reduction_model = dim_reduction_model
+        self.testing = testing
 
-        with open("bacpipe/config.yaml", "r") as f:
+        with open("bacpipe/path_settings.yaml", "r") as f:
             self.config = yaml.safe_load(f)
 
         for key, val in self.config.items():
@@ -92,6 +93,10 @@ class Loader:
                     if num_audio_files == num_files:
                         self.combination_already_exists = True
                         self._get_metadata_dict(d)
+                        print(
+                            "\n### Embeddings already exist. "
+                            f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
+                        )
                         break
 
     def _get_audio_paths(self):
@@ -121,13 +126,23 @@ class Loader:
         with open(folder.joinpath("metadata.yml"), "r") as f:
             self.metadata_dict = yaml.safe_load(f)
         for key, val in self.metadata_dict.items():
-            if isinstance(val, str) and Path(val).is_dir():
+            if isinstance(val, str):
+                if not Path(val).is_dir():
+                    if key == "embed_dir":
+                        val = folder.parent.joinpath(Path(val).stem)
+                    elif key == "audio_dir":
+                        print(
+                            "The audio files are no longer where they used to be "
+                            "during the previous run. This might cause a problem."
+                        )
                 setattr(self, key, Path(val))
         if self.model_name == "umap":
             self.dim_reduc_embed_dir = folder
 
     def get_embeddings(self):
         embed_dir = self.get_embedding_dir()
+        if self.testing:
+            embed_dir = Path("bacpipe/evaluation/datasets/embedding_test_files")
         self.files = [f for f in embed_dir.rglob(f"*{self.embed_suffix}")]
         self.files.sort()
 
@@ -188,10 +203,11 @@ class Loader:
         self.metadata_dict["files"]["embedding_dimensions"].append(embeds.shape)
         return embeds
 
-    def write_audio_file_to_metadata(self, index, file, embed):
+    def write_audio_file_to_metadata(self, index, file, embed, embed_size):
         if index == 0:
             self.metadata_dict["segment_length (samples)"] = embed.model.segment_length
             self.metadata_dict["sample_rate (Hz)"] = embed.model.sr
+            self.metadata_dict["embedding_size"] = embed_size
         rel_file_path = Path(file).relative_to(self.audio_dir)
         self.metadata_dict["files"]["audio_files"].append(str(rel_file_path))
         self.metadata_dict["files"]["file_lengths (s)"].append(embed.file_length)
@@ -203,13 +219,15 @@ class Loader:
     def update_files(self):
         if self.dim_reduction_model:
             self.files = [f for f in self.embed_dir.iterdir() if f.suffix == ".json"]
+        else:
+            self.files = list(self.embed_dir.rglob("*.npy"))
 
 
 class Embedder:
     def __init__(self, model_name, dim_reduction_model=False, **kwargs):
         import yaml
 
-        with open("bacpipe/config.yaml", "rb") as f:
+        with open("bacpipe/path_settings.yaml", "rb") as f:
             self.config = yaml.safe_load(f)
 
         self.dim_reduction_model = dim_reduction_model
@@ -221,7 +239,14 @@ class Embedder:
         self._init_model()
 
     def _init_model(self):
-        module = importlib.import_module(f"bacpipe.pipelines.{self.model_name}")
+        if self.dim_reduction_model:
+            module = importlib.import_module(
+                f"bacpipe.pipelines.dimensionality_reduction.{self.model_name}"
+            )
+        else:
+            module = importlib.import_module(
+                f"bacpipe.pipelines.feature_extractors.{self.model_name}"
+            )
         self.model = module.Model()
         self.model.prepare_inference()
 
@@ -321,11 +346,11 @@ def save_embeddings_dict_with_timestamps(
 def generate_embeddings(save_files=True, **kwargs):
     if "dim_reduction_model" in kwargs:
         print(
-            f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model']} ######\n"
+            f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"
         )
     elif "model_name" in kwargs:
         print(
-            f"\n\n\n###### Generating embeddings using {kwargs['model_name']} ######\n"
+            f"\n\n\n###### Generating embeddings using {kwargs['model_name'].upper()} ######\n"
         )
     else:
         raise ValueError("model_name not provided in kwargs.")
@@ -339,7 +364,9 @@ def generate_embeddings(save_files=True, **kwargs):
                 if not ld.dim_reduction_model:
                     sample = file
                     embeddings = embed.get_embeddings_from_model(sample)
-                    ld.write_audio_file_to_metadata(idx, file, embed)
+                    ld.write_audio_file_to_metadata(
+                        idx, file, embed, embeddings.shape[-1]
+                    )
                     embed.save_embeddings(idx, ld, file, embeddings)
                 else:
                     if idx == 0:
@@ -354,7 +381,7 @@ def generate_embeddings(save_files=True, **kwargs):
             ld.write_metadata_file()
             ld.update_files()
         return ld
-    except (KeyboardInterrupt, AssertionError):
+    except KeyboardInterrupt:
         if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
             print("KeyboardInterrupt: Exiting and deleting created embeddings.")
             import shutil

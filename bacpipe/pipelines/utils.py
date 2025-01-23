@@ -4,6 +4,9 @@ import numpy as np
 import torchaudio as ta
 import torch
 from tqdm import tqdm
+import logging
+
+logger = logging.getLogger("bacpipe")
 
 MODEL_BASE_PATH = "bacpipe/model_checkpoints"
 GLOBAL_BATCH_SIZE = 16
@@ -11,7 +14,7 @@ GLOBAL_BATCH_SIZE = 16
 
 class ModelBaseClass:
     def __init__(self, sr, segment_length, **kwargs):
-        with open("bacpipe/config.yaml", "rb") as f:
+        with open("bacpipe/path_settings.yaml", "rb") as f:
             self.config = yaml.safe_load(f)
 
         for key, value in kwargs.items():
@@ -26,7 +29,13 @@ class ModelBaseClass:
     def prepare_inference(self):
         try:
             self.model.eval()
+            try:
+                self.model = self.model.to(self.config["device"])
+            except AttributeError as e:
+                print(e)
+                pass
         except AttributeError:
+            logger.debug("Skipping model.eval() because model is from tensorflow.")
             pass
 
     def load_and_resample(self, path):

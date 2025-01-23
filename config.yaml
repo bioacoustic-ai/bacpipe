@@ -34,7 +34,9 @@ available_models : [
 
 
 # embedding model name
-embedding_model: ["perch_bird"]
+embedding_model: [
+  "birdnet"
+]
 
 # dimensionality reduction model name.
 supported_models: [
@@ -43,4 +45,12 @@ supported_models: [
   "t_sne",
   "umap"
 ]
-dim_reduction_model: "umap"
+dim_reduction_model: None
+
+# specify the evaluation task to be performed
+supported_evaluation_tasks: [
+  "ID",
+  "species",
+  "taxon"
+]
+evaluation_task: None
