@@ -2,7 +2,7 @@ from bacpipe.main import get_embeddings
 from bacpipe.evaluation.visualization import plot_comparison, visualize_task_results
 import yaml
 from bacpipe.evaluation.classification import evaluate_on_task
-from bacpipe.evaluation.evaluation_utils.evaluation_metrics import build_results_report
+from bacpipe.evaluation.classification_utils.evaluation_metrics import build_results_report
 
 with open("config.yaml", "rb") as f:
     config = yaml.safe_load(f)
