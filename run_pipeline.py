@@ -2,7 +2,9 @@ from bacpipe.main import get_embeddings
 from bacpipe.evaluation.visualization import plot_comparison, visualize_task_results
 import yaml
 from bacpipe.evaluation.classification import evaluate_on_task
-from bacpipe.evaluation.classification_utils.evaluation_metrics import build_results_report
+from bacpipe.evaluation.classification_utils.evaluation_metrics import (
+    build_results_report,
+)
 
 with open("config.yaml", "rb") as f:
     config = yaml.safe_load(f)
@@ -24,16 +26,10 @@ for model_name in config["embedding_model"]:
             + "Are you sure you have selected the right data?"
         )
 
-        overall_metrics, per_class_metrics, items_per_class = evaluate_on_task(
-            task_name, model_name, loader_obj
-        )
+        metrics, task_config = evaluate_on_task(task_name, model_name, loader_obj)
 
-        build_results_report(
-            task_name, model_name, overall_metrics, per_class_metrics, items_per_class
-        )
-        visualize_task_results(
-            task_name, model_name, overall_metrics, per_class_metrics
-        )
+        build_results_report(task_name, model_name, metrics, task_config)
+        visualize_task_results(task_name, model_name, metrics)
 if not config["dim_reduction_model"] == "None" and len(config["embedding_model"]) > 1:
     plot_comparison(
         config["audio_dir"],

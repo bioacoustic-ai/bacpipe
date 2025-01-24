@@ -17,7 +17,7 @@ def plot_embeddings(umap_embed_path, dim_reduction_model, axes=False, fig=False)
     files = umap_embed_path.iterdir()
     centroids = {}
     for file in files:
-        if file.suffix == ".json":
+        if file.suffix == ".json" and dim_reduction_model in file.stem:
             with open(file, "r") as f:
                 embeds_dict = json.load(f)
     split_data = data_split_by_labels(embeds_dict)
@@ -122,26 +122,28 @@ def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
     fig.savefig(ld.embed_dir.joinpath("comp_fig.png"), dpi=300)
 
 
-def visualize_task_results(task_name, model_name, overall_metrics, per_class_metrics):
+def visualize_task_results(task_name, model_name, metrics):
     fig, ax = plt.subplots(1, 1, figsize=(12, 8))
     cmap = plt.cm.tab10
-    colors = cmap(np.arange(len(per_class_metrics.values())) % cmap.N)
+    colors = cmap(np.arange(len(metrics["per_class_accuracy"].values())) % cmap.N)
     ax.bar(
-        per_class_metrics.keys(),
-        per_class_metrics.values(),
+        metrics["per_class_accuracy"].keys(),
+        metrics["per_class_accuracy"].values(),
         width=0.5,
         color=colors,
     )
-    metrics = "".join([f"{k}: {v:.3f} | " for k, v in overall_metrics.items()])
+    metrics_string = "".join(
+        [f"{k}: {v:.3f} | " for k, v in metrics["overall"].items()]
+    )
     fig.suptitle(
         f"Per Class Metrics for {task_name} "
         f"classification with {model_name.upper()} embeddings\n"
-        f"{metrics}"
+        f"{metrics_string}"
     )
     ax.set_ylabel("Accuracy")
     ax.set_xlabel("Classes")
-    ax.set_xticks(range(len(per_class_metrics)))
-    ax.set_xticklabels(per_class_metrics.keys(), rotation=90)
+    ax.set_xticks(range(len(metrics["per_class_accuracy"])))
+    ax.set_xticklabels(metrics["per_class_accuracy"].keys(), rotation=90)
     fig.subplots_adjust(bottom=0.3)
     fig.savefig(
         Path(bacpipe_settings["task_results_dir"])

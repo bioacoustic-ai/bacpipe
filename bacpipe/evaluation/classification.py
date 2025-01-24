@@ -120,8 +120,8 @@ def evaluate_on_task(task_name, model_name, loader_object, **kwargs):
 
     y_pred, y_true, probability_scores = inference_with_linear_probe(lp, test_gen)
 
-    overall_metrics, per_class_metrics, items_per_class = compute_task_metrics(
+    metrics = compute_task_metrics(
         y_pred, y_true, probability_scores, task_config["label_to_index"]
     )
 
-    return overall_metrics, per_class_metrics, items_per_class
+    return metrics, task_config
