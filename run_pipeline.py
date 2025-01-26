@@ -13,9 +13,6 @@ from bacpipe.evaluation.classification_utils.evaluation_metrics import (
 with open("config.yaml", "rb") as f:
     config = yaml.safe_load(f)
 
-overall_macro_acc_models_dict = {}
-per_class_acc_across_models_dict = {}
-
 
 for model_name in config["embedding_model"]:
     loader_obj = get_embeddings(
