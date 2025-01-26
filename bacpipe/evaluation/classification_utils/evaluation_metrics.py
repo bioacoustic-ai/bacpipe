@@ -22,7 +22,7 @@ def accuracy_per_class(y_true, y_pred, label2index, items_per_class):
             acc_per_cls_idx[true_class] += 1
 
     accuracy_per_class = {
-        class_label: acc_per_cls_idx[class_idx] / items_per_class[class_idx]
+        class_label: acc_per_cls_idx[class_idx] / items_per_class[class_label]
         for class_label, class_idx in label2index.items()
     }
 
@@ -76,21 +76,23 @@ def compute_task_metrics(y_pred, y_true, probability_scores, label2index):
     Compute the evaluation metrics
     """
 
-    overall_metrics = {
+    metrics = dict()
+
+    metrics["overall"] = {
         "macro_accuracy": macro_accuracy(y_true, y_pred),
         "micro_accuracy": micro_accuracy(y_true, y_pred),
         "auc": auc(y_true, probability_scores),
         "macro_f1": macro_f1(y_true, y_pred),
         "micro_f1": micro_f1(y_true, y_pred),
     }
-    items_per_class = {
-        class_idx: y_true.count(class_idx) for class_idx in label2index.values()
+    metrics["items_per_class"] = {
+        name: y_true.count(idx) for name, idx in label2index.items()
     }
-    per_class_accuracy = accuracy_per_class(
-        y_true, y_pred, label2index, items_per_class
+    metrics["per_class_accuracy"] = accuracy_per_class(
+        y_true, y_pred, label2index, metrics["items_per_class"]
     )
 
-    return overall_metrics, per_class_accuracy, items_per_class
+    return metrics
 
 
 # def compute_metrics_per_level_above():
@@ -101,35 +103,35 @@ def compute_task_metrics(y_pred, y_true, probability_scores, label2index):
 #     return
 
 
-def build_results_report(
-    task_name, model_name, overall_metrics, per_class_metrics, items_per_class
-):
+def build_results_report(task_name, model_name, metrics, task_config):
     """
     Build a results report
     """
 
-    report = {}
+    report = dict()
 
     report["Overall Metrics:"] = {
-        "Macro Accuracy": overall_metrics["macro_accuracy"],
-        "Micro Accuracy": overall_metrics["micro_accuracy"],
-        "AUC": overall_metrics["auc"],
-        "Macro F1": overall_metrics["macro_f1"],
-        "Micro F1": overall_metrics["micro_f1"],
+        "Macro Accuracy": float(metrics["overall"]["macro_accuracy"]),
+        "Micro Accuracy": float(metrics["overall"]["micro_accuracy"]),
+        "AUC": float(metrics["overall"]["auc"]),
+        "Macro F1": float(metrics["overall"]["macro_f1"]),
+        "Micro F1": float(metrics["overall"]["micro_f1"]),
     }
 
     report["Per Class Metrics:"] = {
-        label: accuracy for label, accuracy in per_class_metrics.items()
+        label: acc for label, acc in metrics["per_class_accuracy"].items()
     }
 
     report["Items per Class:"] = {
-        label: items for label, items in items_per_class.items()
+        label: items for label, items in metrics["items_per_class"].items()
     }
+
+    report["Task Configuration:"] = task_config
 
     save_dir = Path(bacpipe_settings["task_results_dir"]).joinpath("metrics")
     save_path = save_dir.joinpath(
-        f"classsification_results_{task_name}_{model_name}.json"
+        f"classsification_results_{task_name}_{model_name}.yml"
     )
     # save the report as json
     with open(save_path, "w") as f:
-        json.dump(report, f)
+        yaml.safe_dump(report, f)

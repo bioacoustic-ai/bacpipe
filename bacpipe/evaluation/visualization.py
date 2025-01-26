@@ -5,7 +5,7 @@ import numpy as np
 from types import SimpleNamespace
 from bacpipe.generate_embeddings import Loader
 import yaml
-from .clustering import get_centroid, get_ari_and_ami
+from .clustering import get_centroid, get_clustering_scores
 
 with open("bacpipe/path_settings.yaml", "rb") as f:
     bacpipe_settings = yaml.safe_load(f)
@@ -13,17 +13,37 @@ with open("bacpipe/path_settings.yaml", "rb") as f:
 SPLIT_BY_FOLDER = True
 
 
+def darken_hex_color_bitwise(hex_color):
+    """
+    Darkens a hex color using the bitwise operation: (color & 0xfefefe) >> 1.
+
+    Parameters:
+        hex_color (str): The hex color string (e.g., '#1f77b4').
+
+    Returns:
+        str: The darkened hex color.
+    """
+    # Remove '#' and convert hex color to an integer
+    color_int = int(hex_color.lstrip("#"), 16)
+
+    # Apply the bitwise operation to darken the color
+    darkened_color_int = (color_int & 0xFEFEFE) >> 1
+
+    # Convert back to a hex string and return with leading '#'
+    return f"#{darkened_color_int:06x}"
+
+
 def plot_embeddings(umap_embed_path, dim_reduction_model, axes=False, fig=False):
     files = umap_embed_path.iterdir()
     centroids = {}
     for file in files:
-        if file.suffix == ".json":
+        if file.suffix == ".json" and dim_reduction_model in file.stem:
             with open(file, "r") as f:
                 embeds_dict = json.load(f)
     split_data = data_split_by_labels(embeds_dict)
 
     if not fig:
-        fig, axes = plt.subplots()
+        fig, axes = plt.subplots(figsize=(12, 8))
         return_axes = False
     else:
         return_axes = True
@@ -31,7 +51,7 @@ def plot_embeddings(umap_embed_path, dim_reduction_model, axes=False, fig=False)
     # for embed in embeds_ar:
     if split_data is not None:
         for label in split_data:
-            axes.plot(
+            points = axes.plot(
                 split_data[label]["x"],
                 split_data[label]["y"],
                 "o",
@@ -39,10 +59,16 @@ def plot_embeddings(umap_embed_path, dim_reduction_model, axes=False, fig=False)
                 markersize=0.5,
             )
             centroids[label] = get_centroid(split_data[label])
+            c = darken_hex_color_bitwise(points[0]._color)
             axes.plot(
-                centroids[label][0], centroids[label][1], "x", label=f"{label} centroid"
+                centroids[label][0],
+                centroids[label][1],
+                "x",
+                color=c,
+                label=f"{label} centroid",
+                markersize=12,
             )
-        clustering_dict = get_ari_and_ami(split_data, centroids)
+        clustering_dict = get_clustering_scores(split_data, centroids)
         with open(umap_embed_path.joinpath("clustering_metrics.json"), "w") as f:
             json.dump(clustering_dict, f)
     else:
@@ -54,9 +80,39 @@ def plot_embeddings(umap_embed_path, dim_reduction_model, axes=False, fig=False)
     if return_axes:
         return axes, clustering_dict
     else:
-        axes.legend()
+        fig, axes = set_legend(fig, axes)
+
         axes.set_title(f"{dim_reduction_model.upper()} embeddings")
         fig.savefig(umap_embed_path.joinpath("embed.png"), dpi=300)
+        plt.close(fig)
+
+
+def set_legend(fig, axes):
+    # Calculate number of columns dynamically based on the number of labels
+    num_labels = len(
+        axes.get_legend_handles_labels()[1]
+    )  # Number of labels in the legend
+    ncol = min(num_labels, 6)  # Use 6 columns or fewer if there are fewer labels
+
+    handles, labels = axes.get_legend_handles_labels()
+
+    custom_marker = plt.scatter(
+        [], [], marker="x", color="black", s=10
+    )  # Empty scatter, only for the legend
+
+    # Update the legend
+    axes.legend(
+        handles[::2] + [custom_marker],
+        labels[::2] + ["centroids"],  # Use the handles and labels from the plot
+        loc="upper center",  # Center the legend
+        bbox_to_anchor=(0.5, -0.19),  # Position below the plot
+        ncol=ncol,  # Number of columns
+        markerscale=3,
+    )
+
+    # Adjust the layout so the legend doesn't overlap with the figure
+    fig.subplots_adjust(bottom=0.25)
+    return fig, axes
 
 
 def data_split_by_labels(embeds_dict):
@@ -94,12 +150,23 @@ def return_rows_cols(num):
         return 4, 5
 
 
+def set_figsize_for_comparison(rows, cols):
+    if rows == 1:
+        return (12, 5)
+    elif rows == 2:
+        return (12, 7)
+    elif rows == 3:
+        return (12, 8)
+    elif rows > 3:
+        return (12, 10)
+
+
 def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
     rows, cols = return_rows_cols(len(embedding_models))
     clust_dict = {}
-    fig, axes = plt.subplots(rows, cols, figsize=(12, 8))
+    fig, axes = plt.subplots(rows, cols, figsize=set_figsize_for_comparison(rows, cols))
     fig.subplots_adjust(
-        left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.9
+        left=0.1, bottom=0.1, right=0.9, top=0.85, wspace=0.4, hspace=0.9
     )
     for idx, model in enumerate(embedding_models):
         ld = Loader(
@@ -108,40 +175,44 @@ def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
         axes.flatten()[idx], clust_dict[model] = plot_embeddings(
             ld.embed_dir, dim_reduction_model, axes=axes.flatten()[idx], fig=fig
         )
-        metric_str = ", ".join([f"{k}={v:.3f}" for k, v in clust_dict[model].items()])
-        axes.flatten()[idx].set_title(f"{model}\n{metric_str}")
+        # metric_str = ", ".join([f"{k}={v:.3f}" for k, v in clust_dict[model].items()])
+        metric_str = f"Silhouette Score= {clust_dict[model]['SS']:.3f}"
+        axes.flatten()[idx].set_title(f"{model.upper()}\n{metric_str}")
     # fig.tight_layout()
     new_order = [
-        k[0] for k in sorted(clust_dict.items(), key=lambda kv: kv[1]["ARI"])[::-1]
+        k[0] for k in sorted(clust_dict.items(), key=lambda kv: kv[1]["SS"])[::-1]
     ]
     positions = {mod: ax.get_position() for mod, ax in zip(new_order, axes.flatten())}
     for model, ax in zip(embedding_models, axes.flatten()):
         ax.set_position(positions[model])
     # plt.legend(loc='lower left', ncol=6, bbox_to_anchor=(0, 0, 1, 1))
+    set_legend(fig, axes.flatten()[-int(cols / 2) - 1])
     fig.suptitle(f"Comparison of {dim_reduction_model} embeddings", fontweight="bold")
     fig.savefig(ld.embed_dir.joinpath("comp_fig.png"), dpi=300)
 
 
-def visualize_task_results(task_name, model_name, overall_metrics, per_class_metrics):
+def visualize_task_results(task_name, model_name, metrics):
     fig, ax = plt.subplots(1, 1, figsize=(12, 8))
     cmap = plt.cm.tab10
-    colors = cmap(np.arange(len(per_class_metrics.values())) % cmap.N)
+    colors = cmap(np.arange(len(metrics["per_class_accuracy"].values())) % cmap.N)
     ax.bar(
-        per_class_metrics.keys(),
-        per_class_metrics.values(),
+        metrics["per_class_accuracy"].keys(),
+        metrics["per_class_accuracy"].values(),
         width=0.5,
         color=colors,
     )
-    metrics = "".join([f"{k}: {v:.3f} | " for k, v in overall_metrics.items()])
+    metrics_string = "".join(
+        [f"{k}: {v:.3f} | " for k, v in metrics["overall"].items()]
+    )
     fig.suptitle(
         f"Per Class Metrics for {task_name} "
         f"classification with {model_name.upper()} embeddings\n"
-        f"{metrics}"
+        f"{metrics_string}"
     )
     ax.set_ylabel("Accuracy")
     ax.set_xlabel("Classes")
-    ax.set_xticks(range(len(per_class_metrics)))
-    ax.set_xticklabels(per_class_metrics.keys(), rotation=90)
+    ax.set_xticks(range(len(metrics["per_class_accuracy"])))
+    ax.set_xticklabels(metrics["per_class_accuracy"].keys(), rotation=90)
     fig.subplots_adjust(bottom=0.3)
     fig.savefig(
         Path(bacpipe_settings["task_results_dir"])
@@ -156,16 +227,29 @@ def visualise_classification_results_across_models(
     task_name, models_list, overall_metrics_dict, per_class_metrics_dict
 ):
     num_classes = len(next(iter(per_class_metrics_dict.values())).keys())
-    fig_width = max(12, num_classes * 0.5)  
+    fig_width = max(12, num_classes * 0.5)
     fig, ax = plt.subplots(1, 1, figsize=(fig_width, 8))
 
     cmap = plt.cm.tab10
     model_colors = cmap(np.arange(len(models_list)) % cmap.N)
 
-  
-    base_markers = ['o', 's', '^', 'D', 'P', 'X', '*', 'h', 'H', '<', '>', 'v', '|', '_']
+    base_markers = [
+        "o",
+        "s",
+        "^",
+        "D",
+        "P",
+        "X",
+        "*",
+        "h",
+        "H",
+        "<",
+        ">",
+        "v",
+        "|",
+        "_",
+    ]
     extended_markers = base_markers * ((len(models_list) // len(base_markers)) + 1)
-
 
     all_classes = sorted(list(next(iter(per_class_metrics_dict.values())).keys()))
 
@@ -173,25 +257,22 @@ def visualise_classification_results_across_models(
         per_class_metrics = per_class_metrics_dict[model_name]
         per_class_values = [per_class_metrics[cls] for cls in all_classes]
 
-
         ax.scatter(
             np.arange(len(all_classes)),
             per_class_values,
             color=model_colors[i],
             label=f"{model_name.upper()} (accuracy: {overall_metrics_dict[model_name]:.3f})",
             marker=extended_markers[i],
-            s=100, 
+            s=100,
         )
-
 
         ax.plot(
             np.arange(len(all_classes)),
             per_class_values,
             color=model_colors[i],
-            linestyle='-',  # Solid line
+            linestyle="-",  # Solid line
             linewidth=1.5,
         )
-
 
     fig.suptitle(
         f"Per Class Metrics for {task_name} Classification Across Models",
@@ -202,7 +283,7 @@ def visualise_classification_results_across_models(
     ax.set_xticks(np.arange(len(all_classes)))
     ax.set_xticklabels(all_classes, rotation=90)
 
-    ax.legend(loc='upper left', bbox_to_anchor=(1.05, 1), title="Models", fontsize=10)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.05, 1), title="Models", fontsize=10)
 
     fig.subplots_adjust(right=0.75, bottom=0.3)
     fig.savefig(

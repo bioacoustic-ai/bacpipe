@@ -33,9 +33,7 @@ def pytest_generate_tests(metafunc):
 def test_task_evaluation(task):
     loader = loader_fn()
     # for task in tasks:
-    overall_metrics, per_class_metrics, items_per_class = evaluate_on_task(
-        task, "avesecho_passt", loader, testing=task
-    )
+    evaluate_on_task(task, "avesecho_passt", loader, testing=task)
 
 
 test_task_evaluation("species")
