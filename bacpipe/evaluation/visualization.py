@@ -223,15 +223,79 @@ def visualize_task_results(task_name, model_name, metrics):
     plt.close(fig)
 
 
-def visualise_classification_results_across_models(
-    task_name, models_list, overall_metrics_dict, per_class_metrics_dict
-):
-    num_classes = len(next(iter(per_class_metrics_dict.values())).keys())
+def load_classification_results(task_name, model_list):
+    per_class_metrics = {}
+    overall_metrics = {}
+    for model_name in model_list:
+        with open(
+            Path(bacpipe_settings["task_results_dir"])
+            .joinpath("metrics")
+            .joinpath(f"classsification_results_{task_name}_{model_name}.yml"),
+            "r",
+        ) as f:
+            metrics = yaml.safe_load(f)
+            per_class_metrics[model_name] = metrics["Per Class Metrics:"]
+            overall_metrics[model_name] = metrics["Overall Metrics:"]
+    return per_class_metrics, overall_metrics
+
+
+def visualise_classification_results_across_models(task_name, model_list):
+    per_class_metrics, overall_metrics = load_classification_results(
+        task_name, model_list
+    )
+    plot_per_class_metrics(task_name, model_list, per_class_metrics, overall_metrics)
+
+    plot_overview_metrics(task_name, model_list, overall_metrics)
+
+
+def plot_overview_metrics(task_name, model_list, overall_metrics):
+    fig, ax = plt.subplots(1, 1, figsize=(14, 6))
+    num_metrics = len(overall_metrics[model_list[0]])
+    bar_width = 1 / (num_metrics + 1)
+
+    cmap = plt.cm.tab10
+    cols = cmap(np.arange(num_metrics) % cmap.N)
+
+    for mod_idx, (model, d) in enumerate(overall_metrics.items()):
+        for i, (metric, value) in enumerate(d.items()):
+            ax.bar(
+                mod_idx - bar_width * i,
+                value,
+                label=metric,
+                width=bar_width,
+                color=cols[i],
+            )
+    ax.set_ylabel("Various Metrics")
+    ax.set_xlabel("Models")
+    ax.set_xticks(np.arange(len(model_list)) - bar_width * (num_metrics - 1) / 2)
+    ax.set_xticklabels([model.upper() for model in model_list])
+    ax.set_title(f"Overall Metrics for {task_name} Classification Across Models")
+
+    fig.subplots_adjust(right=0.75)
+    ax.legend(
+        loc="upper left",
+        bbox_to_anchor=(1.05, 1),
+        title="Metrics",
+        labels=d.keys(),
+        fontsize=10,
+    )
+
+    fig.savefig(
+        Path(bacpipe_settings["task_results_dir"])
+        .joinpath("plots")
+        .joinpath(f"overview_metrics_{task_name}_" + "-".join(model_list) + ".png"),
+        dpi=300,
+    )
+    plt.close(fig)
+
+
+def plot_per_class_metrics(task_name, model_list, per_class_metrics, overall_metrics):
+    num_classes = len(per_class_metrics[model_list[0]].keys())
     fig_width = max(12, num_classes * 0.5)
     fig, ax = plt.subplots(1, 1, figsize=(fig_width, 8))
 
     cmap = plt.cm.tab10
-    model_colors = cmap(np.arange(len(models_list)) % cmap.N)
+    model_colors = cmap(np.arange(len(model_list)) % cmap.N)
 
     base_markers = [
         "o",
@@ -249,19 +313,19 @@ def visualise_classification_results_across_models(
         "|",
         "_",
     ]
-    extended_markers = base_markers * ((len(models_list) // len(base_markers)) + 1)
+    extended_markers = base_markers * ((len(model_list) // len(base_markers)) + 1)
 
-    all_classes = sorted(list(next(iter(per_class_metrics_dict.values())).keys()))
+    all_classes = sorted(per_class_metrics[model_list[0]].keys())
 
-    for i, model_name in enumerate(models_list):
-        per_class_metrics = per_class_metrics_dict[model_name]
-        per_class_values = [per_class_metrics[cls] for cls in all_classes]
+    for i, model_name in enumerate(model_list):
+        per_class_values = per_class_metrics[model_name].values()
 
         ax.scatter(
             np.arange(len(all_classes)),
             per_class_values,
             color=model_colors[i],
-            label=f"{model_name.upper()} (accuracy: {overall_metrics_dict[model_name]:.3f})",
+            label=f"{model_name.upper()} "
+            + f"(accuracy: {overall_metrics[model_name]['Macro Accuracy']:.3f})",
             marker=extended_markers[i],
             s=100,
         )
@@ -286,10 +350,11 @@ def visualise_classification_results_across_models(
     ax.legend(loc="upper left", bbox_to_anchor=(1.05, 1), title="Models", fontsize=10)
 
     fig.subplots_adjust(right=0.75, bottom=0.3)
+    file_name = f"comparison_{task_name}_" + "-".join(model_list) + ".png"
     fig.savefig(
         Path(bacpipe_settings["task_results_dir"])
         .joinpath("plots")
-        .joinpath(f"classsification_results_{task_name}_across_models.png"),
+        .joinpath(file_name),
         dpi=300,
     )
     plt.close(fig)
