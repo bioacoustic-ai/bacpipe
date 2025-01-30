@@ -100,6 +100,8 @@ class Loader:
                         )
                         self.embed_dir = d
                         break
+                    else:
+                        return d
                 else:
                     num_files = len([f for f in list(d.rglob(f"*{self.embed_suffix}"))])
                     num_audio_files = len(self._get_audio_files())
