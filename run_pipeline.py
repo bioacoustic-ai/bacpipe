@@ -30,8 +30,9 @@ for model_name in config["embedding_model"]:
             "Too few files to evaluate embeddings with linear probe. "
             + "Are you sure you have selected the right data?"
         )
-
         metrics, task_config = evaluate_on_task(task_name, model_name, loader_obj)
+        if not task_config:
+            continue
 
         build_results_report(task_name, model_name, metrics, task_config)
         visualize_task_results(task_name, model_name, metrics)

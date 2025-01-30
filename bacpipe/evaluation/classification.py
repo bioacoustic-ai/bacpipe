@@ -101,6 +101,20 @@ def evaluate_on_task(task_name, model_name, loader_object, **kwargs):
             overall and per class evaluation metrics.
 
     """
+    output_file = (
+        Path(loader_object.task_results_dir)
+        .joinpath("metrics")
+        .joinpath(f"class_results_{task_name}_{model_name}.yml")
+    )
+    if output_file.exists():
+        print(
+            f"Classification results for {task_name} and {model_name} already "
+            "exist. Skipping evaluation."
+        )
+        with open(output_file, "r") as f:
+            results = yaml.safe_load(f)
+        return results, None
+
     clean_df, link_embed2wavfile, task_config = load_and_clean_data(
         task_name, model_name, loader_object, **kwargs
     )
