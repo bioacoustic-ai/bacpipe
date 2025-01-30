@@ -8,7 +8,7 @@ import yaml
 from .clustering import get_centroid, get_clustering_scores
 
 with open("bacpipe/path_settings.yaml", "rb") as f:
-    bacpipe_settings = yaml.safe_load(f)
+    bacpipe_settings = yaml.load(f, Loader=yaml.CLoader)
 
 SPLIT_BY_FOLDER = True
 
@@ -248,7 +248,7 @@ def load_classification_results(task_name, model_list):
             .joinpath(f"class_results_{task_name}_{model_name}.yml"),
             "r",
         ) as f:
-            metrics = yaml.safe_load(f)
+            metrics = yaml.load(f, Loader=yaml.CLoader)
             per_class_metrics[model_name] = metrics["Per Class Metrics:"]
             overall_metrics[model_name] = metrics["Overall Metrics:"]
     return per_class_metrics, overall_metrics

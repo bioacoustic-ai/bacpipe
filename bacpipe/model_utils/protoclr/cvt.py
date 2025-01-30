@@ -674,7 +674,7 @@ def build_model(config, **kwargs):
 
 def cvt13(**kwargs):
     f = open("bacpipe/model_utils/protoclr/config/cvt-13-224x224.yaml", "r")
-    config = yaml.safe_load(f)
+    config = yaml.load(f, Loader=yaml.CLoader)
     return ConvolutionalVisionTransformer(
         spec=config["MODEL"]["SPEC"]
     )  # only loades the config, no pretraining
@@ -682,7 +682,7 @@ def cvt13(**kwargs):
 
 if __name__ == "__main__":
     f = open("config/cvt-13-224x224.yaml", "r")
-    config = yaml.safe_load(f)
+    config = yaml.load(f, Loader=yaml.CLoader)
     model = ConvolutionalVisionTransformer(spec=config["MODEL"]["SPEC"])
     # print(summary(model))
     quit()

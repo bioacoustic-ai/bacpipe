@@ -11,7 +11,7 @@ from bacpipe.evaluation.classification_utils.evaluation_metrics import (
 )
 
 with open("config.yaml", "rb") as f:
-    config = yaml.safe_load(f)
+    config = yaml.load(f, Loader=yaml.CLoader)
 
 
 for model_name in config["embedding_model"]:
