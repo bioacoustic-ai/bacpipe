@@ -29,10 +29,16 @@ def get_embeddings(
             audio_dir=audio_dir,
             check_if_combination_exists=check_if_secondary_combination_exists,
         )
-        print(
-            "### Generating visualizations of embeddings using "
-            f"{dim_reduction_model}. Plots are saved in "
-            f"{loader_dim_reduced.embed_dir} ###"
-        )
-        plot_embeddings(loader_dim_reduced.embed_dir, dim_reduction_model)
+        if loader_dim_reduced.embed_dir.joinpath("embed.png").exists():
+            logger.debug(
+                f"Embedding visualization already exist in {loader_dim_reduced.embed_dir}"
+                " Skipping visualization generation."
+            )
+        else:
+            print(
+                "### Generating visualizations of embeddings using "
+                f"{dim_reduction_model}. Plots are saved in "
+                f"{loader_dim_reduced.embed_dir} ###"
+            )
+            plot_embeddings(loader_dim_reduced.embed_dir, dim_reduction_model)
     return loader_embeddings

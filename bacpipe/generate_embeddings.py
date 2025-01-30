@@ -27,7 +27,7 @@ class Loader:
         self.testing = testing
 
         with open("bacpipe/path_settings.yaml", "r") as f:
-            self.config = yaml.safe_load(f)
+            self.config = yaml.load(f, Loader=yaml.CLoader)
 
         for key, val in self.config.items():
             setattr(self, key, val)
@@ -38,7 +38,12 @@ class Loader:
         else:
             self.embed_suffix = ".npy"
 
+        start = time.time()
         self.check_embeds_already_exist()
+        logger.debug(
+            f"Checking if embeddings already exist took {time.time()-start:.2f}s."
+        )
+
         if self.combination_already_exists or self.dim_reduction_model:
             self.get_embeddings()
         else:
@@ -61,9 +66,10 @@ class Loader:
 
         if self.check_if_combination_exists:
             if self.dim_reduction_model:
-                existing_embed_dirs = list(Path(self.dim_reduc_parent_dir).iterdir())
+                existing_embed_dirs = Path(self.dim_reduc_parent_dir).iterdir()
             else:
-                existing_embed_dirs = list(Path(self.embed_parent_dir).iterdir())
+                existing_embed_dirs = Path(self.embed_parent_dir).iterdir()
+            existing_embed_dirs = list(existing_embed_dirs)
             if isinstance(self.check_if_combination_exists, str):
                 existing_embed_dirs = [
                     existing_embed_dirs[0].parent.joinpath(
@@ -81,14 +87,21 @@ class Loader:
                     d.rmdir()
                     continue
                 with open(d.joinpath("metadata.yml"), "r") as f:
-                    mdata = yaml.safe_load(f)
+                    mdata = yaml.load(f, Loader=yaml.CLoader)
                     if not self.model_name == mdata["model_name"]:
                         continue
 
                 if self.dim_reduction_model:
                     if self.dim_reduction_model in d.stem:
                         self.combination_already_exists = True
-                    return d
+                        print(
+                            "\n### Embeddings already exist. "
+                            f"Using embeddings in {str(d)} ###"
+                        )
+                        self.embed_dir = d
+                        break
+                    else:
+                        return d
                 else:
                     num_files = len([f for f in list(d.rglob(f"*{self.embed_suffix}"))])
                     num_audio_files = len(self._get_audio_files())
@@ -127,7 +140,7 @@ class Loader:
 
     def _get_metadata_dict(self, folder):
         with open(folder.joinpath("metadata.yml"), "r") as f:
-            self.metadata_dict = yaml.safe_load(f)
+            self.metadata_dict = yaml.load(f, Loader=yaml.CLoader)
         for key, val in self.metadata_dict.items():
             if isinstance(val, str):
                 if not Path(val).is_dir():
@@ -164,6 +177,7 @@ class Loader:
         if self.dim_reduction_model:
             if self.combination_already_exists:
                 self.embed_parent_dir = Path(self.dim_reduc_parent_dir)
+                return self.embed_dir
             else:
                 self.embed_parent_dir = Path(self.embed_parent_dir)
                 self.embed_suffix = ".npy"
@@ -231,7 +245,7 @@ class Embedder:
         import yaml
 
         with open("bacpipe/path_settings.yaml", "rb") as f:
-            self.config = yaml.safe_load(f)
+            self.config = yaml.load(f, Loader=yaml.CLoader)
 
         self.dim_reduction_model = dim_reduction_model
         if dim_reduction_model:
@@ -358,7 +372,9 @@ def generate_embeddings(save_files=True, **kwargs):
     else:
         raise ValueError("model_name not provided in kwargs.")
     try:
+        start = time.time()
         ld = Loader(**kwargs)
+        logger.debug(f"Loading the data took {time.time()-start:.2f}s.")
         if not ld.combination_already_exists:
             embed = Embedder(**kwargs)
             for idx, file in enumerate(

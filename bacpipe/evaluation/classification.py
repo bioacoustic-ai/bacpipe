@@ -16,7 +16,7 @@ from .classification_utils.evaluation_metrics import compute_task_metrics
 import torch
 
 with open("bacpipe/path_settings.yaml", "rb") as f:
-    bacpipe_settings = yaml.safe_load(f)
+    bacpipe_settings = yaml.load(f, Loader=yaml.CLoader)
 
 
 def gen_loader_obj(
@@ -101,6 +101,20 @@ def evaluate_on_task(task_name, model_name, loader_object, **kwargs):
             overall and per class evaluation metrics.
 
     """
+    output_file = (
+        Path(loader_object.task_results_dir)
+        .joinpath("metrics")
+        .joinpath(f"class_results_{task_name}_{model_name}.yml")
+    )
+    if output_file.exists():
+        print(
+            f"Classification results for {task_name} and {model_name} already "
+            "exist. Skipping evaluation."
+        )
+        with open(output_file, "r") as f:
+            results = yaml.load(f, Loader=yaml.CLoader)
+        return results, None
+
     clean_df, link_embed2wavfile, task_config = load_and_clean_data(
         task_name, model_name, loader_object, **kwargs
     )

@@ -8,7 +8,7 @@ def get_centroid(data):
     return np.mean(data["x"]), np.mean(data["y"])
 
 
-def get_ari_and_ami(split_data, centroids):
+def get_clustering_scores(split_data, centroids):
 
     x = []
     y = []
@@ -46,5 +46,5 @@ def get_ari_and_ami(split_data, centroids):
         y = np.concatenate(y, axis=0)
         data = np.column_stack((x, y))
         ss = silhouette_score(data, labels)
-        cluster_score_dict["Silhouette Score"] = ss
+        cluster_score_dict["SS"] = ss
     return cluster_score_dict
