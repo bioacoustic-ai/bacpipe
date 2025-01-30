@@ -129,9 +129,7 @@ def build_results_report(task_name, model_name, metrics, task_config):
     report["Task Configuration:"] = task_config
 
     save_dir = Path(bacpipe_settings["task_results_dir"]).joinpath("metrics")
-    save_path = save_dir.joinpath(
-        f"classsification_results_{task_name}_{model_name}.yml"
-    )
+    save_path = save_dir.joinpath(f"class_results_{task_name}_{model_name}.yml")
     # save the report as json
     with open(save_path, "w") as f:
         yaml.safe_dump(report, f)

@@ -33,7 +33,9 @@ def darken_hex_color_bitwise(hex_color):
     return f"#{darkened_color_int:06x}"
 
 
-def plot_embeddings(umap_embed_path, dim_reduction_model, axes=False, fig=False):
+def plot_embeddings(
+    umap_embed_path, dim_reduction_model, axes=False, fig=False, plot_centroids=True
+):
     files = umap_embed_path.iterdir()
     centroids = {}
     for file in files:
@@ -60,14 +62,15 @@ def plot_embeddings(umap_embed_path, dim_reduction_model, axes=False, fig=False)
             )
             centroids[label] = get_centroid(split_data[label])
             c = darken_hex_color_bitwise(points[0]._color)
-            axes.plot(
-                centroids[label][0],
-                centroids[label][1],
-                "x",
-                color=c,
-                label=f"{label} centroid",
-                markersize=12,
-            )
+            if plot_centroids:
+                axes.plot(
+                    centroids[label][0],
+                    centroids[label][1],
+                    "x",
+                    color=c,
+                    label=f"{label} centroid",
+                    markersize=12,
+                )
         clustering_dict = get_clustering_scores(split_data, centroids)
         with open(umap_embed_path.joinpath("clustering_metrics.json"), "w") as f:
             json.dump(clustering_dict, f)
@@ -80,14 +83,14 @@ def plot_embeddings(umap_embed_path, dim_reduction_model, axes=False, fig=False)
     if return_axes:
         return axes, clustering_dict
     else:
-        fig, axes = set_legend(fig, axes)
+        fig, axes = set_legend(fig, axes, plot_centroids=plot_centroids)
 
         axes.set_title(f"{dim_reduction_model.upper()} embeddings")
         fig.savefig(umap_embed_path.joinpath("embed.png"), dpi=300)
         plt.close(fig)
 
 
-def set_legend(fig, axes):
+def set_legend(fig, axes, plot_centroids=True):
     # Calculate number of columns dynamically based on the number of labels
     num_labels = len(
         axes.get_legend_handles_labels()[1]
@@ -96,14 +99,20 @@ def set_legend(fig, axes):
 
     handles, labels = axes.get_legend_handles_labels()
 
-    custom_marker = plt.scatter(
-        [], [], marker="x", color="black", s=10
-    )  # Empty scatter, only for the legend
+    if plot_centroids:
+        custom_marker = plt.scatter(
+            [], [], marker="x", color="black", s=10
+        )  # Empty scatter, only for the legend
+        new_handles = handles[::2] + [custom_marker]
+        new_labels = labels[::2] + ["centroids"]
+    else:
+        new_handles = handles
+        new_labels = labels
 
     # Update the legend
     axes.legend(
-        handles[::2] + [custom_marker],
-        labels[::2] + ["centroids"],  # Use the handles and labels from the plot
+        new_handles,
+        new_labels,  # Use the handles and labels from the plot
         loc="upper center",  # Center the legend
         bbox_to_anchor=(0.5, -0.19),  # Position below the plot
         ncol=ncol,  # Number of columns
@@ -144,7 +153,9 @@ def return_rows_cols(num):
         return 2, 3
     elif num > 6 and num <= 9:
         return 3, 3
-    elif num > 9 and num <= 16:
+    elif num > 9 and num <= 12:
+        return 3, 4
+    elif num > 12 and num <= 16:
         return 4, 4
     elif num > 16 and num <= 20:
         return 4, 5
@@ -173,19 +184,23 @@ def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
             audio_dir, model_name=model, dim_reduction_model=dim_reduction_model
         )
         axes.flatten()[idx], clust_dict[model] = plot_embeddings(
-            ld.embed_dir, dim_reduction_model, axes=axes.flatten()[idx], fig=fig
+            ld.embed_dir,
+            dim_reduction_model,
+            axes=axes.flatten()[idx],
+            fig=fig,
+            plot_centroids=False,
         )
-        # metric_str = ", ".join([f"{k}={v:.3f}" for k, v in clust_dict[model].items()])
+
         metric_str = f"Silhouette Score= {clust_dict[model]['SS']:.3f}"
         axes.flatten()[idx].set_title(f"{model.upper()}\n{metric_str}")
-    # fig.tight_layout()
+    [ax.remove() for ax in axes.flatten()[idx + 1 :]]
     new_order = [
         k[0] for k in sorted(clust_dict.items(), key=lambda kv: kv[1]["SS"])[::-1]
     ]
     positions = {mod: ax.get_position() for mod, ax in zip(new_order, axes.flatten())}
     for model, ax in zip(embedding_models, axes.flatten()):
         ax.set_position(positions[model])
-    # plt.legend(loc='lower left', ncol=6, bbox_to_anchor=(0, 0, 1, 1))
+
     set_legend(fig, axes.flatten()[-int(cols / 2) - 1])
     fig.suptitle(f"Comparison of {dim_reduction_model} embeddings", fontweight="bold")
     fig.savefig(ld.embed_dir.joinpath("comp_fig.png"), dpi=300)
@@ -217,7 +232,7 @@ def visualize_task_results(task_name, model_name, metrics):
     fig.savefig(
         Path(bacpipe_settings["task_results_dir"])
         .joinpath("plots")
-        .joinpath(f"classsification_results_{task_name}_{model_name}.png"),
+        .joinpath(f"class_results_{task_name}_{model_name}.png"),
         dpi=300,
     )
     plt.close(fig)
@@ -230,7 +245,7 @@ def load_classification_results(task_name, model_list):
         with open(
             Path(bacpipe_settings["task_results_dir"])
             .joinpath("metrics")
-            .joinpath(f"classsification_results_{task_name}_{model_name}.yml"),
+            .joinpath(f"class_results_{task_name}_{model_name}.yml"),
             "r",
         ) as f:
             metrics = yaml.safe_load(f)
@@ -268,10 +283,10 @@ def plot_overview_metrics(task_name, model_list, overall_metrics):
     ax.set_ylabel("Various Metrics")
     ax.set_xlabel("Models")
     ax.set_xticks(np.arange(len(model_list)) - bar_width * (num_metrics - 1) / 2)
-    ax.set_xticklabels([model.upper() for model in model_list])
+    ax.set_xticklabels([model.upper() for model in model_list], rotation=45)
     ax.set_title(f"Overall Metrics for {task_name} Classification Across Models")
 
-    fig.subplots_adjust(right=0.75)
+    fig.subplots_adjust(right=0.75, bottom=0.3)
     ax.legend(
         loc="upper left",
         bbox_to_anchor=(1.05, 1),
@@ -349,7 +364,7 @@ def plot_per_class_metrics(task_name, model_list, per_class_metrics, overall_met
 
     ax.legend(loc="upper left", bbox_to_anchor=(1.05, 1), title="Models", fontsize=10)
 
-    fig.subplots_adjust(right=0.75, bottom=0.3)
+    fig.subplots_adjust(right=0.65, bottom=0.3)
     file_name = f"comparison_{task_name}_" + "-".join(model_list) + ".png"
     fig.savefig(
         Path(bacpipe_settings["task_results_dir"])
