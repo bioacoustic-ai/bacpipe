@@ -40,7 +40,7 @@ class Loader:
 
         start = time.time()
         self.check_embeds_already_exist()
-        logger.DEBUG(
+        logger.debug(
             f"Checking if embeddings already exist took {time.time()-start:.2f}s."
         )
 
@@ -372,7 +372,7 @@ def generate_embeddings(save_files=True, **kwargs):
     try:
         start = time.time()
         ld = Loader(**kwargs)
-        logger.DEBUG(f"Loading the data took {time.time()-start:.2f}s.")
+        logger.debug(f"Loading the data took {time.time()-start:.2f}s.")
         if not ld.combination_already_exists:
             embed = Embedder(**kwargs)
             for idx, file in enumerate(

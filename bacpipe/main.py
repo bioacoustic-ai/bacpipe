@@ -30,7 +30,7 @@ def get_embeddings(
             check_if_combination_exists=check_if_secondary_combination_exists,
         )
         if loader_dim_reduced.embed_dir.joinpath("embed.png").exists():
-            print(
+            logger.debug(
                 f"Embedding visualization already exist in {loader_dim_reduced.embed_dir}"
                 " Skipping visualization generation."
             )

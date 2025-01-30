@@ -91,13 +91,11 @@ def plot_embeddings(
 
 
 def set_legend(fig, axes, plot_centroids=True):
-    # Calculate number of columns dynamically based on the number of labels
-    num_labels = len(
-        axes.get_legend_handles_labels()[1]
-    )  # Number of labels in the legend
-    ncol = min(num_labels, 6)  # Use 6 columns or fewer if there are fewer labels
-
     handles, labels = axes.get_legend_handles_labels()
+
+    # Calculate number of columns dynamically based on the number of labels
+    num_labels = len(labels)  # Number of labels in the legend
+    ncol = min(num_labels, 6)  # Use 6 columns or fewer if there are fewer labels
 
     if plot_centroids:
         custom_marker = plt.scatter(
@@ -110,17 +108,14 @@ def set_legend(fig, axes, plot_centroids=True):
         new_labels = labels
 
     # Update the legend
-    axes.legend(
+    fig.legend(
         new_handles,
         new_labels,  # Use the handles and labels from the plot
-        loc="upper center",  # Center the legend
-        bbox_to_anchor=(0.5, -0.19),  # Position below the plot
+        loc="outside lower center",  # Center the legend
+        # bbox_to_anchor=(0.5, 1.05),  # Position below the plot
         ncol=ncol,  # Number of columns
-        markerscale=3,
+        markerscale=6,
     )
-
-    # Adjust the layout so the legend doesn't overlap with the figure
-    fig.subplots_adjust(bottom=0.25)
     return fig, axes
 
 
@@ -177,7 +172,7 @@ def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
     clust_dict = {}
     fig, axes = plt.subplots(rows, cols, figsize=set_figsize_for_comparison(rows, cols))
     fig.subplots_adjust(
-        left=0.1, bottom=0.1, right=0.9, top=0.85, wspace=0.4, hspace=0.9
+        left=0.1, bottom=0.15, right=0.9, top=0.85, wspace=0.4, hspace=0.9
     )
     for idx, model in enumerate(embedding_models):
         ld = Loader(
@@ -201,7 +196,7 @@ def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
     for model, ax in zip(embedding_models, axes.flatten()):
         ax.set_position(positions[model])
 
-    set_legend(fig, axes.flatten()[-int(cols / 2) - 1])
+    set_legend(fig, axes.flatten()[0], plot_centroids=False)
     fig.suptitle(f"Comparison of {dim_reduction_model} embeddings", fontweight="bold")
     fig.savefig(ld.embed_dir.joinpath("comp_fig.png"), dpi=300)
 
