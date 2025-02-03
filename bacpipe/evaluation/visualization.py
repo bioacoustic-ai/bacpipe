@@ -278,7 +278,11 @@ def plot_overview_metrics(task_name, model_list, overall_metrics):
     ax.set_ylabel("Various Metrics")
     ax.set_xlabel("Models")
     ax.set_xticks(np.arange(len(model_list)) - bar_width * (num_metrics - 1) / 2)
-    ax.set_xticklabels([model.upper() for model in model_list], rotation=45)
+    ax.set_xticklabels(
+        [model.upper() for model in model_list],
+        rotation=45,
+        horizontalalignment="right",
+    )
     ax.set_title(f"Overall Metrics for {task_name} Classification Across Models")
 
     fig.subplots_adjust(right=0.75, bottom=0.3)
