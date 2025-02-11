@@ -32,13 +32,15 @@ def get_clustering_scores(split_data, centroids):
                         [(split_data[label]["x"][i]), (split_data[label]["y"][i])]
                     )
                 )
-            preds.append(label_dict[list(p.keys())[np.argmin(list(p.values()))]])
+            if p:
+                preds.append(label_dict[list(p.keys())[np.argmin(list(p.values()))]])
             labels.append(label_dict[label])
             acc_idx += 1
-    ari = ari_score(labels, preds)
-    ami = ami_score(labels, preds)
-    cluster_score_dict["ARI"] = ari
-    cluster_score_dict["AMI"] = ami
+    if preds:
+        ari = ari_score(labels, preds)
+        ami = ami_score(labels, preds)
+        cluster_score_dict["ARI"] = ari
+        cluster_score_dict["AMI"] = ami
 
     # Silhouette Score
     if np.unique(labels).shape[0] > 1:

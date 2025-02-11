@@ -359,6 +359,17 @@ def save_embeddings_dict_with_timestamps(
     with open(file_dest, "w") as f:
         json.dump(d, f)
 
+    if embeds.shape[-1] > 2:
+        embed_dict = {}
+        acc_shape = 0
+        for shape, file in zip(
+            loader_obj.metadata_dict["files"]["embedding_dimensions"],
+            loader_obj.files,
+        ):
+            embed_dict[file.stem] = embeds[acc_shape : acc_shape + shape[0]]
+            acc_shape += shape[0]
+        np.save(file_dest.replace(".json", f"{embeds.shape[-1]}.npy"), embed_dict)
+
 
 def generate_embeddings(save_files=True, **kwargs):
     if "dim_reduction_model" in kwargs:

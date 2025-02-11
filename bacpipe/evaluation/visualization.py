@@ -33,46 +33,84 @@ def darken_hex_color_bitwise(hex_color):
     return f"#{darkened_color_int:06x}"
 
 
-def plot_embeddings(
-    umap_embed_path, dim_reduction_model, axes=False, fig=False, plot_centroids=True
-):
-    files = umap_embed_path.iterdir()
-    centroids = {}
+def collect_embeddings(dim_reduced_embed_path, dim_reduction_model):
+    files = dim_reduced_embed_path.iterdir()
     for file in files:
         if file.suffix == ".json" and dim_reduction_model in file.stem:
             with open(file, "r") as f:
                 embeds_dict = json.load(f)
     split_data = data_split_by_labels(embeds_dict)
+    return split_data, embeds_dict
+
+
+def plot_centroids(axes, centroids, label, split_data, points):
+    centroids[label] = get_centroid(split_data[label])
+    c = darken_hex_color_bitwise(points[0]._color)
+    axes.plot(
+        centroids[label][0],
+        centroids[label][1],
+        "x",
+        color=c,
+        label=f"{label} centroid",
+        markersize=12,
+    )
+    return centroids
+
+
+def plot_points(axes, split_data, label, bool_spherical):
+    if bool_spherical:
+        x = np.sin(split_data[label]["x"]) * np.cos(split_data[label]["y"])
+        y = np.sin(split_data[label]["x"]) * np.sin(split_data[label]["y"])
+        z = np.cos(split_data[label]["x"])
+        points = axes.plot(
+            x,
+            y,
+            z,
+            "o",
+            label=label,
+            markersize=0.5,
+        )
+    else:
+        points = axes.plot(
+            split_data[label]["x"],
+            split_data[label]["y"],
+            "o",
+            label=label,
+            markersize=0.5,
+        )
+    return points
+
+
+def plot_embeddings(
+    dim_reduced_embed_path,
+    dim_reduction_model,
+    axes=False,
+    fig=False,
+    bool_plot_centroids=True,
+    bool_spherical=False,
+):
+    split_data, embeds_dict = collect_embeddings(
+        dim_reduced_embed_path, dim_reduction_model
+    )
 
     if not fig:
-        fig, axes = plt.subplots(figsize=(12, 8))
+        if bool_spherical:
+            fig, axes = plt.subplots(subplot_kw={"projection": "3d"}, figsize=(12, 8))
+        else:
+            fig, axes = plt.subplots(figsize=(12, 8))
         return_axes = False
     else:
         return_axes = True
 
+    centroids = {}
     # for embed in embeds_ar:
     if split_data is not None:
         for label in split_data:
-            points = axes.plot(
-                split_data[label]["x"],
-                split_data[label]["y"],
-                "o",
-                label=label,
-                markersize=0.5,
-            )
-            centroids[label] = get_centroid(split_data[label])
-            c = darken_hex_color_bitwise(points[0]._color)
-            if plot_centroids:
-                axes.plot(
-                    centroids[label][0],
-                    centroids[label][1],
-                    "x",
-                    color=c,
-                    label=f"{label} centroid",
-                    markersize=12,
-                )
+            points = plot_points(axes, split_data, label, bool_spherical)
+            if bool_plot_centroids:
+                centroids = plot_centroids(axes, centroids, label, split_data, points)
         clustering_dict = get_clustering_scores(split_data, centroids)
-        with open(umap_embed_path.joinpath("clustering_metrics.json"), "w") as f:
+        with open(dim_reduced_embed_path.joinpath("clustering_metrics.json"), "w") as f:
             json.dump(clustering_dict, f)
     else:
         embed_x = embeds_dict["x"]
@@ -83,21 +121,21 @@ def plot_embeddings(
     if return_axes:
         return axes, clustering_dict
     else:
-        fig, axes = set_legend(fig, axes, plot_centroids=plot_centroids)
+        fig, axes = set_legend(fig, axes, bool_plot_centroids=bool_plot_centroids)
 
         axes.set_title(f"{dim_reduction_model.upper()} embeddings")
-        fig.savefig(umap_embed_path.joinpath("embed.png"), dpi=300)
+        fig.savefig(dim_reduced_embed_path.joinpath("embed.png"), dpi=300)
         plt.close(fig)
 
 
-def set_legend(fig, axes, plot_centroids=True):
+def set_legend(fig, axes, bool_plot_centroids=True):
     handles, labels = axes.get_legend_handles_labels()
 
     # Calculate number of columns dynamically based on the number of labels
     num_labels = len(labels)  # Number of labels in the legend
     ncol = min(num_labels, 6)  # Use 6 columns or fewer if there are fewer labels
 
-    if plot_centroids:
+    if bool_plot_centroids:
         custom_marker = plt.scatter(
             [], [], marker="x", color="black", s=10
         )  # Empty scatter, only for the legend
@@ -167,10 +205,23 @@ def set_figsize_for_comparison(rows, cols):
         return (12, 10)
 
 
-def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
+def plot_comparison(
+    audio_dir, embedding_models, dim_reduction_model, bool_spherical=False
+):
     rows, cols = return_rows_cols(len(embedding_models))
     clust_dict = {}
-    fig, axes = plt.subplots(rows, cols, figsize=set_figsize_for_comparison(rows, cols))
+    if not bool_spherical:
+        fig, axes = plt.subplots(
+            rows, cols, figsize=set_figsize_for_comparison(rows, cols)
+        )
+    else:
+        fig, axes = plt.subplots(
+            rows,
+            cols,
+            subplot_kw={"projection": "3d"},
+            figsize=set_figsize_for_comparison(rows, cols),
+        )
+
     fig.subplots_adjust(
         left=0.1, bottom=0.15, right=0.9, top=0.85, wspace=0.4, hspace=0.9
     )
@@ -183,7 +234,7 @@ def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
             dim_reduction_model,
             axes=axes.flatten()[idx],
             fig=fig,
-            plot_centroids=False,
+            bool_plot_centroids=False,
         )
 
         metric_str = f"Silhouette Score= {clust_dict[model]['SS']:.3f}"
@@ -196,7 +247,7 @@ def plot_comparison(audio_dir, embedding_models, dim_reduction_model):
     for model, ax in zip(embedding_models, axes.flatten()):
         ax.set_position(positions[model])
 
-    set_legend(fig, axes.flatten()[0], plot_centroids=False)
+    set_legend(fig, axes.flatten()[0], bool_plot_centroids=False)
     fig.suptitle(f"Comparison of {dim_reduction_model} embeddings", fontweight="bold")
     fig.savefig(ld.embed_dir.joinpath("comp_fig.png"), dpi=300)
 
@@ -224,10 +275,10 @@ def visualize_task_results(task_name, model_name, metrics):
     ax.set_xticks(range(len(metrics["per_class_accuracy"])))
     ax.set_xticklabels(metrics["per_class_accuracy"].keys(), rotation=90)
     fig.subplots_adjust(bottom=0.3)
+    path = Path(bacpipe_settings["task_results_dir"]).joinpath("plots")
+    path.mkdir(parents=True, exist_ok=True)
     fig.savefig(
-        Path(bacpipe_settings["task_results_dir"])
-        .joinpath("plots")
-        .joinpath(f"class_results_{task_name}_{model_name}.png"),
+        path.joinpath(f"class_results_{task_name}_{model_name}.png"),
         dpi=300,
     )
     plt.close(fig)
