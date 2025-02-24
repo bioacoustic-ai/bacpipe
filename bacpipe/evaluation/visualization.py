@@ -237,17 +237,18 @@ def plot_comparison(
             bool_plot_centroids=False,
         )
 
-        metric_str = f"Silhouette Score= {clust_dict[model]['SS']:.3f}"
-        axes.flatten()[idx].set_title(f"{model.upper()}\n{metric_str}")
-    [ax.remove() for ax in axes.flatten()[idx + 1 :]]
-    new_order = [
-        k[0] for k in sorted(clust_dict.items(), key=lambda kv: kv[1]["SS"])[::-1]
-    ]
-    positions = {mod: ax.get_position() for mod, ax in zip(new_order, axes.flatten())}
-    for model, ax in zip(embedding_models, axes.flatten()):
-        ax.set_position(positions[model])
+        # metric_str = f"Silhouette Score= {clust_dict[model]['SS']:.3f}"
+        # axes.flatten()[idx].set_title(f"{model.upper()}\n{metric_str}")
+        axes.flatten()[idx].set_title(f"{model.upper()}")
+    # [ax.remove() for ax in axes.flatten()[idx + 1 :]]
+    # new_order = [
+    #     k[0] for k in sorted(clust_dict.items(), key=lambda kv: kv[1]["SS"])[::-1]
+    # ]
+    # positions = {mod: ax.get_position() for mod, ax in zip(new_order, axes.flatten())}
+    # for model, ax in zip(embedding_models, axes.flatten()):
+    #     ax.set_position(positions[model])
 
-    set_legend(fig, axes.flatten()[0], bool_plot_centroids=False)
+    # set_legend(fig, axes.flatten()[0], bool_plot_centroids=False)
     fig.suptitle(f"Comparison of {dim_reduction_model} embeddings", fontweight="bold")
     fig.savefig(ld.embed_dir.joinpath("comp_fig.png"), dpi=300)
 

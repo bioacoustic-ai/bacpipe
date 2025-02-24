@@ -5,6 +5,7 @@ from ..utils import ModelBaseClass
 
 SAMPLE_RATE = 16000
 LENGTH_IN_SAMPLES = int(SAMPLE_RATE * 6)
+BATCH_SIZE = 8
 
 
 # Mel Spectrogram
@@ -19,6 +20,7 @@ FMIN = 50  # fmin
 class Normalization(torch.nn.Module):
     def __init__(self):
         super().__init__()
+        self.batch_size = BATCH_SIZE
 
     def forward(self, x):
         return (x - x.min()) / (x.max() - x.min())

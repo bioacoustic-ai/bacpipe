@@ -12,3 +12,4 @@ PATH_TO_PT_FILE = (
 class Model(A2VMK):
     def __init__(self):
         super().__init__(xeno_canto=True)
+        self.batch_size = 32
