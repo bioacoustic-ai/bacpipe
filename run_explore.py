@@ -136,4 +136,5 @@ if True:
         reducer_2d_conf=conf_2d_reduction[0],
         clust_conf=clust_conf,
         label_file=label_file,
+        remove_noise=True,
     )

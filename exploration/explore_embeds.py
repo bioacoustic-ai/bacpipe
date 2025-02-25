@@ -162,6 +162,7 @@ def finalize_split_arrays(label_file, embed_dict, model, all_labels, label_idx_d
         embed_dict[model]["split"].update(
             {"unknown": embed_dict[model]["all"][all_labels == -1]}
         )
+        embed_dict[model]["label_dict"].update({"unknown": -1})
         embed_dict[model]["labels"] = all_labels
 
     else:  # if not file then the split is done by the parent folder name
@@ -238,9 +239,9 @@ def get_original_embeds(models=None, label_file=None):
     return embed_dict
 
 
-def define_2d_reducer(reducer_2d_conf):
+def define_2d_reducer(reducer_2d_conf, verbose=True):
     if reducer_2d_conf["name"] == "2dumap":
-        reducer = umap.UMAP(**list(reducer_2d_conf.values())[-1])
+        reducer = umap.UMAP(**list(reducer_2d_conf.values())[-1], verbose=verbose)
     else:
         assert False, "Reducer not implemented"
     return reducer
@@ -298,7 +299,7 @@ def convert_numpy_types(obj):
     return obj  # Return unchanged for other types
 
 
-def clustering(embeds, name, clust_conf=None, **kwargs):
+def clustering(embeds, name, clust_conf=None, remove_noise=False, **kwargs):
     if not clust_metrics_path.joinpath(f"{name}_cluster_metrics.json").exists():
         metrics = {}
         clusterings = {}
@@ -311,6 +312,10 @@ def clustering(embeds, name, clust_conf=None, **kwargs):
             labels = embeds[model]["labels"]
             metrics[model] = {}
             clusterings[model] = {}
+            if remove_noise:
+                if -1 in labels:
+                    embeds[model]["all"] = embeds[model]["all"][labels != -1]
+                    labels = labels[labels != -1]
             metrics[model]["SS"] = SS(embeds[model]["all"], labels)
 
             for clust in clust_conf:
@@ -323,11 +328,7 @@ def clustering(embeds, name, clust_conf=None, **kwargs):
                 clusterings[model][clust["name"]] = clusterer.fit_predict(
                     embeds[model]["all"]
                 )
-                # with tqdm(total=len(embeds[model]["all"]), desc="Clustering Progress") as pbar:
-                #     clusterings[model][clust["name"]] = clusterer.fit_predict(
-                #         embeds[model]["all"]
-                #     )
-                #     pbar.update(len(embeds[model]["all"]))
+
             metrics[model]["AMI"] = {}
             metrics[model]["ARI"] = {}
             for clust_name, clustering in clusterings[model].items():
@@ -352,7 +353,43 @@ def clustering(embeds, name, clust_conf=None, **kwargs):
     return metrics, clusterings
 
 
-def compare(embeds, **kwargs):
+def comppute_reduction(orig_embeddings, name, reducer, **kwargs):
+    """
+    Compute the dimensionality reduction for the embeddings.
+
+    Parameters
+    ----------
+    orig_embeddings : dict
+        dictionary containing all the embeddings for each model and labels
+    name : string
+        name of the dimensionality reduction method
+    reducer : class
+        class of the dimensionality reduction method
+    **kwargs : dict
+        dictionary containing the configuration of the dimensionality reduction method
+
+    Returns
+    -------
+    processed_embeds : dict
+        dictionary containing the processed embeddings
+    """
+    processed_embeds = {}
+    for model, embed in tqdm(
+        orig_embeddings.items(),
+        desc=f"calculating dimensionality reduction for {name}",
+        position=0,
+        leave=False,
+    ):
+        processed_embeds[model] = {}
+        processed_embeds[model]["all"] = reducer.fit_transform(embed["all"])
+
+        processed_embeds[model]["labels"] = embed["labels"]
+        if "label_dict" in embed.keys():
+            processed_embeds[model]["label_dict"] = embed["label_dict"]
+    return processed_embeds
+
+
+def compare(orig_embeddings, remove_noise=False, **kwargs):
 
     if "reducer_conf" in kwargs:
         configs = ["normal"] + [conf["name"] for conf in kwargs["reducer_conf"]]
@@ -361,28 +398,32 @@ def compare(embeds, **kwargs):
 
     for config_idx, name in enumerate(configs):
         if not name == "normal":
+            conf = [a for a in kwargs["reducer_conf"] if a["name"] == name][0]
             if name.split("_")[0] == "pca":
-                reducer = PCA(**kwargs["reducer_conf"][name])
+                reducer = PCA(**conf["conf_1"])
             elif name.split("_")[0] == "spca":
-                reducer = SparsePCA(**kwargs["reducer_conf"][name])
+                reducer = SparsePCA(**conf["conf_1"])
             elif name.split("_")[0] == "umap":
-                reducer = umap.UMAP(**kwargs["reducer_conf"][name])
+                reducer = umap.UMAP(**conf["conf_1"])
 
-            for model, embed in tqdm(
-                embeds.items(),
-                desc="calculating dimensionality reduction",
-                position=0,
-                leave=False,
-            ):
-                embeds[model]["all"] = reducer.fit_transform(embed["all"])
+            processed_embeds = comppute_reduction(
+                orig_embeddings, name, reducer, **kwargs
+            )
+        else:
+            processed_embeds = orig_embeddings
 
-        reduc_embeds = reduce_dimensions(embeds, name, **kwargs)
+        reduc_2d_embeds = reduce_dimensions(processed_embeds, name, **kwargs)
 
-        calc_distances(embeds)
+        # calc_distances(embeds)
 
-        # metrics_embed, clust_embed = clustering(embeds, name, **kwargs)
-        # metrics_reduc, clust_reduc = clustering(reduc_embeds, name + "_reduced",
-        #                                         **kwargs)
+        if remove_noise:
+            name += "_no_noise"
+        metrics_embed, clust_embed = clustering(
+            processed_embeds, name, remove_noise=remove_noise, **kwargs
+        )
+        metrics_reduc, clust_reduc = clustering(
+            reduc_2d_embeds, name + "_reduced", remove_noise=remove_noise, **kwargs
+        )
 
     # plot_comparison(
     #     embeds.keys(),
@@ -422,53 +463,57 @@ def get_percentage_change(runs, clusterings):
 
 
 def calc_distances(all_embeds):
-    distances = {}
-    for model, embeds in tqdm(
-        all_embeds.items(), desc="calculating distances", position=0, leave=False
-    ):
-        distances[model] = {}
-        d_all = []
-        d_intra = []
-        d_inter = []
-        for metric in ["cosine", "euclidean"]:
-            d_all.append(pairwise_distances(embeds["all"], metric=metric).flatten())
-            for ind, (k, v) in tqdm(
-                enumerate(embeds["split"].items()),
-                desc="calculating intra and inter distances",
-                position=1,
-                leave=False,
-            ):
-                cluster = v
-                if len(cluster) == 0:
-                    continue
-                all_without_cluster = []
-                # dict_copy = embeds['split']
-                [
-                    all_without_cluster.extend(em)
-                    for label, em in embeds["split"].items()
-                    if not label == k
+    if np_embeds_path.joinpath("distances.npy").exists():
+        distances = {}
+        for model, embeds in tqdm(
+            all_embeds.items(), desc="calculating distances", position=0, leave=False
+        ):
+            distances[model] = {}
+            d_all = []
+            d_intra = []
+            d_inter = []
+            for metric in ["cosine", "euclidean"]:
+                d_all.append(pairwise_distances(embeds["all"], metric=metric).flatten())
+                for ind, (k, v) in tqdm(
+                    enumerate(embeds["split"].items()),
+                    desc="calculating intra and inter distances",
+                    position=1,
+                    leave=False,
+                ):
+                    cluster = v
+                    if len(cluster) == 0:
+                        continue
+                    all_without_cluster = []
+                    # dict_copy = embeds['split']
+                    [
+                        all_without_cluster.extend(em)
+                        for label, em in embeds["split"].items()
+                        if not label == k
+                    ]
+
+                    d_intra.append(pairwise_distances(cluster).flatten())
+                    # d_inter.append(
+                    #     pairwise_distances(cluster, np.array(all_without_cluster)).flatten()
+                    # )
+
+                ratios = [
+                    float(np.mean(intr) / np.mean(inte))
+                    for intr, inte in zip(d_intra, d_inter)
                 ]
 
-                # [b.extend(em) for em in embeds['split'][:ind]]
-                # [b.extend(em) for em in embeds['split'][ind+1:]]
-                d_intra.append(pairwise_distances(cluster).flatten())
-                d_inter.append(
-                    pairwise_distances(cluster, np.array(all_without_cluster)).flatten()
-                )
+            distances[model] = {
+                "all": d_all,
+                "intra": d_intra,
+                "inter": d_inter,
+                "ratios": ratios,
+            }
 
-            ratios = [
-                float(np.mean(intr) / np.mean(inte))
-                for intr, inte in zip(d_intra, d_inter)
-            ]
-
-        distances[model] = {
-            "all": d_all,
-            "intra": d_intra,
-            "inter": d_inter,
-            "ratios": ratios,
-        }
-
-    np.save(np_embeds_path.joinpath("distances.npy"), distances)
+        np.save(np_embeds_path.joinpath("distances.npy"), distances)
+    else:
+        distances = np.load(
+            np_embeds_path.joinpath("distances.npy"), allow_pickle=True
+        ).item()
+    return distances
 
     # plt.figure()
     # plt.plot(ratios)
