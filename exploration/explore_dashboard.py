@@ -36,6 +36,7 @@ REDUCERS = [
     for d in list(np_embeds_path.rglob("*.npy"))
     if d.stem not in ["distances", "embed_dict"]
 ]
+METRICS = ["SS", "AMI_hdbscan", "AMI_kmeans", "ARI_hdbscan", "ARI_kmeans"]
 # freq_slider = pn.widgets.IntSlider(name="Frequency", start=1, end=10, value=5)
 
 conf_2d_reduction = [
@@ -84,6 +85,36 @@ def plot_overview(orig_embeds, reducer, **kwargs):
         hand, labl = ax[idx // 4, idx % 4].get_legend_handles_labels()
     fig.legend(hand, labl, fontsize=8, markerscale=15, loc="outside right")
     return fig
+
+
+def plot_clust_overview(
+    select_clustering, label_by, no_noise=False, plot_percentages=False, **kwargs
+):
+    metrics = {}
+    for reducer in REDUCERS:
+        if no_noise:
+            reducer = f"{reducer}_no_noise"
+        with open(
+            clust_metrics_path.joinpath(f"{reducer}_cluster_metrics.json"), "r"
+        ) as f:
+            metrics[reducer] = flatten_metric_dict(json.load(f))
+
+    metrics_by_clustering = {}
+    for model in metrics[reducer].keys():
+        metrics_by_clustering[model] = {}
+        for reducer, metric in metrics.items():
+            metrics_by_clustering[model][reducer] = metric[model][select_clustering]
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    fig.subplots_adjust(right=0.8)
+
+    if plot_percentages:
+        perc_metrics = get_percentage_change(metrics_by_clustering, no_noise=no_noise)
+        return plot_bars_dicka(
+            perc_metrics, fig, ax, y_label="Percentage change", **kwargs
+        )
+    else:
+        return plot_bars_dicka(metrics_by_clustering, fig, ax, **kwargs)
 
 
 def plot_embeds(
@@ -160,10 +191,13 @@ def get_percentage_change(metrics, no_noise=False):
     ]:
         clust_percentages[reducer] = {}
         for key, value in metric.items():
+            if relative_to in metrics.keys():
+                denominator = metrics[relative_to][key]
+            elif relative_to in metrics[reducer].keys():
+                denominator = metrics[reducer][relative_to]
+
             try:
-                clust_percentages[reducer][key] = (
-                    value / metrics[relative_to][key] - 1
-                ) * 100
+                clust_percentages[reducer][key] = (value / denominator - 1) * 100
             except ZeroDivisionError:
                 clust_percentages[reducer][key] = 0
     return clust_percentages
@@ -172,11 +206,12 @@ def get_percentage_change(metrics, no_noise=False):
 def plot_bars_dicka(
     metrics, fig, ax, y_label="Metric value", no_legend=False, **kwargs
 ):
-    bar_width = 1 / (len(REDUCERS) * 2)
+    bar_width = 1 / (len(list(metrics.values())[0].keys()) + 1)
     cmap = plt.cm.tab10
-    colors = cmap(np.arange(len(REDUCERS) * 2 - 1 + 3) % cmap.N)
+    colors = cmap(np.arange(len(list(metrics.values())[0].keys())) % cmap.N)
+    metrics_sorted = dict(sorted(metrics.items()))
 
-    for out_idx, (reducer, metric) in enumerate(metrics.items()):
+    for out_idx, (reducer, metric) in enumerate(metrics_sorted.items()):
         for inner_idx, (key, value) in enumerate(metric.items()):
             ax.bar(
                 out_idx - bar_width * inner_idx,
@@ -186,8 +221,8 @@ def plot_bars_dicka(
                 color=colors[inner_idx],
             )
 
-    ax.set_xticks(np.arange(len(REDUCERS)) - 0.3)
-    ax.set_xticklabels(REDUCERS, rotation=45, ha="right")
+    ax.set_xticks(np.arange(len(metrics_sorted.keys())) - 0.33)
+    ax.set_xticklabels(list(metrics_sorted.keys()), rotation=45, ha="right")
     ax.set_ylabel(y_label)
     ax.hlines(0, -1, out_idx, linestyles="dashed", color="black", linewidth=0.3)
     hand, labl = ax.get_legend_handles_labels()
@@ -200,6 +235,21 @@ def plot_bars_dicka(
             loc="outside right",
         )
     return fig
+
+
+def flatten_metric_dict(metrics):
+    # flatten
+    flat_dict = {}
+
+    for key_red, met in metrics.items():
+        flat_dict[key_red] = {}
+        for key_met, value in met.items():
+            if isinstance(value, dict):
+                for sub_key, sub_value in value.items():
+                    flat_dict[key_red][f"{key_met}_{sub_key}"] = sub_value
+            else:
+                flat_dict[key_red][key_met] = value
+    return flat_dict
 
 
 def plot_clusterings(
@@ -218,17 +268,7 @@ def plot_clusterings(
         fig, ax = plt.subplots(figsize=(5, 4))
         fig.subplots_adjust(right=0.7)
 
-    # flatten
-    flat_dict = {}
-
-    for key_red, met in metrics.items():
-        flat_dict[key_red] = {}
-        for key_met, value in met.items():
-            if isinstance(value, dict):
-                for sub_key, sub_value in value.items():
-                    flat_dict[key_red][f"{key_met}_{sub_key}"] = sub_value
-            else:
-                flat_dict[key_red][key_met] = value
+    flat_dict = flatten_metric_dict(metrics)
 
     if plot_percentages:
         perc_metrics = get_percentage_change(flat_dict, no_noise=no_noise)
@@ -254,6 +294,7 @@ percentages1 = pn.widgets.RadioBoxGroup(
     name="Show percentages", options=[True, False], value=False
 )
 no_noise1 = pn.widgets.Checkbox(name="Remove noise", value=False)
+select_clustering = pn.widgets.Select(name="Reducer", options=METRICS, width=120)
 
 model2 = copy.deepcopy(model1)
 reducer2 = copy.deepcopy(reducer1)
@@ -269,6 +310,15 @@ Overview = pn.bind(
     label_by=label_by1,
     no_noise=no_noise1,
 )
+
+Clusterings_overview = pn.bind(
+    plot_clust_overview,
+    select_clustering=select_clustering,
+    label_by=label_by1,
+    no_noise=no_noise1,
+    plot_percentages=percentages1,
+)
+
 
 Embeddings1 = pn.bind(
     plot_embeds,
@@ -366,8 +416,9 @@ dashboard = pn.Tabs(
             pn.Row(
                 "Display percentage relativ to original embeddngs?",
                 percentages1,
+                select_clustering,
             ),
-            pn.panel(Clusterings1, tight=True),
+            pn.panel(Clusterings_overview, tight=True),
         ),
     ),
 )
