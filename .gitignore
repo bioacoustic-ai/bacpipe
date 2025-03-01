@@ -17,3 +17,11 @@ bacpipe/evaluation/task_results/plots/*
 
 # track all Readme files, including the ones in subdirectories
 !**/README.md
+
+# exploration/dim*
+# exploration/Evaluation*
+# exploration/id*
+
+exploration/*
+!exploration/explore_embeds.py
+!exploration/explore_dashboard.py

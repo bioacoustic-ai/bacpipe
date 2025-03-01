@@ -4,11 +4,15 @@ import matplotlib.pyplot as plt
 import matplotlib
 import json
 import copy
+import pandas as pd
+import seaborn as sns
 
 matplotlib.use("agg")
 
 from exploration.explore_embeds import set_paths
 
+# data_path = "Evaluation_set_5shots"
+# data_path = "id_task_data"
 data_path = "colombia_soundscape"
 set_paths(data_path)
 from exploration.explore_embeds import (
@@ -16,6 +20,7 @@ from exploration.explore_embeds import (
     reduce_dimensions,
     clustering,
     main_embeds_path,
+    distances_path,
     clust_metrics_path,
     np_embeds_path,
     np_clust_path,
@@ -34,10 +39,16 @@ MODELS = [
 REDUCERS = [
     d.stem
     for d in list(np_embeds_path.rglob("*.npy"))
-    if d.stem not in ["distances", "embed_dict"]
+    if d.stem not in ["distances", "embed_dict", "normal_distances"]
 ]
 METRICS = ["SS", "AMI_hdbscan", "AMI_kmeans", "ARI_hdbscan", "ARI_kmeans"]
-# freq_slider = pn.widgets.IntSlider(name="Frequency", start=1, end=10, value=5)
+
+ALL_DISTS = {}
+for file in distances_path.glob("*.npy"):
+    ALL_DISTS[file.stem.split("_distances")[0]] = np.load(
+        file, allow_pickle=True
+    ).item()
+
 
 conf_2d_reduction = [
     {
@@ -51,6 +62,70 @@ conf_2d_reduction = [
         },
     }
 ]
+
+
+def load_distances(reducer=None, model=None, label=None, metric="euclidean"):
+    if reducer is not None:
+        distances = np.load(
+            distances_path.joinpath(f"{reducer}_distances.npy"), allow_pickle=True
+        ).item()
+    else:
+        distances = ALL_DISTS
+    if reducer is None:
+        distances_left = {
+            k: v[model][metric][label]["intra"] for k, v in distances.items()
+        }
+        distances_right = {
+            k: v[model][metric][label]["inter"] for k, v in distances.items()
+        }
+    elif model is not None:
+        distances_left = {k: v["intra"] for k, v in distances[model][metric].items()}
+        distances_right = {k: v["inter"] for k, v in distances[model][metric].items()}
+    elif label is not None:
+        distances_left = {
+            k: v[metric][label]["intra"]
+            for k, v in distances.items()
+            if not k == "rcl_fs_bsed"
+        }
+        distances_right = {
+            k: v[metric][label]["inter"]
+            for k, v in distances.items()
+            if not k == "rcl_fs_bsed"
+        }
+
+    return plot_violins(distances_left, distances_right)
+
+
+def plot_violins(left, right):
+    val = []
+    typ = []
+    cat = []
+    for idx, label in enumerate(dict(sorted(left.items())).keys()):
+        val.append(left[label])
+        val.append(right[label])
+        typ.extend(["Intra"] * len(left[label]))
+        typ.extend(["Inter"] * len(right[label]))
+        cat.extend([label] * len(left[label]))
+        cat.extend([label] * len(right[label]))
+
+    # Convert to long-form format
+    data_long = pd.DataFrame(
+        {"Value": np.concatenate(val), "Type": typ, "Category": cat}
+    )
+
+    # Create the violin plot
+    fig, ax = plt.subplots(figsize=(14, 8))
+    sns.violinplot(
+        x="Category",
+        y="Value",
+        hue="Type",
+        data=data_long,
+        split=True,
+        inner="quartile",
+    )
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
+
+    return fig
 
 
 def plot_overview(orig_embeds, reducer, **kwargs):
@@ -295,12 +370,21 @@ percentages1 = pn.widgets.RadioBoxGroup(
 )
 no_noise1 = pn.widgets.Checkbox(name="Remove noise", value=False)
 select_clustering = pn.widgets.Select(name="Reducer", options=METRICS, width=120)
+label1 = pn.widgets.Select(
+    name="Label", options=list(embed_dict[model1.value]["label_dict"].keys()), width=120
+)
 
 model2 = copy.deepcopy(model1)
 reducer2 = copy.deepcopy(reducer1)
 label_by2 = copy.deepcopy(label_by1)
 percentages2 = copy.deepcopy(percentages1)
 no_noise2 = copy.deepcopy(no_noise1)
+
+reducer3 = pn.widgets.Select(name="Reducer", options=[None] + REDUCERS, width=120)
+label3 = pn.widgets.Select(
+    name="Label", options=list(embed_dict[model1.value]["label_dict"].keys()), width=120
+)
+metric1 = pn.widgets.Select(name="Metric", options=["euclidean", "cosine"], width=120)
 
 # Bind the slider to both plots
 Overview = pn.bind(
@@ -351,6 +435,12 @@ Clusterings2 = pn.bind(
     no_legend=True,
 )
 
+Violins = pn.bind(
+    load_distances, reducer=reducer3, model=model1, label=label3, metric=metric1
+)
+
+Violins2 = pn.bind(load_distances, reducer=reducer1, label=label1)
+
 
 # Layout: Dashboard with tabs
 dashboard = pn.Tabs(
@@ -369,6 +459,8 @@ dashboard = pn.Tabs(
                 percentages1,
             ),
             pn.panel(Clusterings1, tight=True),
+            pn.Row(label3, reducer3, metric1),
+            pn.panel(Violins, tight=True),
         ),
     ),
     (
@@ -419,6 +511,8 @@ dashboard = pn.Tabs(
                 select_clustering,
             ),
             pn.panel(Clusterings_overview, tight=True),
+            label1,
+            pn.panel(Violins2, tight=True),
         ),
     ),
 )

@@ -23,18 +23,21 @@ import matplotlib.pyplot as plt
 def set_paths(data_path):
     global main_embeds_path
     global np_embeds_path
+    global distances_path
     global np_clust_path
     global clust_metrics_path
     global plot_path
 
     main_embeds_path = Path(f"exploration/{data_path}/embeddings")
     np_embeds_path = Path(f"exploration/{data_path}/numpy_embeddings")
+    distances_path = Path(f"exploration/{data_path}/distances")
     np_clust_path = Path(f"exploration/{data_path}/numpy_clusterings")
     clust_metrics_path = Path(f"exploration/{data_path}/cluster_metrics")
     plot_path = Path(f"exploration/{data_path}/plots")
 
     main_embeds_path.mkdir(exist_ok=True)
     np_embeds_path.mkdir(exist_ok=True)
+    distances_path.mkdir(exist_ok=True)
     np_clust_path.mkdir(exist_ok=True)
     clust_metrics_path.mkdir(exist_ok=True)
     plot_path.mkdir(exist_ok=True)
@@ -43,7 +46,7 @@ def set_paths(data_path):
 def get_models_in_dir():
     return [
         d.stem.split("___")[-1].split("-")[0]
-        for d in list(main_embeds_path.rglob("*"))
+        for d in list(main_embeds_path.glob("*"))
         if d.is_dir()
     ]
 
@@ -117,6 +120,9 @@ def build_split_array_by_labels(
     else:  # if not file then the split is done by the parent folder name
         if not file.parent.stem in embed_dict[model]["label_dict"].keys():
             embed_dict[model]["label_dict"][file.parent.stem] = num_embeds
+            all_labels = np.concatenate(
+                (all_labels, np.ones(embed.shape[0]) * label_idx_dict[file.parent.stem])
+            )
     return embed_dict, all_labels
 
 
@@ -179,10 +185,10 @@ def finalize_split_arrays(label_file, embed_dict, model, all_labels, label_idx_d
 
         embed_dict[model]["labels"] = np.concatenate(
             [
-                np.ones(len(data)) * i
-                for i, data in enumerate(embed_dict[model]["split"])
+                np.ones(len(v)) * label_idx_dict[k]
+                for k, v in embed_dict[model]["split"].items()
             ]
-        )
+        ).tolist()
     return embed_dict
 
 
@@ -196,6 +202,10 @@ def get_original_embeds(models=None, label_file=None):
 
         if label_file:
             label_df, label_idx_dict = load_labels_and_build_dict(label_file)
+        else:
+            labels = [d.stem for d in paths[0].iterdir() if d.is_dir()]
+            label_idx_dict = {label: idx for idx, label in enumerate(labels)}
+            label_df = None
 
         embed_dict = {}
         for model, path in tqdm(
@@ -414,7 +424,7 @@ def compare(orig_embeddings, remove_noise=False, **kwargs):
 
         reduc_2d_embeds = reduce_dimensions(processed_embeds, name, **kwargs)
 
-        # calc_distances(embeds)
+        calc_distances(processed_embeds, name)
 
         if remove_noise:
             name += "_no_noise"
@@ -462,56 +472,66 @@ def get_percentage_change(runs, clusterings):
     return clust_percentages
 
 
-def calc_distances(all_embeds):
-    if np_embeds_path.joinpath("distances.npy").exists():
+def calc_distances(all_embeds, name):
+    if not distances_path.joinpath(f"{name}_distances.npy").exists():
         distances = {}
         for model, embeds in tqdm(
             all_embeds.items(), desc="calculating distances", position=0, leave=False
         ):
             distances[model] = {}
-            d_all = []
-            d_intra = []
-            d_inter = []
             for metric in ["cosine", "euclidean"]:
-                d_all.append(pairwise_distances(embeds["all"], metric=metric).flatten())
-                for ind, (k, v) in tqdm(
-                    enumerate(embeds["split"].items()),
+                # d_all.append(pairwise_distances(embeds["all"], metric=metric).flatten())
+                distances[model][metric] = {}
+                for ind, lab in tqdm(
+                    enumerate(np.unique(embeds["labels"])),
                     desc="calculating intra and inter distances",
                     position=1,
                     leave=False,
                 ):
-                    cluster = v
+                    if lab == -1:
+                        continue
+                    cluster = embeds["all"][embeds["labels"] == lab]
                     if len(cluster) == 0:
                         continue
-                    all_without_cluster = []
-                    # dict_copy = embeds['split']
-                    [
-                        all_without_cluster.extend(em)
-                        for label, em in embeds["split"].items()
-                        if not label == k
-                    ]
+                    label_key = [
+                        k for k, v in embeds["label_dict"].items() if v == lab
+                    ][0]
+                    distances[model][metric].update({label_key: {}})
+                    all_without_cluster = embeds["all"][embeds["labels"] != lab]
 
-                    d_intra.append(pairwise_distances(cluster).flatten())
-                    # d_inter.append(
-                    #     pairwise_distances(cluster, np.array(all_without_cluster)).flatten()
-                    # )
+                    distances[model][metric][label_key].update(
+                        {
+                            "intra": pairwise_distances(cluster, metric=metric)
+                            .flatten()
+                            .tolist()
+                        }
+                    )
 
-                ratios = [
-                    float(np.mean(intr) / np.mean(inte))
-                    for intr, inte in zip(d_intra, d_inter)
-                ]
+                    distances[model][metric][label_key].update(
+                        {
+                            "inter": np.sort(
+                                pairwise_distances(
+                                    cluster, all_without_cluster, metric=metric
+                                )
+                            )[:, :15]
+                            .flatten()
+                            .tolist()
+                        }
+                    )
 
-            distances[model] = {
-                "all": d_all,
-                "intra": d_intra,
-                "inter": d_inter,
-                "ratios": ratios,
-            }
+                    distances[model][metric][label_key].update(
+                        {
+                            "ratio": np.mean(
+                                distances[model][metric][label_key]["intra"]
+                            )
+                            / np.mean(distances[model][metric][label_key]["inter"])
+                        }
+                    )
 
-        np.save(np_embeds_path.joinpath("distances.npy"), distances)
+        np.save(distances_path.joinpath(f"{name}_distances.npy"), distances)
     else:
         distances = np.load(
-            np_embeds_path.joinpath("distances.npy"), allow_pickle=True
+            distances_path.joinpath(f"{name}_distances.npy"), allow_pickle=True
         ).item()
     return distances
 
