@@ -30,16 +30,20 @@ class Model(ModelBaseClass):
     def __init__(self):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
 
-        self.mel = T.MelSpectrogram(
-            sample_rate=SAMPLE_RATE,
-            n_fft=NFFT,
-            hop_length=HOPLEN,
-            f_min=FMIN,
-            f_max=FMAX,
-            n_mels=NMELS,
-        ).to(DEVICE)
-        self.power_to_db = T.AmplitudeToDB()
-        self.norm = Normalization()
+        self.mel = (
+            T.MelSpectrogram(
+                sample_rate=SAMPLE_RATE,
+                n_fft=NFFT,
+                hop_length=HOPLEN,
+                f_min=FMIN,
+                f_max=FMAX,
+                n_mels=NMELS,
+            )
+            .to(DEVICE)
+            .eval()
+        )
+        self.power_to_db = T.AmplitudeToDB().eval()
+        self.norm = Normalization().eval()
 
         self.model = cvt13()
         state_dict = torch.load(

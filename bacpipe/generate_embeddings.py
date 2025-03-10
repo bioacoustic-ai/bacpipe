@@ -118,8 +118,17 @@ class Loader:
     def _get_audio_paths(self):
         self.files = self._get_audio_files()
         self.files.sort()
+        if False:
+            self._get_annotation_files()
 
         self.embed_dir = Path(self.embed_parent_dir).joinpath(self.get_timestamp_dir())
+
+    def _get_annotation_files(self):
+        all_annotation_files = list(self.audio_dir.rglob("*.csv"))
+        audio_stems = [file.stem for file in self.files]
+        self.annot_files = [
+            file for file in all_annotation_files if file.stem in audio_stems
+        ]
 
     def _get_audio_files(self):
         files_list = []
@@ -389,7 +398,7 @@ def generate_embeddings(save_files=True, **kwargs):
         if not ld.combination_already_exists:
             embed = Embedder(**kwargs)
             for idx, file in enumerate(
-                tqdm(ld.files, desc="processing files", position=1)
+                tqdm(ld.files, desc="processing files", position=1, leave=False)
             ):
                 if not ld.dim_reduction_model:
                     sample = file

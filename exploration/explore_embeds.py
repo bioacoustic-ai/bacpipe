@@ -118,11 +118,16 @@ def build_split_array_by_labels(
         embed_dict[model]["label_dict"] = label_idx_dict
 
     else:  # if not file then the split is done by the parent folder name
-        if not file.parent.stem in embed_dict[model]["label_dict"].keys():
-            embed_dict[model]["label_dict"][file.parent.stem] = num_embeds
-            all_labels = np.concatenate(
-                (all_labels, np.ones(embed.shape[0]) * label_idx_dict[file.parent.stem])
+        # if not file.parent.stem in embed_dict[model]["label_dict"].keys():
+        embed_dict[model]["label_dict"][file.parent.stem] = label_idx_dict[
+            file.parent.parent.stem
+        ]
+        all_labels = np.concatenate(
+            (
+                all_labels,
+                np.ones(embed.shape[0]) * label_idx_dict[file.parent.parent.stem],
             )
+        )
     return embed_dict, all_labels
 
 
@@ -160,35 +165,16 @@ def concat_embeddings_and_split_by_label(
 
 
 def finalize_split_arrays(label_file, embed_dict, model, all_labels, label_idx_dict):
+    embed_dict[model]["split"] = {
+        k: embed_dict[model]["all"][all_labels == v] for k, v in label_idx_dict.items()
+    }
+    embed_dict[model]["labels"] = all_labels
     if label_file:
-        embed_dict[model]["split"] = {
-            k: embed_dict[model]["all"][all_labels == v]
-            for k, v in label_idx_dict.items()
-        }
         embed_dict[model]["split"].update(
             {"unknown": embed_dict[model]["all"][all_labels == -1]}
         )
         embed_dict[model]["label_dict"].update({"unknown": -1})
-        embed_dict[model]["labels"] = all_labels
 
-    else:  # if not file then the split is done by the parent folder name
-        embed_dict[model]["split"] = {  # TODO check that this works
-            k: v
-            for k, v in zip(
-                embed_dict[model]["label_dict"].keys(),
-                np.split(
-                    embed_dict[model]["all"],
-                    list(embed_dict[model]["label_dict"].values())[1:],
-                ),
-            )
-        }
-
-        embed_dict[model]["labels"] = np.concatenate(
-            [
-                np.ones(len(v)) * label_idx_dict[k]
-                for k, v in embed_dict[model]["split"].items()
-            ]
-        ).tolist()
     return embed_dict
 
 
@@ -258,23 +244,23 @@ def define_2d_reducer(reducer_2d_conf, verbose=True):
 
 
 def get_reduced_embeddings_by_label(embed, model, reduc_embeds, label_file=None):
-    if label_file:
-        reduc_embeds[model]["split"] = {
-            k: reduc_embeds[model]["all"][embed["labels"] == v]
-            for k, v in embed["label_dict"].items()
-        }
-    else:
-        reduc_embeds[model]["split"] = {  # TODO test if this works
-            k: np.split(
-                reduc_embeds[model]["all"], list(embed["label_dict"].values())[1:]
-            )
-            for k in embed["label_dict"].keys()
-        }
+    # if label_file:
+    reduc_embeds[model]["split"] = {
+        k: reduc_embeds[model]["all"][embed["labels"] == v]
+        for k, v in embed["label_dict"].items()
+    }
+    # else:
+    #     reduc_embeds[model]["split"] = {  # TODO test if this works
+    #         k: np.split(
+    #             reduc_embeds[model]["all"], list(embed["label_dict"].values())[1:]
+    #         )
+    #         for k in embed["label_dict"].keys()
+    #     }
     return reduc_embeds
 
 
 def reduce_dimensions(embeds, name, reducer_2d_conf=None, label_file=None, **kwargs):
-    if not np_embeds_path.joinpath(f"{name}.npy").exists():
+    if not np_embeds_path.joinpath(f"{name}_2d.npy").exists():
         reduc_embeds = {}
         for model, embed in tqdm(
             embeds.items(),
@@ -293,10 +279,10 @@ def reduce_dimensions(embeds, name, reducer_2d_conf=None, label_file=None, **kwa
 
             reduc_embeds[model]["labels"] = embed["labels"]
 
-        np.save(np_embeds_path.joinpath(f"{name}.npy"), reduc_embeds)
+        np.save(np_embeds_path.joinpath(f"{name}_2d.npy"), reduc_embeds)
     else:
         reduc_embeds = np.load(
-            np_embeds_path.joinpath(f"{name}.npy"), allow_pickle=True
+            np_embeds_path.joinpath(f"{name}_2d.npy"), allow_pickle=True
         ).item()
     return reduc_embeds
 
@@ -383,6 +369,8 @@ def comppute_reduction(orig_embeddings, name, reducer, **kwargs):
     processed_embeds : dict
         dictionary containing the processed embeddings
     """
+    folder = np_embeds_path.joinpath(f"{name}")
+    folder.mkdir(exist_ok=True, parents=True)
     processed_embeds = {}
     for model, embed in tqdm(
         orig_embeddings.items(),
@@ -390,22 +378,33 @@ def comppute_reduction(orig_embeddings, name, reducer, **kwargs):
         position=0,
         leave=False,
     ):
-        processed_embeds[model] = {}
-        processed_embeds[model]["all"] = reducer.fit_transform(embed["all"])
+        file = folder.joinpath(f"{name}_{model}.npy")
+        if not file.exists():
+            processed_embeds[model] = {}
+            processed_embeds[model]["all"] = reducer.fit_transform(embed["all"])
 
-        processed_embeds[model]["labels"] = embed["labels"]
-        if "label_dict" in embed.keys():
-            processed_embeds[model]["label_dict"] = embed["label_dict"]
+            processed_embeds[model]["labels"] = embed["labels"]
+            if "label_dict" in embed.keys():
+                processed_embeds[model]["label_dict"] = embed["label_dict"]
+            np.save(file, processed_embeds[model])
+        else:
+            processed_embeds = {}
+            for model in orig_embeddings.keys():
+                processed_embeds[model] = np.load(
+                    file,
+                    allow_pickle=True,
+                ).item()
     return processed_embeds
 
 
-def compare(orig_embeddings, remove_noise=False, **kwargs):
+def compare(orig_embeddings, remove_noise=False, distances=False, **kwargs):
 
     if "reducer_conf" in kwargs:
         configs = ["normal"] + [conf["name"] for conf in kwargs["reducer_conf"]]
     else:
         configs = ["normal"]
-
+    all_clusts = {}
+    all_clusts_reordere = {}
     for config_idx, name in enumerate(configs):
         if not name == "normal":
             conf = [a for a in kwargs["reducer_conf"] if a["name"] == name][0]
@@ -424,28 +423,102 @@ def compare(orig_embeddings, remove_noise=False, **kwargs):
 
         reduc_2d_embeds = reduce_dimensions(processed_embeds, name, **kwargs)
 
-        calc_distances(processed_embeds, name)
+        save_2d_embeds_by_model(reduc_2d_embeds, name)
+
+        if distances:
+            distances = calc_distances(processed_embeds, name)
 
         if remove_noise:
             name += "_no_noise"
         metrics_embed, clust_embed = clustering(
             processed_embeds, name, remove_noise=remove_noise, **kwargs
         )
-        metrics_reduc, clust_reduc = clustering(
-            reduc_2d_embeds, name + "_reduced", remove_noise=remove_noise, **kwargs
-        )
+        # metrics_reduc, clust_reduc = clustering(
+        #     reduc_2d_embeds, name + "_reduced", remove_noise=remove_noise, **kwargs
+        # )
 
-    # plot_comparison(
-    #     embeds.keys(),
-    #     list(embeds.values())[0]["label_dict"].keys(),
-    #     reduc_embeds,
-    #     name,
-    #     metrics_embed,
-    #     metrics_reduc,
-    #     clust_embed,
-    #     clust_reduc,
-    #     **kwargs,
-    # )
+        # plot_comparison(
+        #     reduc_2d_embeds.keys(),
+        #     list(reduc_2d_embeds.values())[0]["split"].keys(),
+        #     reduc_2d_embeds,
+        #     name,
+        #     metrics_embed,
+        #     metrics_reduc,
+        #     clust_embed,
+        #     clust_reduc,
+        #     **kwargs,
+        # )
+        all_clusts.update({name: metrics_embed})
+        # from exploration.explore_dashboard import plot_overview
+        # fig = plot_overview(processed_embeds, 'normal', no_noise=True)
+        # fig.savefig(plot_path.joinpath(f"{name}_overview.png"), dpi=300)
+
+    if not clust_metrics_path.joinpath(f"all_clusts.npy").exists():
+        all_clusts_reordered = {"SS": {}, "AMI": {}, "ARI": {}}
+        for model in reduc_2d_embeds.keys():
+            all_clusts_reordered["SS"][model] = {
+                run: all_clusts[run][model]["SS"] for run in all_clusts.keys()
+            }
+            all_clusts_reordered["AMI"][model] = {
+                run: all_clusts[run][model]["AMI"]["kmeans"]
+                for run in all_clusts.keys()
+            }
+            all_clusts_reordered["ARI"][model] = {
+                run: all_clusts[run][model]["ARI"]["kmeans"]
+                for run in all_clusts.keys()
+            }
+        np.save(
+            clust_metrics_path.joinpath(f"all_clusts_reordered.npy"),
+            all_clusts_reordered,
+        )
+    else:
+        all_clusts_reordered = np.load(
+            clust_metrics_path.joinpath(f"all_clusts_reordered.npy"), allow_pickle=True
+        ).item()
+    plot_clustering_by_metric(all_clusts_reordered, reduc_2d_embeds.keys())
+
+
+def plot_clustering_by_metric(all_clusts_reordered, models):
+    fig, axes = plt.subplots(3, 1, figsize=(20, 10))
+
+    cmap = plt.cm.tab10
+    colors = cmap(np.arange(len(models)) % cmap.N)
+    for axes, metric in zip(axes.flatten(), ["SS", "AMI", "ARI"]):
+        for idx, model in enumerate(models):
+            order = [
+                "normal",
+                "pca_50",
+                "pca_100",
+                "spca_50",
+                "spca_100",
+                "umap_50",
+                "umap_100",
+            ]
+            values = [all_clusts_reordered[metric][model][run] for run in order]
+            axes.plot(values, "-x", color=colors[idx], label=model)
+        axes.set_ylabel(metric)
+        axes.set_xticks(np.arange(len(order)))
+        axes.set_xticklabels(order, rotation=45, ha="right")
+    plt.show()
+
+
+def save_2d_embeds_by_model(reduc_embeds, name):
+    for model, embed in reduc_embeds.items():
+        folder = np_embeds_path.joinpath(name)
+        if not folder.joinpath(f"{name}_{model}_2d.npy").exists():
+            embed["x"] = embed["all"][:, 0]
+            embed["y"] = embed["all"][:, 1]
+
+            for k, v in embed.items():
+                embed[k] = convert_numpy_types(v)
+                for kk, vv in embed["split"].items():
+                    embed["split"][kk] = convert_numpy_types(vv)
+
+            folder.mkdir(exist_ok=True, parents=True)
+            np.save(
+                folder.joinpath(f"{name}_{model}_2d.npy"),
+                embed,
+            )
 
 
 def get_percentage_change(runs, clusterings):
@@ -479,7 +552,7 @@ def calc_distances(all_embeds, name):
             all_embeds.items(), desc="calculating distances", position=0, leave=False
         ):
             distances[model] = {}
-            for metric in ["cosine", "euclidean"]:
+            for metric in ["euclidean"]:  # "cosine",
                 # d_all.append(pairwise_distances(embeds["all"], metric=metric).flatten())
                 distances[model][metric] = {}
                 for ind, lab in tqdm(
@@ -609,6 +682,7 @@ def plot_comparison(
     clust_embed,
     clust_reduc,
     reducer_conf,
+    label_file=None,
     **kwargs,
 ):
     # fig, axes = plt.subplots(2, 5, figsize=(20, 10))
@@ -616,7 +690,7 @@ def plot_comparison(
         label_keys = list(label_keys) + ["Unlabeled"]
     fig, axes = plt.subplots(4, 4, figsize=(16, 10))
     for ax, model in zip(axes.flatten(), models):
-        for key, embed_split in zip(label_keys, reduced_embeds[model]["split"]):
+        for key, embed_split in reduced_embeds[model]["split"].items():
             ax.plot(
                 embed_split[:, 0],
                 embed_split[:, 1],
