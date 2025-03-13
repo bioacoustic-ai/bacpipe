@@ -3,19 +3,26 @@
 
 # fixed path, embeddings will be stored here, DO NOT CHANGE
 embed_parent_dir :   "bacpipe/evaluation/embeddings"
-dim_reduc_parent_dir :   "bacpipe/evaluation/dim_reduced_embeddings"
+# embed_parent_dir :   "exploration/embeddings"
+# dim_reduc_parent_dir :   "bacpipe/evaluation/dim_reduced_embeddings"
+# dim_reduc_parent_dir :   "exploration/dim_reduced_embeddings/pca50_id_task_data"
+# dim_reduc_parent_dir :   "exploration/dim_reduced_embeddings/id_task_data"
+dim_reduc_parent_dir :   "bacpipe/evaluation/embeddings"
 
 # fixed paths for tasks:
 task_config_files : "bacpipe/evaluation/tasks"
-task_results_dir : "bacpipe/evaluation/task_results"
+# task_results_dir : "bacpipe/evaluation/task_results"
+task_results_dir : "exploration/dim_reduced_embeddings/neotropic_dawn_chorus/task_results"
 
 
 # To avoid creating embeddings when configurations are still being tested, this is set to True. 
 # Set to False if you want to keep embeddings even if the process is interrupted.
 rm_embedding_on_keyboard_interrupt: True
 
+use_reduced_dim_embeds_for_tasks: True
+
 # supported formats of audio files
-audio_suffixes: ['.wav', '.WAV', '.aif', '.mp3']
+audio_suffixes: ['.wav', '.WAV', '.aif', '.mp3', '.flac']
 
 # specify your device ['cpu', 'cuda', ...]
 device: 'cpu'

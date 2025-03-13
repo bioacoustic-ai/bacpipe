@@ -7,17 +7,20 @@ import copy
 import pandas as pd
 import seaborn as sns
 
+sns.set_theme(style="whitegrid")
+
 matplotlib.use("agg")
 
 from exploration.explore_embeds import set_paths
 
-data_path = "Evaluation_set_5shots"
+# data_path = "Evaluation_set_5shots"
+data_path = "neotropic_dawn_chorus"
 # data_path = "id_task_data"
 # data_path = "colombia_soundscape"
 set_paths(data_path)
 from exploration.explore_embeds import (
     get_original_embeds,
-    reduce_dimensions,
+    reduce_to_2d,
     clustering,
     main_embeds_path,
     distances_path,
@@ -129,14 +132,23 @@ def plot_violins(left, right):
 
 
 def plot_overview(orig_embeds, reducer, **kwargs):
-    fig, ax = plt.subplots(4, 4, figsize=(12, 8))
+    fig, ax = plt.subplots(4, 4, figsize=(10, 7))
     fig.subplots_adjust(
-        right=0.8,
+        # right=0.8,
+        bottom=0.1,
     )
-    embeds = reduce_dimensions(
+    embeds = reduce_to_2d(
         orig_embeds, name=reducer, reducer_2d_conf=conf_2d_reduction[0]
     )
-    for idx, model in enumerate(embeds.keys()):
+
+    if True:
+        met_clust = np.load(
+            clust_metrics_path.joinpath("all_clusts_reordered.npy"), allow_pickle=True
+        ).item()
+        amis = {k: v["normal_no_noise"] for k, v in met_clust["AMI"].items()}
+        new_order = dict(sorted(amis.items(), key=lambda item: item[1], reverse=True))
+
+    for idx, model in enumerate(new_order.keys()):
         label_keys = list(orig_embeds[model]["label_dict"].keys())
         plot_embeds(
             embeds,
@@ -158,7 +170,12 @@ def plot_overview(orig_embeds, reducer, **kwargs):
         ].get_legend_handles_labels()
     else:
         hand, labl = ax[idx // 4, idx % 4].get_legend_handles_labels()
-    fig.legend(hand, labl, fontsize=8, markerscale=15, loc="outside right")
+    # fig.legend(hand, labl, fontsize=12, markerscale=15, loc="outside right")
+    fig.legend(hand, labl, fontsize=9.5, markerscale=30, loc="lower center", ncol=4)
+    for axes, model in zip(ax.flatten(), new_order.keys()):
+        axes.set_title(f"{model.upper()} ({amis[model]:.2f}) ", fontsize=12)
+    fig.tight_layout()
+    fig.subplots_adjust(bottom=0.14)
     return fig
 
 
@@ -204,7 +221,7 @@ def plot_embeds(
     no_noise=False,
     **kwargs,
 ):
-    embeds = reduce_dimensions(
+    embeds = reduce_to_2d(
         orig_embeds, name=reducer, reducer_2d_conf=conf_2d_reduction[0]
     )
 
@@ -213,12 +230,13 @@ def plot_embeds(
         fig.subplots_adjust(right=0.6)
         ax.set_title(f"Embeddings of {model}", fontsize=8)
     else:
-        ax.set_title(model.upper(), fontsize=8)
+        ax.set_title(model.upper(), fontsize=12)
         no_legend = True
 
     if label_by in ["hdbscan", "kmeans"]:
         clusterings = np.load(
-            np_clust_path.joinpath(f"{reducer}_clusterings.npy"), allow_pickle=True
+            np_clust_path.joinpath(f"{reducer}_no_noise_clusterings.npy"),
+            allow_pickle=True,
         ).item()
         clusterings = clusterings[model][label_by]
         label_keys = list(set(clusterings))
@@ -228,8 +246,8 @@ def plot_embeds(
     elif label_by == "ground truth":
         data = embeds[model]["split"]
 
-    cmap = plt.cm.tab10
-    colors = cmap(np.arange(len(data.keys())) % cmap.N)
+    cmap = plt.cm.tab20
+    colors = cmap(np.arange(len(data.keys())) % cmap.N)[::-1]
 
     if no_noise:
         label_keys = [key for key in label_keys if key != "unknown" and key != -1]
@@ -245,7 +263,7 @@ def plot_embeds(
             data[label][:, 1],
             "o",
             label=label,
-            markersize=2,
+            markersize=0.2,
             color=colors[idx],
         )
         ax.set_xticks([])

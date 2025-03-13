@@ -10,6 +10,9 @@ from .classification_utils.linear_probe import (
     LinearProbe,
     train_linear_probe,
     inference_with_linear_probe,
+    KNN,
+    train_knn_probe,
+    inference_with_knn_probe,
 )
 from .classification_utils.evaluation_metrics import compute_task_metrics
 
@@ -42,9 +45,9 @@ def gen_loader_obj(
 def link_embeds_to_wavfiles(model_name, loader_object, data):
     return np.array(
         [
-            (f, f.stem.replace(f"_{model_name}", ".wav"))
+            (f, f.stem.replace(f"_{model_name}", ".flac"))
             for f in loader_object.files
-            if f.stem.replace(f"_{model_name}", ".wav") in list(data.wavfilename)
+            if f.stem.replace(f"_{model_name}", ".flac") in list(data.wavfilename)
         ]
     )
 
@@ -76,9 +79,15 @@ def load_and_clean_data(task_name, model_name, loader_object, **kwargs):
         dataset_path = "bacpipe/evaluation/datasets/embedding_test_files/test_task.csv"
     else:
         dataset_path = task_config["dataset_csv_path"]
+        if True:
+            dataset_path = Path(dataset_path).parent.joinpath(
+                f"{model_name}__task_annotations.csv"
+            )
     data = pd.read_csv(dataset_path)
 
     task_config = define_labels_for_task(data, task_config)
+    if True:
+        return data, None, task_config
 
     data = data[~data.duplicated()]
 
@@ -106,7 +115,7 @@ def evaluate_on_task(task_name, model_name, loader_object, **kwargs):
         .joinpath("metrics")
         .joinpath(f"class_results_{task_name}_{model_name}.yml")
     )
-    if output_file.exists():
+    if False:  # output_file.exists():
         print(
             f"Classification results for {task_name} and {model_name} already "
             "exist. Skipping evaluation."
@@ -133,6 +142,10 @@ def evaluate_on_task(task_name, model_name, loader_object, **kwargs):
     lp = train_linear_probe(lp, train_gen, task_config)
 
     y_pred, y_true, probability_scores = inference_with_linear_probe(lp, test_gen)
+    # lp = KNN(in_dim=embed_size, out_dim=task_config["Num_classes"])
+    # lp = train_knn_probe(lp, train_gen, task_config)
+
+    # y_pred, y_true, probability_scores = inference_with_knn_probe(lp, test_gen)
 
     metrics = compute_task_metrics(
         y_pred, y_true, probability_scores, task_config["label_to_index"]

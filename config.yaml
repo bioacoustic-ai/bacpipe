@@ -9,7 +9,13 @@
 
 # PATHS:
 # define paths for your audio data
-audio_dir :       "bacpipe/evaluation/datasets/audio_test_files"
+# audio_dir :       "bacpipe/evaluation/datasets/audio_test_files"
+# audio_dir :       "/home/siriussound/Data/id_task_data"
+# audio_dir :       "/mnt/swap/Work/Data/dawn chorus California, Oregon, and Washington/annotated_recordings"
+audio_dir :       "/mnt/swap/Work/Data/neotropical coffee farms in Colombia and Costa Rica/soundscape_data" 
+# audio_dir :       "/mnt/swap/Work/Data/dcase_task5/dev_set/Development_Set/Training_Set" 
+# audio_dir :       "/media/siriussound/Extreme SSD/MA/SAMOSAS_VINCENT/EL1_2kHz_March-April"
+# audio_dir :       "/home/siriussound/Data/dcase_task5/6517414/Evaluation_set_5shots"
 
 # CHOOSE FROM MODELS
 available_models : [
@@ -23,6 +29,7 @@ available_models : [
     "avesecho_passt",
     "hbdet",
     "insect66",
+    "insect459",
     "perch_bird",
     "mix2",
     "protoclr",
@@ -35,7 +42,25 @@ available_models : [
 
 # embedding model name
 embedding_model: [
-  "birdnet"
+    "birdnet",
+    "animal2vec_xc",
+    "animal2vec_mk",
+    "audiomae",
+    "aves_especies",
+    "biolingual",
+    "birdaves_especies",
+    "avesecho_passt",
+    # "hbdet",
+    "insect66",
+    "insect459",
+    "perch_bird",
+    # "mix2",
+    "protoclr",
+    # "rcl_fs_bsed",
+    "surfperch",
+    "google_whale",
+    # "vggish",
+    "nonbioaves_especies"
 ]
 
 # dimensionality reduction model name.
@@ -53,4 +78,4 @@ supported_evaluation_tasks: [
   "species",
   "taxon"
 ]
-evaluation_task: None
+evaluation_task: 'species'

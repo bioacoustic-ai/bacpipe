@@ -318,6 +318,12 @@ def plot_overview_metrics(task_name, model_list, overall_metrics):
     cmap = plt.cm.tab10
     cols = cmap(np.arange(num_metrics) % cmap.N)
 
+    d = {m: v["Macro Accuracy"] for m, v in overall_metrics.items()}
+    overall_metrics = dict(
+        sorted(overall_metrics.items(), key=lambda x: d[x[0]], reverse=True)
+    )
+    model_list = list(overall_metrics.keys())
+
     for mod_idx, (model, d) in enumerate(overall_metrics.items()):
         for i, (metric, value) in enumerate(d.items()):
             ax.bar(
@@ -381,6 +387,8 @@ def plot_per_class_metrics(task_name, model_list, per_class_metrics, overall_met
     ]
     extended_markers = base_markers * ((len(model_list) // len(base_markers)) + 1)
 
+    d = {m: v["Macro Accuracy"] for m, v in overall_metrics.items()}
+    model_list = sorted(d, key=d.get, reverse=True)
     all_classes = sorted(per_class_metrics[model_list[0]].keys())
 
     for i, model_name in enumerate(model_list):

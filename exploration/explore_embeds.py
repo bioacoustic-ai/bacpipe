@@ -19,6 +19,8 @@ from sklearn.metrics import adjusted_mutual_info_score as AMI
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+sns.set_theme(style="white")
+
 
 def set_paths(data_path):
     global main_embeds_path
@@ -83,7 +85,7 @@ def apply_labels_to_embeddings(df, label_idx_dict, embed, segment_s, audio_file)
     embed_timestamps = np.arange(embed.shape[0]) * segment_s
 
     assert (
-        df.end.values[-1] < embed_timestamps[-1] + segment_s
+        df.end.values[-1] <= embed_timestamps[-1] + segment_s
     ), f"Timestamps do not match for {audio_file}"
 
     for _, row in df.iterrows():
@@ -110,11 +112,16 @@ def build_split_array_by_labels(
     if label_file:
         audio_file = metadata["files"]["audio_files"][ind]
         df = label_df[label_df.Filename == audio_file]
+
+        if df.empty:
+            all_labels = np.concatenate((all_labels, np.ones(embed.shape[0]) * -1))
+            return embed_dict, all_labels
+
         file_labels = apply_labels_to_embeddings(
             df, label_idx_dict, embed, segment_s, audio_file
         )
-
         all_labels = np.concatenate((all_labels, file_labels))
+
         embed_dict[model]["label_dict"] = label_idx_dict
 
     else:  # if not file then the split is done by the parent folder name
@@ -164,21 +171,27 @@ def concat_embeddings_and_split_by_label(
     return embeddings, all_labels, embed_dict
 
 
-def finalize_split_arrays(label_file, embed_dict, model, all_labels, label_idx_dict):
+def finalize_split_arrays(
+    label_file, embed_dict, model, all_labels, label_idx_dict, remove_noise=False
+):
     embed_dict[model]["split"] = {
         k: embed_dict[model]["all"][all_labels == v] for k, v in label_idx_dict.items()
     }
     embed_dict[model]["labels"] = all_labels
     if label_file:
-        embed_dict[model]["split"].update(
-            {"unknown": embed_dict[model]["all"][all_labels == -1]}
-        )
-        embed_dict[model]["label_dict"].update({"unknown": -1})
+        if remove_noise == False:
+            embed_dict[model]["split"].update(
+                {"unknown": embed_dict[model]["all"][all_labels == -1]}
+            )
+            embed_dict[model]["label_dict"].update({"unknown": -1})
+        else:
+            embed_dict[model]["all"] = embed_dict[model]["all"][all_labels != -1]
+            embed_dict[model]["labels"] = all_labels[all_labels != -1]
 
     return embed_dict
 
 
-def get_original_embeds(models=None, label_file=None):
+def get_original_embeds(models=None, label_file=None, **kwargs):
     if not models:
         models = get_models_in_dir()
 
@@ -224,7 +237,7 @@ def get_original_embeds(models=None, label_file=None):
             embed_dict[model]["all"] = embeddings
 
             embed_dict = finalize_split_arrays(
-                label_file, embed_dict, model, all_labels, label_idx_dict
+                label_file, embed_dict, model, all_labels, label_idx_dict, **kwargs
             )
 
         np.save(np_embeds_path.joinpath("embed_dict.npy"), embed_dict)
@@ -259,7 +272,7 @@ def get_reduced_embeddings_by_label(embed, model, reduc_embeds, label_file=None)
     return reduc_embeds
 
 
-def reduce_dimensions(embeds, name, reducer_2d_conf=None, label_file=None, **kwargs):
+def reduce_to_2d(embeds, name, reducer_2d_conf=None, label_file=None, **kwargs):
     if not np_embeds_path.joinpath(f"{name}_2d.npy").exists():
         reduc_embeds = {}
         for model, embed in tqdm(
@@ -388,13 +401,30 @@ def comppute_reduction(orig_embeddings, name, reducer, **kwargs):
                 processed_embeds[model]["label_dict"] = embed["label_dict"]
             np.save(file, processed_embeds[model])
         else:
-            processed_embeds = {}
-            for model in orig_embeddings.keys():
-                processed_embeds[model] = np.load(
-                    file,
-                    allow_pickle=True,
-                ).item()
+            processed_embeds[model] = np.load(
+                file,
+                allow_pickle=True,
+            ).item()
     return processed_embeds
+
+
+def load_task_results():
+    import yaml
+
+    task_dict = {}
+    for fold in main_embeds_path.parent.joinpath("task_results").iterdir():
+        if fold.is_dir():
+            space = fold.stem.split("__")[-1]
+            cl_type = fold.stem.split("__")[1]
+            if not cl_type in task_dict.keys():
+                task_dict[cl_type] = {}
+            task_dict[cl_type][space] = {}
+            for file in fold.joinpath("metrics").glob("*.yml"):
+                model = file.stem.split("species_")[-1]
+                task_dict[cl_type][space][model] = yaml.load(
+                    open(file, "r"), Loader=yaml.CLoader
+                )["Overall Metrics:"]["Macro Accuracy"]
+    return task_dict
 
 
 def compare(orig_embeddings, remove_noise=False, distances=False, **kwargs):
@@ -421,12 +451,22 @@ def compare(orig_embeddings, remove_noise=False, distances=False, **kwargs):
         else:
             processed_embeds = orig_embeddings
 
-        reduc_2d_embeds = reduce_dimensions(processed_embeds, name, **kwargs)
+        reduc_2d_embeds = reduce_to_2d(processed_embeds, name, **kwargs)
 
         save_2d_embeds_by_model(reduc_2d_embeds, name)
 
         if distances:
             distances = calc_distances(processed_embeds, name)
+
+        from exploration.explore_dashboard import plot_overview
+        import exploration.explore_dashboard
+        import importlib
+
+        importlib.reload(exploration.explore_dashboard)
+        from exploration.explore_dashboard import plot_overview
+
+        fig = plot_overview(processed_embeds, name, no_noise=True)
+        fig.savefig(plot_path.joinpath(f"{name}_overview_kmeans.png"), dpi=300)
 
         if remove_noise:
             name += "_no_noise"
@@ -449,11 +489,8 @@ def compare(orig_embeddings, remove_noise=False, distances=False, **kwargs):
         #     **kwargs,
         # )
         all_clusts.update({name: metrics_embed})
-        # from exploration.explore_dashboard import plot_overview
-        # fig = plot_overview(processed_embeds, 'normal', no_noise=True)
-        # fig.savefig(plot_path.joinpath(f"{name}_overview.png"), dpi=300)
 
-    if not clust_metrics_path.joinpath(f"all_clusts.npy").exists():
+    if not clust_metrics_path.joinpath(f"all_clusts_reordered.npy").exists():
         all_clusts_reordered = {"SS": {}, "AMI": {}, "ARI": {}}
         for model in reduc_2d_embeds.keys():
             all_clusts_reordered["SS"][model] = {
@@ -475,14 +512,252 @@ def compare(orig_embeddings, remove_noise=False, distances=False, **kwargs):
         all_clusts_reordered = np.load(
             clust_metrics_path.joinpath(f"all_clusts_reordered.npy"), allow_pickle=True
         ).item()
-    plot_clustering_by_metric(all_clusts_reordered, reduc_2d_embeds.keys())
+    plot_clustering_by_metric_new(all_clusts_reordered, reduc_2d_embeds.keys())
+    scatterplot_clust_vs_class()
+
+
+def scatterplot_clust_vs_class():
+    sns.set_theme(style="white")
+    met_clust = np.load(
+        clust_metrics_path.joinpath("all_clusts_reordered.npy"), allow_pickle=True
+    ).item()
+    met_class = load_task_results()
+    symbols = {"birds": "x", "nonbirds": "o"}
+    colors = {"supl": "green", "ssl": "red"}
+    mod_type = {
+        "birdnet": "supl-birds",
+        "animal2vec_xc": "ssl-birds",
+        "animal2vec_mk": "ssl-nonbirds",
+        "audiomae": "ssl-nonbirds",
+        "aves_especies": "ssl-nonbirds",
+        "biolingual": "supl-birds",
+        "birdaves_especies": "ssl-birds",
+        "avesecho_passt": "supl-birds",
+        "insect66": "supl-nonbirds",
+        "insect459": "supl-nonbirds",
+        "perch_bird": "supl-birds",
+        "protoclr": "supl-birds",
+        "surfperch": "supl-birds",
+        "google_whale": "supl-nonbirds",
+        "nonbioaves_especies": "ssl-nonbirds",
+    }
+
+    mod_short = {
+        "birdnet": "brdnet",
+        "animal2vec_xc": "a2v_xc",
+        "animal2vec_mk": "a2v_mk",
+        "audiomae": "aud_mae",
+        "aves_especies": "aves",
+        "biolingual": "bioling",
+        "birdaves_especies": "birdaves",
+        "avesecho_passt": "aecho",
+        "insect66": "i66",
+        "insect459": "i459",
+        "perch_bird": "perch",
+        "protoclr": "p_clr",
+        "surfperch": "s_perch",
+        "google_whale": "g_whale",
+        "nonbioaves_especies": "nonbioaves",
+    }
+
+    loc_text = {
+        "birdnet": {"ha": "right", "va": "top"},
+        "animal2vec_xc": {"ha": "left", "va": "bottom"},
+        "animal2vec_mk": {"ha": "left", "va": "bottom"},
+        "audiomae": {"ha": "right", "va": "center"},
+        "aves_especies": {"ha": "left", "va": "bottom"},
+        "biolingual": {"ha": "left", "va": "bottom"},
+        "birdaves_especies": {"ha": "left", "va": "top"},
+        "avesecho_passt": {"ha": "left", "va": "top"},
+        "insect66": {"ha": "right", "va": "bottom"},
+        "insect459": {"ha": "right", "va": "top"},
+        "perch_bird": {"ha": "right", "va": "center"},
+        "protoclr": {"ha": "left", "va": "top"},
+        "surfperch": {"ha": "left", "va": "bottom"},
+        "google_whale": {"ha": "left", "va": "top"},
+        "nonbioaves_especies": {"ha": "left", "va": "top"},
+    }
+
+    loc = {
+        "birdnet": [-0.01, -0.01],
+        "animal2vec_xc": [0.01, 0.01],
+        "animal2vec_mk": [0.01, 0.01],
+        "audiomae": [-0.01, -0.01],
+        "aves_especies": [+0.01, 0],
+        "biolingual": [+0.01, +0.01],
+        "birdaves_especies": [0.01, 0.01],
+        "avesecho_passt": [0.01, 0.01],
+        "insect66": [0.01, 0.01],
+        "insect459": [-0.01, -0.01],
+        "perch_bird": [-0.01, -0.01],
+        "protoclr": [-0.01, -0.01],
+        "surfperch": [+0.01, +0.01],
+        "google_whale": [-0.01, -0.01],
+        "nonbioaves_especies": [+0.01, -0.01],
+    }
+
+    fig, axes = plt.subplots(figsize=(5, 4))
+    plt.subplots_adjust(bottom=0.3)
+    for model in met_clust["AMI"].keys():
+        axes.scatter(
+            [met_class["linear"]["normal"][model]][0],
+            [met_clust["AMI"][model]["normal_no_noise"]][0],
+            label=model,
+            marker=symbols[mod_type[model].split("-")[-1]],
+            color=colors[mod_type[model].split("-")[0]],
+        )
+        plt.text(
+            met_class["linear"]["normal"][model] + loc[model][0],
+            met_clust["AMI"][model]["normal_no_noise"] + loc[model][1],
+            mod_short[model],
+            fontsize=10,
+            **loc_text[model],
+        )
+    axes.scatter([], [], label="supl(birds)", marker="x", color="green")
+    axes.scatter([], [], label="ssl(birds)", marker="x", color="red")
+    axes.scatter([], [], label="supl(non-birds)", marker="o", color="green")
+    axes.scatter([], [], label="ssl(non-birds)", marker="o", color="red")
+    axes.set_xlabel("Lin. Class. Macro Accuracy")
+    axes.set_ylabel("Clustering AMI")
+    hand, label = axes.get_legend_handles_labels()
+    # fig.legend(["supl-birds", "ssl-birds", "supl-nonbirds", "ssl-nonbirds"], loc="upper right")
+    fig.legend(hand[-4:], label[-4:], ncol=2, loc="lower center")
+    # fig.legend(hand, label, loc="upper right")
+    fig.savefig(plot_path.joinpath(f"scatterplot_clust_vs_class.png"), dpi=600)
+
+    fig, axes = plt.subplots(figsize=(5, 4))
+    plt.subplots_adjust(bottom=0.3)
+    for model in met_clust["AMI"].keys():
+        axes.scatter(
+            [met_class["knn"]["normal"][model]][0],
+            [met_clust["AMI"][model]["normal_no_noise"]][0],
+            label=model,
+            marker=symbols[mod_type[model].split("-")[-1]],
+            color=colors[mod_type[model].split("-")[0]],
+        )
+        axes.scatter(
+            [met_class["knn"]["umap_300"][model]][0],
+            [met_clust["AMI"][model]["umap_300_no_noise"]][0],
+            label=model,
+            marker=symbols[mod_type[model].split("-")[-1]],
+            color="k",
+        )
+        axes.plot(
+            [met_class["knn"]["normal"][model], met_class["knn"]["umap_300"][model]],
+            [
+                met_clust["AMI"][model]["normal_no_noise"],
+                met_clust["AMI"][model]["umap_300_no_noise"],
+            ],
+            "--",
+            color="gray",
+            label=model,
+        )
+        plt.text(
+            met_class["knn"]["normal"][model] + loc[model][0],
+            met_clust["AMI"][model]["normal_no_noise"] + loc[model][1],
+            mod_short[model],
+            fontsize=10,
+            **loc_text[model],
+        )
+    axes.scatter([], [], label="supl(birds)", marker="x", color="green")
+    axes.scatter([], [], label="ssl(birds)", marker="x", color="red")
+    axes.scatter([], [], label="supl(non-birds)", marker="o", color="green")
+    axes.scatter([], [], label="ssl(non-birds)", marker="o", color="red")
+    axes.scatter([], [], marker="x", label="pca 300", color="black")
+    axes.scatter([], [], marker="o", label="pca 300", color="black")
+    axes.set_xlabel("Lin. Class. Macro Accuracy")
+    axes.set_ylabel("Clustering AMI")
+    hand, label = axes.get_legend_handles_labels()
+    # fig.legend(["supl-birds", "ssl-birds", "supl-nonbirds", "ssl-nonbirds"], loc="upper right")
+    fig.legend(hand[-6:], label[-6:], ncol=3, loc="lower center")
+    # fig.legend(hand, label, loc="upper right")
+    fig.savefig(
+        plot_path.joinpath(f"scatterplot_clust_vs_class_with_knn_umap.png"), dpi=600
+    )
+
+
+def plot_clustering_by_metric_new(all_clusts_reordered, models):
+    fig, axes = plt.subplots(2, 3, figsize=(20, 10))
+    plt.subplots_adjust(right=0.9)
+
+    sort_dict = {
+        m: v["normal_no_noise"] for m, v in all_clusts_reordered["AMI"].items()
+    }
+    sort_dict = dict(sorted(sort_dict.items(), key=lambda x: x[-1], reverse=True))
+    models = list(sort_dict.keys())
+
+    cmap = plt.cm.tab20
+    colors = cmap(np.arange(len(models)) % cmap.N)
+    for axes_row, metric in zip(axes, ["AMI", "ARI"]):
+        for axes, met in zip(axes_row, ["normal", "pca", "umap"]):
+            # for axes, met in zip(axes_row, ["normal", "pca", "spca", "umap", "umap_bars"]):
+            for idx, model in enumerate(sort_dict.keys()):
+                # order = [
+                #     "normal",
+                #     "pca_50",
+                #     "pca_100",
+                #     "spca_50",
+                #     "spca_100",
+                #     "umap_50",
+                #     "umap_100",
+                # ]
+                if met == "normal":
+                    values = all_clusts_reordered[metric][model][met + "_no_noise"]
+                    axes.bar(
+                        idx / len(models),
+                        values,
+                        width=1 / len(models),
+                        color=colors[idx],
+                        label=model,
+                    )
+                    if metric == "AMI":
+                        axes.set_title("Orig. Embedding")
+                        axes.set_xticks([])
+                    else:
+                        axes.set_xticks([])
+                    axes.set_ylabel(metric)
+                # elif met == 'umap_bars':
+                else:
+                    # values = all_clusts_reordered[metric][model]['umap_100_no_noise']
+                    values = all_clusts_reordered[metric][model][met + "_300_no_noise"]
+                    axes.bar(
+                        idx / len(models),
+                        values,
+                        width=1 / len(models),
+                        color=colors[idx],
+                        label=model,
+                    )
+                    if metric == "AMI":
+                        axes.set_title(met.upper() + " 300")
+                        axes.set_xticks([])
+                    else:
+                        axes.set_xticks([])
+                # else:
+                #     # values = [all_clusts_reordered[metric][model][met+ii+'_no_noise'] for ii in ["_50", "_100"]]
+                #     values = [all_clusts_reordered[metric][model][met+'_'+ii+'_no_noise'] for ii in ["300"]]
+                #     values = np.array(values)/all_clusts_reordered[metric][model]['normal_no_noise']
+                #     axes.plot(values, "-x", color=colors[idx], label=model)
+                #     axes.set_ylim([0.45, 2.5])
+                #     axes.hlines(1, 0, 1, linestyles="dashed", color="black", linewidth=1.5)
+                #     if metric == 'AMI':
+                #         axes.set_title(met.upper() + ' perc. change')
+                #         axes.set_xticks([])
+                #     else:
+                #         axes.set_xticks(np.arange(1))
+                #         # axes.set_xticklabels([met+'_50', met+'_100'], rotation=45, ha="right")
+                #         axes.set_xticklabels([met+'_300'], rotation=45, ha="right")
+
+    plt.show()
+    fig.legend(models, loc="outside right")
+    fig.savefig(plot_path.joinpath(f"clustering_by_metriccc.png"), dpi=300)
 
 
 def plot_clustering_by_metric(all_clusts_reordered, models):
     fig, axes = plt.subplots(3, 1, figsize=(20, 10))
+    plt.subplots_adjust(right=0.8)
 
-    cmap = plt.cm.tab10
-    colors = cmap(np.arange(len(models)) % cmap.N)
+    cmap = plt.cm.tab20
+    colors = cmap(np.arange(len(models)) % cmap.N)[::-1]
     for axes, metric in zip(axes.flatten(), ["SS", "AMI", "ARI"]):
         for idx, model in enumerate(models):
             order = [
@@ -494,12 +769,17 @@ def plot_clustering_by_metric(all_clusts_reordered, models):
                 "umap_50",
                 "umap_100",
             ]
-            values = [all_clusts_reordered[metric][model][run] for run in order]
+            values = [
+                all_clusts_reordered[metric][model][run + "_no_noise"] for run in order
+            ]
+            # values = np.array(values)/values[0]
             axes.plot(values, "-x", color=colors[idx], label=model)
         axes.set_ylabel(metric)
         axes.set_xticks(np.arange(len(order)))
         axes.set_xticklabels(order, rotation=45, ha="right")
     plt.show()
+    fig.legend(models, loc="outside right")
+    fig.savefig(plot_path.joinpath(f"clustering_by_metric.png"), dpi=300)
 
 
 def save_2d_embeds_by_model(reduc_embeds, name):

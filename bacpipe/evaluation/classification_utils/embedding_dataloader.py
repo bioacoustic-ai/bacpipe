@@ -41,31 +41,62 @@ class EmbeddingTaskLoader(Dataset):
 
         self.features_folder = loader_object.embed_dir
         self.embed2wavfile_mapper = embed2wavfile_mapper
-        self.sound_files = list(self.dataset.wavfilename)
+        if False:
+            self.sound_files = list(self.dataset.wavfilename)
         self.pretrained_model_name = pretrained_model_name
         self.labels = list(self.dataset[target_labels])
         self.label2index = label2index
         if REDUCED_EMBEDS:
-            p = list(
-                Path(path_settings["dim_reduc_parent_dir"]).glob(
-                    f"*{pretrained_model_name}*/*.npy"
-                )
-            )[-1]
-            self.all_embeds = np.load(p, allow_pickle=True).item()
+            if False:
+                p = list(
+                    Path(path_settings["dim_reduc_parent_dir"]).glob(
+                        f"*{pretrained_model_name}*/*.npy"
+                    )
+                )[-1]
+                self.all_embeds = np.load(p, allow_pickle=True).item()
+            else:
+                # p = '/home/siriussound/Code/bacpipe/exploration/neotropic_dawn_chorus/numpy_embeddings/embed_dict.npy'
+                # all_embeds = np.load(p, allow_pickle=True).item()[pretrained_model_name]['split']
+                # self.all_embeds = np.concatenate(list(all_embeds.values()))
+                # all_labels = np.concatenate(
+                #     [np.array([k] * v.shape[0]) for k, v in all_embeds.items()]
+                # )
+                # assert np.all(all_labels == partition_dataframe.species), (
+                #     "The labels in the embeddings file do not match the labels in the task annotations."
+                # )
+
+                # p = '/home/siriussound/Code/bacpipe/exploration/neotropic_dawn_chorus/numpy_embeddings/embed_dict.npy'
+                # all_embeds = np.load(p, allow_pickle=True).item()[pretrained_model_name]
+                p = f"/home/siriussound/Code/bacpipe/exploration/neotropic_dawn_chorus/numpy_embeddings/umap_300/umap_300_{pretrained_model_name}.npy"
+                all_embeds = np.load(p, allow_pickle=True).item()
+                self.all_embeds = all_embeds["all"]
+                ind2lab = {v: k for k, v in all_embeds["label_dict"].items()}
+                labs = [ind2lab[i] for i in all_embeds["labels"]]
+                assert np.all(
+                    labs == partition_dataframe.species
+                ), "The labels in the embeddings file do not match the labels in the task annotations."
+                self.dataset = self.dataset.sample(frac=1, random_state=42)
+                self.labels = list(self.dataset[target_labels])
 
     def __len__(self):
         return len(self.dataset)
 
     def __getitem__(self, idx):
-        sound_file = self.sound_files[idx]
-        embd_idx = np.where(self.embed2wavfile_mapper[:, 1] == sound_file)[0][0]
-        embed_file = self.embed2wavfile_mapper[embd_idx, 0]
-
-        if not REDUCED_EMBEDS:
-            X = np.load(embed_file)
+        if True:
+            X = self.all_embeds[self.dataset.index[idx]]
+            X = X.reshape(1, -1)
         else:
-            index_file = sound_file.replace(".wav", f"_{self.pretrained_model_name}")
-            X = self.all_embeds[index_file]
+            sound_file = self.sound_files[idx]
+            embd_idx = np.where(self.embed2wavfile_mapper[:, 1] == sound_file)[0][0]
+            embed_file = self.embed2wavfile_mapper[embd_idx, 0]
+
+            if not REDUCED_EMBEDS:
+                X = np.load(embed_file)
+            else:
+                index_file = sound_file.replace(
+                    ".wav", f"_{self.pretrained_model_name}"
+                )
+                X = self.all_embeds[index_file]
 
         if X.shape[0] > 1:
             X = np.mean(X, axis=0)
@@ -73,7 +104,7 @@ class EmbeddingTaskLoader(Dataset):
             X = X.flatten()
         y = self.label2index[self.labels[idx]]
 
-        return X, y, self.labels[idx], embed_file.stem
+        return X, y
 
 
 # TODO handle different embedding sizes
