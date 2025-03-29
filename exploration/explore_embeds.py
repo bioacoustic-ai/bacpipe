@@ -19,7 +19,7 @@ from sklearn.metrics import adjusted_mutual_info_score as AMI
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-sns.set_theme(style="white")
+# sns.set_theme(style="white")
 
 
 def set_paths(data_path):
@@ -80,18 +80,31 @@ def concat_embeddings(ind, cumulative_embeddings, file_embeddings):
     return cumulative_embeddings
 
 
-def apply_labels_to_embeddings(df, label_idx_dict, embed, segment_s, audio_file):
+def apply_labels_to_embeddings(
+    df, label_idx_dict, embed, segment_s, audio_file, single_label=True
+):
     file_labels = np.ones(embed.shape[0]) * -1
     embed_timestamps = np.arange(embed.shape[0]) * segment_s
+    if single_label:
+        single_label_arr = [True] * len(embed_timestamps)
 
-    assert (
-        df.end.values[-1] <= embed_timestamps[-1] + segment_s
-    ), f"Timestamps do not match for {audio_file}"
+    # assert (
+    #     df.end.values[-1] <= embed_timestamps[-1] + segment_s*2
+    # ), f"Timestamps do not match for {audio_file}"
 
     for _, row in df.iterrows():
         em_start = np.argmin(np.abs(embed_timestamps - row.start))
         em_end = np.argmin(np.abs(embed_timestamps - row.end))
-        file_labels[em_start:em_end] = label_idx_dict[row.label]
+        if single_label:
+            if (
+                not all(file_labels[em_start:em_end] == -1)
+                and not label_idx_dict[row.label] in file_labels[em_start:em_end]
+            ):
+                single_label_arr[em_start:em_end] = [False] * (em_end - em_start)
+        if row.end - row.start > 0.65:  # 0.33*segment_s:
+            file_labels[em_start:em_end] = label_idx_dict[row.label]
+    if single_label:
+        file_labels[~np.array(single_label_arr)] = -2
     return file_labels
 
 
@@ -111,7 +124,9 @@ def build_split_array_by_labels(
 ):
     if label_file:
         audio_file = metadata["files"]["audio_files"][ind]
-        df = label_df[label_df.Filename == audio_file]
+        if "/" in audio_file:
+            audio_file = Path(audio_file).stem + Path(audio_file).suffix
+        df = label_df[label_df.audiofilename == audio_file]
 
         if df.empty:
             all_labels = np.concatenate((all_labels, np.ones(embed.shape[0]) * -1))
@@ -123,6 +138,34 @@ def build_split_array_by_labels(
         all_labels = np.concatenate((all_labels, file_labels))
 
         embed_dict[model]["label_dict"] = label_idx_dict
+
+        if np.unique(file_labels).shape[0] > 3:
+            embed_timestamps = np.arange(embed.shape[0]) * segment_s
+            path = (
+                np_embeds_path.parent.joinpath("annotations")
+                .joinpath("raven_tables_for_sanity_check")
+                .joinpath(model)
+            )
+            path.mkdir(exist_ok=True, parents=True)
+            if (
+                len(list(path.iterdir())) < 10
+            ):  # make sure to only do this a handful of times
+                df_file_gt = label_df[label_df.audiofilename == audio_file]
+                df_file_fit = pd.DataFrame()
+                df_file_fit["start"] = embed_timestamps[file_labels > -1]
+                df_file_fit["end"] = embed_timestamps[file_labels > -1] + segment_s
+                inv = {v: k for k, v in label_idx_dict.items()}
+                df_file_fit["label"] = [inv[i] for i in file_labels[file_labels > -1]]
+                raven_gt = create_Raven_annotation_table(df_file_gt)
+                raven_fit = create_Raven_annotation_table(df_file_fit)
+                raven_fit["Low Freq (Hz)"] = 1500
+                raven_fit["High Freq (Hz)"] = 2000
+                raven_gt.to_csv(
+                    path.joinpath(f"{audio_file}_gt.txt"), sep="\t", index=False
+                )
+                raven_fit.to_csv(
+                    path.joinpath(f"{audio_file}_fit.txt"), sep="\t", index=False
+                )
 
     else:  # if not file then the split is done by the parent folder name
         # if not file.parent.stem in embed_dict[model]["label_dict"].keys():
@@ -138,6 +181,19 @@ def build_split_array_by_labels(
     return embed_dict, all_labels
 
 
+def create_Raven_annotation_table(df):
+    df.index = np.arange(1, len(df) + 1)
+    raven_df = pd.DataFrame()
+    raven_df["Selection"] = df.index
+    raven_df.index = np.arange(1, len(df) + 1)
+    raven_df["Begin Time (s)"] = df.start
+    raven_df["End Time (s)"] = df.end
+    raven_df["High Freq (Hz)"] = 1000
+    raven_df["Low Freq (Hz)"] = 0
+    raven_df["Label"] = df.label
+    return raven_df
+
+
 def concat_embeddings_and_split_by_label(
     files, model, embed_dict, segment_s, metadata, label_file, label_df, label_idx_dict
 ):
@@ -146,9 +202,8 @@ def concat_embeddings_and_split_by_label(
 
     for ind, file in tqdm(
         enumerate(files),
-        desc="Loading embeddings and split by labels",
-        position=1,
-        leave=True,
+        desc=f"Loading {model} embeddings and split by labels",
+        leave=False,
     ):
         file_embeds = np.load(file)
         embed_dict, all_labels = build_split_array_by_labels(
@@ -172,7 +227,13 @@ def concat_embeddings_and_split_by_label(
 
 
 def finalize_split_arrays(
-    label_file, embed_dict, model, all_labels, label_idx_dict, remove_noise=False
+    label_file,
+    embed_dict,
+    model,
+    all_labels,
+    label_idx_dict,
+    remove_noise=False,
+    single_label=True,
 ):
     embed_dict[model]["split"] = {
         k: embed_dict[model]["all"][all_labels == v] for k, v in label_idx_dict.items()
@@ -185,8 +246,12 @@ def finalize_split_arrays(
             )
             embed_dict[model]["label_dict"].update({"unknown": -1})
         else:
-            embed_dict[model]["all"] = embed_dict[model]["all"][all_labels != -1]
-            embed_dict[model]["labels"] = all_labels[all_labels != -1]
+            if single_label:
+                embed_dict[model]["all"] = embed_dict[model]["all"][all_labels > -1]
+                embed_dict[model]["labels"] = all_labels[all_labels > -1]
+            else:
+                embed_dict[model]["all"] = embed_dict[model]["all"][all_labels != -1]
+                embed_dict[model]["labels"] = all_labels[all_labels != -1]
 
     return embed_dict
 
@@ -210,7 +275,6 @@ def get_original_embeds(models=None, label_file=None, **kwargs):
         for model, path in tqdm(
             zip(models, paths),
             desc="Organize embeddings and concatenate them",
-            position=0,
             leave=False,
         ):
             files = list(path.rglob("*.npy"))
@@ -273,7 +337,7 @@ def get_reduced_embeddings_by_label(embed, model, reduc_embeds, label_file=None)
 
 
 def reduce_to_2d(embeds, name, reducer_2d_conf=None, label_file=None, **kwargs):
-    if not np_embeds_path.joinpath(f"{name}_2d.npy").exists():
+    if not np_embeds_path.joinpath(f"{name}.npy").exists():
         reduc_embeds = {}
         for model, embed in tqdm(
             embeds.items(),
@@ -292,10 +356,10 @@ def reduce_to_2d(embeds, name, reducer_2d_conf=None, label_file=None, **kwargs):
 
             reduc_embeds[model]["labels"] = embed["labels"]
 
-        np.save(np_embeds_path.joinpath(f"{name}_2d.npy"), reduc_embeds)
+        np.save(np_embeds_path.joinpath(f"{name}.npy"), reduc_embeds)
     else:
         reduc_embeds = np.load(
-            np_embeds_path.joinpath(f"{name}_2d.npy"), allow_pickle=True
+            np_embeds_path.joinpath(f"{name}.npy"), allow_pickle=True
         ).item()
     return reduc_embeds
 
@@ -408,11 +472,15 @@ def comppute_reduction(orig_embeddings, name, reducer, **kwargs):
     return processed_embeds
 
 
-def load_task_results():
+def load_task_results(path=None):
     import yaml
 
     task_dict = {}
-    for fold in main_embeds_path.parent.joinpath("task_results").iterdir():
+    if not path:
+        path = main_embeds_path
+    path = path.parent.joinpath("task_results")
+    path.mkdir(exist_ok=True, parents=True)
+    for fold in path.iterdir():
         if fold.is_dir():
             space = fold.stem.split("__")[-1]
             cl_type = fold.stem.split("__")[1]
@@ -521,9 +589,23 @@ def scatterplot_clust_vs_class():
     met_clust = np.load(
         clust_metrics_path.joinpath("all_clusts_reordered.npy"), allow_pickle=True
     ).item()
+    met_clust_nt = np.load(
+        clust_metrics_path.parent.parent.joinpath(
+            "neotropic_dawn_chorus/cluster_metrics"
+        ).joinpath("all_clusts_reordered.npy"),
+        allow_pickle=True,
+    ).item()
+    color = ["#D81B60", "#1E88E5", "#D8501B", "#4F1EE5"]
     met_class = load_task_results()
+    met_class_nt = load_task_results(
+        path=main_embeds_path.parent.parent.joinpath("neotropic_dawn_chorus/embeddings")
+    )
     symbols = {"birds": "x", "nonbirds": "o"}
-    colors = {"supl": "green", "ssl": "red"}
+    colors = {
+        "bird": {"supl": color[0], "ssl": color[1]},
+        "frog": {"supl": color[2], "ssl": color[3]},
+    }
+    # colors = {"supl": color[0], "ssl": color[1]}
     mod_type = {
         "birdnet": "supl-birds",
         "animal2vec_xc": "ssl-birds",
@@ -561,119 +643,310 @@ def scatterplot_clust_vs_class():
     }
 
     loc_text = {
-        "birdnet": {"ha": "right", "va": "top"},
-        "animal2vec_xc": {"ha": "left", "va": "bottom"},
-        "animal2vec_mk": {"ha": "left", "va": "bottom"},
-        "audiomae": {"ha": "right", "va": "center"},
-        "aves_especies": {"ha": "left", "va": "bottom"},
-        "biolingual": {"ha": "left", "va": "bottom"},
+        "birdnet": {"ha": "left", "va": "top"},
+        "animal2vec_xc": {"ha": "left", "va": "center"},
+        "animal2vec_mk": {"ha": "left", "va": "center"},
+        "audiomae": {"ha": "left", "va": "bottom"},
+        "aves_especies": {"ha": "left", "va": "center"},
+        "biolingual": {"ha": "left", "va": "top"},
         "birdaves_especies": {"ha": "left", "va": "top"},
-        "avesecho_passt": {"ha": "left", "va": "top"},
-        "insect66": {"ha": "right", "va": "bottom"},
-        "insect459": {"ha": "right", "va": "top"},
-        "perch_bird": {"ha": "right", "va": "center"},
-        "protoclr": {"ha": "left", "va": "top"},
+        "avesecho_passt": {"ha": "right", "va": "top"},
+        "insect66": {"ha": "right", "va": "top"},
+        "insect459": {"ha": "left", "va": "top"},
+        "perch_bird": {"ha": "left", "va": "center"},
+        "protoclr": {"ha": "left", "va": "center"},
         "surfperch": {"ha": "left", "va": "bottom"},
-        "google_whale": {"ha": "left", "va": "top"},
+        "google_whale": {"ha": "left", "va": "bottom"},
         "nonbioaves_especies": {"ha": "left", "va": "top"},
     }
 
     loc = {
-        "birdnet": [-0.01, -0.01],
-        "animal2vec_xc": [0.01, 0.01],
-        "animal2vec_mk": [0.01, 0.01],
-        "audiomae": [-0.01, -0.01],
+        "birdnet": [+0.01, -0.01],
+        "animal2vec_xc": [0.01, -0.01],
+        "animal2vec_mk": [0.01, 0],
+        "audiomae": [+0.01, +0.01],
         "aves_especies": [+0.01, 0],
-        "biolingual": [+0.01, +0.01],
-        "birdaves_especies": [0.01, 0.01],
-        "avesecho_passt": [0.01, 0.01],
-        "insect66": [0.01, 0.01],
-        "insect459": [-0.01, -0.01],
-        "perch_bird": [-0.01, -0.01],
-        "protoclr": [-0.01, -0.01],
-        "surfperch": [+0.01, +0.01],
-        "google_whale": [-0.01, -0.01],
+        "avesecho_passt": [-0.01, 0],
+        "biolingual": [+0, -0.01],
+        "birdaves_especies": [0.01, -0.01],
+        "insect66": [-0.01, 0],
+        "insect459": [+0.01, -0],
+        "perch_bird": [+0.01, -0],
+        "protoclr": [0.01, -0.01],
+        "surfperch": [+0.01, +0],
+        "google_whale": [+0.01, +0],
         "nonbioaves_especies": [+0.01, -0.01],
     }
 
     fig, axes = plt.subplots(figsize=(5, 4))
     plt.subplots_adjust(bottom=0.3)
-    for model in met_clust["AMI"].keys():
+    for model in met_clust_nt["AMI"].keys():
         axes.scatter(
-            [met_class["linear"]["normal"][model]][0],
-            [met_clust["AMI"][model]["normal_no_noise"]][0],
+            [met_class_nt["knn"]["normal"][model]][0],
+            [met_clust_nt["AMI"][model]["normal_no_noise"]][0],
             label=model,
             marker=symbols[mod_type[model].split("-")[-1]],
-            color=colors[mod_type[model].split("-")[0]],
+            color=colors["bird"][mod_type[model].split("-")[0]],
         )
         plt.text(
-            met_class["linear"]["normal"][model] + loc[model][0],
-            met_clust["AMI"][model]["normal_no_noise"] + loc[model][1],
+            met_class_nt["knn"]["normal"][model] + loc[model][0],
+            met_clust_nt["AMI"][model]["normal_no_noise"] + loc[model][1],
             mod_short[model],
             fontsize=10,
             **loc_text[model],
         )
-    axes.scatter([], [], label="supl(birds)", marker="x", color="green")
-    axes.scatter([], [], label="ssl(birds)", marker="x", color="red")
-    axes.scatter([], [], label="supl(non-birds)", marker="o", color="green")
-    axes.scatter([], [], label="ssl(non-birds)", marker="o", color="red")
-    axes.set_xlabel("Lin. Class. Macro Accuracy")
+    axes.scatter([], [], label="supl(birds)", marker="x", color=color[0])
+    axes.scatter([], [], label="ssl(birds)", marker="x", color=color[1])
+    axes.scatter([], [], label="supl(non-birds)", marker="o", color=color[0])
+    axes.scatter([], [], label="ssl(non-birds)", marker="o", color=color[1])
+    axes.set_xlabel("kNN. Class. Macro Accuracy")
     axes.set_ylabel("Clustering AMI")
+    axes.spines["top"].set_visible(False)
+    axes.spines["right"].set_visible(False)
     hand, label = axes.get_legend_handles_labels()
     # fig.legend(["supl-birds", "ssl-birds", "supl-nonbirds", "ssl-nonbirds"], loc="upper right")
     fig.legend(hand[-4:], label[-4:], ncol=2, loc="lower center")
     # fig.legend(hand, label, loc="upper right")
-    fig.savefig(plot_path.joinpath(f"scatterplot_clust_vs_class.png"), dpi=600)
+    fig.savefig(
+        plot_path.joinpath(f"scatterplot_clust_vs_class_nt_knn_normal.png"), dpi=600
+    )
 
+    reduc = "normal"
     fig, axes = plt.subplots(figsize=(5, 4))
     plt.subplots_adjust(bottom=0.3)
     for model in met_clust["AMI"].keys():
         axes.scatter(
-            [met_class["knn"]["normal"][model]][0],
-            [met_clust["AMI"][model]["normal_no_noise"]][0],
+            [met_class_nt["knn"][f"{reduc}"][model]][0],
+            [met_clust_nt["AMI"][model][f"{reduc}_no_noise"]][0],
             label=model,
             marker=symbols[mod_type[model].split("-")[-1]],
-            color=colors[mod_type[model].split("-")[0]],
+            color=colors["bird"][mod_type[model].split("-")[0]],
+            # s=40,
+            # color="k",
         )
         axes.scatter(
-            [met_class["knn"]["umap_300"][model]][0],
-            [met_clust["AMI"][model]["umap_300_no_noise"]][0],
+            [met_class["knn"][f"{reduc}"][model]][0],
+            [met_clust["AMI"][model][f"{reduc}_no_noise"]][0],
             label=model,
             marker=symbols[mod_type[model].split("-")[-1]],
+            # color=colors['bird'][mod_type[model].split("-")[0]],
             color="k",
+            # s=12,
         )
-        axes.plot(
-            [met_class["knn"]["normal"][model], met_class["knn"]["umap_300"][model]],
-            [
-                met_clust["AMI"][model]["normal_no_noise"],
-                met_clust["AMI"][model]["umap_300_no_noise"],
-            ],
-            "--",
+        axes.arrow(
+            met_class_nt["knn"][f"{reduc}"][model],
+            met_clust_nt["AMI"][model][f"{reduc}_no_noise"],
+            met_class["knn"][f"{reduc}"][model]
+            - met_class_nt["knn"][f"{reduc}"][model],
+            met_clust["AMI"][model][f"{reduc}_no_noise"]
+            - met_clust_nt["AMI"][model][f"{reduc}_no_noise"],
             color="gray",
-            label=model,
+            length_includes_head=True,
+            head_width=0.007,
+            head_length=0.011,
+            linewidth=0.5,
         )
         plt.text(
-            met_class["knn"]["normal"][model] + loc[model][0],
-            met_clust["AMI"][model]["normal_no_noise"] + loc[model][1],
+            met_class_nt["knn"][f"{reduc}"][model] + loc[model][0],
+            met_clust_nt["AMI"][model][f"{reduc}_no_noise"] + loc[model][1],
             mod_short[model],
             fontsize=10,
             **loc_text[model],
         )
-    axes.scatter([], [], label="supl(birds)", marker="x", color="green")
-    axes.scatter([], [], label="ssl(birds)", marker="x", color="red")
-    axes.scatter([], [], label="supl(non-birds)", marker="o", color="green")
-    axes.scatter([], [], label="ssl(non-birds)", marker="o", color="red")
-    axes.scatter([], [], marker="x", label="pca 300", color="black")
-    axes.scatter([], [], marker="o", label="pca 300", color="black")
-    axes.set_xlabel("Lin. Class. Macro Accuracy")
+    axes.scatter([], [], label="supl(bird)", marker="x", color=color[0])
+    axes.scatter([], [], label="ssl(bird)", marker="x", color=color[1])
+    axes.scatter([], [], label="supl(non-bird)", marker="o", color=color[0])
+    axes.scatter([], [], label="ssl(non-bird)", marker="o", color=color[1])
+    axes.scatter([], [], marker="x", label="frog data(bird)", color="black")
+    axes.scatter([], [], marker="o", label="frog data(non-bird)", color="black")
+    axes.set_xlabel("kNN. Class. Macro Accuracy")
     axes.set_ylabel("Clustering AMI")
+    axes.spines["top"].set_visible(False)
+    axes.spines["right"].set_visible(False)
     hand, label = axes.get_legend_handles_labels()
     # fig.legend(["supl-birds", "ssl-birds", "supl-nonbirds", "ssl-nonbirds"], loc="upper right")
-    fig.legend(hand[-6:], label[-6:], ncol=3, loc="lower center")
+    fig.legend(hand[-6:], label[-6:], ncol=3, loc="lower center", columnspacing=0.7)
     # fig.legend(hand, label, loc="upper right")
     fig.savefig(
-        plot_path.joinpath(f"scatterplot_clust_vs_class_with_knn_umap.png"), dpi=600
+        plot_path.joinpath(f"scatterplot_clust_vs_class_neotrop_anuran_{reduc}.png"),
+        dpi=600,
     )
+
+    ### get values for table
+    d, d_std = {}, {}
+    reduc = "pca_300"
+    d[reduc], d_std[reduc] = get_table_metrics(
+        reduc, met_class, met_clust, met_class_nt, met_clust_nt
+    )
+    mets = {"means": d, "stds": d_std}
+    with open(plot_path.joinpath("clustering_summary.yml"), "w") as f:
+        yaml.dump(d, f)
+
+
+f"""
+    ssl & {d['normal']['nt']['ssl']['class']}& {d['umap_300']['nt']['ssl']['class']}& {d['pca_300']['nt']['ssl']['class']} \\
+    supl & {d['normal']['nt']['subl']['class']}& {d['umap_300']['nt']['subl']['class']}& {d['pca_300']['nt']['subl']['class']} \\
+    bird & {d['normal']['nt']['bird']['class']}& {d['umap_300']['nt']['bird']['class']}& {d['pca_300']['nt']['bird']['class']} \\
+    non-bird & {d['normal']['nt']['nonbird']['class']}& {d['umap_300']['nt']['nonbird']['class']}& {d['pca_300']['nt']['nonbird']['class']} \\
+    \hline
+        
+    \hline
+    ssl & {d['normal']['nt']['ssl']['clust']}& {d['umap_300']['nt']['ssl']['clust']}& {d['pca_300']['nt']['ssl']['clust']} \\
+    supl & {d['normal']['nt']['subl']['clust']}& {d['umap_300']['nt']['subl']['clust']}& {d['pca_300']['nt']['subl']['clust']} \\
+    bird & {d['normal']['nt']['bird']['clust']}& {d['umap_300']['nt']['bird']['clust']}& {d['pca_300']['nt']['bird']['clust']} \\
+    non-bird & {d['normal']['nt']['nonbird']['clust']}& {d['umap_300']['nt']['nonbird']['clust']}& {d['pca_300']['nt']['nonbird']['clust']} \\
+    \hline
+        
+    \hline
+    category &
+    original &
+    umap &
+    pca \\
+    \hline
+    ssl & {d['normal']['frog']['ssl']['class']}& {d['umap_300']['frog']['ssl']['class']}& {d['pca_300']['frog']['ssl']['class']} \\
+    supl & {d['normal']['frog']['subl']['class']}& {d['umap_300']['frog']['subl']['class']}& {d['pca_300']['frog']['subl']['class']} \\
+    bird & {d['normal']['frog']['bird']['class']}& {d['umap_300']['frog']['bird']['class']}& {d['pca_300']['frog']['bird']['class']} \\
+    non-bird & {d['normal']['frog']['nonbird']['class']}& {d['umap_300']['frog']['nonbird']['class']}& {d['pca_300']['frog']['nonbird']['class']} \\
+    \hline
+        
+    \hline
+    ssl & {d['normal']['frog']['ssl']['clust']}& {d['umap_300']['frog']['ssl']['clust']}& {d['pca_300']['frog']['ssl']['clust']} \\
+    supl & {d['normal']['frog']['subl']['clust']}& {d['umap_300']['frog']['subl']['clust']}& {d['pca_300']['frog']['subl']['clust']} \\
+    bird & {d['normal']['frog']['bird']['clust']}& {d['umap_300']['frog']['bird']['clust']}& {d['pca_300']['frog']['bird']['clust']} \\
+    non-bird & {d['normal']['frog']['nonbird']['clust']}& {d['umap_300']['frog']['nonbird']['clust']}& {d['pca_300']['frog']['nonbird']['clust']} \\
+"""
+
+
+def get_table_metrics(reduc, met_class, met_clust, met_class_nt, met_clust_nt):
+    class_nt = met_class_nt["linear"][f"{reduc}"]
+    clust_nt = {
+        k: float(v[f"{reduc}_no_noise"]) for k, v in met_clust_nt["AMI"].items()
+    }
+    class_frog = met_class["linear"][f"{reduc}"]
+    clust_frog = {k: float(v[f"{reduc}_no_noise"]) for k, v in met_clust["AMI"].items()}
+
+    ssl_mods = [
+        "animal2vec_mk",
+        "audiomae",
+        "aves_especies",
+        "animal2vec_xc",
+        "birdaves_especies",
+        "nonbioaves_especies",
+    ]
+    supl_mods = [
+        "birdnet",
+        "biolingual",
+        "avesecho_passt",
+        "insect66",
+        "insect459",
+        "perch_bird",
+        "protoclr",
+        "surfperch",
+        "google_whale",
+    ]
+
+    bird = [
+        "birdnet",
+        "biolingual",
+        "birdaves_especies",
+        "avesecho_passt",
+        "perch_bird",
+        "protoclr",
+        "surfperch",
+        "animal2vec_xc",
+    ]
+
+    nonbird = [
+        "animal2vec_mk",
+        "audiomae",
+        "aves_especies",
+        "google_whale",
+        "nonbioaves_especies",
+        "insect66",
+        "insect459",
+    ]
+    d = {
+        "frog": {
+            "ssl": {
+                "clust": float(np.round(np.mean([clust_frog[m] for m in ssl_mods]), 3)),
+                "class": float(np.round(np.mean([class_frog[m] for m in ssl_mods]), 3)),
+            },
+            "subl": {
+                "clust": float(
+                    np.round(np.mean([clust_frog[m] for m in supl_mods]), 3)
+                ),
+                "class": float(
+                    np.round(np.mean([class_frog[m] for m in supl_mods]), 3)
+                ),
+            },
+            "bird": {
+                "clust": float(np.round(np.mean([clust_frog[m] for m in bird]), 3)),
+                "class": float(np.round(np.mean([class_frog[m] for m in bird]), 3)),
+            },
+            "nonbird": {
+                "clust": float(np.round(np.mean([clust_frog[m] for m in nonbird]), 3)),
+                "class": float(np.round(np.mean([class_frog[m] for m in nonbird]), 3)),
+            },
+        },
+        "nt": {
+            "ssl": {
+                "clust": float(np.round(np.mean([clust_nt[m] for m in ssl_mods]), 3)),
+                "class": float(np.round(np.mean([class_nt[m] for m in ssl_mods]), 3)),
+            },
+            "subl": {
+                "clust": float(np.round(np.mean([clust_nt[m] for m in supl_mods]), 3)),
+                "class": float(np.round(np.mean([class_nt[m] for m in supl_mods]), 3)),
+            },
+            "bird": {
+                "clust": float(np.round(np.mean([clust_nt[m] for m in bird]), 3)),
+                "class": float(np.round(np.mean([class_nt[m] for m in bird]), 3)),
+            },
+            "nonbird": {
+                "clust": float(np.round(np.mean([clust_nt[m] for m in nonbird]), 3)),
+                "class": float(np.round(np.mean([class_nt[m] for m in nonbird]), 3)),
+            },
+        },
+    }
+
+    d_std = {
+        "frog": {
+            "ssl": {
+                "clust": float(np.round(np.std([clust_frog[m] for m in ssl_mods]), 3)),
+                "class": float(np.round(np.std([class_frog[m] for m in ssl_mods]), 3)),
+            },
+            "subl": {
+                "clust": float(np.round(np.std([clust_frog[m] for m in supl_mods]), 3)),
+                "class": float(np.round(np.std([class_frog[m] for m in supl_mods]), 3)),
+            },
+            "bird": {
+                "clust": float(np.round(np.std([clust_frog[m] for m in bird]), 3)),
+                "class": float(np.round(np.std([class_frog[m] for m in bird]), 3)),
+            },
+            "nonbird": {
+                "clust": float(np.round(np.std([clust_frog[m] for m in nonbird]), 3)),
+                "class": float(np.round(np.std([class_frog[m] for m in nonbird]), 3)),
+            },
+        },
+        "nt": {
+            "ssl": {
+                "clust": float(np.round(np.std([clust_nt[m] for m in ssl_mods]), 3)),
+                "class": float(np.round(np.std([class_nt[m] for m in ssl_mods]), 3)),
+            },
+            "subl": {
+                "clust": float(np.round(np.std([clust_nt[m] for m in supl_mods]), 3)),
+                "class": float(np.round(np.std([class_nt[m] for m in supl_mods]), 3)),
+            },
+            "bird": {
+                "clust": float(np.round(np.std([clust_nt[m] for m in bird]), 3)),
+                "class": float(np.round(np.std([class_nt[m] for m in bird]), 3)),
+            },
+            "nonbird": {
+                "clust": float(np.round(np.std([clust_nt[m] for m in nonbird]), 3)),
+                "class": float(np.round(np.std([class_nt[m] for m in nonbird]), 3)),
+            },
+        },
+    }
+    return d, d_std
 
 
 def plot_clustering_by_metric_new(all_clusts_reordered, models):

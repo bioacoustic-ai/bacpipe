@@ -13,11 +13,14 @@ matplotlib.use("agg")
 
 from exploration.explore_embeds import set_paths
 
-# data_path = "Evaluation_set_5shots"
-data_path = "neotropic_dawn_chorus"
-# data_path = "id_task_data"
-# data_path = "colombia_soundscape"
-set_paths(data_path)
+# from run_explore import DATA_PATH
+
+# DATA_PATH = "Evaluation_set_5shots"
+# DATA_PATH = "neotropic_dawn_chorus"
+# DATA_PATH = "id_task_data"
+# DATA_PATH = "colombia_soundscape"
+DATA_PATH = "anuran_set"
+set_paths(DATA_PATH)
 from exploration.explore_embeds import (
     get_original_embeds,
     reduce_to_2d,
@@ -103,9 +106,20 @@ def plot_violins(left, right):
     val = []
     typ = []
     cat = []
-    for idx, label in enumerate(dict(sorted(left.items())).keys()):
-        val.append(left[label])
-        val.append(right[label])
+    if "aves_especies" in left.keys():
+        labels = [
+            "aves_especies",
+            "birdaves_especies",
+            "birdnet",
+            "perch_bird",
+            "avesecho_passt",
+            "insect66",
+        ]
+    else:
+        labels = dict(sorted(left.items())).keys()
+    for idx, label in enumerate(labels):
+        val.append(np.array(left[label]) / max(left[label]))
+        val.append(np.array(right[label]) / max(left[label]))
         typ.extend(["Intra"] * len(left[label]))
         typ.extend(["Inter"] * len(right[label]))
         cat.extend([label] * len(left[label]))
@@ -126,6 +140,7 @@ def plot_violins(left, right):
         split=True,
         inner="quartile",
     )
+    # ax.set_ylim([-2, 14])
     ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
 
     return fig
@@ -147,6 +162,9 @@ def plot_overview(orig_embeds, reducer, **kwargs):
         ).item()
         amis = {k: v["normal_no_noise"] for k, v in met_clust["AMI"].items()}
         new_order = dict(sorted(amis.items(), key=lambda item: item[1], reverse=True))
+    else:
+        new_order = orig_embeds
+        amis = {k: 0 for k in orig_embeds.keys()}
 
     for idx, model in enumerate(new_order.keys()):
         label_keys = list(orig_embeds[model]["label_dict"].keys())
@@ -175,7 +193,7 @@ def plot_overview(orig_embeds, reducer, **kwargs):
     for axes, model in zip(ax.flatten(), new_order.keys()):
         axes.set_title(f"{model.upper()} ({amis[model]:.2f}) ", fontsize=12)
     fig.tight_layout()
-    fig.subplots_adjust(bottom=0.14)
+    fig.subplots_adjust(bottom=0.18)
     return fig
 
 
@@ -246,7 +264,7 @@ def plot_embeds(
     elif label_by == "ground truth":
         data = embeds[model]["split"]
 
-    cmap = plt.cm.tab20
+    cmap = plt.cm.tab20b
     colors = cmap(np.arange(len(data.keys())) % cmap.N)[::-1]
 
     if no_noise:
@@ -258,6 +276,8 @@ def plot_embeds(
         label_keys = [-1] + [key for key in label_keys if key != -1]
 
     for idx, label in enumerate(label_keys):
+        if not label in data.keys():
+            continue
         ax.plot(
             data[label][:, 0],
             data[label][:, 1],
@@ -372,7 +392,7 @@ def plot_clusterings(
         return plot_bars_dicka(flat_dict, fig, ax, **kwargs)
 
 
-if False:
+if __name__ == "__main__":
     embed_dict = get_original_embeds()
 
     ############## LAYOUT ##############

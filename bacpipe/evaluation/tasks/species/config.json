@@ -1,7 +1,7 @@
 {
     "task_name": "species",
-    "dataset_csv_path": "../bacpipe/exploration/neotropic_dawn_chorus/task_annotations.csv",
-    "Num_classes": 11,
+    "dataset_csv_path": "../bacpipe/exploration/anuran_set/annotations/task_annotations/task_annotations.csv",
+    "Num_classes": 18,
     "learning_rate": 0.001,
     "batch_size": 64,
     "num_epochs": 10,

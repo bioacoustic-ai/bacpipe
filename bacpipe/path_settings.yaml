@@ -12,7 +12,8 @@ dim_reduc_parent_dir :   "bacpipe/evaluation/embeddings"
 # fixed paths for tasks:
 task_config_files : "bacpipe/evaluation/tasks"
 # task_results_dir : "bacpipe/evaluation/task_results"
-task_results_dir : "exploration/dim_reduced_embeddings/neotropic_dawn_chorus/task_results"
+# task_results_dir : "exploration/dim_reduced_embeddings/neotropic_dawn_chorus/task_results"
+task_results_dir : "exploration/anuran_set/task_results"
 
 
 # To avoid creating embeddings when configurations are still being tested, this is set to True. 

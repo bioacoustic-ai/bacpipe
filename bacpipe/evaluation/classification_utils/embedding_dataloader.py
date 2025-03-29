@@ -67,7 +67,10 @@ class EmbeddingTaskLoader(Dataset):
 
                 # p = '/home/siriussound/Code/bacpipe/exploration/neotropic_dawn_chorus/numpy_embeddings/embed_dict.npy'
                 # all_embeds = np.load(p, allow_pickle=True).item()[pretrained_model_name]
-                p = f"/home/siriussound/Code/bacpipe/exploration/neotropic_dawn_chorus/numpy_embeddings/umap_300/umap_300_{pretrained_model_name}.npy"
+                # p = f"/home/siriussound/Code/bacpipe/exploration/neotropic_dawn_chorus/numpy_embeddings/umap_300/umap_300_{pretrained_model_name}.npy"
+                # p = '/home/siriussound/Code/bacpipe/exploration/anuran_set/numpy_embeddings/embed_dict.npy'
+                # all_embeds = np.load(p, allow_pickle=True).item()[pretrained_model_name]
+                p = f"/home/siriussound/Code/bacpipe/exploration/anuran_set/numpy_embeddings/pca_300/pca_300_{pretrained_model_name}.npy"
                 all_embeds = np.load(p, allow_pickle=True).item()
                 self.all_embeds = all_embeds["all"]
                 ind2lab = {v: k for k, v in all_embeds["label_dict"].items()}

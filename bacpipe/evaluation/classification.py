@@ -136,7 +136,7 @@ def evaluate_on_task(task_name, model_name, loader_object, **kwargs):
         "test", clean_df, link_embed2wavfile, model_name, loader_object, task_config
     )
 
-    embed_size = loader_object.metadata_dict["embedding_size"]
+    embed_size = 300  # loader_object.metadata_dict["embedding_size"]
 
     lp = LinearProbe(in_dim=embed_size, out_dim=task_config["Num_classes"])
     lp = train_linear_probe(lp, train_gen, task_config)
