@@ -2,18 +2,12 @@
 # audio_dir :       "/media/vincent/Extreme SSD/MA/20221019-Benoit/transfer_1780104_files_cfc5b86f/SABA01_201511_201604_SN275/resampled_2kHz/wav"
 
 # fixed path, embeddings will be stored here, DO NOT CHANGE
-embed_parent_dir :   "bacpipe/evaluation/embeddings"
-# embed_parent_dir :   "exploration/embeddings"
-# dim_reduc_parent_dir :   "bacpipe/evaluation/dim_reduced_embeddings"
-# dim_reduc_parent_dir :   "exploration/dim_reduced_embeddings/pca50_id_task_data"
-# dim_reduc_parent_dir :   "exploration/dim_reduced_embeddings/id_task_data"
-dim_reduc_parent_dir :   "bacpipe/evaluation/embeddings"
+embed_parent_dir :   "results/by_dataset/{}/embeddings"
+dim_reduc_parent_dir :   "results/by_dataset/{}/dim_reduced_embeddings"
 
 # fixed paths for tasks:
-task_config_files : "bacpipe/evaluation/tasks"
-# task_results_dir : "bacpipe/evaluation/task_results"
-# task_results_dir : "exploration/dim_reduced_embeddings/neotropic_dawn_chorus/task_results"
-task_results_dir : "exploration/anuran_set/task_results"
+task_config_files : "bacpipe/embedding_evaluation/classification/tasks"
+task_results_dir : "results/by_dataset/{}/task_results"
 
 
 # To avoid creating embeddings when configurations are still being tested, this is set to True. 

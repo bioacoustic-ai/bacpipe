@@ -1,11 +1,16 @@
-from pathlib import Path
+import yaml
 import json
+from pathlib import Path
+from types import SimpleNamespace
+
 import matplotlib.pyplot as plt
 import numpy as np
-from types import SimpleNamespace
+
 from bacpipe.generate_embeddings import Loader
-import yaml
-from .clustering import get_centroid, get_clustering_scores
+from bacpipe.embedding_evaluation.clustering.cluster_embeddings import (
+    get_centroid,
+    get_clustering_scores,
+)
 
 with open("bacpipe/path_settings.yaml", "rb") as f:
     bacpipe_settings = yaml.load(f, Loader=yaml.CLoader)

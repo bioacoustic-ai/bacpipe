@@ -5,8 +5,8 @@ from pathlib import Path
 import yaml
 
 
-from .classification_utils.embedding_dataloader import EmbeddingTaskLoader
-from .classification_utils.linear_probe import (
+from .load_data import EmbeddingTaskLoader
+from .classify_embeddings import (
     LinearProbe,
     train_linear_probe,
     inference_with_linear_probe,
@@ -14,7 +14,7 @@ from .classification_utils.linear_probe import (
     train_knn_probe,
     inference_with_knn_probe,
 )
-from .classification_utils.evaluation_metrics import compute_task_metrics
+from .evaluate_classifcation_results import compute_task_metrics
 
 import torch
 

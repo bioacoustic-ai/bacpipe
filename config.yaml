@@ -9,14 +9,7 @@
 
 # PATHS:
 # define paths for your audio data
-# audio_dir :       "bacpipe/evaluation/datasets/audio_test_files"
-# audio_dir :       "/home/siriussound/Data/id_task_data"
-# audio_dir :       "/mnt/swap/Work/Data/dawn chorus California, Oregon, and Washington/annotated_recordings"
-# audio_dir :       "/mnt/swap/Work/Data/neotropical coffee farms in Colombia and Costa Rica/soundscape_data" 
 audio_dir :       "/mnt/swap/Work/Data/marine/marine mammals/Ilaria_annotated/Ilaria_AL_eval" 
-# audio_dir :       "/mnt/swap/Work/Data/dcase_task5/dev_set/Development_Set/Training_Set" 
-# audio_dir :       "/media/siriussound/Extreme SSD/MA/SAMOSAS_VINCENT/EL1_2kHz_March-April"
-# audio_dir :       "/home/siriussound/Data/dcase_task5/6517414/Evaluation_set_5shots"
 
 # CHOOSE FROM MODELS
 available_models : [
@@ -42,27 +35,35 @@ available_models : [
 
 
 # embedding model name
-embedding_model: [
-    "birdnet",
-    # "animal2vec_xc",
-    # "animal2vec_mk",
-    "audiomae",
-    "aves_especies",
-    "biolingual",
-    "birdaves_especies",
-    "avesecho_passt",
-    "hbdet",
-    "insect66",
-    "insect459",
-    "perch_bird",
-    # "mix2",
-    "protoclr",
-    # "rcl_fs_bsed",
-    "surfperch",
-    "google_whale",
-    # "vggish",
-    # "nonbioaves_especies"
-]
+embedding_model: 
+  # if already_computed is True, the embeddings will be loaded from the
+  # embeddings directory in the dataset path in `results/by_dataset/`
+
+  # if already_computed is False, the embeddings will be computed 
+  # for all selected models
+
+  already_computed: True
+  selected_models: [
+      "birdnet",
+      # "animal2vec_xc",
+      # "animal2vec_mk",
+      "audiomae",
+      "aves_especies",
+      "biolingual",
+      "birdaves_especies",
+      "avesecho_passt",
+      "hbdet",
+      "insect66",
+      "insect459",
+      "perch_bird",
+      # "mix2",
+      "protoclr",
+      # "rcl_fs_bsed",
+      "surfperch",
+      "google_whale",
+      # "vggish",
+      # "nonbioaves_especies"
+  ]
 
 # dimensionality reduction model name.
 supported_models: [
