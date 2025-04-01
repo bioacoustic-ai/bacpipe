@@ -12,7 +12,8 @@
 # audio_dir :       "bacpipe/evaluation/datasets/audio_test_files"
 # audio_dir :       "/home/siriussound/Data/id_task_data"
 # audio_dir :       "/mnt/swap/Work/Data/dawn chorus California, Oregon, and Washington/annotated_recordings"
-audio_dir :       "/mnt/swap/Work/Data/neotropical coffee farms in Colombia and Costa Rica/soundscape_data" 
+# audio_dir :       "/mnt/swap/Work/Data/neotropical coffee farms in Colombia and Costa Rica/soundscape_data" 
+audio_dir :       "/mnt/swap/Work/Data/marine/marine mammals/Ilaria_annotated/Ilaria_AL_eval" 
 # audio_dir :       "/mnt/swap/Work/Data/dcase_task5/dev_set/Development_Set/Training_Set" 
 # audio_dir :       "/media/siriussound/Extreme SSD/MA/SAMOSAS_VINCENT/EL1_2kHz_March-April"
 # audio_dir :       "/home/siriussound/Data/dcase_task5/6517414/Evaluation_set_5shots"
@@ -43,14 +44,14 @@ available_models : [
 # embedding model name
 embedding_model: [
     "birdnet",
-    "animal2vec_xc",
-    "animal2vec_mk",
+    # "animal2vec_xc",
+    # "animal2vec_mk",
     "audiomae",
     "aves_especies",
     "biolingual",
     "birdaves_especies",
     "avesecho_passt",
-    # "hbdet",
+    "hbdet",
     "insect66",
     "insect459",
     "perch_bird",
@@ -60,7 +61,7 @@ embedding_model: [
     "surfperch",
     "google_whale",
     # "vggish",
-    "nonbioaves_especies"
+    # "nonbioaves_especies"
 ]
 
 # dimensionality reduction model name.
@@ -70,7 +71,7 @@ supported_models: [
   "t_sne",
   "umap"
 ]
-dim_reduction_model: None
+dim_reduction_model: "umap"
 
 # specify the evaluation task to be performed
 supported_evaluation_tasks: [
@@ -78,4 +79,4 @@ supported_evaluation_tasks: [
   "species",
   "taxon"
 ]
-evaluation_task: 'species'
+evaluation_task: None
