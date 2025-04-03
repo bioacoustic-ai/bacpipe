@@ -1,6 +1,6 @@
 # Reduced dimension embeddings directory 
 
-### Embeddings that are created using dimensionality reduction algorithms will automatically be saved here unless specified differently in bacpipe/path_settings.yaml
+### Embeddings that are created using dimensionality reduction algorithms will automatically be saved here unless specified differently in bacpipe/settings.yaml
 
 By default the naming conventions for the embedding directories is:
 

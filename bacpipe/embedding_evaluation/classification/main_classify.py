@@ -18,7 +18,7 @@ from .evaluate_classifcation_results import compute_task_metrics
 
 import torch
 
-with open("bacpipe/path_settings.yaml", "rb") as f:
+with open("bacpipe/settings.yaml", "rb") as f:
     bacpipe_settings = yaml.load(f, Loader=yaml.CLoader)
 
 

@@ -14,7 +14,7 @@ GLOBAL_BATCH_SIZE = 16
 
 class ModelBaseClass:
     def __init__(self, sr, segment_length, **kwargs):
-        with open("bacpipe/path_settings.yaml", "rb") as f:
+        with open("bacpipe/settings.yaml", "rb") as f:
             self.config = yaml.load(f, Loader=yaml.CLoader)
 
         for key, value in kwargs.items():

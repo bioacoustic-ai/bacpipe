@@ -1,13 +1,15 @@
 ## MAIN VARS ##
 # audio_dir :       "/media/vincent/Extreme SSD/MA/20221019-Benoit/transfer_1780104_files_cfc5b86f/SABA01_201511_201604_SN275/resampled_2kHz/wav"
 
-# fixed path, embeddings will be stored here, DO NOT CHANGE
-embed_parent_dir :   "results/by_dataset/{}/embeddings"
-dim_reduc_parent_dir :   "results/by_dataset/{}/dim_reduced_embeddings"
+# fixed path, embeddings will be stored here, advised not to change
+# because this is also where bacpipe will look for existing embeddings
+main_results_dir :   "results/by_dataset"
+embed_parent_dir :   "embeddings"
+dim_reduc_parent_dir :   "dim_reduced_embeddings"
 
 # fixed paths for tasks:
+task_results_dir : "task_results"
 task_config_files : "bacpipe/embedding_evaluation/classification/tasks"
-task_results_dir : "results/by_dataset/{}/task_results"
 
 
 # To avoid creating embeddings when configurations are still being tested, this is set to True. 
@@ -22,3 +24,4 @@ audio_suffixes: ['.wav', '.WAV', '.aif', '.mp3', '.flac']
 # specify your device ['cpu', 'cuda', ...]
 device: 'cpu'
 
+use_parent_dir_as_label: False

@@ -6,10 +6,10 @@ import pandas as pd
 from pathlib import Path
 import yaml
 
-with open("bacpipe/path_settings.yaml", "rb") as f:
-    path_settings = yaml.load(f, Loader=yaml.CLoader)
+with open("bacpipe/settings.yaml", "rb") as f:
+    settings = yaml.load(f, Loader=yaml.CLoader)
 
-REDUCED_EMBEDS = path_settings["use_reduced_dim_embeds_for_tasks"]
+REDUCED_EMBEDS = settings["use_reduced_dim_embeds_for_tasks"]
 
 
 class EmbeddingTaskLoader(Dataset):
@@ -49,7 +49,7 @@ class EmbeddingTaskLoader(Dataset):
         if REDUCED_EMBEDS:
             if False:
                 p = list(
-                    Path(path_settings["dim_reduc_parent_dir"]).glob(
+                    Path(settings["dim_reduc_parent_dir"]).glob(
                         f"*{pretrained_model_name}*/*.npy"
                     )
                 )[-1]

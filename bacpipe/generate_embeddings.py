@@ -8,7 +8,6 @@ import logging
 import importlib
 
 logger = logging.getLogger("bacpipe")
-PARENT_DIR_IS_LABEL = True
 
 
 class Loader:
@@ -26,11 +25,7 @@ class Loader:
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
 
-        with open("bacpipe/path_settings.yaml", "r") as f:
-            self.config = yaml.load(f, Loader=yaml.CLoader)
-
-        for key, val in self.config.items():
-            setattr(self, key, val)
+        self.initialize_path_structure()
 
         self.check_if_combination_exists = check_if_combination_exists
         if self.dim_reduction_model:
@@ -59,6 +54,22 @@ class Loader:
                     self.model_name, Path(self.audio_dir).stem, str(self.embed_dir)
                 )
             )
+
+    def initialize_path_structure(self):
+        with open("bacpipe/settings.yaml", "r") as f:
+            self.config = yaml.load(f, Loader=yaml.CLoader)
+
+        for key, val in self.config.items():
+            if key == "main_results_dir":
+                continue
+            if key in ["embed_parent_dir", "dim_reduc_parent_dir", "task_results_dir"]:
+                val = (
+                    Path(self.config["main_results_dir"])
+                    .joinpath(self.audio_dir.stem)
+                    .joinpath(val)
+                )
+                val.mkdir(exist_ok=True, parents=True)
+            setattr(self, key, val)
 
     def check_embeds_already_exist(self):
         self.combination_already_exists = False
@@ -222,7 +233,18 @@ class Loader:
 
     def embed_read(self, index, file):
         embeds = np.load(file)
-        rel_file_path = Path(file).relative_to(self.metadata_dict["embed_dir"])
+        try:
+            rel_file_path = file.relative_to(self.metadata_dict["embed_dir"])
+        except ValueError:
+            print(
+                "Embedding file is not in the same directory structure "
+                "as it was when created."
+            )
+            rel_file_path = file.relative_to(
+                self.embed_parent_dir.joinpath(
+                    Path(self.metadata_dict["embed_dir"]).stem
+                )
+            )
         self.metadata_dict["files"]["embedding_files"].append(str(rel_file_path))
         if len(embeds.shape) == 1:
             embeds = np.expand_dims(embeds, axis=0)
@@ -253,7 +275,7 @@ class Embedder:
     def __init__(self, model_name, dim_reduction_model=False, **kwargs):
         import yaml
 
-        with open("bacpipe/path_settings.yaml", "rb") as f:
+        with open("bacpipe/settings.yaml", "rb") as f:
             self.config = yaml.load(f, Loader=yaml.CLoader)
 
         self.dim_reduction_model = dim_reduction_model
@@ -267,11 +289,11 @@ class Embedder:
     def _init_model(self):
         if self.dim_reduction_model:
             module = importlib.import_module(
-                f"bacpipe.pipelines.dimensionality_reduction.{self.model_name}"
+                f"bacpipe.embedding_generation_pipelines.dimensionality_reduction.{self.model_name}"
             )
         else:
             module = importlib.import_module(
-                f"bacpipe.pipelines.feature_extractors.{self.model_name}"
+                f"bacpipe.embedding_generation_pipelines.feature_extractors.{self.model_name}"
             )
         self.model = module.Model()
         self.model.prepare_inference()
@@ -349,11 +371,13 @@ def save_embeddings_dict_with_timestamps(
         var: embeds[:, i].tolist() for i, var in zip(range(embeds.shape[1]), ["x", "y"])
     }
     d["timestamp"] = t_stamps
-    if PARENT_DIR_IS_LABEL:
+    if loader_obj.use_parent_dir_as_label:
         d["label"] = [
             par.relative_to(loader_obj.metadata_dict["embed_dir"]).parent.stem
             for par in loader_obj.files
         ]
+    else:
+        pass  # TODO
 
     d["metadata"] = {
         k: (v if isinstance(v, list) else v)

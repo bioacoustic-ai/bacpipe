@@ -12,7 +12,7 @@ from bacpipe.embedding_evaluation.clustering.cluster_embeddings import (
     get_clustering_scores,
 )
 
-with open("bacpipe/path_settings.yaml", "rb") as f:
+with open("bacpipe/settings.yaml", "rb") as f:
     bacpipe_settings = yaml.load(f, Loader=yaml.CLoader)
 
 SPLIT_BY_FOLDER = True

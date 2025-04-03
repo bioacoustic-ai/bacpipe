@@ -26,14 +26,20 @@ logger = logging.getLogger("bacpipe")
 with open("config.yaml", "rb") as f:
     config = yaml.load(f, Loader=yaml.CLoader)
 
-with open("bacpipe/path_settings.yaml", "rb") as p:
+with open("bacpipe/settings.yaml", "rb") as p:
     paths = yaml.load(p, Loader=yaml.CLoader)
 
 
 def get_model_names():
+    global model_names
     if config["embedding_model"]["already_computed"]:
+
         dataset_name = Path(config["audio_dir"]).stem
-        main_results_path = Path(paths["embed_parent_dir"].format(dataset_name))
+        main_results_path = (
+            Path(paths["main_results_dir"])
+            .joinpath(dataset_name)
+            .joinpath(paths["embed_parent_dir"])
+        )
         model_names = [
             d.stem.split("___")[-1].split("-")[0]
             for d in list(main_results_path.rglob("*"))
@@ -44,7 +50,7 @@ def get_model_names():
 
 
 def model_specific_embedding_creation():
-    for model_name in config["embedding_model"]:
+    for model_name in model_names:
         get_embeddings(
             model_name=model_name,
             dim_reduction_model=config["dim_reduction_model"],
@@ -53,7 +59,7 @@ def model_specific_embedding_creation():
 
 
 def model_specific_evaluation():
-    for model_name in config["embedding_model"]:
+    for model_name in model_names:
         loader_obj = ge.Loader(
             config["audio_dir"],
             model_name=model_name,
@@ -78,10 +84,10 @@ def model_specific_evaluation():
 
 
 def cross_model_evaluation():
-    if len(config["embedding_model"]) > 1:
+    if len(model_names) > 1:
         if not config["evaluation_task"] == "None":
             visualise_classification_results_across_models(
-                config["evaluation_task"], config["embedding_model"]
+                config["evaluation_task"], model_names
             )
         if not config["dim_reduction_model"] == "None":
             plot_comparison(
