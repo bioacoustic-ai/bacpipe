@@ -30,12 +30,12 @@ def set_paths(data_path):
     global clust_metrics_path
     global plot_path
 
-    main_embeds_path = Path(f"exploration/{data_path}/embeddings")
-    np_embeds_path = Path(f"exploration/{data_path}/numpy_embeddings")
-    distances_path = Path(f"exploration/{data_path}/distances")
-    np_clust_path = Path(f"exploration/{data_path}/numpy_clusterings")
-    clust_metrics_path = Path(f"exploration/{data_path}/cluster_metrics")
-    plot_path = Path(f"exploration/{data_path}/plots")
+    main_embeds_path = Path(f"results/by_dataset/{data_path}/embeddings")
+    np_embeds_path = Path(f"results/by_dataset/{data_path}/numpy_embeddings")
+    distances_path = Path(f"results/by_dataset/{data_path}/distances")
+    np_clust_path = Path(f"results/by_dataset/{data_path}/numpy_clusterings")
+    clust_metrics_path = Path(f"results/by_dataset/{data_path}/cluster_metrics")
+    plot_path = Path(f"results/by_dataset/{data_path}/plots")
 
     main_embeds_path.mkdir(exist_ok=True)
     np_embeds_path.mkdir(exist_ok=True)
@@ -595,7 +595,7 @@ def scatterplot_clust_vs_class():
         ).joinpath("all_clusts_reordered.npy"),
         allow_pickle=True,
     ).item()
-    color = ["#D81B60", "#1E88E5", "#D8501B", "#4F1EE5"]
+    color = ["#1E25E5", "#009A2E", "#D81B60", "#4F1EE5"]
     met_class = load_task_results()
     met_class_nt = load_task_results(
         path=main_embeds_path.parent.parent.joinpath("neotropic_dawn_chorus/embeddings")
@@ -772,6 +772,97 @@ def scatterplot_clust_vs_class():
         dpi=600,
     )
 
+    #### subplots with lines
+    model_order = [
+        "birdnet",  # "supl-birds"
+        "perch_bird",  # "supl-birds"
+        "avesecho_passt",  # "supl-birds"
+        "surfperch",  # "supl-birds"
+        "biolingual",  # "supl-birds"
+        "protoclr",  # "supl-birds"
+        "insect66",  # "supl-nonbirds"
+        "insect459",  # "supl-nonbirds"
+        "google_whale",  # "supl-nonbirds"
+        "animal2vec_xc",  # "ssl-birds"
+        "birdaves_especies",  # "ssl-birds"
+        "aves_especies",  # "ssl-nonbirds"
+        "nonbioaves_especies",  # "ssl-nonbirds"
+        "animal2vec_mk",  # "ssl-nonbirds"
+        "audiomae",  # "ssl-nonbirds"
+    ]
+    mods_xticks = [mod_short[model] for model in model_order]
+    clust = {
+        "nt": [
+            met_clust_nt["AMI"][model][f"{reduc}_no_noise"] for model in model_order
+        ],
+        "fr": [met_clust["AMI"][model][f"{reduc}_no_noise"] for model in model_order],
+    }
+    clas = {
+        "nt": [met_class_nt["knn"][f"{reduc}"][model] for model in model_order],
+        "fr": [met_class["knn"][f"{reduc}"][model] for model in model_order],
+    }
+    fig, axes = plt.subplots(2, 1, figsize=(6, 5))
+    plt.subplots_adjust(bottom=0.3)
+    for idx, (species, name) in enumerate(zip(["bird", "frog"], ["nt", "fr"])):
+        for section in [[0, 1, 2, 3, 4, 5], [6, 7, 8], [9, 10], [11, 12, 13, 14]]:
+            axes[0].plot(
+                np.array(model_order)[section],
+                np.array(clust[name])[section],
+                c=color[idx],
+                marker="x",
+                label=f"{species} data",
+            )
+
+    for idx, (species, name) in enumerate(zip(["bird", "frog"], ["nt", "fr"])):
+        for section in [[0, 1, 2, 3, 4, 5], [6, 7, 8], [9, 10], [11, 12, 13, 14]]:
+            axes[1].plot(
+                np.array(model_order)[section],
+                np.array(clas[name])[section],
+                c=color[idx],
+                marker="x",
+                label=f"{species} data",
+            )
+
+    axes[0].vlines(
+        [5.5, 8.5, 10.5], ymin=0.15, ymax=0.82, color="gray", linestyle="--", lw=2
+    )
+    axes[1].vlines(
+        [5.5, 8.5, 10.5], ymin=0.4, ymax=0.9, color="gray", linestyle="--", lw=2
+    )
+    axes[0].text(
+        2, 0.7, "supl \nbird", ha="center", fontsize=12, color="black", alpha=0.85
+    )
+    axes[0].text(
+        7, 0.7, "supl \nnon-bird", ha="center", fontsize=12, color="black", alpha=0.85
+    )
+    axes[0].text(
+        9.5, 0.7, "ssl \nbird", ha="center", fontsize=12, color="black", alpha=0.85
+    )
+    axes[0].text(
+        13, 0.7, "ssl \nnon-bird", ha="center", fontsize=12, color="black", alpha=0.85
+    )
+
+    axes[0].set_ylabel("AMI")
+    axes[1].set_ylabel("Macro accuracy")
+    axes[1].set_xlabel("Models")
+    axes[1].set_xticks(np.arange(len(model_order)) + 0.2)
+    axes[1].set_xticklabels(mods_xticks, rotation=45, ha="right", fontsize=12)
+    axes[0].spines["top"].set_visible(False)
+    axes[0].spines["right"].set_visible(False)
+    axes[1].spines["top"].set_visible(False)
+    axes[1].spines["right"].set_visible(False)
+    axes[0].set_xticklabels([])
+
+    axes[0].plot([], [], label="bird data", color=color[0])
+    axes[0].plot([], [], label="frog data", color=color[1])
+    axes[0].plot([], [], label="bird data", color=color[0])
+    axes[0].plot([], [], label="frog data", color=color[1])
+    hand, label = axes[0].get_legend_handles_labels()
+    fig.legend(hand[-2:], label[-2:], loc="upper center", ncol=2, columnspacing=0.7)
+    fig.tight_layout()
+    plt.subplots_adjust(top=0.9)
+    plt.savefig(plot_path.joinpath("clust_and_class_lineplots.png"), dpi=800)
+
     ### get values for table
     d, d_std = {}, {}
     reduc = "pca_300"
@@ -782,39 +873,38 @@ def scatterplot_clust_vs_class():
     with open(plot_path.joinpath("clustering_summary.yml"), "w") as f:
         yaml.dump(d, f)
 
-
-f"""
-    ssl & {d['normal']['nt']['ssl']['class']}& {d['umap_300']['nt']['ssl']['class']}& {d['pca_300']['nt']['ssl']['class']} \\
-    supl & {d['normal']['nt']['subl']['class']}& {d['umap_300']['nt']['subl']['class']}& {d['pca_300']['nt']['subl']['class']} \\
-    bird & {d['normal']['nt']['bird']['class']}& {d['umap_300']['nt']['bird']['class']}& {d['pca_300']['nt']['bird']['class']} \\
-    non-bird & {d['normal']['nt']['nonbird']['class']}& {d['umap_300']['nt']['nonbird']['class']}& {d['pca_300']['nt']['nonbird']['class']} \\
-    \hline
-        
-    \hline
-    ssl & {d['normal']['nt']['ssl']['clust']}& {d['umap_300']['nt']['ssl']['clust']}& {d['pca_300']['nt']['ssl']['clust']} \\
-    supl & {d['normal']['nt']['subl']['clust']}& {d['umap_300']['nt']['subl']['clust']}& {d['pca_300']['nt']['subl']['clust']} \\
-    bird & {d['normal']['nt']['bird']['clust']}& {d['umap_300']['nt']['bird']['clust']}& {d['pca_300']['nt']['bird']['clust']} \\
-    non-bird & {d['normal']['nt']['nonbird']['clust']}& {d['umap_300']['nt']['nonbird']['clust']}& {d['pca_300']['nt']['nonbird']['clust']} \\
-    \hline
-        
-    \hline
-    category &
-    original &
-    umap &
-    pca \\
-    \hline
-    ssl & {d['normal']['frog']['ssl']['class']}& {d['umap_300']['frog']['ssl']['class']}& {d['pca_300']['frog']['ssl']['class']} \\
-    supl & {d['normal']['frog']['subl']['class']}& {d['umap_300']['frog']['subl']['class']}& {d['pca_300']['frog']['subl']['class']} \\
-    bird & {d['normal']['frog']['bird']['class']}& {d['umap_300']['frog']['bird']['class']}& {d['pca_300']['frog']['bird']['class']} \\
-    non-bird & {d['normal']['frog']['nonbird']['class']}& {d['umap_300']['frog']['nonbird']['class']}& {d['pca_300']['frog']['nonbird']['class']} \\
-    \hline
-        
-    \hline
-    ssl & {d['normal']['frog']['ssl']['clust']}& {d['umap_300']['frog']['ssl']['clust']}& {d['pca_300']['frog']['ssl']['clust']} \\
-    supl & {d['normal']['frog']['subl']['clust']}& {d['umap_300']['frog']['subl']['clust']}& {d['pca_300']['frog']['subl']['clust']} \\
-    bird & {d['normal']['frog']['bird']['clust']}& {d['umap_300']['frog']['bird']['clust']}& {d['pca_300']['frog']['bird']['clust']} \\
-    non-bird & {d['normal']['frog']['nonbird']['clust']}& {d['umap_300']['frog']['nonbird']['clust']}& {d['pca_300']['frog']['nonbird']['clust']} \\
-"""
+    table = f"""
+        ssl & {d['normal']['nt']['ssl']['class']}& {d['umap_300']['nt']['ssl']['class']}& {d['pca_300']['nt']['ssl']['class']} \\
+        supl & {d['normal']['nt']['subl']['class']}& {d['umap_300']['nt']['subl']['class']}& {d['pca_300']['nt']['subl']['class']} \\
+        bird & {d['normal']['nt']['bird']['class']}& {d['umap_300']['nt']['bird']['class']}& {d['pca_300']['nt']['bird']['class']} \\
+        non-bird & {d['normal']['nt']['nonbird']['class']}& {d['umap_300']['nt']['nonbird']['class']}& {d['pca_300']['nt']['nonbird']['class']} \\
+        \hline
+            
+        \hline
+        ssl & {d['normal']['nt']['ssl']['clust']}& {d['umap_300']['nt']['ssl']['clust']}& {d['pca_300']['nt']['ssl']['clust']} \\
+        supl & {d['normal']['nt']['subl']['clust']}& {d['umap_300']['nt']['subl']['clust']}& {d['pca_300']['nt']['subl']['clust']} \\
+        bird & {d['normal']['nt']['bird']['clust']}& {d['umap_300']['nt']['bird']['clust']}& {d['pca_300']['nt']['bird']['clust']} \\
+        non-bird & {d['normal']['nt']['nonbird']['clust']}& {d['umap_300']['nt']['nonbird']['clust']}& {d['pca_300']['nt']['nonbird']['clust']} \\
+        \hline
+            
+        \hline
+        category &
+        original &
+        umap &
+        pca \\
+        \hline
+        ssl & {d['normal']['frog']['ssl']['class']}& {d['umap_300']['frog']['ssl']['class']}& {d['pca_300']['frog']['ssl']['class']} \\
+        supl & {d['normal']['frog']['subl']['class']}& {d['umap_300']['frog']['subl']['class']}& {d['pca_300']['frog']['subl']['class']} \\
+        bird & {d['normal']['frog']['bird']['class']}& {d['umap_300']['frog']['bird']['class']}& {d['pca_300']['frog']['bird']['class']} \\
+        non-bird & {d['normal']['frog']['nonbird']['class']}& {d['umap_300']['frog']['nonbird']['class']}& {d['pca_300']['frog']['nonbird']['class']} \\
+        \hline
+            
+        \hline
+        ssl & {d['normal']['frog']['ssl']['clust']}& {d['umap_300']['frog']['ssl']['clust']}& {d['pca_300']['frog']['ssl']['clust']} \\
+        supl & {d['normal']['frog']['subl']['clust']}& {d['umap_300']['frog']['subl']['clust']}& {d['pca_300']['frog']['subl']['clust']} \\
+        bird & {d['normal']['frog']['bird']['clust']}& {d['umap_300']['frog']['bird']['clust']}& {d['pca_300']['frog']['bird']['clust']} \\
+        non-bird & {d['normal']['frog']['nonbird']['clust']}& {d['umap_300']['frog']['nonbird']['clust']}& {d['pca_300']['frog']['nonbird']['clust']} \\
+    """
 
 
 def get_table_metrics(reduc, met_class, met_clust, met_class_nt, met_clust_nt):
