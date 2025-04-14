@@ -673,7 +673,7 @@ def build_model(config, **kwargs):
 
 
 def cvt13(**kwargs):
-    f = open("bacpipe/model_utils/protoclr/config/cvt-13-224x224.yaml", "r")
+    f = open("bacpipe/model_specific_utils/protoclr/config/cvt-13-224x224.yaml", "r")
     config = yaml.load(f, Loader=yaml.CLoader)
     return ConvolutionalVisionTransformer(
         spec=config["MODEL"]["SPEC"]

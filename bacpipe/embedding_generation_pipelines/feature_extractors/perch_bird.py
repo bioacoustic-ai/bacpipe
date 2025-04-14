@@ -1,6 +1,6 @@
 from ml_collections import config_dict
-from bacpipe.model_utils.perch_chirp.chirp.inference.embed_lib import EmbedFn
-from bacpipe.model_utils.perch_chirp.chirp.projects.zoo.models import (
+from bacpipe.model_specific_utils.perch_chirp.chirp.inference.embed_lib import EmbedFn
+from bacpipe.model_specific_utils.perch_chirp.chirp.projects.zoo.models import (
     get_preset_model_config,
 )
 import tensorflow as tf

@@ -48,7 +48,7 @@ MATLAB package jLab.
 import enum
 from typing import Callable
 
-import bacpipe.model_utils.perch_chirp.chirp.signal
+import bacpipe.model_specific_utils.perch_chirp.chirp.signal
 from jax import lax
 from jax import numpy as jnp
 from jax import scipy as jsp

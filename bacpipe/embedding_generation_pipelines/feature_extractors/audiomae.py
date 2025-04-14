@@ -18,8 +18,8 @@ from timm.models.layers import trunc_normal_
 from timm.models.layers import to_2tuple
 
 
-import bacpipe.model_utils.audiomae.models_vit as models_vit
-from bacpipe.model_utils.audiomae.dataset import AudiosetDataset
+import bacpipe.model_specific_utils.audiomae.models_vit as models_vit
+from bacpipe.model_specific_utils.audiomae.dataset import AudiosetDataset
 from ..utils import ModelBaseClass
 
 BATCH_SIZE = 8  # important to lower this if run on laptop cpu

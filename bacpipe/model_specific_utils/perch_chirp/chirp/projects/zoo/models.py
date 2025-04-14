@@ -20,12 +20,14 @@ import tempfile
 from typing import Any
 
 from absl import logging
-from bacpipe.model_utils.perch_chirp.chirp.models import frontend
-from bacpipe.model_utils.perch_chirp.chirp.models import handcrafted_features
-from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import taxonomy_model_tf
-from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import zoo_interface
-from bacpipe.model_utils.perch_chirp.chirp.taxonomy import namespace
-from bacpipe.model_utils.perch_chirp.chirp.taxonomy import namespace_db
+from bacpipe.model_specific_utils.perch_chirp.chirp.models import frontend
+from bacpipe.model_specific_utils.perch_chirp.chirp.models import handcrafted_features
+from bacpipe.model_specific_utils.perch_chirp.chirp.projects.zoo import (
+    taxonomy_model_tf,
+)
+from bacpipe.model_specific_utils.perch_chirp.chirp.projects.zoo import zoo_interface
+from bacpipe.model_specific_utils.perch_chirp.chirp.taxonomy import namespace
+from bacpipe.model_specific_utils.perch_chirp.chirp.taxonomy import namespace_db
 from etils import epath
 from ml_collections import config_dict
 import numpy as np
@@ -217,7 +219,7 @@ class BirbSepModelTF1(zoo_interface.EmbeddingModel):
 
     Example usage:
     ```
-    from bacpipe.model_utils.perch_chirp.chirp.projects.zoo import models
+    from bacpipe.model_specific_utils.perch_chirp.chirp.projects.zoo import models
     birbsep1_config = config_dict.ConfigDict({
       'model_path': $MODEL_PATH,
       'window_size_s': 60.0,

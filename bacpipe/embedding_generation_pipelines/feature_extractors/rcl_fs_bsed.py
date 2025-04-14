@@ -1,6 +1,6 @@
 import torch
 from torchaudio import transforms as T
-from bacpipe.model_utils.rcl_fs_bsed.resnet import ResNet
+from bacpipe.model_specific_utils.rcl_fs_bsed.resnet import ResNet
 from ..utils import ModelBaseClass
 
 SAMPLE_RATE = 22050

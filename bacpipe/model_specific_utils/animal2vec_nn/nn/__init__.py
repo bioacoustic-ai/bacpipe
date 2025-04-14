@@ -6,9 +6,9 @@
 """
 This initializes the nn module
 """
-from bacpipe.model_utils.animal2vec_nn.nn.sinc import SincConv
-from bacpipe.model_utils.animal2vec_nn.nn.modalities.modality import Modality
-from bacpipe.model_utils.animal2vec_nn.nn.utils import (
+from bacpipe.model_specific_utils.animal2vec_nn.nn.sinc import SincConv
+from bacpipe.model_specific_utils.animal2vec_nn.nn.modalities.modality import Modality
+from bacpipe.model_specific_utils.animal2vec_nn.nn.utils import (
     get_conv_size,
     plot_confusion_matrices,
     rename_attribute,
@@ -26,38 +26,38 @@ from bacpipe.model_utils.animal2vec_nn.nn.utils import (
     chunk_and_normalize,
 )
 
-from bacpipe.model_utils.animal2vec_nn.nn.audio_tasks import AudioTaskCCAS
-from bacpipe.model_utils.animal2vec_nn.nn.wav2vec2 import (
+from bacpipe.model_specific_utils.animal2vec_nn.nn.audio_tasks import AudioTaskCCAS
+from bacpipe.model_specific_utils.animal2vec_nn.nn.wav2vec2 import (
     Wav2VecCcasFinetune,
 )
-from bacpipe.model_utils.animal2vec_nn.nn.audio_train_routine import (
+from bacpipe.model_specific_utils.animal2vec_nn.nn.audio_train_routine import (
     animal2vec_audio_main,
 )
-from bacpipe.model_utils.animal2vec_nn.nn.criterions import (
+from bacpipe.model_specific_utils.animal2vec_nn.nn.criterions import (
     FinetuneCrossEntropyCriterion,
     ExpandedModelCriterion,
 )
-from bacpipe.model_utils.animal2vec_nn.nn.modalities.base import (
+from bacpipe.model_specific_utils.animal2vec_nn.nn.modalities.base import (
     MaskSeed,
     D2vModalityConfig,
     ModalitySpecificEncoder,
     get_annealed_rate,
 )
-from bacpipe.model_utils.animal2vec_nn.nn.modalities.modules import (
+from bacpipe.model_specific_utils.animal2vec_nn.nn.modalities.modules import (
     D2vDecoderConfig,
     AltBlock,
     Decoder1d,
     FixedPositionalEncoder,
 )
 
-from bacpipe.model_utils.animal2vec_nn.nn.modalities.audio import (
+from bacpipe.model_specific_utils.animal2vec_nn.nn.modalities.audio import (
     D2vAudioConfig,
     AudioEncoder,
 )
 
-from bacpipe.model_utils.animal2vec_nn.nn.modalities.images import (
+from bacpipe.model_specific_utils.animal2vec_nn.nn.modalities.images import (
     D2vImageConfig,
     ImageEncoder,
 )
 
-from bacpipe.model_utils.animal2vec_nn.nn.data2vec2 import Data2VecMultiModel
+from bacpipe.model_specific_utils.animal2vec_nn.nn.data2vec2 import Data2VecMultiModel

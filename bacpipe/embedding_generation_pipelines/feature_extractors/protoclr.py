@@ -1,6 +1,6 @@
 from torchaudio import transforms as T
 import torch
-from bacpipe.model_utils.protoclr.cvt import cvt13
+from bacpipe.model_specific_utils.protoclr.cvt import cvt13
 from ..utils import ModelBaseClass
 
 SAMPLE_RATE = 16000

@@ -1,5 +1,5 @@
 from torchaudio.transforms import MelSpectrogram, AmplitudeToDB
-from bacpipe.model_utils.mix2.mobile_net_v3 import mobilenetv3, MinMaxNorm
+from bacpipe.model_specific_utils.mix2.mobile_net_v3 import mobilenetv3, MinMaxNorm
 import torch
 
 SAMPLE_RATE = 16000
