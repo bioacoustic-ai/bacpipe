@@ -155,7 +155,11 @@ class Loader:
             "model_name": self.model_name,
             "audio_dir": str(self.audio_dir),
             "embed_dir": str(self.embed_dir),
-            "files": {"audio_files": [], "file_lengths (s)": []},
+            "files": {
+                "audio_files": [],
+                "file_lengths (s)": [],
+                "nr_embeds_per_file": [],
+            },
         }
 
     def _get_metadata_dict(self, folder):
@@ -235,10 +239,11 @@ class Loader:
         embeds = np.load(file)
         try:
             rel_file_path = file.relative_to(self.metadata_dict["embed_dir"])
-        except ValueError:
+        except ValueError as e:
             print(
-                "Embedding file is not in the same directory structure "
-                "as it was when created."
+                "\nEmbedding file is not in the same directory structure "
+                "as it was when created.\n",
+                e,
             )
             rel_file_path = file.relative_to(
                 self.embed_parent_dir.joinpath(
@@ -251,16 +256,23 @@ class Loader:
         self.metadata_dict["files"]["embedding_dimensions"].append(embeds.shape)
         return embeds
 
-    def write_audio_file_to_metadata(self, index, file, embed, embed_size):
+    def write_audio_file_to_metadata(self, index, file, embed, embeddings):
         if index == 0:
             self.metadata_dict["segment_length (samples)"] = embed.model.segment_length
             self.metadata_dict["sample_rate (Hz)"] = embed.model.sr
-            self.metadata_dict["embedding_size"] = embed_size
+            self.metadata_dict["embedding_size"] = embeddings.shape[-1]
         rel_file_path = Path(file).relative_to(self.audio_dir)
         self.metadata_dict["files"]["audio_files"].append(str(rel_file_path))
         self.metadata_dict["files"]["file_lengths (s)"].append(embed.file_length)
+        self.metadata_dict["files"]["nr_embeds_per_file"].append(embeddings.shape[0])
 
     def write_metadata_file(self):
+        self.metadata_dict["nr_embeds_total"] = sum(
+            self.metadata_dict["files"]["nr_embeds_per_file"]
+        )
+        self.metadata_dict["total_dataset_length (s)"] = sum(
+            self.metadata_dict["files"]["file_lengths (s)"]
+        )
         with open(str(self.embed_dir.joinpath("metadata.yml")), "w") as f:
             yaml.safe_dump(self.metadata_dict, f)
 
@@ -346,7 +358,6 @@ class Embedder:
             save_embeddings_dict_with_timestamps(
                 file_dest, embeds, input_len, fileloader_obj, file_idx
             )
-            # TODO save png of embeddings for umap embeds
         else:
             relative_parent_path = (
                 Path(file).relative_to(fileloader_obj.audio_dir).parent
@@ -371,13 +382,6 @@ def save_embeddings_dict_with_timestamps(
         var: embeds[:, i].tolist() for i, var in zip(range(embeds.shape[1]), ["x", "y"])
     }
     d["timestamp"] = t_stamps
-    if loader_obj.use_parent_dir_as_label:
-        d["label"] = [
-            par.relative_to(loader_obj.metadata_dict["embed_dir"]).parent.stem
-            for par in loader_obj.files
-        ]
-    else:
-        pass  # TODO
 
     d["metadata"] = {
         k: (v if isinstance(v, list) else v)
