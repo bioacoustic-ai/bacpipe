@@ -351,9 +351,9 @@ def ground_truth_by_model(
     paths,
     model,
     label_file=None,
-    remove_noise=False,
-    single_label=True,
     overwrite=False,
+    single_label=True,
+    remove_noise=False,
     **kwargs,
 ):
     if overwrite or not paths.labels_path.joinpath("ground_truth.npy").exists():

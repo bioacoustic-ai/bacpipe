@@ -21,7 +21,7 @@ from bacpipe.embedding_evaluation.label_embeddings import (
 
 from bacpipe.embedding_evaluation.classification.classify import classification_pipeline
 
-from bacpipe.embedding_evaluation.clustering.cluster_embeddings import clustering
+from bacpipe.embedding_evaluation.clustering.cluster import clustering
 
 from bacpipe.embedding_evaluation.distance_evalutation.distances import (
     calc_distances,
@@ -207,7 +207,8 @@ def model_specific_evaluation(
                     classification_pipeline(paths, class_embeds, **class_config)
 
         if "clustering" in evaluation_task:
-            clustering(paths, embeds, ground_truth, remove_noise=False, overwrite=True)
+            embeds_array = np.concatenate(list(embeds.values()))
+            clustering(paths, embeds_array, ground_truth, **kwargs)
 
         if "pairwise_distances" in evaluation_task:
             for dist_config in distance_configs.values():
