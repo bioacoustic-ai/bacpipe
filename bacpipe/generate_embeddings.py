@@ -6,6 +6,7 @@ import time
 from tqdm import tqdm
 import logging
 import importlib
+import json
 
 logger = logging.getLogger("bacpipe")
 
@@ -222,9 +223,6 @@ class Loader:
         embed_dirs.sort()
         return self._find_existing_embed_dir(embed_dirs)
 
-    def get_annotations(self):
-        pass
-
     def get_timestamp_dir(self):
         if self.dim_reduction_model:
             model_name = self.dim_reduction_model
@@ -255,6 +253,18 @@ class Loader:
             embeds = np.expand_dims(embeds, axis=0)
         self.metadata_dict["files"]["embedding_dimensions"].append(embeds.shape)
         return embeds
+
+    def embedding_dict(self):
+        d = {}
+        for file in self.files:
+            if not self.dim_reduction_model:
+                embeds = np.load(file)
+            else:
+                with open(file, "r") as f:
+                    embeds = json.load(f)
+                embeds = np.array(embeds)
+            d[file.stem] = embeds
+        return d
 
     def write_audio_file_to_metadata(self, index, file, embed, embeddings):
         if index == 0:

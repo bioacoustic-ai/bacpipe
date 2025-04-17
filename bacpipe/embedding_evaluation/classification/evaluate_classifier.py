@@ -1,20 +1,30 @@
-import sklearn.metrics as metrics
 import json
-from pathlib import Path
-import yaml
-import numpy as np
 
-with open("bacpipe/settings.yaml", "rb") as f:
-    bacpipe_settings = yaml.load(f, Loader=yaml.CLoader)
-#  compute the evaluation metrics for classification based predictions
+import sklearn.metrics as metrics
+import numpy as np
 
 
 #  accuracy per class
 def accuracy_per_class(y_true, y_pred, label2index, items_per_class):
     """
-    Compute the accuracy per class
-    """
+    Accuracy per class
 
+    Parameters
+    ----------
+    y_true : list
+        ground truth
+    y_pred : list
+        predictions
+    label2index : dict
+        link labels to ints
+    items_per_class : list
+        number of items per class
+
+    Returns
+    -------
+    dict
+        classwise accuracy
+    """
     acc_per_cls_idx = {class_idx: 0 for class_idx in label2index.values()}
 
     for pred_class, true_class in zip(y_pred, y_true):
@@ -29,19 +39,26 @@ def accuracy_per_class(y_true, y_pred, label2index, items_per_class):
     return accuracy_per_class
 
 
-#  macro accuracy
 def macro_accuracy(y_true, y_pred):
     """
-    Compute the macro accuracy
+    Compute macro accuracy.
+
+    Parameters
+    ----------
+    y_true : list
+        ground truth
+    y_pred : list
+        predictions
+
+    Returns
+    -------
+    float
+        balance accuracy score
     """
     return metrics.balanced_accuracy_score(y_true, y_pred)
 
 
-#  micro accuracy
 def micro_accuracy(y_true, y_pred):
-    """
-    Compute the micro accuracy
-    """
     return metrics.accuracy_score(y_true, y_pred)
 
 
@@ -95,19 +112,19 @@ def compute_task_metrics(y_pred, y_true, probability_scores, label2index):
     return metrics
 
 
-# def compute_metrics_per_level_above():
-#     '''
-#     aggregate the metrics as per classification level above. i.e. if classification on individual classes, then compute metrics per species classes, if classification on species, then compute metrics per taxon classes...
-#     '''
-#     # TODO
-#     return
-
-
-def build_results_report(task_name, model_name, metrics, task_config):
+def evaluate_classification(paths, config, metrics, **kwargs):
     """
-    Build a results report
-    """
+    Save a dict with all performance metrics.
 
+    Parameters
+    ----------
+    paths : SimpleNamespace object
+        dict with attributs of paths for loading and saving
+    config : string
+        type of classification (linear or knn)
+    metrics : dict
+        performance
+    """
     report = dict()
 
     report["Overall Metrics:"] = {
@@ -126,11 +143,9 @@ def build_results_report(task_name, model_name, metrics, task_config):
         label: items for label, items in metrics["items_per_class"].items()
     }
 
-    report["Task Configuration:"] = task_config
+    report["Task Configuration:"] = kwargs
 
-    save_dir = Path(bacpipe_settings["task_results_dir"]).joinpath("metrics")
-    save_dir.mkdir(parents=True, exist_ok=True)
-    save_path = save_dir.joinpath(f"class_results_{task_name}_{model_name}.yml")
+    save_path = paths.class_path.joinpath(f"class_results_{config}.json")
     # save the report as json
     with open(save_path, "w") as f:
-        yaml.safe_dump(report, f)
+        json.dump(report, f)

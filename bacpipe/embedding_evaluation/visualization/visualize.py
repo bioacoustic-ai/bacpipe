@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import matplotlib.pyplot as plt
 import numpy as np
 
+import bacpipe.embedding_evaluation.label_embeddings as le
 from bacpipe.generate_embeddings import Loader
 from bacpipe.embedding_evaluation.clustering.cluster_embeddings import (
     get_centroid,
@@ -44,8 +45,8 @@ def collect_embeddings(dim_reduced_embed_path, dim_reduction_model):
         if file.suffix == ".json" and dim_reduction_model in file.stem:
             with open(file, "r") as f:
                 embeds_dict = json.load(f)
-    split_data = data_split_by_labels(embeds_dict)
-    return split_data, embeds_dict
+    # split_data = data_split_by_labels(embeds_dict)
+    return embeds_dict
 
 
 def plot_centroids(axes, centroids, label, split_data, points):
@@ -89,15 +90,16 @@ def plot_points(axes, split_data, label, bool_spherical):
 def plot_embeddings(
     dim_reduced_embed_path,
     dim_reduction_model,
+    default_labels,
+    ground_truth=None,
     axes=False,
     fig=False,
     bool_plot_centroids=True,
     bool_spherical=False,
+    label_by="audio_file_name",
 ):
-    split_data, embeds_dict = collect_embeddings(
-        dim_reduced_embed_path, dim_reduction_model
-    )
-
+    embeds = collect_embeddings(dim_reduced_embed_path, dim_reduction_model)
+    split_data = data_split_by_labels(embeds)
     if not fig:
         if bool_spherical:
             fig, axes = plt.subplots(subplot_kw={"projection": "3d"}, figsize=(12, 8))
@@ -107,34 +109,70 @@ def plot_embeddings(
     else:
         return_axes = True
 
-    centroids = {}
-    # for embed in embeds_ar:
-    if split_data is not None:
-        for label in split_data:
-            points = plot_points(axes, split_data, label, bool_spherical)
-            if bool_plot_centroids:
-                centroids = plot_centroids(axes, centroids, label, split_data, points)
-        clustering_dict = get_clustering_scores(split_data, centroids)
-        with open(dim_reduced_embed_path.joinpath("clustering_metrics.json"), "w") as f:
-            json.dump(clustering_dict, f)
+    if not ground_truth:
+        labels = default_labels[label_by]
+        remove_noise = False
     else:
-        embed_x = embeds_dict["x"]
-        embed_y = embeds_dict["y"]
-        file_stem = Path(embeds_dict["metadata"]["audio_files"]).stem
-        axes.plot(embed_x, embed_y, "o", label=file_stem, markersize=0.5)
+        labels = ground_truth["labels"]
+        remove_noise = True
+
+    centroids = {}
+
+    c_label_dict = {lab: i for i, lab in enumerate(np.unique(labels))}
+    # Normalize and pick a continuous colormap
+
+    import matplotlib.cm as cm
+
+    cmap = cm.viridis  # or 'plasma', 'inferno', 'magma', etc.
+    if remove_noise:
+        num_labels = np.array([c_label_dict[lab] for lab in labels[labels != -1]])
+        sss = axes.scatter(
+            np.array(embeds["x"])[labels != -1],
+            np.array(embeds["y"])[labels != -1],
+            c=num_labels,
+            s=1,
+            cmap=cmap,
+        )
+    else:
+        num_labels = np.array([c_label_dict[lab] for lab in labels])
+        sss = axes.scatter(
+            embeds["x"],
+            embeds["y"],
+            c=num_labels,
+            s=1,
+            cmap=cmap,
+        )
+    if bool_plot_centroids:
+        centroids = plot_centroids(axes, centroids, label, split_data, points)
+    clustering_dict = get_clustering_scores(split_data, centroids)
+    with open(dim_reduced_embed_path.joinpath("clustering_metrics.json"), "w") as f:
+        json.dump(clustering_dict, f)
 
     if return_axes:
         return axes, clustering_dict
     else:
-        fig, axes = set_legend(fig, axes, bool_plot_centroids=bool_plot_centroids)
+        # handles, labels = axes.get_legend_handles_labels()
+        # handl = []
+        # for label in np.unique(default_labels[label_by]):
+        #     handl.append(handles[np.where(np.array(labels) == label)[0][0]])
+        cbar = plt.colorbar(sss, ax=axes)
+        locs = [0, int(len(c_label_dict) / 3), int(len(c_label_dict) / 3) * 2, -1]
+        cbar.set_ticks([list(c_label_dict.values())[loc] for loc in locs])
+        cbar.set_ticklabels([list(c_label_dict.keys())[loc] for loc in locs])
+        cbar.set_label("Label")
+        # fig, axes = set_legend(handl,
+        #                        np.unique(default_labels[label_by]),
+        #                        fig,
+        #                        axes,
+        #                        bool_plot_centroids=bool_plot_centroids)
 
         axes.set_title(f"{dim_reduction_model.upper()} embeddings")
         fig.savefig(dim_reduced_embed_path.joinpath("embed.png"), dpi=300)
         plt.close(fig)
 
 
-def set_legend(fig, axes, bool_plot_centroids=True):
-    handles, labels = axes.get_legend_handles_labels()
+def set_legend(handles, labels, fig, axes, bool_plot_centroids=True):
+    # handles, labels = axes.get_legend_handles_labels()
 
     # Calculate number of columns dynamically based on the number of labels
     num_labels = len(labels)  # Number of labels in the legend
@@ -211,7 +249,7 @@ def set_figsize_for_comparison(rows, cols):
 
 
 def plot_comparison(
-    audio_dir, embedding_models, dim_reduction_model, bool_spherical=False
+    paths, audio_dir, embedding_models, dim_reduction_model, bool_spherical=False
 ):
     rows, cols = return_rows_cols(len(embedding_models))
     clust_dict = {}
@@ -234,9 +272,19 @@ def plot_comparison(
         ld = Loader(
             audio_dir, model_name=model, dim_reduction_model=dim_reduction_model
         )
+        default_labels = le.create_default_labels(paths, model, audio_dir)
+        if le.labels_path.joinpath("ground_truth.npy").exists():
+            ground_truth_dict = np.load(
+                le.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
+            ).item()
+        else:
+            ground_truth_dict = None
+
         axes.flatten()[idx], clust_dict[model] = plot_embeddings(
             ld.embed_dir,
             dim_reduction_model,
+            default_labels,
+            ground_truth=ground_truth_dict,
             axes=axes.flatten()[idx],
             fig=fig,
             bool_plot_centroids=False,
@@ -258,7 +306,8 @@ def plot_comparison(
     fig.savefig(ld.embed_dir.joinpath("comp_fig.png"), dpi=300)
 
 
-def visualize_task_results(task_name, model_name, metrics):
+def plot_classification_results(paths, task_name, metrics):
+    model_name = paths.labels_path.parent.stem
     fig, ax = plt.subplots(1, 1, figsize=(12, 8))
     cmap = plt.cm.tab10
     colors = cmap(np.arange(len(metrics["per_class_accuracy"].values())) % cmap.N)
@@ -281,8 +330,7 @@ def visualize_task_results(task_name, model_name, metrics):
     ax.set_xticks(range(len(metrics["per_class_accuracy"])))
     ax.set_xticklabels(metrics["per_class_accuracy"].keys(), rotation=90)
     fig.subplots_adjust(bottom=0.3)
-    path = Path(bacpipe_settings["task_results_dir"]).joinpath("plots")
-    path.mkdir(parents=True, exist_ok=True)
+    path = paths.class_path
     fig.savefig(
         path.joinpath(f"class_results_{task_name}_{model_name}.png"),
         dpi=300,
@@ -437,3 +485,400 @@ def plot_per_class_metrics(task_name, model_list, per_class_metrics, overall_met
         dpi=300,
     )
     plt.close(fig)
+
+
+#################################################################
+
+
+def plot_violins(left, right):
+    val = []
+    typ = []
+    cat = []
+    for idx, (intra, inter) in enumerate(zip(left, right)):
+        val.append(intra.tolist())
+        val.append(inter.tolist())
+        typ.extend(["Intra"] * len(intra))
+        typ.extend(["Inter"] * len(inter))
+        cat.extend([f"Group {idx}"] * len(intra))
+        cat.extend([f"Group {idx}"] * len(inter))
+
+    # Convert to long-form format
+    data_long = pd.DataFrame(
+        {"Value": np.concatenate(val), "Type": typ, "Category": cat}
+    )
+
+    # Create the violin plot
+    plt.figure(figsize=(14, 8))
+    sns.violinplot(
+        x="Category",
+        y="Value",
+        hue="Type",
+        data=data_long,
+        split=True,
+        inner="quartile",
+    )
+
+    plt.show()
+
+
+def plot_bars(clusterings, run, model, ax, outer_idx):
+    metrics_list = ["SS", "AMI", "ARI"]
+    bar_width = 1 / (len(metrics_list) + 1)
+    cmap = plt.cm.tab10
+    colors = cmap(np.arange(len(metrics_list)) % cmap.N)
+    for inner_idx, (metric, color) in enumerate(zip(metrics_list, colors)):
+        if metric == "SS":
+            val = clusterings[run][model][metric]
+            label = metric
+        else:
+            val = clusterings[run][model][metric]["KMeans"]
+            label = metric + "(KMeans)"
+
+        ax.bar(
+            outer_idx - bar_width * inner_idx,
+            val,
+            label=label,
+            width=bar_width,
+            color=color,
+        )
+
+
+def plot_comparison(
+    models,
+    label_keys,
+    reduced_embeds,
+    name,
+    metrics_embed,
+    metrics_reduc,
+    clust_embed,
+    clust_reduc,
+    reducer_conf,
+    label_file=None,
+    **kwargs,
+):
+    # fig, axes = plt.subplots(2, 5, figsize=(20, 10))
+    if label_file:  # TODO
+        label_keys = list(label_keys) + ["Unlabeled"]
+    fig, axes = plt.subplots(4, 4, figsize=(16, 10))
+    for ax, model in zip(axes.flatten(), models):
+        for key, embed_split in reduced_embeds[model]["split"].items():
+            ax.plot(
+                embed_split[:, 0],
+                embed_split[:, 1],
+                "o",
+                label=key,
+                markersize=0.5,
+            )
+        # ss_string = f"\nSS_orig: {metrics_embed[model]['SS']:.3f} " + \
+        #             f"SS_reduc: {metrics_reduc[model]['SS']:.3f}"
+        ss_string = (
+            f"\nSilhouette Score: {metrics_embed[model]['SS']:.3f} | "
+            + f"AMI: {metrics_embed[model]['AMI']['kmeans']:.3f}"
+        )
+        ax.set_title(model.upper() + ss_string)
+
+    fig.subplots_adjust(hspace=0.5)
+    orig_sorted = dict(
+        sorted(metrics_embed.items(), key=lambda x: x[-1]["SS"])[::-1]
+    ).keys()
+    # orig_sorted = dict(sorted(metrics_embed.items(),
+    #                           key=lambda x: x[-1]['AMI']['kmeans'])[::-1]).keys()
+    reduc_sorted = dict(
+        sorted(metrics_reduc.items(), key=lambda x: x[-1]["SS"])[::-1]
+    ).keys()
+    positions = {
+        mod: ax.get_position() for mod, ax in zip(list(orig_sorted), axes.flatten())
+    }
+    for model, ax in zip(list(metrics_embed.keys()), axes.flatten()):
+        ax.set_position(positions[model])
+
+    handles, labels = axes.flatten()[0].get_legend_handles_labels()
+    # labels = [
+    #     "Chiffchaff & Cuckoo",
+    #     "Coati",
+    #     "Dawn Chorus (Cuckoo, Wren & Robin)",
+    #     "Chick calls",
+    #     "Manx Shearwater",
+    #     "Dolphin Quacks",
+    # ]
+    fig.legend(handles, labels, fontsize=12, markerscale=15, ncol=3, loc="lower center")
+    # fig.legend(*ax.get_legend_handles_labels(),
+    #            markerscale=6,
+    #            loc="outside right")
+    path = plot_path.joinpath(f"default_{list(reducer_conf.keys())[-1]}")
+    path.mkdir(exist_ok=True)
+
+    fig.savefig(path.joinpath(f"{name}_ss.png"))
+
+    plot_clusterings(models, clust_embed, metrics_embed, reduced_embeds, name, **kwargs)
+    plot_clusterings(
+        models, clust_reduc, metrics_reduc, reduced_embeds, name + "_reduced", **kwargs
+    )
+
+
+def clust_bar_plot(runs):
+    clusterings = {}
+    for run in runs:
+        with open(clust_metrics_path.joinpath(f"{run}_cluster_metrics.json"), "r") as f:
+            clusterings[run] = json.load(f)
+        with open(
+            clust_metrics_path.joinpath(f"{run}_reduced_cluster_metrics.json"), "r"
+        ) as f:
+            clusterings[run + "_reduced"] = json.load(f)
+
+    perc_clust = get_percentage_change(runs, clusterings)
+
+    bar_width = 1 / (len(runs) * 2 - 1 + 1)
+    cmap = plt.cm.tab10
+    colors = cmap(np.arange(len(runs) * 2 - 1 + 3) % cmap.N)
+    fig_tot, axes_tot = plt.subplots(4, 1, figsize=(10, 10))
+    met_idx = 0
+    run_label = []
+    for met in ["SS", "AMI", "ARI"]:
+        for mod_idx, model in enumerate(clusterings[run].keys()):
+            # fig, axes = plt.subplots(2, 1, figsize=(10, 10))
+            run_idx = 0
+            for reduc_label in ["", "_reduced"]:
+                for run in runs:
+                    run = run + reduc_label
+
+                    if run == "normal":
+                        if met_idx == 0:
+                            for idx, orig_met in enumerate(["SS", "AMI", "ARI"]):
+                                if not isinstance(
+                                    clusterings[run][model][orig_met], float
+                                ):
+                                    axes_tot[0].bar(
+                                        mod_idx - bar_width * idx,
+                                        clusterings[run][model][orig_met]["kmeans"],
+                                        label=orig_met,
+                                        width=bar_width,
+                                        color=colors[5 + idx],
+                                    )
+                                else:
+                                    axes_tot[0].bar(
+                                        mod_idx - bar_width * idx,
+                                        clusterings[run][model][orig_met],
+                                        label=orig_met,
+                                        width=bar_width,
+                                        color=colors[5 + idx],
+                                    )
+                        continue
+
+                    if not isinstance(perc_clust[run][model][met], float):
+                        axes_tot[met_idx + 1].bar(
+                            mod_idx - bar_width * run_idx,
+                            perc_clust[run][model][met]["kmeans"],
+                            label=run,
+                            width=bar_width,
+                            color=colors[run_idx],
+                        )
+                    else:
+                        axes_tot[met_idx + 1].bar(
+                            mod_idx - bar_width * run_idx,
+                            perc_clust[run][model][met],
+                            label=run,
+                            width=bar_width,
+                            color=colors[run_idx],
+                        )
+                    run_label.append(run)
+                    # plot_bars(perc_clust, run+reduc_label, model, ax, run_idx)
+                    # axes_tot[run_idx].bar(mod_idx - bar_width * run_idx,
+                    #                 perc_clust[run][model][met],
+                    #                 label=run,
+                    #                 width=bar_width,
+                    #                 color=colors[run_idx])
+                    run_idx += 1
+        axes_tot[met_idx].set_xticks([])
+        axes_tot[met_idx + 1].set_ylabel(met)
+        axes_tot[met_idx + 1].hlines(
+            0, -1, mod_idx, linestyles="dashed", color="black", linewidth=0.3
+        )
+        met_idx += 1
+
+        # ax.set_title(model)
+        # ax.set_xticks([])
+
+        # axes[0].set_ylabel('original embedding')
+        # axes[1].set_ylabel('reduced 2d UMAP embedding')
+        # axes[-1].set_xticks(np.arange(len(runs)) - 0.3)
+        # axes[-1].set_xticklabels(runs, rotation=45, ha='right')
+        # hand, labl = ax.get_legend_handles_labels()
+        # hand, labl = hand[:3], labl[:3]
+
+        # fig.legend(hand, labl, loc="lower right")
+        path = plot_path.joinpath(f"compare_runs").joinpath(model)
+        path.mkdir(exist_ok=True, parents=True)
+        # fig.savefig(path.joinpath(f'{run}_barplot.png'))
+
+    axes_tot[0].set_ylabel("original embeddings")
+    axes_tot[0 + 1].set_ylim(-50, 1400)
+    axes_tot[1 + 1].set_ylim(-30, 150)
+    axes_tot[2 + 1].set_ylim(-30, 150)
+    fig_tot.subplots_adjust(right=0.8)
+    models = list(clusterings[run].keys())
+    # axes_tot[0].set_ylabel('original embedding')
+    # axes_tot[1].set_ylabel('reduced 2d UMAP embedding')
+    axes_tot[-1].set_xticks(np.arange(len(models)) - 0.3)
+    axes_tot[-1].set_xticklabels(models, rotation=45, ha="right")
+
+    hand0, labl0 = axes_tot[0].get_legend_handles_labels()
+    hand0, labl0 = hand0[:3], labl0[:3]
+    # fig_tot.legend(hand0, labl0, loc="outside right")
+
+    hand1, labl1 = axes_tot[-1].get_legend_handles_labels()
+    hand1, labl1 = hand1[:5][::-1], labl1[:5][::-1]
+    hand, labl = hand0 + hand1, labl0 + labl1
+    fig_tot.legend(hand, labl, loc="outside right")
+
+    axes_tot[0].set_title("Clustering scores of original embeddings")
+    axes_tot[1].set_title(
+        "Percentage change of clustering scores from original embeddings"
+    )
+    # fig_tot.suptitle('Deviations from original values in percent')
+    path = plot_path.joinpath(f"compare_runs")
+    path.mkdir(exist_ok=True)
+    fig_tot.savefig(path.joinpath(f"barplot.png"), dpi=300)
+
+
+def plot_clusterings(
+    models, clust_values, metrics, reduced_embeds, name, clust_conf, **kwargs
+):
+    for clust_name in list(clust_values.values())[0].keys():
+        fig, axes = plt.subplots(4, 4, figsize=(20, 10))
+        for ax, model in zip(axes.flatten(), models):
+            clust_vals = clust_values[model][clust_name]
+            for cluster in np.unique(clust_vals):
+                ems = reduced_embeds[model]["all"][clust_vals == cluster]
+                ax.plot(
+                    ems[:, 0],
+                    ems[:, 1],
+                    "o",
+                    markersize=0.5,
+                )
+
+            metric_string = (
+                f"\nARI: {metrics[model]['ARI'][clust_name]:.3f} "
+                + f"AMI: {metrics[model]['AMI'][clust_name]:.3f}"
+            )
+            ax.set_title(model.upper() + metric_string)
+
+        conf_label = [
+            list(clust.keys())[-1]
+            for clust in clust_conf
+            if clust["name"] == clust_name.lower()
+        ][0]
+        if "_reduced" in name:
+            path = plot_path.joinpath(f"reduced_{clust_name}_{conf_label}")
+        else:
+            path = plot_path.joinpath(f"{clust_name}_{conf_label}")
+
+        path.mkdir(exist_ok=True)
+
+        fig.savefig(path.joinpath(f"{name}_{clust_name}.png"))
+
+
+def plot_clustering_by_metric_new(all_clusts_reordered, models):
+    fig, axes = plt.subplots(2, 3, figsize=(20, 10))
+    plt.subplots_adjust(right=0.9)
+
+    sort_dict = {
+        m: v["normal_no_noise"] for m, v in all_clusts_reordered["AMI"].items()
+    }
+    sort_dict = dict(sorted(sort_dict.items(), key=lambda x: x[-1], reverse=True))
+    models = list(sort_dict.keys())
+
+    cmap = plt.cm.tab20
+    colors = cmap(np.arange(len(models)) % cmap.N)
+    for axes_row, metric in zip(axes, ["AMI", "ARI"]):
+        for axes, met in zip(axes_row, ["normal", "pca", "umap"]):
+            # for axes, met in zip(axes_row, ["normal", "pca", "spca", "umap", "umap_bars"]):
+            for idx, model in enumerate(sort_dict.keys()):
+                # order = [
+                #     "normal",
+                #     "pca_50",
+                #     "pca_100",
+                #     "spca_50",
+                #     "spca_100",
+                #     "umap_50",
+                #     "umap_100",
+                # ]
+                if met == "normal":
+                    values = all_clusts_reordered[metric][model][met + "_no_noise"]
+                    axes.bar(
+                        idx / len(models),
+                        values,
+                        width=1 / len(models),
+                        color=colors[idx],
+                        label=model,
+                    )
+                    if metric == "AMI":
+                        axes.set_title("Orig. Embedding")
+                        axes.set_xticks([])
+                    else:
+                        axes.set_xticks([])
+                    axes.set_ylabel(metric)
+                # elif met == 'umap_bars':
+                else:
+                    # values = all_clusts_reordered[metric][model]['umap_100_no_noise']
+                    values = all_clusts_reordered[metric][model][met + "_300_no_noise"]
+                    axes.bar(
+                        idx / len(models),
+                        values,
+                        width=1 / len(models),
+                        color=colors[idx],
+                        label=model,
+                    )
+                    if metric == "AMI":
+                        axes.set_title(met.upper() + " 300")
+                        axes.set_xticks([])
+                    else:
+                        axes.set_xticks([])
+                # else:
+                #     # values = [all_clusts_reordered[metric][model][met+ii+'_no_noise'] for ii in ["_50", "_100"]]
+                #     values = [all_clusts_reordered[metric][model][met+'_'+ii+'_no_noise'] for ii in ["300"]]
+                #     values = np.array(values)/all_clusts_reordered[metric][model]['normal_no_noise']
+                #     axes.plot(values, "-x", color=colors[idx], label=model)
+                #     axes.set_ylim([0.45, 2.5])
+                #     axes.hlines(1, 0, 1, linestyles="dashed", color="black", linewidth=1.5)
+                #     if metric == 'AMI':
+                #         axes.set_title(met.upper() + ' perc. change')
+                #         axes.set_xticks([])
+                #     else:
+                #         axes.set_xticks(np.arange(1))
+                #         # axes.set_xticklabels([met+'_50', met+'_100'], rotation=45, ha="right")
+                #         axes.set_xticklabels([met+'_300'], rotation=45, ha="right")
+
+    plt.show()
+    fig.legend(models, loc="outside right")
+    fig.savefig(plot_path.joinpath(f"clustering_by_metriccc.png"), dpi=300)
+
+
+def plot_clustering_by_metric(all_clusts_reordered, models):
+    fig, axes = plt.subplots(3, 1, figsize=(20, 10))
+    plt.subplots_adjust(right=0.8)
+
+    cmap = plt.cm.tab20
+    colors = cmap(np.arange(len(models)) % cmap.N)[::-1]
+    for axes, metric in zip(axes.flatten(), ["SS", "AMI", "ARI"]):
+        for idx, model in enumerate(models):
+            order = [
+                "normal",
+                "pca_50",
+                "pca_100",
+                "spca_50",
+                "spca_100",
+                "umap_50",
+                "umap_100",
+            ]
+            values = [
+                all_clusts_reordered[metric][model][run + "_no_noise"] for run in order
+            ]
+            # values = np.array(values)/values[0]
+            axes.plot(values, "-x", color=colors[idx], label=model)
+        axes.set_ylabel(metric)
+        axes.set_xticks(np.arange(len(order)))
+        axes.set_xticklabels(order, rotation=45, ha="right")
+    plt.show()
+    fig.legend(models, loc="outside right")
+    fig.savefig(plot_path.joinpath(f"clustering_by_metric.png"), dpi=300)
