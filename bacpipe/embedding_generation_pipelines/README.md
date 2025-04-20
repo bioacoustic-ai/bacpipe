@@ -185,13 +185,13 @@ To add a new model, simply add a pipeline with the name of your model. Make sure
 - define a class called "__Model__" which inherits the __ModelBaseClass__ from __bacpipe.utils__
 - define the __init__, preproc, and __call__ methods so that the model can be called
 - if necessary save the checkpoint in the __bacpipe.model_checkpoints__ dir with the name corresponding to the name of the model
-- if you need to import code where your specific model class is defined, create a directory in __bacpipe.model_utils__ corresponding to your model name "newmodel" and add all the necessary code in there
+- if you need to import code where your specific model class is defined, create a directory in __bacpipe.model_specific_utils__ corresponding to your model name "newmodel" and add all the necessary code in there
 
 Here is an example:
 
 ```python 
 import torch
-from bacpipe.model_utils.newmodel.module import MyClass
+from bacpipe.model_specific_utils.newmodel.module import MyClass
 from .utils import ModelBaseClass
 
 SAMPLE_RATE = 12345

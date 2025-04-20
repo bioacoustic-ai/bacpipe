@@ -8,39 +8,16 @@ from tqdm import tqdm
 from pathlib import Path
 import datetime as dt
 
-import umap
-
-# import hdbscan
-
-from sklearn.decomposition import PCA, SparsePCA
-from sklearn.cluster import KMeans
-from sklearn.metrics import pairwise_distances
-from sklearn.metrics import silhouette_score as SS
-from sklearn.metrics import adjusted_rand_score as ARI
-from sklearn.metrics import adjusted_mutual_info_score as AMI
-
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-# sns.set_theme(style="white")
-
-
 import logging
 
 logger = logging.getLogger("bacpipe")
 
-import yaml
-
-with open("bacpipe/settings.yaml", "rb") as p:
-    settings = yaml.load(p, Loader=yaml.CLoader)
-
 
 class DefaultLabels:
-    def __init__(self, paths, model, **kwargs):
+    def __init__(self, paths, model, default_label_keys, **kwargs):
         self.model = model
-        with open("bacpipe/settings.yaml", "r") as f:
-            self.settings = yaml.safe_load(f)
-        embed_path = model_specific_embedding_path(paths, model)
+        self.default_label_keys = default_label_keys
+        embed_path = model_specific_embedding_path(paths.main_embeds_path, model)
         self.metadata = yaml.safe_load(open(embed_path.joinpath("metadata.yml"), "r"))
         self.nr_embeds_per_file = self.metadata["files"]["nr_embeds_per_file"]
         self.nr_embeds_total = self.metadata["nr_embeds_total"]
@@ -51,7 +28,7 @@ class DefaultLabels:
 
     def generate(self):
         self.default_label_dict = {}
-        for default_label in self.settings["default_labels"]:
+        for default_label in self.default_label_keys:
             getattr(self, default_label)()
 
             self.default_label_dict.update(
@@ -120,7 +97,9 @@ class DefaultLabels:
         for file_idx, (file, time_of_day) in enumerate(time_of_day_per_file.items()):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
                 self.time_of_day_per_embedding.append(
-                    time_of_day + index_of_embedding * segment_s_dt
+                    (time_of_day + index_of_embedding * segment_s_dt)
+                    .time()
+                    .replace(microsecond=0)
                 )
 
     def day_of_year(self):
@@ -152,7 +131,9 @@ class DefaultLabels:
         ):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
                 self.continuous_timestamp_per_embedding.append(
-                    datetime_per_file + index_of_embedding * segment_s_dt
+                    (datetime_per_file + index_of_embedding * segment_s_dt).replace(
+                        microsecond=0
+                    )
                 )
 
     def parent_directory(self):
@@ -170,16 +151,16 @@ class DefaultLabels:
             )
 
 
-def model_specific_embedding_path(paths, model):
+def model_specific_embedding_path(path, model):
     embed_paths_for_this_model = [
         d
-        for d in paths.main_embeds_path.iterdir()
-        if d.is_dir() and d.stem.split("___")[-1].split("-")[0] == model
+        for d in path.iterdir()
+        if d.is_dir() and model in d.stem.split("___")[-1].split("-")
     ]
     embed_paths_for_this_model.sort()
     if len(embed_paths_for_this_model) == 0:
         raise ValueError(
-            f"No embeddings found for model {model} in {paths.main_embeds_path}. "
+            f"No embeddings found for model {model} in {path}. "
             "Please check the directory path."
         )
     elif len(embed_paths_for_this_model) > 1:
@@ -350,15 +331,14 @@ def collect_ground_truth_labels_by_file(
 def ground_truth_by_model(
     paths,
     model,
-    label_file=None,
+    label_file="annotations.csv",
     overwrite=False,
     single_label=True,
-    remove_noise=False,
     **kwargs,
 ):
     if overwrite or not paths.labels_path.joinpath("ground_truth.npy").exists():
 
-        path = model_specific_embedding_path(paths, model)
+        path = model_specific_embedding_path(paths.main_embeds_path, model)
 
         label_df, label_idx_dict = load_labels_and_build_dict(paths, label_file)
 
@@ -378,12 +358,6 @@ def ground_truth_by_model(
             label_idx_dict,
             single_label=single_label,
         )
-
-        if remove_noise:
-            if single_label:
-                ground_truth = ground_truth[ground_truth > -1]
-            else:
-                ground_truth = ground_truth[ground_truth != -1]
 
         ground_truth_dict = {
             "labels": ground_truth,

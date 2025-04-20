@@ -186,7 +186,7 @@ def classification_pipeline(
     """
     if (
         overwrite
-        or not paths.clust_path.joinpath(f"class_results_{name}.json").exists()
+        or not paths.class_path.joinpath(f"class_results_{name}.json").exists()
     ):
         metrics = classify(paths, dataset_csv_path, embeds, config=name, **kwargs)
 

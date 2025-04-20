@@ -36,15 +36,16 @@ def save_clustering_performance(paths, clusterings, metrics, remove_noise):
         whether to remove the not annotated segments or not
     """
     if remove_noise:
-        appendix = "_no_noise"
+        appendix = ""
     else:
         appendix = "_with_noise"
     clust_path = lambda a, b, c: paths.clust_path.joinpath(f"clust_{a}_{b}.{c}")
 
     np.save(clust_path("label", appendix, "npy"), clusterings)
 
-    with open(clust_path("metrics", appendix, "json"), "w") as f:
-        json.dump(metrics, f, default=convert_numpy_types)
+    if metrics:
+        with open(clust_path("results", appendix, "json"), "w") as f:
+            json.dump(metrics, f, default=convert_numpy_types)
 
 
 def compute_clusterings(embeds, labels, cluster_configs):
@@ -72,12 +73,13 @@ def compute_clusterings(embeds, labels, cluster_configs):
     for name, clusterer in cluster_configs.items():
         clusterings[name] = clusterer.fit_predict(embeds)
 
-    metrics["SS"] = SS(embeds, labels)
-    metrics["AMI"] = {}
-    metrics["ARI"] = {}
-    for clust_name, cluster_labels in clusterings.items():
-        metrics["AMI"][clust_name] = AMI(labels, cluster_labels)
-        metrics["ARI"][clust_name] = ARI(labels, cluster_labels)
+    if labels is not None:
+        metrics["SS"] = SS(embeds, labels)
+        for clust_name, cluster_labels in clusterings.items():
+            metrics[f"AMI({clust_name})"] = AMI(labels, cluster_labels)
+            metrics[f"ARI({clust_name})"] = ARI(labels, cluster_labels)
+    else:
+        metrics = None
     return metrics, clusterings
 
 
@@ -107,7 +109,7 @@ def get_clustering_models(clust_params):
     return cluster_configs
 
 
-def get_nr_of_clusters(ground_truth, labels, clust_configs, **kwargs):
+def get_nr_of_clusters(labels, clust_configs, **kwargs):
     """
     Get number of clusters either from ground truth or if doesn't exist
     from settings.yaml
@@ -127,7 +129,7 @@ def get_nr_of_clusters(ground_truth, labels, clust_configs, **kwargs):
     clust_params = {}
     for config in clust_configs.values():
         if config["name"] == "kmeans":
-            if ground_truth is not None:
+            if labels is not None:
                 nr_of_classes = len(np.unique(labels))
                 clust_params[config["name"]] = {
                     "n_clusters": nr_of_classes,
@@ -161,12 +163,15 @@ def clustering(
     """
     if overwrite or not len(list(paths.clust_path.glob("*.json"))) > 0:
 
-        labels = ground_truth["labels"]
+        if ground_truth:
+            labels = ground_truth["labels"]
 
-        if remove_noise:
-            if -1 in labels:
-                embeds = embeds[labels != -1]
-                labels = labels[labels != -1]
+            if remove_noise:
+                if -1 in labels:
+                    embeds = embeds[labels != -1]
+                    labels = labels[labels != -1]
+        else:
+            labels = None
 
         clust_params = get_nr_of_clusters(labels, **kwargs)
 

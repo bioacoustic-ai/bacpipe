@@ -11,7 +11,7 @@ import bacpipe.generate_embeddings as ge
 from bacpipe.embedding_evaluation.visualization.visualize import (
     plot_comparison,
     plot_embeddings,
-    visualise_classification_results_across_models,
+    visualise_results_across_models,
 )
 from bacpipe.embedding_evaluation.label_embeddings import (
     create_default_labels,
@@ -189,7 +189,7 @@ def model_specific_evaluation(
         if not evaluation_task == "None":
             embeds = loader_dict[model_name].embedding_dict()
             paths = set_paths(audio_dir, model_name, **kwargs)
-            ground_truth = ground_truth_by_model(paths, model_name)
+            ground_truth = ground_truth_by_model(paths, model_name, **kwargs)
 
         if "classification" in evaluation_task:
             print("\nTraining linear classifier to evaluate embeddings")
@@ -204,7 +204,9 @@ def model_specific_evaluation(
             class_embeds = embeds_array_without_noise(embeds, ground_truth)
             for class_config in class_configs.values():
                 if class_config["bool"]:
-                    classification_pipeline(paths, class_embeds, **class_config)
+                    classification_pipeline(
+                        paths, class_embeds, **class_config, **kwargs
+                    )
 
         if "clustering" in evaluation_task:
             embeds_array = np.concatenate(list(embeds.values()))
@@ -216,20 +218,36 @@ def model_specific_evaluation(
                     calc_distances(paths, embeds, **dist_config)
 
 
-def embeds_array_without_noise(embeds, ground_truth):
-    return np.concatenate(list(embeds.values()))[ground_truth["labels"] > -1]
-
-
 def cross_model_evaluation(audio_dir, dim_reduction_model, evaluation_task, **kwargs):
+    """
+    Generate plots to compare models by the specified tasks.
+
+    Parameters
+    ----------
+    audio_dir : str
+        string to audio data for getting the plot path
+    dim_reduction_model : str
+        name of dimensionality reduction model
+    evaluation_task : list
+        tasks to evaluate models by
+    """
+    path_func = lambda x: set_paths(audio_dir, x, **kwargs)
     if len(model_names) > 1:
-        if not evaluation_task == "None":
-            visualise_classification_results_across_models(evaluation_task, model_names)
+        plot_path = path_func(model_names[0]).plot_path.parent.parent.joinpath(
+            "overview"
+        )
+        plot_path.mkdir(exist_ok=True, parents=True)
+        if not len(evaluation_task) == 0:
+            for task in evaluation_task:
+                visualise_results_across_models(path_func, plot_path, task, model_names)
         if not dim_reduction_model == "None":
             plot_comparison(
-                audio_dir,
-                model_names,
-                dim_reduction_model,
+                path_func, plot_path, model_names, dim_reduction_model, **kwargs
             )
+
+
+def embeds_array_without_noise(embeds, ground_truth):
+    return np.concatenate(list(embeds.values()))[ground_truth["labels"] > -1]
 
 
 def visualize_using_dashboard():
@@ -276,10 +294,12 @@ def get_embeddings(
         check_if_combination_exists=check_if_primary_combination_exists,
     )
     paths = set_paths(audio_dir, model_name, **kwargs)
-    default_labels = create_default_labels(paths, model_name, audio_dir, **kwargs)
+    default_labels = create_default_labels(
+        paths, model_name, audio_dir, overwrite=overwrite, **kwargs
+    )
 
     ground_truth = ground_truth_by_model(
-        paths, model_name, label_file="annotations.csv", **kwargs
+        paths, model_name, label_file="annotations.csv", overwrite=overwrite, **kwargs
     )
 
     if not dim_reduction_model == "None":
@@ -294,9 +314,7 @@ def get_embeddings(
             audio_dir=audio_dir,
             check_if_combination_exists=check_if_secondary_combination_exists,
         )
-        if not overwrite and (
-            loader_dim_reduced.embed_dir.joinpath("embed.png").exists()
-        ):
+        if not overwrite and (paths.plot_path.joinpath("embeddings.png").exists()):
             logger.debug(
                 f"Embedding visualization already exist in {loader_dim_reduced.embed_dir}"
                 " Skipping visualization generation."
@@ -308,12 +326,14 @@ def get_embeddings(
                 f"{loader_dim_reduced.embed_dir} ###"
             )
             plot_embeddings(
+                paths,
                 loader_dim_reduced.embed_dir,
                 dim_reduction_model,
                 default_labels,
                 ground_truth=ground_truth,
                 bool_plot_centroids=False,
                 label_by="time_of_day",
+                **kwargs,
             )
     return loader_embeddings
 

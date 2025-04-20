@@ -24,7 +24,7 @@ audio tasks listed in `available_evaluation_tasks`. A linear classifier will be 
 
 **At this point and time publication of the training data that we use is still pending, however you can define your own classification task if you have labeled data.**
 
-**Linear probes** are simple linear layers trained for the specific task at hand, until convergence. These are intended to produce predictions on the test set with minimum modification of the pre-trained embeddings. From the predictions generated we compute micro and macro accuracies which provide a comparable value to evaluate performance across the different models. 
+**Linear classifiers** are simple linear layers trained for the specific task at hand, until convergence. These are intended to produce predictions on the test set with minimum modification of the pre-trained embeddings. From the predictions generated we compute micro and macro accuracies which provide a comparable value to evaluate performance across the different models. 
 
 ### How to use it
 
