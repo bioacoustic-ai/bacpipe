@@ -1,6 +1,8 @@
 import yaml
 import json
 import re
+from types import SimpleNamespace
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -151,6 +153,75 @@ class DefaultLabels:
             )
 
 
+def make_set_paths_func(audio_dir, main_results_dir, dim_reduc_parent_dir, **kwargs):
+
+    global get_paths
+
+    def get_paths(model_name):
+        """
+        Generate model specific paths for the results of the embedding evaluation.
+        This includes paths for the embeddings, labels, clustering, classification,
+        distances, and plots. The paths are created based on the audio directory,
+        and model name.
+
+        Parameters
+        ----------
+        audio_dir : string
+            full path to audio files
+        model_name : string
+            name of the model used for embedding
+        main_results_dir : string
+            top level directory for the results of the embedding evaluation
+
+        Returns
+        -------
+        paths : SimpleNamespace
+            object containing the paths for the results of the embedding evaluation
+        """
+        dataset_path = Path(main_results_dir).joinpath(Path(audio_dir).stem)
+        task_path = dataset_path.joinpath("task_results").joinpath(model_name)
+
+        paths = {
+            "dataset_path": dataset_path,
+            "dim_reduc_parent_dir": dataset_path.joinpath(dim_reduc_parent_dir),
+            "main_embeds_path": dataset_path.joinpath("embeddings"),
+            "labels_path": task_path.joinpath("labels"),
+            "clust_path": task_path.joinpath("clustering"),
+            "class_path": task_path.joinpath("classification"),
+            "distances_path": task_path.joinpath("distances"),
+            "plot_path": task_path.joinpath("plots"),
+        }
+
+        paths = SimpleNamespace(**paths)
+
+        paths.main_embeds_path.mkdir(exist_ok=True, parents=True)
+        paths.labels_path.mkdir(exist_ok=True, parents=True)
+        paths.clust_path.mkdir(exist_ok=True)
+        paths.class_path.mkdir(exist_ok=True)
+        paths.distances_path.mkdir(exist_ok=True)
+        paths.plot_path.mkdir(exist_ok=True)
+        return paths
+
+    return get_paths
+
+
+def get_dim_reduc_path_func(model_name):
+    return model_specific_embedding_path(
+        get_paths(model_name).dim_reduc_parent_dir, model_name
+    )
+
+
+def get_default_labels(model_name, **kwargs):
+    return create_default_labels(get_paths(model_name), model_name, **kwargs)
+
+
+def get_ground_truth(model_name):
+    return np.load(
+        get_paths(model_name).labels_path.joinpath("ground_truth.npy"),
+        allow_pickle=True,
+    ).item()
+
+
 def model_specific_embedding_path(path, model):
     embed_paths_for_this_model = [
         d
@@ -171,7 +242,7 @@ def model_specific_embedding_path(path, model):
     return embed_paths_for_this_model[-1]
 
 
-def create_default_labels(paths, model, audio_dir, overwrite=True, **kwargs):
+def create_default_labels(paths, model, overwrite=True, **kwargs):
     if overwrite or not paths.labels_path.joinpath("default_labels.npy").exists():
 
         default_labels = DefaultLabels(paths, model=model, **kwargs)

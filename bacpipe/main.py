@@ -1,7 +1,6 @@
 import time
 import logging
 from pathlib import Path
-from types import SimpleNamespace
 
 import numpy as np
 from tqdm import tqdm
@@ -12,9 +11,10 @@ from bacpipe.embedding_evaluation.visualization.visualize import (
     plot_comparison,
     plot_embeddings,
     visualise_results_across_models,
+    EmbedAndLabelLoader,
 )
 from bacpipe.embedding_evaluation.label_embeddings import (
-    create_default_labels,
+    make_set_paths_func,
     generate_annotations_for_classification_task,
     ground_truth_by_model,
 )
@@ -27,51 +27,9 @@ from bacpipe.embedding_evaluation.distance_evalutation.distances import (
     calc_distances,
 )
 
+from bacpipe.embedding_evaluation.visualization.dashboard import DashBoard
+
 logger = logging.getLogger("bacpipe")
-
-
-def set_paths(audio_dir, model_name, main_results_dir, **kwargs):
-    """
-    Generate model specific paths for the results of the embedding evaluation.
-    This includes paths for the embeddings, labels, clustering, classification,
-    distances, and plots. The paths are created based on the audio directory,
-    and model name.
-
-    Parameters
-    ----------
-    audio_dir : string
-        full path to audio files
-    model_name : string
-        name of the model used for embedding
-    main_results_dir : string
-        top level directory for the results of the embedding evaluation
-
-    Returns
-    -------
-    paths : SimpleNamespace
-        object containing the paths for the results of the embedding evaluation
-    """
-    dataset_path = Path(main_results_dir).joinpath(Path(audio_dir).stem)
-    task_path = dataset_path.joinpath("task_results").joinpath(model_name)
-
-    paths = {
-        "main_embeds_path": dataset_path.joinpath("embeddings"),
-        "labels_path": task_path.joinpath("labels"),
-        "clust_path": task_path.joinpath("clustering"),
-        "class_path": task_path.joinpath("classification"),
-        "distances_path": task_path.joinpath("distances"),
-        "plot_path": task_path.joinpath("plots"),
-    }
-
-    paths = SimpleNamespace(**paths)
-
-    paths.main_embeds_path.mkdir(exist_ok=True, parents=True)
-    paths.labels_path.mkdir(exist_ok=True, parents=True)
-    paths.clust_path.mkdir(exist_ok=True)
-    paths.class_path.mkdir(exist_ok=True)
-    paths.distances_path.mkdir(exist_ok=True)
-    paths.plot_path.mkdir(exist_ok=True)
-    return paths
 
 
 def get_model_names(
@@ -159,7 +117,7 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, **kwargs):
 
 
 def model_specific_evaluation(
-    loader_dict, audio_dir, evaluation_task, class_configs, distance_configs, **kwargs
+    loader_dict, evaluation_task, class_configs, distance_configs, **kwargs
 ):
     """
     Perform evaluation of the embeddings using the specified
@@ -176,19 +134,19 @@ def model_specific_evaluation(
     ----------
     loader_dict : dict
         dictionary containing the loader objects for each model
-    audio_dir : string
-        full path to audio files
     evaluation_task : string
         name of the evaluation task to be performed.
     class_configs : dict
         dictionary containing the configuration for the
         classification tasks. The configurations are specified
         in the bacpipe/settings.yaml file.
+    distance_configs : dict
+        dictionary to specify which distance calculations to perform
     """
     for model_name in model_names:
         if not evaluation_task == "None":
             embeds = loader_dict[model_name].embedding_dict()
-            paths = set_paths(audio_dir, model_name, **kwargs)
+            paths = get_paths(model_name)
             ground_truth = ground_truth_by_model(paths, model_name, **kwargs)
 
         if "classification" in evaluation_task:
@@ -218,65 +176,38 @@ def model_specific_evaluation(
                     calc_distances(paths, embeds, **dist_config)
 
 
-def cross_model_evaluation(audio_dir, dim_reduction_model, evaluation_task, **kwargs):
+def cross_model_evaluation(dim_reduction_model, evaluation_task, **kwargs):
     """
     Generate plots to compare models by the specified tasks.
 
     Parameters
     ----------
-    audio_dir : str
-        string to audio data for getting the plot path
     dim_reduction_model : str
         name of dimensionality reduction model
     evaluation_task : list
         tasks to evaluate models by
     """
-    path_func = lambda x: set_paths(audio_dir, x, **kwargs)
     if len(model_names) > 1:
-        plot_path = path_func(model_names[0]).plot_path.parent.parent.joinpath(
+        plot_path = get_paths(model_names[0]).plot_path.parent.parent.joinpath(
             "overview"
         )
         plot_path.mkdir(exist_ok=True, parents=True)
         if not len(evaluation_task) == 0:
             for task in evaluation_task:
-                visualise_results_across_models(path_func, plot_path, task, model_names)
+                visualise_results_across_models(plot_path, task, model_names)
         if not dim_reduction_model == "None":
-            plot_comparison(
-                path_func, plot_path, model_names, dim_reduction_model, **kwargs
-            )
+            plot_comparison(plot_path, model_names, dim_reduction_model, **kwargs)
 
 
 def embeds_array_without_noise(embeds, ground_truth):
     return np.concatenate(list(embeds.values()))[ground_truth["labels"] > -1]
 
 
-def visualize_using_dashboard():
+def visualize_using_dashboard(**kwargs):
+    dashboard = DashBoard(model_names, **kwargs)
+    dashboard.build_layout()
 
-    if not clust_metrics_path.joinpath(f"all_clusts_reordered.npy").exists():
-        all_clusts_reordered = {"SS": {}, "AMI": {}, "ARI": {}}
-        for model in reduc_2d_embeds.keys():
-            all_clusts_reordered["SS"][model] = {
-                run: all_clusts[run][model]["SS"] for run in all_clusts.keys()
-            }
-            all_clusts_reordered["AMI"][model] = {
-                run: all_clusts[run][model]["AMI"]["kmeans"]
-                for run in all_clusts.keys()
-            }
-            all_clusts_reordered["ARI"][model] = {
-                run: all_clusts[run][model]["ARI"]["kmeans"]
-                for run in all_clusts.keys()
-            }
-        np.save(
-            clust_metrics_path.joinpath(f"all_clusts_reordered.npy"),
-            all_clusts_reordered,
-        )
-    else:
-        all_clusts_reordered = np.load(
-            clust_metrics_path.joinpath(f"all_clusts_reordered.npy"), allow_pickle=True
-        ).item()
-    plot_overview(processed_embeds, name, no_noise=True)
-    plot_clustering_by_metric_new(all_clusts_reordered, reduc_2d_embeds.keys())
-    scatterplot_clust_vs_class()
+    dashboard.app.servable()
 
 
 def get_embeddings(
@@ -293,14 +224,9 @@ def get_embeddings(
         audio_dir=audio_dir,
         check_if_combination_exists=check_if_primary_combination_exists,
     )
-    paths = set_paths(audio_dir, model_name, **kwargs)
-    default_labels = create_default_labels(
-        paths, model_name, audio_dir, overwrite=overwrite, **kwargs
-    )
-
-    ground_truth = ground_truth_by_model(
-        paths, model_name, label_file="annotations.csv", overwrite=overwrite, **kwargs
-    )
+    global get_paths
+    get_paths = make_set_paths_func(audio_dir, **kwargs)
+    paths = get_paths(model_name)
 
     if not dim_reduction_model == "None":
 
@@ -325,12 +251,12 @@ def get_embeddings(
                 f"{dim_reduction_model}. Plots are saved in "
                 f"{loader_dim_reduced.embed_dir} ###"
             )
+            vis_loader = EmbedAndLabelLoader(**kwargs)
             plot_embeddings(
-                paths,
-                loader_dim_reduced.embed_dir,
-                dim_reduction_model,
-                default_labels,
-                ground_truth=ground_truth,
+                vis_loader,
+                paths=paths,
+                model_name=loader_dim_reduced.embedding_model,
+                dim_reduction_model=dim_reduction_model,
                 bool_plot_centroids=False,
                 label_by="time_of_day",
                 **kwargs,

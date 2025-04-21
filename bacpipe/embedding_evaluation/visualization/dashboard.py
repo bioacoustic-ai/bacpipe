@@ -1,565 +1,285 @@
 import panel as pn
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib
-import json
 import copy
-import pandas as pd
 import seaborn as sns
+from pathlib import Path
+import numpy as np
+from functools import reduce
+
+from .visualize import plot_embeddings, plot_comparison, EmbedAndLabelLoader
+import bacpipe.embedding_evaluation.label_embeddings as le
 
 sns.set_theme(style="whitegrid")
 
 matplotlib.use("agg")
 
-from exploration.explore_embeds import set_paths
-
-# from run_explore import DATA_PATH
-
-# DATA_PATH = "Evaluation_set_5shots"
-# DATA_PATH = "neotropic_dawn_chorus"
-# DATA_PATH = "id_task_data"
-# DATA_PATH = "colombia_soundscape"
-DATA_PATH = "anuran_set"
-set_paths(DATA_PATH)
-from exploration.explore_embeds import (
-    get_original_embeds,
-    reduce_to_2d,
-    clustering,
-    main_embeds_path,
-    distances_path,
-    clust_metrics_path,
-    np_embeds_path,
-    np_clust_path,
-)
-
 # Enable Panel
 pn.extension()
 
-# Create a shared frequency slider
 
-MODELS = [
-    d.stem.split("___")[-1].split("-")[0]
-    for d in list(main_embeds_path.rglob("*"))
-    if d.is_dir()
-]
-REDUCERS = [
-    d.stem
-    for d in list(np_embeds_path.glob("*.npy"))
-    if d.stem not in ["distances", "embed_dict", "normal_distances"]
-]
-METRICS = ["SS", "AMI_hdbscan", "AMI_kmeans", "ARI_hdbscan", "ARI_kmeans"]
-
-ALL_DISTS = {}
-for file in distances_path.glob("*.npy"):
-    ALL_DISTS[file.stem.split("_distances")[0]] = np.load(
-        file, allow_pickle=True
-    ).item()
-
-
-conf_2d_reduction = [
-    {
-        "name": "2dumap",
-        "conf_1": {
-            "n_neighbors": 15,
-            "min_dist": 0.1,
-            "n_components": 2,
-            "metric": "euclidean",
-            "random_state": 42,
-        },
-    }
-]
-
-
-def load_distances(reducer=None, model=None, label=None, metric="euclidean"):
-    if reducer is not None:
-        distances = np.load(
-            distances_path.joinpath(f"{reducer}_distances.npy"), allow_pickle=True
-        ).item()
-    else:
-        distances = ALL_DISTS
-    if reducer is None:
-        distances_left = {
-            k: v[model][metric][label]["intra"] for k, v in distances.items()
-        }
-        distances_right = {
-            k: v[model][metric][label]["inter"] for k, v in distances.items()
-        }
-    elif model is not None:
-        distances_left = {k: v["intra"] for k, v in distances[model][metric].items()}
-        distances_right = {k: v["inter"] for k, v in distances[model][metric].items()}
-    elif label is not None:
-        distances_left = {
-            k: v[metric][label]["intra"]
-            for k, v in distances.items()
-            if not k == "rcl_fs_bsed"
-        }
-        distances_right = {
-            k: v[metric][label]["inter"]
-            for k, v in distances.items()
-            if not k == "rcl_fs_bsed"
-        }
-
-    return plot_violins(distances_left, distances_right)
-
-
-def plot_violins(left, right):
-    val = []
-    typ = []
-    cat = []
-    if "aves_especies" in left.keys():
-        labels = [
-            "aves_especies",
-            "birdaves_especies",
-            "birdnet",
-            "perch_bird",
-            "avesecho_passt",
-            "insect66",
-        ]
-    else:
-        labels = dict(sorted(left.items())).keys()
-    for idx, label in enumerate(labels):
-        val.append(np.array(left[label]) / max(left[label]))
-        val.append(np.array(right[label]) / max(left[label]))
-        typ.extend(["Intra"] * len(left[label]))
-        typ.extend(["Inter"] * len(right[label]))
-        cat.extend([label] * len(left[label]))
-        cat.extend([label] * len(right[label]))
-
-    # Convert to long-form format
-    data_long = pd.DataFrame(
-        {"Value": np.concatenate(val), "Type": typ, "Category": cat}
-    )
-
-    # Create the violin plot
-    fig, ax = plt.subplots(figsize=(14, 8))
-    sns.violinplot(
-        x="Category",
-        y="Value",
-        hue="Type",
-        data=data_long,
-        split=True,
-        inner="quartile",
-    )
-    # ax.set_ylim([-2, 14])
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
-
-    return fig
-
-
-def plot_overview(orig_embeds, reducer, **kwargs):
-    fig, ax = plt.subplots(4, 4, figsize=(10, 7))
-    fig.subplots_adjust(
-        # right=0.8,
-        bottom=0.1,
-    )
-    embeds = reduce_to_2d(
-        orig_embeds, name=reducer, reducer_2d_conf=conf_2d_reduction[0]
-    )
-
-    if True:
-        met_clust = np.load(
-            clust_metrics_path.joinpath("all_clusts_reordered.npy"), allow_pickle=True
-        ).item()
-        amis = {k: v["normal_no_noise"] for k, v in met_clust["AMI"].items()}
-        new_order = dict(sorted(amis.items(), key=lambda item: item[1], reverse=True))
-    else:
-        new_order = orig_embeds
-        amis = {k: 0 for k in orig_embeds.keys()}
-
-    for idx, model in enumerate(new_order.keys()):
-        label_keys = list(orig_embeds[model]["label_dict"].keys())
-        plot_embeds(
-            embeds,
-            model,
-            reducer,
-            label_keys,
-            fig=fig,
-            ax=ax[idx // 4, idx % 4],
-            **kwargs,
+class DashBoard:
+    def __init__(
+        self,
+        model_names,
+        audio_dir,
+        main_results_dir,
+        default_label_keys,
+        evaluation_task,
+        dim_reduction_model,
+        dim_reduc_parent_dir,
+        **kwargs,
+    ):
+        self.models = model_names
+        self.default_label_keys = default_label_keys
+        self.label_by = default_label_keys.copy()
+        get_paths = le.make_set_paths_func(
+            audio_dir, main_results_dir, dim_reduc_parent_dir, **kwargs
         )
-    ax.flatten()[-1].axis("off")
-    if "label_by" in kwargs and kwargs["label_by"] == "hdbscan":
-        num_labels = []
-        for a in ax.flatten():
-            hand, labl = a.get_legend_handles_labels()
-            num_labels.append(len(labl))
-        hand, labl = ax.flatten()[
-            num_labels.index(max(num_labels))
-        ].get_legend_handles_labels()
-    else:
-        hand, labl = ax[idx // 4, idx % 4].get_legend_handles_labels()
-    # fig.legend(hand, labl, fontsize=12, markerscale=15, loc="outside right")
-    fig.legend(hand, labl, fontsize=9.5, markerscale=30, loc="lower center", ncol=4)
-    for axes, model in zip(ax.flatten(), new_order.keys()):
-        axes.set_title(f"{model.upper()} ({amis[model]:.2f}) ", fontsize=12)
-    fig.tight_layout()
-    fig.subplots_adjust(bottom=0.18)
-    return fig
-
-
-def plot_clust_overview(
-    select_clustering, label_by, no_noise=False, plot_percentages=False, **kwargs
-):
-    metrics = {}
-    for reducer in REDUCERS:
-        if no_noise:
-            reducer = f"{reducer}_no_noise"
-        with open(
-            clust_metrics_path.joinpath(f"{reducer}_cluster_metrics.json"), "r"
-        ) as f:
-            metrics[reducer] = flatten_metric_dict(json.load(f))
-
-    metrics_by_clustering = {}
-    for model in metrics[reducer].keys():
-        metrics_by_clustering[model] = {}
-        for reducer, metric in metrics.items():
-            metrics_by_clustering[model][reducer] = metric[model][select_clustering]
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    fig.subplots_adjust(right=0.8)
-
-    if plot_percentages:
-        perc_metrics = get_percentage_change(metrics_by_clustering, no_noise=no_noise)
-        return plot_bars_dicka(
-            perc_metrics, fig, ax, y_label="Percentage change", **kwargs
+        self.plot_path = get_paths(model_names[0]).plot_path.parent.parent.joinpath(
+            "overview"
         )
-    else:
-        return plot_bars_dicka(metrics_by_clustering, fig, ax, **kwargs)
+        self.dim_reduc_parent_dir = dim_reduc_parent_dir
 
+        self.ground_truth = None
+        if (
+            le.get_paths(model_names[0])
+            .labels_path.joinpath("ground_truth.npy")
+            .exists()
+        ):
+            self.ground_truth = True
+            self.label_by += ["ground_truth"]
 
-def plot_embeds(
-    orig_embeds,
-    model,
-    reducer,
-    label_keys,
-    label_by="ground truth",
-    fig=None,
-    ax=None,
-    no_legend=False,
-    no_noise=False,
-    **kwargs,
-):
-    embeds = reduce_to_2d(
-        orig_embeds, name=reducer, reducer_2d_conf=conf_2d_reduction[0]
-    )
-
-    if not fig and not ax:
-        fig, ax = plt.subplots(figsize=(6, 4))
-        fig.subplots_adjust(right=0.6)
-        ax.set_title(f"Embeddings of {model}", fontsize=8)
-    else:
-        ax.set_title(model.upper(), fontsize=12)
-        no_legend = True
-
-    if label_by in ["hdbscan", "kmeans"]:
-        clusterings = np.load(
-            np_clust_path.joinpath(f"{reducer}_no_noise_clusterings.npy"),
-            allow_pickle=True,
-        ).item()
-        clusterings = clusterings[model][label_by]
-        label_keys = list(set(clusterings))
-        data = {}
-        for label in label_keys:
-            data[label] = embeds[model]["all"][clusterings == label]
-    elif label_by == "ground truth":
-        data = embeds[model]["split"]
-
-    cmap = plt.cm.tab20b
-    colors = cmap(np.arange(len(data.keys())) % cmap.N)[::-1]
-
-    if no_noise:
-        label_keys = [key for key in label_keys if key != "unknown" and key != -1]
-    elif "unknown" in label_keys:
-        # reorder dict so that unknown is first
-        label_keys = ["unknown"] + [key for key in label_keys if key != "unknown"]
-    elif -1 in label_keys:
-        label_keys = [-1] + [key for key in label_keys if key != -1]
-
-    for idx, label in enumerate(label_keys):
-        if not label in data.keys():
-            continue
-        ax.plot(
-            data[label][:, 0],
-            data[label][:, 1],
-            "o",
-            label=label,
-            markersize=0.2,
-            color=colors[idx],
+        self.evaluation_task = evaluation_task
+        self.dim_reduction_model = dim_reduction_model
+        self.widget_width = 120
+        self.vis_loader = EmbedAndLabelLoader(
+            dashboard=True, dim_reduction_model=dim_reduction_model, **kwargs
         )
-        ax.set_xticks([])
-        ax.set_yticks([])
-    if not no_legend:
-        fig.legend(fontsize=8, markerscale=15, loc="outside right")
-    return fig
 
+        self.model_select = dict()
+        self.label_select = dict()
+        self.noise_select = dict()
+        self.embed_plot = dict()
 
-def get_percentage_change(metrics, no_noise=False):
-    if not no_noise:
-        relative_to = "normal"
-    else:
-        relative_to = "normal_no_noise"
-    clust_percentages = {}
-    for reducer, metric in [
-        metric for metric in metrics.items() if not metric[0] == relative_to
-    ]:
-        clust_percentages[reducer] = {}
-        for key, value in metric.items():
-            if relative_to in metrics.keys():
-                denominator = metrics[relative_to][key]
-            elif relative_to in metrics[reducer].keys():
-                denominator = metrics[reducer][relative_to]
-
-            try:
-                clust_percentages[reducer][key] = (value / denominator - 1) * 100
-            except ZeroDivisionError:
-                clust_percentages[reducer][key] = 0
-    return clust_percentages
-
-
-def plot_bars_dicka(
-    metrics, fig, ax, y_label="Metric value", no_legend=False, **kwargs
-):
-    bar_width = 1 / (len(list(metrics.values())[0].keys()) + 1)
-    cmap = plt.cm.tab10
-    colors = cmap(np.arange(len(list(metrics.values())[0].keys())) % cmap.N)
-    metrics_sorted = dict(sorted(metrics.items()))
-
-    for out_idx, (reducer, metric) in enumerate(metrics_sorted.items()):
-        for inner_idx, (key, value) in enumerate(metric.items()):
-            ax.bar(
-                out_idx - bar_width * inner_idx,
-                value,
-                label=key,
-                width=bar_width,
-                color=colors[inner_idx],
-            )
-
-    ax.set_xticks(np.arange(len(metrics_sorted.keys())) - 0.33)
-    ax.set_xticklabels(list(metrics_sorted.keys()), rotation=45, ha="right")
-    ax.set_ylabel(y_label)
-    ax.hlines(0, -1, out_idx, linestyles="dashed", color="black", linewidth=0.3)
-    hand, labl = ax.get_legend_handles_labels()
-    if not no_legend:
-        fig.legend(
-            hand[: inner_idx + 1],
-            labl[: inner_idx + 1],
-            fontsize=10,
-            markerscale=15,
-            loc="outside right",
+    def init_plot(self, p_type, plot_func, widget_idx, **kwargs):
+        getattr(self, f"{p_type}_plot")[widget_idx] = pn.panel(
+            self.plot_widget(plot_func, widget_idx=widget_idx, **kwargs), tight=True
         )
-    return fig
+        return getattr(self, f"{p_type}_plot")[widget_idx]
 
+    def plot_widget(self, plot_func, **kwargs):
+        return pn.bind(plot_func, **kwargs)
 
-def flatten_metric_dict(metrics):
-    # flatten
-    flat_dict = {}
-
-    for key_red, met in metrics.items():
-        flat_dict[key_red] = {}
-        for key_met, value in met.items():
-            if isinstance(value, dict):
-                for sub_key, sub_value in value.items():
-                    flat_dict[key_red][f"{key_met}_{sub_key}"] = sub_value
-            else:
-                flat_dict[key_red][key_met] = value
-    return flat_dict
-
-
-def plot_clusterings(
-    model, fig=None, ax=None, plot_percentages=False, no_noise=False, **kwargs
-):
-    metrics = {}
-    for reducer in REDUCERS:
-        if no_noise:
-            reducer = f"{reducer}_no_noise"
-        with open(
-            clust_metrics_path.joinpath(f"{reducer}_cluster_metrics.json"), "r"
-        ) as f:
-            metrics[reducer] = json.load(f)[model]
-
-    if not fig and not ax:
-        fig, ax = plt.subplots(figsize=(5, 4))
-        fig.subplots_adjust(right=0.7)
-
-    flat_dict = flatten_metric_dict(metrics)
-
-    if plot_percentages:
-        perc_metrics = get_percentage_change(flat_dict, no_noise=no_noise)
-        return plot_bars_dicka(
-            perc_metrics, fig, ax, y_label="Percentage change", **kwargs
+    def widget(self, name, options, attr="Select", width=120, **kwargs):
+        return getattr(pn.widgets, attr)(
+            name=name, options=options, width=self.widget_width, **kwargs
         )
-    else:
-        return plot_bars_dicka(flat_dict, fig, ax, **kwargs)
 
+    def init_widget(self, idx, w_type, **kwargs):
+        getattr(self, f"{w_type}_select")[idx] = self.widget(**kwargs)
+        return getattr(self, f"{w_type}_select")[idx]
 
-if __name__ == "__main__":
-    embed_dict = get_original_embeds()
-
-    ############## LAYOUT ##############
-
-    model1 = pn.widgets.Select(name="Model", options=MODELS, width=120)
-    reducer1 = pn.widgets.Select(name="Reducer", options=REDUCERS, width=120)
-    label_by1 = pn.widgets.Select(
-        name="label_by", options=["ground truth", "hdbscan", "kmeans"], width=120
-    )
-    percentages1 = pn.widgets.RadioBoxGroup(
-        name="Show percentages", options=[True, False], value=False
-    )
-    no_noise1 = pn.widgets.Checkbox(name="Remove noise", value=False)
-    select_clustering = pn.widgets.Select(name="Reducer", options=METRICS, width=120)
-    label1 = pn.widgets.Select(
-        name="Label",
-        options=list(embed_dict[model1.value]["label_dict"].keys()),
-        width=120,
-    )
-
-    model2 = copy.deepcopy(model1)
-    reducer2 = copy.deepcopy(reducer1)
-    label_by2 = copy.deepcopy(label_by1)
-    percentages2 = copy.deepcopy(percentages1)
-    no_noise2 = copy.deepcopy(no_noise1)
-
-    reducer3 = pn.widgets.Select(name="Reducer", options=[None] + REDUCERS, width=120)
-    label3 = pn.widgets.Select(
-        name="Label",
-        options=list(embed_dict[model1.value]["label_dict"].keys()),
-        width=120,
-    )
-    metric1 = pn.widgets.Select(
-        name="Metric", options=["euclidean", "cosine"], width=120
-    )
-
-    # Bind the slider to both plots
-    Overview = pn.bind(
-        plot_overview,
-        orig_embeds=embed_dict,
-        reducer=reducer1,
-        label_by=label_by1,
-        no_noise=no_noise1,
-    )
-
-    Clusterings_overview = pn.bind(
-        plot_clust_overview,
-        select_clustering=select_clustering,
-        label_by=label_by1,
-        no_noise=no_noise1,
-        plot_percentages=percentages1,
-    )
-
-    Embeddings1 = pn.bind(
-        plot_embeds,
-        orig_embeds=embed_dict,
-        reducer=reducer1,
-        model=model1,
-        label_keys=list(embed_dict.values())[0]["label_dict"].keys(),
-        label_by=label_by1,
-        no_noise=no_noise1,
-    )
-    Embeddings2 = pn.bind(
-        plot_embeds,
-        orig_embeds=embed_dict,
-        reducer=reducer2,
-        model=model2,
-        label_keys=list(embed_dict.values())[0]["label_dict"].keys(),
-        label_by=label_by2,
-        no_noise=no_noise2,
-        no_legend=True,
-    )
-
-    Clusterings1 = pn.bind(
-        plot_clusterings,
-        model=model1,
-        plot_percentages=percentages1,
-        no_noise=no_noise1,
-    )
-    Clusterings2 = pn.bind(
-        plot_clusterings,
-        model=model2,
-        plot_percentages=percentages2,
-        no_noise=no_noise2,
-        no_legend=True,
-    )
-
-    Violins = pn.bind(
-        load_distances, reducer=reducer3, model=model1, label=label3, metric=metric1
-    )
-
-    Violins2 = pn.bind(load_distances, reducer=reducer1, label=label1)
-
-    # Layout: Dashboard with tabs
-    dashboard = pn.Tabs(
-        (
-            "Single model",
-            pn.Column(
-                pn.Row(
-                    model1,
-                    reducer1,
-                    label_by1,
-                    no_noise1,
-                ),
-                pn.panel(Embeddings1, tight=True),
-                pn.Row(
-                    "Display percentage relativ to original embeddngs?",
-                    percentages1,
-                ),
-                pn.panel(Clusterings1, tight=True),
-                pn.Row(label3, reducer3, metric1),
-                pn.panel(Violins, tight=True),
-            ),
-        ),
-        (
-            "Two models",
+    def single_model_page(self, widget_idx):
+        return pn.Column(
             pn.Row(
-                pn.Column(
-                    pn.Row(
-                        model2,
-                        reducer2,
-                        label_by2,
-                        no_noise2,
-                    ),
-                    pn.panel(Embeddings2, tight=True),
-                    pn.Row(
-                        "Display percentage relativ to original embeddngs?",
-                        percentages2,
-                    ),
-                    pn.panel(Clusterings2, tight=True),
+                self.init_widget(
+                    widget_idx, "model", name="Model", options=self.models
                 ),
-                pn.Column(
-                    pn.Row(
-                        model1,
-                        reducer1,
-                        label_by1,
-                        no_noise1,
-                    ),
-                    pn.panel(Embeddings1, tight=True),
-                    pn.Row(
-                        "Display percentage relativ to original embeddngs?",
-                        percentages1,
-                    ),
-                    pn.panel(Clusterings1, tight=True),
+                self.init_widget(
+                    widget_idx, "label", name="Label by", options=self.label_by
+                ),
+                self.init_widget(
+                    widget_idx,
+                    "noise",
+                    name="Noise?",
+                    options=[True, False],
+                    attr="RadioBoxGroup",
+                    value=False,
                 ),
             ),
-        ),
-        (
-            "All models",
-            pn.Column(
-                pn.Row(
-                    reducer1,
-                    label_by1,
-                    no_noise1,
-                ),
-                pn.panel(Overview, tight=True),
-                pn.Row(
-                    "Display percentage relativ to original embeddngs?",
-                    percentages1,
-                    select_clustering,
-                ),
-                pn.panel(Clusterings_overview, tight=True),
-                label1,
-                pn.panel(Violins2, tight=True),
+            self.init_plot(
+                "embed",
+                plot_embeddings,
+                widget_idx,
+                loader=self.vis_loader,
+                model_name=self.model_select[widget_idx],
+                label_by=self.label_select[widget_idx],
+                ground_truth=self.ground_truth,
+                dim_reduction_model=self.dim_reduction_model,
+                remove_noise=self.noise_select[widget_idx],
+                dashboard=True,
+                dashboard_idx=widget_idx,
             ),
-        ),
-    )
+            # pn.panel(self.plot_widget(
+            #     plot_cluster,
+            #     orig_embeds=embed_dict,
+            #     model=self.model_select[widget_idx],
+            #     label_by=self.label_select[widget_idx],
+            #     no_noise=self.noise_select[widget_idx],
+            #     tight=True)),
+            # pn.panel(self.plot_widget(
+            #     plot_class,
+            #     orig_embeds=embed_dict,
+            #     model=self.model_select[widget_idx],
+            #     label_by=self.label_select[widget_idx],
+            #     no_noise=self.noise_select[widget_idx],
+            #     tight=True))
+        )
 
-    # Serve the dashboard
-    dashboard.servable()
+    def all_models_page(self, widget_idx):
+        return pn.Column(
+            pn.Row(
+                self.init_widget(
+                    widget_idx, "label", name="Label by", options=self.label_by
+                ),
+                self.init_widget(
+                    widget_idx,
+                    "noise",
+                    name="Noise?",
+                    options=[True, False],
+                    attr="RadioBoxGroup",
+                    value=False,
+                ),
+            ),
+            # pn.pane.Matplotlib(pn.bind(
+            self.init_plot(
+                "embed",
+                plot_comparison,
+                widget_idx,
+                loader=self.vis_loader,
+                plot_path=self.plot_path,
+                models=self.models,
+                dim_reduction_model=self.dim_reduction_model,
+                dim_reduc_parent_dir=self.dim_reduc_parent_dir,
+                label_by=self.label_select[widget_idx],
+                remove_noise=self.noise_select[widget_idx],
+                default_label_keys=self.default_label_keys,
+                dashboard=True,
+                # ), tight=True, dpi=100, height=600, width=800)
+            ),
+            # pn.panel(self.plot_widget(
+            #     plot_cluster,
+            #     orig_embeds=embed_dict,
+            #     model=self.model_select[widget_idx],
+            #     label_by=self.label_select[widget_idx],
+            #     no_noise=self.noise_select[widget_idx],
+            #     tight=True)),
+            # pn.panel(self.plot_widget(
+            #     plot_class,
+            #     orig_embeds=embed_dict,
+            #     model=self.model_select[widget_idx],
+            #     label_by=self.label_select[widget_idx],
+            #     no_noise=self.noise_select[widget_idx],
+            #     tight=True))
+        )
+
+    def build_layout(self):
+        self.app = pn.Tabs(
+            ("Single model", self.single_model_page(1)),
+            (
+                "Two models",
+                pn.Row(self.single_model_page(0), self.single_model_page(1)),
+            ),
+            (
+                "All models",
+                self.all_models_page(1),
+            ),
+        )
+
+    def generate_widgets():
+        embed_dict = get_original_embeds()
+
+        ############## LAYOUT ##############
+
+        # model1 =
+        reducer1 = pn.widgets.Select(name="Reducer", options=REDUCERS, width=120)
+        label_by1 = pn.widgets.Select(
+            name="label_by", options=["ground truth", "hdbscan", "kmeans"], width=120
+        )
+        percentages1 = pn.widgets.RadioBoxGroup(
+            name="Show percentages", options=[True, False], value=False
+        )
+        no_noise1 = pn.widgets.Checkbox(name="Remove noise", value=False)
+        select_clustering = pn.widgets.Select(
+            name="Reducer", options=METRICS, width=120
+        )
+        label1 = pn.widgets.Select(
+            name="Label",
+            options=list(embed_dict[model1.value]["label_dict"].keys()),
+            width=120,
+        )
+
+        model2 = copy.deepcopy(model1)
+        reducer2 = copy.deepcopy(reducer1)
+        label_by2 = copy.deepcopy(label_by1)
+        percentages2 = copy.deepcopy(percentages1)
+        no_noise2 = copy.deepcopy(no_noise1)
+
+        reducer3 = pn.widgets.Select(
+            name="Reducer", options=[None] + REDUCERS, width=120
+        )
+        label3 = pn.widgets.Select(
+            name="Label",
+            options=list(embed_dict[model1.value]["label_dict"].keys()),
+            width=120,
+        )
+        metric1 = pn.widgets.Select(
+            name="Metric", options=["euclidean", "cosine"], width=120
+        )
+
+        # Bind the slider to both plots
+        Overview = pn.bind(
+            plot_overview,
+            orig_embeds=embed_dict,
+            reducer=reducer1,
+            label_by=label_by1,
+            no_noise=no_noise1,
+        )
+
+        Clusterings_overview = pn.bind(
+            plot_clust_overview,
+            select_clustering=select_clustering,
+            label_by=label_by1,
+            no_noise=no_noise1,
+            plot_percentages=percentages1,
+        )
+
+        Embeddings1 = pn.bind(
+            plot_embeds,
+            orig_embeds=embed_dict,
+            reducer=reducer1,
+            model=model1,
+            label_keys=list(embed_dict.values())[0]["label_dict"].keys(),
+            label_by=label_by1,
+            no_noise=no_noise1,
+        )
+        Embeddings2 = pn.bind(
+            plot_embeds,
+            orig_embeds=embed_dict,
+            reducer=reducer2,
+            model=model2,
+            label_keys=list(embed_dict.values())[0]["label_dict"].keys(),
+            label_by=label_by2,
+            no_noise=no_noise2,
+            no_legend=True,
+        )
+
+        Clusterings1 = pn.bind(
+            plot_clusterings,
+            model=model1,
+            plot_percentages=percentages1,
+            no_noise=no_noise1,
+        )
+        Clusterings2 = pn.bind(
+            plot_clusterings,
+            model=model2,
+            plot_percentages=percentages2,
+            no_noise=no_noise2,
+            no_legend=True,
+        )
+
+        Violins = pn.bind(
+            load_distances, reducer=reducer3, model=model1, label=label3, metric=metric1
+        )
+
+        Violins2 = pn.bind(load_distances, reducer=reducer1, label=label1)
