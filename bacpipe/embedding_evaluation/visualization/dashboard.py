@@ -49,6 +49,9 @@ class DashBoard:
             self.ground_truth = True
             self.label_by += ["ground_truth"]
 
+        if len(list(le.get_paths(model_names[0]).clust_path.glob("*.npy"))) > 0:
+            self.label_by += ["kmeans"]
+
         self.evaluation_task = evaluation_task
         self.dim_reduction_model = dim_reduction_model
         self.widget_width = 120
@@ -150,7 +153,6 @@ class DashBoard:
                 plot_path=self.plot_path,
                 models=self.models,
                 dim_reduction_model=self.dim_reduction_model,
-                dim_reduc_parent_dir=self.dim_reduc_parent_dir,
                 label_by=self.label_select[widget_idx],
                 remove_noise=self.noise_select[widget_idx],
                 default_label_keys=self.default_label_keys,

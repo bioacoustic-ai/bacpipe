@@ -69,14 +69,16 @@ class EmbedAndLabelLoader:
         self.labels = dict()
         self.embeds = dict()
         self.split_data = dict()
+        self.bool_noise = dict()
         self.dashboard = dashboard
         self.dim_reduction_model = dim_reduction_model
         self.kwargs = kwargs
 
-    def get_data(self, model_name, label_by):
+    def get_data(self, model_name, label_by, remove_noise=False, **kwargs):
         if not model_name in self.labels.keys():
             print("loading data")
-            self.labels[model_name] = get_labels_for_plot(model_name, **self.kwargs)
+            tup = get_labels_for_plot(model_name, **self.kwargs)
+            self.labels[model_name], self.bool_noise[model_name] = tup
 
             dim_reduced_embed_path = le.get_dim_reduc_path_func(model_name)
 
@@ -84,15 +86,31 @@ class EmbedAndLabelLoader:
                 dim_reduced_embed_path, self.dim_reduction_model
             )
 
-        if not model_name + label_by in self.split_data:
-            print("splitting data")
-            self.split_data[model_name + label_by] = data_split_by_labels(
-                self.embeds[model_name], self.labels[model_name][label_by]
-            )
+        if remove_noise:
+            return_labels = dict()
+            return_embeds = dict()
+            for key in self.labels[model_name].keys():
+                print(key)
+                return_labels[key] = np.array(
+                    self.labels[model_name][key], dtype=object
+                )[~self.bool_noise[model_name]]
+
+            return_embeds["x"] = np.array(self.embeds[model_name]["x"])[
+                ~self.bool_noise[model_name]
+            ]
+
+            return_embeds["y"] = np.array(self.embeds[model_name]["y"])[
+                ~self.bool_noise[model_name]
+            ]
+        else:
+            return_labels = self.labels[model_name]
+            return_embeds = self.embeds[model_name]
+
+        return_splits = data_split_by_labels(return_embeds, return_labels[label_by])
         return (
-            self.labels[model_name][label_by],
-            self.embeds[model_name],
-            self.split_data[model_name + label_by],
+            return_labels[label_by],
+            return_embeds,
+            return_splits,
         )
 
 
@@ -116,29 +134,35 @@ def plot_embeddings(
 
     Parameters
     ----------
-    paths : SimpleNamespace object
-        object with path attributes
-    dim_reduced_embed_path : str
-        path where dimensionality reduced embeddings are located
+    loader : EmbedAndLabelLoader object
+        contains the labels and embeddings by model, for quicker loading
+    model_name : str
+        name of model
+    label_by : str, optional
+        key of default_labels dict, by default "audio_file_name"
+    paths : SimpleNamespace object, optional
+        object with path attributes, defaults to None
     dim_reduction_model : str
         name of dim reduced model
-    default_labels : dict
-        dictionary of default labels in lists
     axes : plt object, optional
         axes handle, by default False
     fig : plt object, optional
         figure handle, by default False
-    label_by : str, optional
-        key of default_labels dict, by default "audio_file_name"
     dashboard : bool, optional
         whether the calls comes from the dashboard, by deafult False
+    dashboard_idx : int, optional
+        index of dashboard plot, relevant for legend placement
 
     Returns
     -------
-    plt object, or None
+    plt object
         axes handles is axes handles were given
+    dict
+        color dictionary for legend
+    list
+        plt point objects for legend of colorbar
     """
-    labels, embeds, split_data = loader.get_data(model_name, label_by)
+    labels, embeds, split_data = loader.get_data(model_name, label_by, **kwargs)
 
     fig, axes, return_axes = init_embed_figure(fig, axes, **kwargs)
 
@@ -184,13 +208,25 @@ def init_embed_figure(fig, axes, bool_3d=False, **kwargs):
 def get_labels_for_plot(model_name=None, **kwargs):
     labels = dict()
     labels = le.get_default_labels(model_name, **kwargs)
+
     if le.get_paths(model_name).labels_path.joinpath("ground_truth.npy"):
         ground_truth = le.get_ground_truth(model_name)
         inv = {v: k for k, v in ground_truth["label_dict"].items()}
         inv[-1.0] = "noise"
         labels["ground_truth"] = [inv[v] for v in ground_truth["labels"]]
+        bool_noise = np.array(labels["ground_truth"]) == "noise"
 
-    return labels
+    if len(list(le.get_paths(model_name).clust_path.glob("*.npy"))) > 0:
+        clusts = [
+            np.load(f, allow_pickle=True).item()
+            for f in le.get_paths(model_name).clust_path.glob("*.npy")
+        ]
+        for clust in clusts:
+            for name, values in clust.items():
+                labels[name] = np.array(["noise"] * len(bool_noise), dtype=object)
+                labels[name][~bool_noise] = [inv[v] for v in values]
+
+    return labels, bool_noise
 
 
 def set_colorbar_or_legend(fig, axes, points, c_label_dict, **kwargs):
@@ -244,16 +280,18 @@ def plot_embedding_points(
         import matplotlib.cm as cm
 
         cmap = cm.viridis  # or 'plasma', 'inferno', 'magma', etc.
-        if remove_noise:
-            bool_labels = np.array(labels) != "noise"
-            labels = np.array(labels)[bool_labels]
-        else:
-            bool_labels = [True] * len(labels)
+        # if remove_noise:
+        #     bool_labels = np.array(labels) != "noise"
+        #     labels = np.array(labels)[bool_labels]
+        # else:
+        #     bool_labels = [True] * len(labels)
 
         num_labels = np.array([c_label_dict[lab] for lab in labels])
         points = axes.scatter(
-            np.array(embeds["x"])[bool_labels],
-            np.array(embeds["y"])[bool_labels],
+            # np.array(embeds["x"])[bool_labels],
+            # np.array(embeds["y"])[bool_labels],
+            np.array(embeds["x"]),
+            np.array(embeds["y"]),
             c=num_labels,
             label=labels,
             s=1,
@@ -292,6 +330,8 @@ def set_legend(
         axes handle
     bool_plot_centroids : bool, optional
         if True centroids of each class will be plotted, by default True
+    dashboard : bool
+        if dashboard called this function or not
 
     Returns
     -------
@@ -407,7 +447,6 @@ def plot_comparison(
     plot_path,
     models,
     dim_reduction_model,
-    dim_reduc_parent_dir,
     bool_spherical=False,
     dashboard=False,
     loader=None,
@@ -426,10 +465,17 @@ def plot_comparison(
         list of models
     dim_reduction_model : str
         name of dimensionality reduction model
-    dim_reduc_parent_dir : pathlib.Path object
-        location of dim reduced embeddings
     bool_spherical : bool, optional
         if True 3d embeddings will be plotted, by default False
+    dashboard : bool, optional
+        if dashboard called this function or not
+    loader : EmbedAndLabelLoader object
+        object containing embeds and labels by model for quicker loading
+
+    Returns
+    -------
+    plt object
+        figure handle
     """
     rows, cols = return_rows_cols(len(models))
 

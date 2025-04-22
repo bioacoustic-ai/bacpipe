@@ -1,16 +1,28 @@
+import yaml
+
 from bacpipe.main import (
     get_model_names,
     model_specific_embedding_creation,
     model_specific_evaluation,
     cross_model_evaluation,
+    visualize_using_dashboard,
 )
 
-if __name__ == "__main__":
 
-    get_model_names()
+with open("config.yaml", "rb") as f:
+    config = yaml.load(f, Loader=yaml.CLoader)
 
-    model_specific_embedding_creation()
+with open("bacpipe/settings.yaml", "rb") as p:
+    settings = yaml.load(p, Loader=yaml.CLoader)
 
-    model_specific_evaluation()
+# if __name__ == "__main__":
 
-    cross_model_evaluation()
+get_model_names(**config, **settings)
+
+loader_dict = model_specific_embedding_creation(**config, **settings)
+
+model_specific_evaluation(loader_dict, **config, **settings)
+
+cross_model_evaluation(**config, **settings)
+
+visualize_using_dashboard(**config, **settings)

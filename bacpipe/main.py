@@ -196,7 +196,13 @@ def cross_model_evaluation(dim_reduction_model, evaluation_task, **kwargs):
             for task in evaluation_task:
                 visualise_results_across_models(plot_path, task, model_names)
         if not dim_reduction_model == "None":
-            plot_comparison(plot_path, model_names, dim_reduction_model, **kwargs)
+            plot_comparison(
+                plot_path,
+                model_names,
+                dim_reduction_model,
+                label_by="time_of_day",
+                **kwargs,
+            )
 
 
 def embeds_array_without_noise(embeds, ground_truth):
@@ -311,57 +317,3 @@ def generate_embeddings(save_files=True, **kwargs):
         import sys
 
         sys.exit()
-
-
-def compare(orig_embeddings, remove_noise=False, distances=False, **kwargs):
-
-    if "reducer_conf" in kwargs:
-        configs = ["normal"] + [conf["name"] for conf in kwargs["reducer_conf"]]
-    else:
-        configs = ["normal"]
-    all_clusts = {}
-    all_clusts_reordere = {}
-    for config_idx, name in enumerate(configs):
-        if not name == "normal":
-            conf = [a for a in kwargs["reducer_conf"] if a["name"] == name][0]
-            if name.split("_")[0] == "pca":
-                reducer = PCA(**conf["conf_1"])
-            elif name.split("_")[0] == "spca":
-                reducer = SparsePCA(**conf["conf_1"])
-            elif name.split("_")[0] == "umap":
-                reducer = umap.UMAP(**conf["conf_1"])
-
-            processed_embeds = comppute_reduction(
-                orig_embeddings, name, reducer, **kwargs
-            )
-        else:
-            processed_embeds = orig_embeddings
-
-        from exploration.explore_dashboard import plot_overview
-        import exploration.explore_dashboard
-        import importlib
-
-        importlib.reload(exploration.explore_dashboard)
-        from exploration.explore_dashboard import plot_overview
-
-        fig = plot_overview(processed_embeds, name, no_noise=True)
-        fig.savefig(plot_path.joinpath(f"{name}_overview_kmeans.png"), dpi=300)
-
-        if remove_noise:
-            name += "_no_noise"
-        # metrics_reduc, clust_reduc = clustering(
-        #     reduc_2d_embeds, name + "_reduced", remove_noise=remove_noise, **kwargs
-        # )
-
-        # plot_comparison(
-        #     reduc_2d_embeds.keys(),
-        #     list(reduc_2d_embeds.values())[0]["split"].keys(),
-        #     reduc_2d_embeds,
-        #     name,
-        #     metrics_embed,
-        #     metrics_reduc,
-        #     clust_embed,
-        #     clust_reduc,
-        #     **kwargs,
-        # )
-        all_clusts.update({name: metrics_embed})
