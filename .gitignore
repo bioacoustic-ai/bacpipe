@@ -7,21 +7,18 @@ bacpipe/tests/.pytest*
 config.yaml
 
 # ignore datasets, embeddings, and task results
-datasets/*
-!datasets/audio_test_files
-!datasets/embedding_test_files
 results/embeddings/*
 results/dim_reduced_embeddings/*
 results/task_results/metrics/*
 results/task_results/plots/*
 results/by_dataset/*
 
+# ignore test result files
+bacpipe/tests/results_files/*
+
 # track all Readme files, including the ones in subdirectories
 !**/README.md
 
-# exploration/dim*
-# exploration/Evaluation*
-# exploration/id*
 
 exploration/*
 !exploration/explore_embeds.py

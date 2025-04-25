@@ -1,9 +1,0 @@
-{
-    "task_name": "ID",
-    "learning_rate": 0.001,
-    "batch_size": 64,
-    "num_epochs": 10,
-    "dataset_csv_path": "bacpipe/evaluation/datasets/benchmark/dataset_9species.csv",
-    "Num_classes": 66,
-    "label_type": "hierarchical_labels"
-}

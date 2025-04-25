@@ -26,7 +26,7 @@ class Loader:
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
 
-        self.initialize_path_structure()
+        self.initialize_path_structure(testing=testing)
 
         self.check_if_combination_exists = check_if_combination_exists
         if self.dim_reduction_model:
@@ -46,7 +46,7 @@ class Loader:
             self._get_audio_paths()
             self._init_metadata_dict()
 
-        if not self.combination_already_exists and not testing:
+        if not self.combination_already_exists:
             self.embed_dir.mkdir(exist_ok=True, parents=True)
         else:
             logger.debug(
@@ -56,9 +56,12 @@ class Loader:
                 )
             )
 
-    def initialize_path_structure(self):
+    def initialize_path_structure(self, testing=False):
         with open("bacpipe/settings.yaml", "r") as f:
             self.config = yaml.load(f, Loader=yaml.CLoader)
+
+        if testing:
+            self.config["main_results_dir"] = "bacpipe/tests/results_files"
 
         for key, val in self.config.items():
             if key == "main_results_dir":
@@ -184,13 +187,11 @@ class Loader:
                             "during the previous run. This might cause a problem."
                         )
                 setattr(self, key, Path(val))
-        if self.model_name == "umap":
+        if self.dim_reduction_model:
             self.dim_reduc_embed_dir = folder
 
     def get_embeddings(self):
         embed_dir = self.get_embedding_dir()
-        if self.testing:
-            embed_dir = Path("bacpipe/evaluation/datasets/embedding_test_files")
         self.files = [f for f in embed_dir.rglob(f"*{self.embed_suffix}")]
         self.files.sort()
 
@@ -301,11 +302,14 @@ class Loader:
 
 
 class Embedder:
-    def __init__(self, model_name, dim_reduction_model=False, **kwargs):
+    def __init__(self, model_name, dim_reduction_model=False, testing=False, **kwargs):
         import yaml
 
         with open("bacpipe/settings.yaml", "rb") as f:
             self.config = yaml.load(f, Loader=yaml.CLoader)
+
+        if testing:
+            self.config["main_results_dir"] = "bacpipe/tests/results_files"
 
         self.dim_reduction_model = dim_reduction_model
         if dim_reduction_model:

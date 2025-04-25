@@ -223,15 +223,18 @@ def get_embeddings(
     check_if_primary_combination_exists=True,
     check_if_secondary_combination_exists=True,
     overwrite=False,
+    testing=False,
     **kwargs,
 ):
     loader_embeddings = generate_embeddings(
         model_name=model_name,
         audio_dir=audio_dir,
         check_if_combination_exists=check_if_primary_combination_exists,
+        testing=testing,
+        **kwargs,
     )
     global get_paths
-    get_paths = make_set_paths_func(audio_dir, **kwargs)
+    get_paths = make_set_paths_func(audio_dir, testing=testing, **kwargs)
     paths = get_paths(model_name)
 
     if not dim_reduction_model == "None":
@@ -245,8 +248,14 @@ def get_embeddings(
             dim_reduction_model=dim_reduction_model,
             audio_dir=audio_dir,
             check_if_combination_exists=check_if_secondary_combination_exists,
+            testing=testing,
+            **kwargs,
         )
-        if not overwrite and (paths.plot_path.joinpath("embeddings.png").exists()):
+        if (
+            not overwrite
+            and (paths.plot_path.joinpath("embeddings.png").exists())
+            or testing
+        ):
             logger.debug(
                 f"Embedding visualization already exist in {loader_dim_reduced.embed_dir}"
                 " Skipping visualization generation."
@@ -272,7 +281,7 @@ def get_embeddings(
     return loader_embeddings
 
 
-def generate_embeddings(save_files=True, **kwargs):
+def generate_embeddings(**kwargs):
     if "dim_reduction_model" in kwargs:
         print(
             f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"

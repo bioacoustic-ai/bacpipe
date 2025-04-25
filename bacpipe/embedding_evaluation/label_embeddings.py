@@ -153,8 +153,16 @@ class DefaultLabels:
             )
 
 
-def make_set_paths_func(audio_dir, main_results_dir, dim_reduc_parent_dir, **kwargs):
-
+def make_set_paths_func(
+    audio_dir,
+    main_results_dir=None,
+    dim_reduc_parent_dir="dim_reduced_embeddings",
+    testing=False,
+    **kwargs,
+):
+    if testing:
+        main_results_dir = Path("bacpipe/tests/results_files")
+        dim_reduc_parent_dir = "dimensionality_reduction"
     global get_paths
 
     def get_paths(model_name):
@@ -261,20 +269,42 @@ def create_default_labels(paths, model, overwrite=True, **kwargs):
     return default_labels.default_label_dict
 
 
-def create_standardize_annotation_file():
-    p = Path(SOURCE)
-    df = pd.DataFrame()
-    for file in tqdm(p.rglob("*.txt")):
-        try:
-            ann = pd.read_csv(file, sep="\t", header=None)
-        except pd.errors.EmptyDataError:
-            continue
+def concatenate_annotation_files(
+    annotation_src,
+    appendix=".txt",
+    acodet_annotations=False,
+    start_col_name="start",
+    end_col_name="end",
+    lab_col_name="label",
+):
+    # TODO needs testing
+    p = Path(annotation_src)
+    if acodet_annotations:
+        ## This should always work for acodet combined annotations
+        dfc = pd.read_csv(p.joinpath("combined_annotations.csv"))
+        dfn = pd.read_csv(p.joinpath("explicit_noise.csv"))
+        dfall = pd.concat([dfc, dfn])
+        aud = dfall["filename"]
+        auds = [Path(a).stem + ".wav" for a in aud]
+        dfall["audiofilename"] = auds
+        df = dfall[["start", "end", "label", "audiofilename"]]
+    else:
+        df = pd.DataFrame()
+        for file in tqdm(
+            p.rglob(f"*{appendix}"), desc="Loading annotations", leave=False
+        ):
+            try:
+                ann = pd.read_csv(file, sep="\t", header=None)
+            except pd.errors.EmptyDataError:
+                continue
+            df = pd.concat([df, dff], ignore_index=True)
+
         dff = pd.DataFrame()
-        dff["start"] = ann[0]
-        dff["end"] = ann[1]
-        dff["label"] = [a.split("_")[0] for a in ann[2]]
+        dff["start"] = ann[start_col_name]
+        dff["end"] = ann[end_col_name]
+        dff["label"] = ann[lab_col_name]
         dff["audiofilename"] = file.stem + ".wav"
-        df = pd.concat([df, dff], ignore_index=True)
+
     if True:
         short_to_species = pd.read_csv(
             "/mnt/swap/Work/Data/Amphibians/AnuranSet/species.csv"
@@ -284,17 +314,8 @@ def create_standardize_annotation_file():
                 short_to_species.CODE == spe
             ].values[0]
 
-    ## This should always work for acodet combined annotations
-    dfc = pd.read_csv(le.main_embeds_path.parent.joinpath("combined_annotations.csv"))
-    dfn = pd.read_csv(le.main_embeds_path.parent.joinpath("explicit_noise.csv"))
-    dfall = pd.concat([dfc, dfn])
-    aud = dfall["filename"]
-    auds = [Path(a).stem + ".wav" for a in aud]
-    dfall["audiofilename"] = auds
-    df = dfall[["start", "end", "label", "audiofilename"]]
-
     df.to_csv(
-        le.main_embeds_path.parent.joinpath("annotations.csv"),
+        p.joinpath("annotations.csv"),
         index=False,
     )
 

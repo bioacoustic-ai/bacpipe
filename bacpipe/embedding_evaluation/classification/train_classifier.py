@@ -155,7 +155,7 @@ def inference(classifier, test_dataloader, device="cuda:0", config="linear", **k
 
 
 class KNN(nn.Module):
-    def __init__(self, n_neighbors=15, **kwargs):
+    def __init__(self, n_neighbors=15, testing=False, **kwargs):
         """
         K-nearest neighbor classifier.
 
@@ -165,6 +165,8 @@ class KNN(nn.Module):
             hyperparameter specified in settings.yaml file, by default 15
         """
         super(KNN, self).__init__()
+        if testing:
+            n_neighbors = 1  # Set to 1 for testing purposes
         self.knn = KNeighborsClassifier(n_neighbors=n_neighbors)
         self.is_trained = False  # Flag to track if KNN is trained
 
