@@ -95,9 +95,16 @@ class Loader:
         for d in existing_embed_dirs[::-1]:
 
             if self.model_name in d.stem and Path(self.audio_dir).stem in d.stem:
-                if list(d.iterdir()) == []:
-                    d.rmdir()
-                    continue
+                if list(d.glob("*yml")) == []:
+                    try:
+                        d.rmdir()
+                        continue
+                    except OSError:
+                        print(
+                            f"Directory {d} is not empty. ",
+                            "Please remove it manually.",
+                        )
+                        continue
                 with open(d.joinpath("metadata.yml"), "r") as f:
                     mdata = yaml.load(f, Loader=yaml.CLoader)
                     if not self.model_name == mdata["model_name"]:

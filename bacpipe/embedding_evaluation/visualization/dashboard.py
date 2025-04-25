@@ -56,7 +56,10 @@ class DashBoard:
         self.dim_reduction_model = dim_reduction_model
         self.widget_width = 120
         self.vis_loader = EmbedAndLabelLoader(
-            dashboard=True, dim_reduction_model=dim_reduction_model, **kwargs
+            dashboard=True,
+            dim_reduction_model=dim_reduction_model,
+            default_label_keys=default_label_keys,
+            **kwargs,
         )
 
         self.model_select = dict()
@@ -187,101 +190,3 @@ class DashBoard:
                 self.all_models_page(1),
             ),
         )
-
-    def generate_widgets():
-        embed_dict = get_original_embeds()
-
-        ############## LAYOUT ##############
-
-        # model1 =
-        reducer1 = pn.widgets.Select(name="Reducer", options=REDUCERS, width=120)
-        label_by1 = pn.widgets.Select(
-            name="label_by", options=["ground truth", "hdbscan", "kmeans"], width=120
-        )
-        percentages1 = pn.widgets.RadioBoxGroup(
-            name="Show percentages", options=[True, False], value=False
-        )
-        no_noise1 = pn.widgets.Checkbox(name="Remove noise", value=False)
-        select_clustering = pn.widgets.Select(
-            name="Reducer", options=METRICS, width=120
-        )
-        label1 = pn.widgets.Select(
-            name="Label",
-            options=list(embed_dict[model1.value]["label_dict"].keys()),
-            width=120,
-        )
-
-        model2 = copy.deepcopy(model1)
-        reducer2 = copy.deepcopy(reducer1)
-        label_by2 = copy.deepcopy(label_by1)
-        percentages2 = copy.deepcopy(percentages1)
-        no_noise2 = copy.deepcopy(no_noise1)
-
-        reducer3 = pn.widgets.Select(
-            name="Reducer", options=[None] + REDUCERS, width=120
-        )
-        label3 = pn.widgets.Select(
-            name="Label",
-            options=list(embed_dict[model1.value]["label_dict"].keys()),
-            width=120,
-        )
-        metric1 = pn.widgets.Select(
-            name="Metric", options=["euclidean", "cosine"], width=120
-        )
-
-        # Bind the slider to both plots
-        Overview = pn.bind(
-            plot_overview,
-            orig_embeds=embed_dict,
-            reducer=reducer1,
-            label_by=label_by1,
-            no_noise=no_noise1,
-        )
-
-        Clusterings_overview = pn.bind(
-            plot_clust_overview,
-            select_clustering=select_clustering,
-            label_by=label_by1,
-            no_noise=no_noise1,
-            plot_percentages=percentages1,
-        )
-
-        Embeddings1 = pn.bind(
-            plot_embeds,
-            orig_embeds=embed_dict,
-            reducer=reducer1,
-            model=model1,
-            label_keys=list(embed_dict.values())[0]["label_dict"].keys(),
-            label_by=label_by1,
-            no_noise=no_noise1,
-        )
-        Embeddings2 = pn.bind(
-            plot_embeds,
-            orig_embeds=embed_dict,
-            reducer=reducer2,
-            model=model2,
-            label_keys=list(embed_dict.values())[0]["label_dict"].keys(),
-            label_by=label_by2,
-            no_noise=no_noise2,
-            no_legend=True,
-        )
-
-        Clusterings1 = pn.bind(
-            plot_clusterings,
-            model=model1,
-            plot_percentages=percentages1,
-            no_noise=no_noise1,
-        )
-        Clusterings2 = pn.bind(
-            plot_clusterings,
-            model=model2,
-            plot_percentages=percentages2,
-            no_noise=no_noise2,
-            no_legend=True,
-        )
-
-        Violins = pn.bind(
-            load_distances, reducer=reducer3, model=model1, label=label3, metric=metric1
-        )
-
-        Violins2 = pn.bind(load_distances, reducer=reducer1, label=label1)

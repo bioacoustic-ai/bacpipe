@@ -257,11 +257,13 @@ def get_embeddings(
                 f"{dim_reduction_model}. Plots are saved in "
                 f"{loader_dim_reduced.embed_dir} ###"
             )
-            vis_loader = EmbedAndLabelLoader(**kwargs)
+            vis_loader = EmbedAndLabelLoader(
+                dim_reduction_model=dim_reduction_model, **kwargs
+            )
             plot_embeddings(
                 vis_loader,
                 paths=paths,
-                model_name=loader_dim_reduced.embedding_model,
+                model_name=loader_dim_reduced.model_name,
                 dim_reduction_model=dim_reduction_model,
                 bool_plot_centroids=False,
                 label_by="time_of_day",

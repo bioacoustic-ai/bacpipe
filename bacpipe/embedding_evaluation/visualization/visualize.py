@@ -50,20 +50,6 @@ def collect_dim_reduced_embeds(dim_reduced_embed_path, dim_reduction_model):
     return embeds_dict
 
 
-def plot_centroids(axes, centroids, label, split_data, points):
-    centroids[label] = get_centroid(split_data[label])
-    c = darken_hex_color_bitwise(points[0]._color)
-    axes.plot(
-        centroids[label][0],
-        centroids[label][1],
-        "x",
-        color=c,
-        label=f"{label} centroid",
-        markersize=12,
-    )
-    return centroids
-
-
 class EmbedAndLabelLoader:
     def __init__(self, dim_reduction_model, dashboard=False, **kwargs):
         self.labels = dict()
@@ -209,13 +195,15 @@ def get_labels_for_plot(model_name=None, **kwargs):
     labels = dict()
     labels = le.get_default_labels(model_name, **kwargs)
 
-    if le.get_paths(model_name).labels_path.joinpath("ground_truth.npy"):
+    if le.get_paths(model_name).labels_path.joinpath("ground_truth.npy").exists():
         ground_truth = le.get_ground_truth(model_name)
         inv = {v: k for k, v in ground_truth["label_dict"].items()}
         inv[-1.0] = "noise"
+        # TODO -2 still in data
         labels["ground_truth"] = [inv[v] for v in ground_truth["labels"]]
         bool_noise = np.array(labels["ground_truth"]) == "noise"
-
+    else:
+        bool_noise = np.array([False] * len(list(labels.values())[0]))
     if len(list(le.get_paths(model_name).clust_path.glob("*.npy"))) > 0:
         clusts = [
             np.load(f, allow_pickle=True).item()
@@ -551,6 +539,8 @@ def reorder_embeddings_by_clustering_performance(
     )
     positions = {mod: ax.get_position() for mod, ax in zip(new_order, axes.flatten())}
     for model, ax in zip(models, axes.flatten()):
+        if not model in positions.keys():
+            continue
         ax.set_position(positions[model])
 
 
@@ -832,6 +822,9 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
 
 
 def plot_violins(left, right):
+    import pandas as pd
+    import seaborn as sns
+
     val = []
     typ = []
     cat = []

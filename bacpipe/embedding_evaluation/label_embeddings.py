@@ -223,6 +223,8 @@ def get_ground_truth(model_name):
 
 
 def model_specific_embedding_path(path, model):
+    if not isinstance(model, str):
+        model = str(model)
     embed_paths_for_this_model = [
         d
         for d in path.iterdir()
@@ -259,7 +261,77 @@ def create_default_labels(paths, model, overwrite=True, **kwargs):
     return default_labels.default_label_dict
 
 
+def create_standardize_annotation_file():
+    p = Path(SOURCE)
+    df = pd.DataFrame()
+    for file in tqdm(p.rglob("*.txt")):
+        try:
+            ann = pd.read_csv(file, sep="\t", header=None)
+        except pd.errors.EmptyDataError:
+            continue
+        dff = pd.DataFrame()
+        dff["start"] = ann[0]
+        dff["end"] = ann[1]
+        dff["label"] = [a.split("_")[0] for a in ann[2]]
+        dff["audiofilename"] = file.stem + ".wav"
+        df = pd.concat([df, dff], ignore_index=True)
+    if True:
+        short_to_species = pd.read_csv(
+            "/mnt/swap/Work/Data/Amphibians/AnuranSet/species.csv"
+        )
+        for spe in df.label.unique():
+            df.label[df.label == spe] = short_to_species.SPECIES[
+                short_to_species.CODE == spe
+            ].values[0]
+
+    ## This should always work for acodet combined annotations
+    dfc = pd.read_csv(le.main_embeds_path.parent.joinpath("combined_annotations.csv"))
+    dfn = pd.read_csv(le.main_embeds_path.parent.joinpath("explicit_noise.csv"))
+    dfall = pd.concat([dfc, dfn])
+    aud = dfall["filename"]
+    auds = [Path(a).stem + ".wav" for a in aud]
+    dfall["audiofilename"] = auds
+    df = dfall[["start", "end", "label", "audiofilename"]]
+
+    df.to_csv(
+        le.main_embeds_path.parent.joinpath("annotations.csv"),
+        index=False,
+    )
+
+
+def filter_annotations_by_minimum_number_of_occurrences(
+    df, min_occurrences=150, min_duration=0.65
+):
+    """
+    Filter the annotations to have at least a minimum number of occurrences
+    and a minimum duration.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the annotations.
+    min_occurrences : int, optional
+        Minimum number of occurrences for each label, by default 150.
+    min_duration : float, optional
+        Minimum duration for each label, by default 0.65.
+
+    Returns
+    -------
+    pd.DataFrame
+        Filtered DataFrame containing the annotations.
+    """
+    label_counts = df["label"].value_counts()
+    labels_to_keep = label_counts[label_counts >= min_occurrences].index
+
+    filtered_df = df[
+        (df["label"].isin(labels_to_keep)) & ((df["end"] - df["start"]) >= min_duration)
+    ]
+
+    return filtered_df
+
+
 def load_labels_and_build_dict(paths, label_file):
+    # TODO filter to have at least 150 labels
     label_df = pd.read_csv(paths.main_embeds_path.parent.joinpath(label_file))
     label_idx_dict = {label: idx for idx, label in enumerate(label_df.label.unique())}
     with open(paths.labels_path.joinpath("label_idx_dict.json"), "w") as f:
@@ -275,10 +347,6 @@ def fit_labels_to_embedding_timestamps(
     if single_label:
         single_label_arr = [True] * len(embed_timestamps)
 
-    # assert (
-    #     df.end.values[-1] <= embed_timestamps[-1] + segment_s*2
-    # ), f"Timestamps do not match for {audio_file}"
-
     for _, row in df.iterrows():
         em_start = np.argmin(np.abs(embed_timestamps - row.start))
         em_end = np.argmin(np.abs(embed_timestamps - row.end))
@@ -288,9 +356,10 @@ def fit_labels_to_embedding_timestamps(
                 and not label_idx_dict[row.label] in file_labels[em_start:em_end]
             ):
                 single_label_arr[em_start:em_end] = [False] * (em_end - em_start)
-        if (
-            row.end - row.start > 0.65
-        ):  # at least 0.65 seconds of the bbox have to be in the embedding timestamp window
+
+        # at least 0.65 seconds of the bbox have
+        # to be in the embedding timestamp window
+        if row.end - row.start > 0.65:
             file_labels[em_start:em_end] = label_idx_dict[row.label]
     if single_label:
         file_labels[~np.array(single_label_arr)] = -2
@@ -472,3 +541,131 @@ def generate_annotations_for_classification_task(paths):
         paths.labels_path.joinpath("classification_dataframe.csv"),
         index=False,
     )
+
+
+def turn_multilabel_into_singlelabel(df_full):
+
+    df = pd.DataFrame()
+    for file in tqdm(
+        df_full.audiofilename.unique(),
+        desc="Removing multi-labels",
+        total=len(df_full.audiofilename.unique()),
+        leave=False,
+    ):
+        dff = df_full[df_full.audiofilename == file]
+        if len(dff.label.unique()) > 1:
+            for _ in range(len(dff)):
+                dff = dff.sort_values("start")
+                dff.index = range(len(dff))
+                number_of_changes = 0
+
+                one_overarching_sound = 0
+                for idx in range(len(dff)):
+                    if idx in dff.index:
+                        row = dff.loc[idx]
+                    else:
+                        continue
+
+                    begins_within = (
+                        (dff.start > row.start)
+                        & (dff.start < row.end)
+                        & (dff.end > row.end)
+                    )
+                    ends_within = (
+                        (dff.end > row.start)
+                        & (dff.end < row.end)
+                        & (dff.start < row.start)
+                    )
+                    complete_within = (
+                        (dff.start >= row.start)
+                        & (dff.end <= row.end)
+                        & (dff.index != idx)
+                    )
+
+                    new_ends = dict()
+                    new_starts = dict()
+
+                    if all(
+                        complete_within[dff.index != idx]
+                    ):  # strict case, meaning as soon as there is a sound going from beg to end we skip
+                        one_overarching_sound += 1
+                        if one_overarching_sound > 1:
+                            break
+
+                    if any(begins_within.values):
+                        new_ends["begins_within"] = dff[
+                            begins_within
+                        ].start.values.tolist()
+
+                    if any(ends_within.values):
+                        new_starts["ends_within"] = dff[ends_within].end.values.tolist()
+
+                    if any(complete_within.values):
+                        new_starts["complete_within"] = dff[
+                            complete_within
+                        ].end.values.tolist()
+                        new_ends["complete_within"] = dff[
+                            complete_within
+                        ].start.values.tolist()
+                        new_starts["complete_within"].insert(0, row.start)
+                        new_ends["complete_within"].append(row.end)
+
+                    if "ends_within" in new_starts.keys():
+                        max_ind = dff.index.max()
+                        for i in range(len(new_starts["ends_within"])):
+                            row.name = max_ind + i + 1
+                            dff = pd.concat([dff, pd.DataFrame(row).T])
+                            index = dff.index[-1]
+                            dff.loc[index, "start"] = new_starts["ends_within"][i]
+
+                    if "begins_within" in new_ends.keys():
+                        max_ind = dff.index.max()
+                        for i in range(len(new_ends["begins_within"])):
+                            row.name = max_ind + i + 1
+                            dff = pd.concat([dff, pd.DataFrame(row).T])
+                            index = dff.index[-1]
+                            dff.loc[index, "end"] = new_ends["begins_within"][i]
+
+                    if "complete_within" in new_starts.keys():
+                        max_ind = dff.index.max()
+                        for i in range(len(new_starts["complete_within"])):
+                            if (
+                                new_starts["complete_within"][i]
+                                >= new_ends["complete_within"][i]
+                            ):
+                                continue
+                                # this is the case if two overlapping sounds start exactly the same time
+                            row.name = max_ind + i + 1
+                            dff = pd.concat([dff, pd.DataFrame(row).T])
+                            # index = max_ind + i
+                            dff.loc[row.name, "start"] = new_starts["complete_within"][
+                                i
+                            ]
+                            dff.loc[row.name, "end"] = new_ends["complete_within"][i]
+                    bool_combination = begins_within ^ complete_within ^ ends_within
+                    dff.drop(
+                        dff.loc[bool_combination.index][bool_combination].index,
+                        inplace=True,
+                    )
+                    if any(bool_combination):
+                        number_of_changes += 1
+
+                    if (
+                        any(begins_within.values)
+                        or any(ends_within.values)
+                        or any(complete_within.values)
+                    ):
+                        dff.drop(idx, inplace=True)
+                dff = dff[
+                    dff.end - dff.start > 0.2
+                ]  # minimum of 0.2 seconds vocalization
+                if number_of_changes == 0:
+                    break
+                # dff.drop_duplicates(inplace=True)
+
+        dff = dff.sort_values("start")
+        if dff.isna().sum().sum() > 0:
+            print(dff)
+            print("NA values in the dataframe")
+        df = pd.concat([df, dff], ignore_index=True)
+    return df
