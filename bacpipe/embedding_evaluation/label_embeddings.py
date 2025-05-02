@@ -98,11 +98,12 @@ class DefaultLabels:
         self.time_of_day_per_embedding = []
         for file_idx, (file, time_of_day) in enumerate(time_of_day_per_file.items()):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
-                self.time_of_day_per_embedding.append(
+                timestamp = (
                     (time_of_day + index_of_embedding * segment_s_dt)
                     .time()
                     .replace(microsecond=0)
                 )
+                self.time_of_day_per_embedding.append(timestamp.strftime("%H-%M-%S"))
 
     def day_of_year(self):
         self.get_datetimes()
@@ -116,7 +117,9 @@ class DefaultLabels:
         self.day_of_year_per_embedding = []
         for file_idx, (file, day_of_year) in enumerate(day_of_year_per_file.items()):
             self.day_of_year_per_embedding.extend(
-                np.repeat(day_of_year, self.nr_embeds_per_file[file_idx])
+                np.repeat(
+                    day_of_year.strftime("%Y-%m-%d"), self.nr_embeds_per_file[file_idx]
+                )
             )
 
     def continuous_timestamp(self):
@@ -132,10 +135,11 @@ class DefaultLabels:
             self.timestamp_per_file.items()
         ):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
+                timestamp = (
+                    datetime_per_file + index_of_embedding * segment_s_dt
+                ).replace(microsecond=0)
                 self.continuous_timestamp_per_embedding.append(
-                    (datetime_per_file + index_of_embedding * segment_s_dt).replace(
-                        microsecond=0
-                    )
+                    timestamp.strftime("%Y-%m-%d_%H:%M:%S")
                 )
 
     def parent_directory(self):
@@ -258,15 +262,16 @@ def create_default_labels(paths, model, overwrite=True, **kwargs):
         default_labels = DefaultLabels(paths, model=model, **kwargs)
         default_labels.generate()
 
+        def_labels = default_labels.default_label_dict
         np.save(
             paths.labels_path.joinpath("default_labels.npy"),
-            default_labels,
+            def_labels,
         )
     else:
-        default_labels = np.load(
+        def_labels = np.load(
             paths.labels_path.joinpath("default_labels.npy"), allow_pickle=True
         ).item()
-    return default_labels.default_label_dict
+    return def_labels
 
 
 def concatenate_annotation_files(
