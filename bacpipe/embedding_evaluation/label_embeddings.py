@@ -191,7 +191,7 @@ def make_set_paths_func(
             object containing the paths for the results of the embedding evaluation
         """
         dataset_path = Path(main_results_dir).joinpath(Path(audio_dir).stem)
-        task_path = dataset_path.joinpath("task_results").joinpath(model_name)
+        task_path = dataset_path.joinpath("evaluations").joinpath(model_name)
 
         paths = {
             "dataset_path": dataset_path,

@@ -1,4 +1,4 @@
-from exploration import explore_embeds
+from bacpipe.embedding_evaluation import label_embeddings as le
 import sklearn
 from tqdm import tqdm
 import pandas as pd
@@ -10,7 +10,8 @@ from pathlib import Path
 # DATA_PATH = "id_task_data"
 # DATA_PATH = "neotropic_dawn_chorus"
 # DATA_PATH = "colombia_soundscape"
-DATA_PATH = "anuran_set"
+# DATA_PATH = "anuran_set"
+DATA_PATH = "Ilaria_AL_eval"
 
 if False:
     from pathlib import Path
@@ -44,7 +45,7 @@ if False:
 
 
 def read_annotations():
-    if not explore_embeds.main_embeds_path.parent.joinpath("annotations.csv").exists():
+    if not le.main_embeds_path.parent.joinpath("annotations.csv").exists():
         p = Path("/mnt/swap/Work/Data/Amphibians/AnuranSet/strong_labels")
         df = pd.DataFrame()
         for file in tqdm(p.rglob("*.txt")):
@@ -66,33 +67,37 @@ def read_annotations():
                 df.label[df.label == spe] = short_to_species.SPECIES[
                     short_to_species.CODE == spe
                 ].values[0]
+
+        ## This should always work for acodet combined annotations
+        dfc = pd.read_csv(
+            le.main_embeds_path.parent.joinpath("combined_annotations.csv")
+        )
+        dfn = pd.read_csv(le.main_embeds_path.parent.joinpath("explicit_noise.csv"))
+        dfall = pd.concat([dfc, dfn])
+        aud = dfall["filename"]
+        auds = [Path(a).stem + ".wav" for a in aud]
+        dfall["audiofilename"] = auds
+        df = dfall[["start", "end", "label", "audiofilename"]]
+
         df.to_csv(
-            explore_embeds.main_embeds_path.parent.joinpath("annotations.csv"),
+            le.main_embeds_path.parent.joinpath("annotations.csv"),
             index=False,
         )
     else:
-        df = pd.read_csv(
-            explore_embeds.main_embeds_path.parent.joinpath("annotations.csv")
-        )
-    if not explore_embeds.main_embeds_path.parent.joinpath(
-        "annotations_single_label.csv"
-    ).exists():
+        df = pd.read_csv(le.main_embeds_path.parent.joinpath("annotations.csv"))
+    if not le.main_embeds_path.parent.joinpath("annotations_single_label.csv").exists():
         df = remove_multilabel(df)
         # Filter annotations
         a, b = np.unique(df.label, return_counts=True)
         c = [aa for aa, bb in zip(a, b) if bb > 150]
         df_filtered = df[df.label.isin(c)]
         df_filtered.to_csv(
-            explore_embeds.main_embeds_path.parent.joinpath(
-                "annotations_single_label.csv"
-            ),
+            le.main_embeds_path.parent.joinpath("annotations_single_label.csv"),
             index=False,
         )
     else:
         df = pd.read_csv(
-            explore_embeds.main_embeds_path.parent.joinpath(
-                "annotations_single_label.csv"
-            )
+            le.main_embeds_path.parent.joinpath("annotations_single_label.csv")
         )
 
 
@@ -223,31 +228,6 @@ def remove_multilabel(df_full):
     return df
 
 
-def generate_annotations(embed_dict):
-    for model in embed_dict.keys():
-        inv = {v: k for k, v in embed_dict[model]["label_dict"].items()}
-        labs = [inv[i] for i in embed_dict[model]["labels"]]
-        df = pd.DataFrame()
-        df["species"] = labs
-        df["predefined_set"] = "lollinger"
-        for k, v in embed_dict[model]["split"].items():
-            l = v.shape[0]
-            ar = list(df[df.species == k].index)
-            np.random.shuffle(ar)
-            tr_ar = ar[: int(l * 0.65)]
-            te_ar = ar[int(l * 0.65) : int(l * 0.85)]
-            va_ar = ar[int(l * 0.85) :]
-            df.predefined_set[tr_ar] = "train"
-            df.predefined_set[te_ar] = "test"
-            df.predefined_set[va_ar] = "val"
-        df.to_csv(
-            explore_embeds.main_embeds_path.parent.joinpath("annotations")
-            .joinpath("task_annotations")
-            .joinpath(f"{model}__task_annotations.csv"),
-            index=False,
-        )
-
-
 ##### CONFIGS #####
 
 conf_2d_reduction = [
@@ -346,18 +326,19 @@ clust_conf = conf_clust[-1:]
 #     ]
 # )
 if True:
-    explore_embeds.set_paths(DATA_PATH)
+    le.set_paths(DATA_PATH, "insect66")
     read_annotations()
-    label_file = explore_embeds.main_embeds_path.parent.joinpath(
-        "annotations_single_label.csv"
-    )
+    # label_file = le.main_embeds_path.parent.joinpath(
+    #     "annotations_single_label.csv"
+    # )
 
-    embed_dict = explore_embeds.get_original_embeds(
-        label_file=label_file, remove_noise=True
+    # embed_dict = le.create_default_labels()
+    ground_truth = le.ground_truth_by_model(
+        label_file="annotations.csv", remove_noise=True
     )
-    generate_annotations(embed_dict)
+    generate_annotations("insect66", ground_truth)
 
-    explore_embeds.compare(
+    le.compare(
         embed_dict,
         reducer_conf=reducer_conf,
         reducer_2d_conf=conf_2d_reduction[0],

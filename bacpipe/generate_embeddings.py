@@ -66,7 +66,7 @@ class Loader:
         for key, val in self.config.items():
             if key == "main_results_dir":
                 continue
-            if key in ["embed_parent_dir", "dim_reduc_parent_dir", "task_results_dir"]:
+            if key in ["embed_parent_dir", "dim_reduc_parent_dir", "evaluations_dir"]:
                 val = (
                     Path(self.config["main_results_dir"])
                     .joinpath(self.audio_dir.stem)

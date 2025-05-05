@@ -45,13 +45,13 @@ Steps:
 
 ### Results 
 
-Once the evaluation finished, a `classification_results.json` file will be saved in `task_results/metrics`. More infor on that [here](task_results/metrics/README.md).
+Once the evaluation finished, a `classification_results.json` file will be saved in `evaluations/metrics`. More infor on that [here](evaluations/metrics/README.md).
 
 **Clustering-based evaluation** is based on computing various clustering scores for the embeddings and labels of each task. 
 These are calculated directly on the extracted embeddings without any fine tuning for the specific task. 
 Some pretrained models are naturally better at certain tasks given their training domain. For instance birdnet on species classification. however these scores are a good indicator of performance on other tasks.
 
-Alongside the metrics, a visualization will be saved showing the performance reults in `task_results/plots`. More infor on that [here](task_results/plots/README.md).
+Alongside the metrics, a visualization will be saved showing the performance reults in `evaluations/plots`. More infor on that [here](evaluations/plots/README.md).
 
 ### Structure of code:
    * `classification_utils/` : contains helper functions to run the classification steps.
@@ -59,7 +59,7 @@ Alongside the metrics, a visualization will be saved showing the performance reu
    * `datasets/` : where the audiio data is stored.
    * `dim_reduced_embeddings/` : here the embeddings after the dimensionality reduction are saved
    * `embeddings/` : here all of the embeddings that are computed during model inference are saved 
-   * `task_results/` : here the classificaion results from the tasks are saved
+   * `evaluations/` : here the classificaion results from the tasks are saved
    * `tasks/` : contains the task definitions and task specific parameters
     
 

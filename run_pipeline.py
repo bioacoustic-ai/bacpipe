@@ -19,10 +19,10 @@ with open("bacpipe/settings.yaml", "rb") as p:
 
 get_model_names(**config, **settings)
 
-loader_dict = model_specific_embedding_creation(**config, **settings)
+# loader_dict = model_specific_embedding_creation(**config, **settings)
 
-model_specific_evaluation(loader_dict, **config, **settings)
+# model_specific_evaluation(loader_dict, **config, **settings)
 
-cross_model_evaluation(**config, **settings)
+# cross_model_evaluation(**config, **settings)
 
 visualize_using_dashboard(**config, **settings)

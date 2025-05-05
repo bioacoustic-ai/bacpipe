@@ -8,10 +8,10 @@ embed_parent_dir :   "embeddings"
 dim_reduc_parent_dir :   "dim_reduced_embeddings"
 
 # fixed paths for tasks:
-task_results_dir : "task_results"
+evaluations_dir : "evaluations"
 task_config_files : "bacpipe/embedding_evaluation/classification/tasks"
 
-overwrite: False
+overwrite: True
 
 remove_noise: True
 

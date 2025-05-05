@@ -9,8 +9,8 @@ config.yaml
 # ignore datasets, embeddings, and task results
 results/embeddings/*
 results/dim_reduced_embeddings/*
-results/task_results/metrics/*
-results/task_results/plots/*
+results/evaluations/metrics/*
+results/evaluations/plots/*
 results/by_dataset/*
 
 # ignore test result files

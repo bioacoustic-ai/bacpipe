@@ -9,7 +9,9 @@
 
 # PATHS:
 # define paths for your audio data
-audio_dir :       "/mnt/swap/Work/Data/marine/marine mammals/Ilaria_annotated/Ilaria_AL_eval" 
+# audio_dir :       "/mnt/swap/Work/Data/Birds/neotropical coffee farms in Colombia and Costa Rica/soundscape_data" 
+audio_dir :       "/mnt/swap/Work/Data/Amphibians/AnuranSet/AnuranSet" 
+# audio_dir :       "/mnt/swap/Work/Data/marine/marine mammals/Ilaria_annotated/Ilaria_AL_eval" 
 
 # CHOOSE FROM MODELS
 available_models : [
@@ -42,44 +44,47 @@ embedding_model:
   # if already_computed is False, the embeddings will be computed 
   # for all selected models
 
-  already_computed: True
+  already_computed: False
   selected_models: [
       "birdnet",
-      # "animal2vec_xc",
-      # "animal2vec_mk",
+      "animal2vec_xc",
+      "animal2vec_mk",
       "audiomae",
       "aves_especies",
       "biolingual",
       "birdaves_especies",
       "avesecho_passt",
-      "hbdet",
+      # "hbdet",
       "insect66",
       "insect459",
       "perch_bird",
-      # "mix2",
+      # # "mix2",
       "protoclr",
-      # "rcl_fs_bsed",
+      # # "rcl_fs_bsed",
       "surfperch",
       "google_whale",
       # "vggish",
-      # "nonbioaves_especies"
+      "nonbioaves_especies"
   ]
 
-# dimensionality reduction model name.
-supported_models: [
+# specify the evaluation task to be performed
+available_evaluation_tasks: [
+  "classification",
+  "clustering",
+  "pairwise_distances"
+]
+
+evaluation_task: [
+  "classification",
+  "clustering"
+]
+
+# dimensionality reduction (for visualization) model name.
+available_reduction_models: [
   "pca",
   "sparse_pca",
   "t_sne",
   "umap"
 ]
 dim_reduction_model: "umap"
-
-# specify the evaluation task to be performed
-supported_evaluation_tasks: [
-  "ID",
-  "species",
-  "taxon"
-]
-evaluation_task: None
-
 
