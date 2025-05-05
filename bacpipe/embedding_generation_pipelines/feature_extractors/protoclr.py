@@ -2,6 +2,7 @@ from torchaudio import transforms as T
 import torch
 from bacpipe.model_specific_utils.protoclr.cvt import cvt13
 from ..utils import ModelBaseClass
+import yaml
 
 SAMPLE_RATE = 16000
 LENGTH_IN_SAMPLES = int(SAMPLE_RATE * 6)
@@ -9,9 +10,9 @@ BATCH_SIZE = 8
 
 
 # Mel Spectrogram
-DEVICE = (
-    "cpu" if not torch.cuda.is_available() else "cuda"
-)  # device to use ['cpu', 'cuda', 'cuda:0', 'cuda:1', ...]
+with open("bacpipe/settings.yaml", "r") as f:
+    settings = yaml.safe_load(f)
+DEVICE = settings["device"]
 NMELS = 128  # number of mels
 NFFT = 1024  # size of FFT
 HOPLEN = 320  # hop between STFT windows

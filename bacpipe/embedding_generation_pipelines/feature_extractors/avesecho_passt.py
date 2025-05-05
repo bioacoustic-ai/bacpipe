@@ -3,11 +3,15 @@ from ..utils import ModelBaseClass, MODEL_BASE_PATH
 import torch.nn as nn
 import torchaudio
 import torch
+import yaml
 
 SAMPLE_RATE = 32000
 LENGTH_IN_SAMPLES = int(3 * SAMPLE_RATE)  # burooj used 3 seconds
 # LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
-DEVICE = "cuda"
+
+with open("bacpipe/settings.yaml", "r") as f:
+    settings = yaml.safe_load(f)
+DEVICE = settings["device"]
 
 sz_float = 4  # size of a float
 epsilon = 10e-8  # fudge factor for normalization

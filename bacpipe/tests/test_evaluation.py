@@ -12,6 +12,8 @@ import yaml
 with open("bacpipe/settings.yaml", "r") as f:
     settings = yaml.safe_load(f)
 
+settings["overwrite"] = True
+
 audio_dir = "bacpipe/tests/audio_test_files/dcase_task5"
 
 

@@ -3,11 +3,13 @@ import numpy as np
 import torch
 from bacpipe.model_specific_utils.animal2vec_nn.nn import chunk_and_normalize
 from ..utils import ModelBaseClass
+import yaml
 
 SAMPLE_RATE = 8000
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
-DEVICE = "cpu" if not torch.cuda.is_available() else "cuda"
-print(DEVICE)
+with open("bacpipe/settings.yaml", "r") as f:
+    settings = yaml.safe_load(f)
+DEVICE = settings["device"]
 
 
 class Model(ModelBaseClass):

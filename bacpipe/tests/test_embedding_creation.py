@@ -9,12 +9,12 @@ from pathlib import Path
 
 # INITIALIZATION
 # Find all models in the pipelines directory
-models = ["avesecho_passt"]
-#     mod.stem
-#     for mod in Path(
-#         "bacpipe/embedding_generation_pipelines/feature_extractors"
-#         ).glob("*.py")
-# ]
+models = [  # "avesecho_passt"]
+    mod.stem
+    for mod in Path("bacpipe/embedding_generation_pipelines/feature_extractors").glob(
+        "*.py"
+    )
+]
 
 # Only test models whos checkpoints have been downloaded
 models_requiring_checkpoints = [
@@ -107,6 +107,6 @@ def test_embedding_dimensions(model):
     )
 
 
-test_embedding_generation("avesecho_passt")
-test_embedding_dimensions("avesecho_passt")
+# test_embedding_generation("avesecho_passt")
+# test_embedding_dimensions("avesecho_passt")
 # pytest -v --disable-warnings test_embedding_creation.py
