@@ -12,6 +12,7 @@ results/dim_reduced_embeddings/*
 results/evaluations/metrics/*
 results/evaluations/plots/*
 results/by_dataset/*
+bacpipe/evaluation
 
 # ignore test result files
 bacpipe/tests/results_files/*
