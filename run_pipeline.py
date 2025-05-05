@@ -26,7 +26,9 @@ if __name__ == "__main__":
 
     get_model_names(**config, **settings)
 
-    if overwrite or not (Path(main_results_dir) / audio_dir).exists():
+    if overwrite or not (
+        len(list((Path(main_results_dir) / audio_dir).rglob("*.json"))) > 0
+    ):
 
         loader_dict = model_specific_embedding_creation(**config, **settings)
 

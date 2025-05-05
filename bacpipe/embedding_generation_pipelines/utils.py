@@ -17,12 +17,12 @@ class ModelBaseClass:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        self.model_base_path = self.config.model_base_path
+        self.model_base_path = self.config["model_base_path"]
         self.sr = sr
         self.segment_length = segment_length
         if segment_length:
             self.batch_size = int(
-                100_000 * self.config.global_batch_size / segment_length
+                100_000 * self.config["global_batch_size"] / segment_length
             )
 
     def prepare_inference(self):
@@ -49,7 +49,7 @@ class ModelBaseClass:
             raise e
         if audio.shape[0] > 1:
             audio = audio.mean(axis=0).unsqueeze(0)
-        if len(audio) == 0:
+        if len(audio[0]) == 0:
             logger.debug(f"Audio file {path} is empty. " f"Skipping {path}.")
             raise ValueError(f"Audio file {path} is empty.")
         re_audio = ta.functional.resample(audio, sr, self.sr)

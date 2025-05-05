@@ -309,9 +309,8 @@ def generate_embeddings(**kwargs):
                     try:
                         embeddings = embed.get_embeddings_from_model(sample)
                     except Exception as e:
-                        logger.debug(
-                            f"Error generating embeddings for {file}. "
-                            f"Skipping {file}."
+                        logger.warning(
+                            f"Error generating embeddings, skipping file. \n"
                             f"Error: {e}"
                         )
                         continue
