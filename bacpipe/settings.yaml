@@ -11,9 +11,12 @@ dim_reduc_parent_dir :   "dim_reduced_embeddings"
 evaluations_dir : "evaluations"
 task_config_files : "bacpipe/embedding_evaluation/classification/tasks"
 
-overwrite: True
+overwrite: False
 
 remove_noise: True
+
+# specify if you want to visualize the embedding evaluations
+dashboard: True
 
 # To avoid creating embeddings when configurations are still being tested, this is set to True. 
 # Set to False if you want to keep embeddings even if the process is interrupted.

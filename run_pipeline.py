@@ -1,4 +1,5 @@
 import yaml
+from pathlib import Path
 
 from bacpipe.main import (
     get_model_names,
@@ -15,14 +16,24 @@ with open("config.yaml", "rb") as f:
 with open("bacpipe/settings.yaml", "rb") as p:
     settings = yaml.load(p, Loader=yaml.CLoader)
 
-# if __name__ == "__main__":
+overwrite, main_results_dir, audio_dir = (
+    settings["overwrite"],
+    settings["main_results_dir"],
+    Path(config["audio_dir"]).stem,
+)
 
-get_model_names(**config, **settings)
+if __name__ == "__main__":
 
-# loader_dict = model_specific_embedding_creation(**config, **settings)
+    get_model_names(**config, **settings)
 
-# model_specific_evaluation(loader_dict, **config, **settings)
+    if overwrite or not (Path(main_results_dir) / audio_dir).exists():
 
-# cross_model_evaluation(**config, **settings)
+        loader_dict = model_specific_embedding_creation(**config, **settings)
 
-visualize_using_dashboard(**config, **settings)
+        model_specific_evaluation(loader_dict, **config, **settings)
+
+        cross_model_evaluation(**config, **settings)
+
+    if settings["dashboard"]:
+
+        visualize_using_dashboard(**config, **settings)

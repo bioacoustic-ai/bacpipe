@@ -56,7 +56,6 @@ class DashBoard:
         self.dim_reduction_model = dim_reduction_model
         self.widget_width = 120
         self.vis_loader = EmbedAndLabelLoader(
-            dashboard=True,
             dim_reduction_model=dim_reduction_model,
             default_label_keys=default_label_keys,
             **kwargs,
@@ -97,7 +96,7 @@ class DashBoard:
                 self.init_widget(
                     widget_idx,
                     "noise",
-                    name="Noise?",
+                    name="Remove Noise",
                     options=[True, False],
                     attr="RadioBoxGroup",
                     value=False,

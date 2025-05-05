@@ -62,7 +62,7 @@ class EmbedAndLabelLoader:
 
     def get_data(self, model_name, label_by, remove_noise=False, **kwargs):
         if not model_name in self.labels.keys():
-            print("loading data")
+
             tup = get_labels_for_plot(model_name, **self.kwargs)
             self.labels[model_name], self.bool_noise[model_name] = tup
 
@@ -76,7 +76,7 @@ class EmbedAndLabelLoader:
             return_labels = dict()
             return_embeds = dict()
             for key in self.labels[model_name].keys():
-                print(key)
+
                 return_labels[key] = np.array(
                     self.labels[model_name][key], dtype=object
                 )[~self.bool_noise[model_name]]

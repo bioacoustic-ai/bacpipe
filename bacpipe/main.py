@@ -176,7 +176,9 @@ def model_specific_evaluation(
                     calc_distances(paths, embeds, **dist_config)
 
 
-def cross_model_evaluation(dim_reduction_model, evaluation_task, **kwargs):
+def cross_model_evaluation(
+    dim_reduction_model, evaluation_task, dashboard=False, **kwargs
+):
     """
     Generate plots to compare models by the specified tasks.
 
@@ -201,6 +203,7 @@ def cross_model_evaluation(dim_reduction_model, evaluation_task, **kwargs):
                 model_names,
                 dim_reduction_model,
                 label_by="time_of_day",
+                dashboard=False,
                 **kwargs,
             )
 
