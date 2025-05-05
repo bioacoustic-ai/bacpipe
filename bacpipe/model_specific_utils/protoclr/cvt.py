@@ -561,7 +561,8 @@ class ConvolutionalVisionTransformer(nn.Module):
 
     def init_weights(self, pretrained="", pretrained_layers=[], verbose=True):
         if os.path.isfile(pretrained):
-            pretrained_dict = torch.load(pretrained, map_location="cpu")
+            device = "cpu" if not torch.cuda.is_available() else "cuda"
+            pretrained_dict = torch.load(pretrained, map_location=device)
             logging.info(f"=> loading pretrained model {pretrained}")
             model_dict = self.state_dict()
             pretrained_dict = {
