@@ -24,7 +24,7 @@ class Model(ModelBaseClass):
         audio_input = []
         for frame in audio:
             features = self.audio_classifier.feature_extractor(
-                frame, sampling_rate=SAMPLE_RATE
+                frame.cpu(), sampling_rate=SAMPLE_RATE
             )
             audio_input.append(features["input_features"])
         audio_input = np.array(audio_input)

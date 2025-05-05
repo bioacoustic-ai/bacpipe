@@ -8,13 +8,13 @@ LENGTH_IN_SAMPLES = int(SAMPLE_RATE * 6)
 
 
 # Mel Spectrogram
-DEVICE = "cpu"  # device to use ['cpu', 'cuda', 'cuda:0', 'cuda:1', ...]
+DEVICE = "cpu" if not torch.cuda.is_available() else 'cuda' # device to use ['cpu', 'cuda', 'cuda:0', 'cuda:1', ...]
 NMELS = 128  # number of mels
 NFFT = 1024  # size of FFT
 HOPLEN = 320  # hop between STFT windows
 FMAX = 8000  # fmax
 FMIN = 50  # fmin
-
+print(DEVICE)
 
 class Normalization(torch.nn.Module):
     def __init__(self):
@@ -27,6 +27,7 @@ class Normalization(torch.nn.Module):
 class Model(ModelBaseClass):
     def __init__(self):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+        self.batch_size = 2
 
         self.mel = T.MelSpectrogram(
             sample_rate=SAMPLE_RATE,
@@ -42,7 +43,7 @@ class Model(ModelBaseClass):
         self.model = cvt13()
         state_dict = torch.load(
             self.model_base_path + "/protoclr/protoclr.pth",
-            map_location="cpu",
+            map_location=DEVICE,
             weights_only=True,
         )
         self.model.load_state_dict(state_dict)
@@ -50,6 +51,7 @@ class Model(ModelBaseClass):
         self.model.eval()
 
     def preprocess(self, audio):
+        audio = audio.to(DEVICE)
         mel = self.mel(audio)
         mel = self.power_to_db(mel)
         mel = self.norm(mel)

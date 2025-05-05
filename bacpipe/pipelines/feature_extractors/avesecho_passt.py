@@ -7,6 +7,7 @@ import torch
 SAMPLE_RATE = 32000
 LENGTH_IN_SAMPLES = int(3 * SAMPLE_RATE)  # burooj used 3 seconds
 # LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
+DEVICE = 'cuda'
 
 sz_float = 4  # size of a float
 epsilon = 10e-8  # fudge factor for normalization
@@ -121,13 +122,14 @@ class Model(ModelBaseClass):
         ckpnt = torch.load(
             f"{MODEL_BASE_PATH}/avesecho_passt/best_model_passt.pt",
             weights_only=True,
-            map_location=torch.device("cpu"),
+            map_location=torch.device(DEVICE),
         )
         self.model.load_state_dict(ckpnt)
-
+        self.model = self.model.to(DEVICE)
         self.preprocessor = AugmentMelSTFT(
             n_mels=128, sr=SAMPLE_RATE, win_length=800, hopsize=320, n_fft=1024
         )
+        self.preprocessor = self.preprocessor.to(DEVICE)
 
     def preprocess(self, audio):
         return self.preprocessor(audio)

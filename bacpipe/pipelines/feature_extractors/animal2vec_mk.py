@@ -6,6 +6,8 @@ from ..utils import ModelBaseClass
 
 SAMPLE_RATE = 8000
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
+DEVICE = "cpu" if not torch.cuda.is_available() else 'cuda'
+print(DEVICE)
 
 
 class Model(ModelBaseClass):
@@ -26,7 +28,7 @@ class Model(ModelBaseClass):
         models, _ = checkpoint_utils.load_model_ensemble(
             [path_to_pt_file]
         )  # , weights_only=True)
-        self.model = models[0].to("cpu")
+        self.model = models[0].to(DEVICE)
         self.model.eval()
 
     def preprocess(self, audio):

@@ -108,7 +108,7 @@ class Model(ModelBaseClass):
         self.model = tf.keras.Sequential(layers=[layer for layer in model_list])
 
     def preprocess(self, audio):
-        return tf.convert_to_tensor(audio)
+        return tf.convert_to_tensor(audio.cpu())
 
     def __call__(self, input):
         return self.model.predict(input)
