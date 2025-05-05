@@ -282,7 +282,11 @@ class Embedder:
             try:
                 embeds = embeds.numpy()
             except:
-                embeds = embeds.detach().numpy()
+                print(type(embeds))
+                try:
+                    embeds = embeds.detach().numpy()
+                except:
+                    embeds = embeds.cpu().detach().numpy()
         return embeds
 
     def get_reduced_dimensionality_embeddings(self, embeds):

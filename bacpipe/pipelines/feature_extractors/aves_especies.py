@@ -15,7 +15,7 @@ LENGTH_IN_SAMPLES = 16000
 
 
 class Model(ModelBaseClass, nn.Module):
-    def __init__(self, birdaves=False):
+    def __init__(self, birdaves=False, nonbioaves=False):
 
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         nn.Module.__init__(self)
@@ -26,6 +26,11 @@ class Model(ModelBaseClass, nn.Module):
             model_config_path = f"{base_path}/birdaves_especies/birdaves-bioxn-large.torchaudio.model_config.json"
             model_path = (
                 f"{base_path}/birdaves_especies/birdaves-bioxn-large.torchaudio.pt"
+            )
+        elif nonbioaves == True:
+            model_config_path = f"{base_path}/nonbioaves_especies/aves-base-nonbio.torchaudio.model_config.json"
+            model_path = (
+                f"{base_path}/nonbioaves_especies/aves-base-nonbio.torchaudio.pt"
             )
         else:
             model_config_path = (

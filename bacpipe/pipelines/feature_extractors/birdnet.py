@@ -16,6 +16,7 @@ class Model(ModelBaseClass):
         self.model = tf.keras.Sequential(model.embeddings_model)
 
     def preprocess(self, audio):
+        audio = audio.cpu()
         return tf.convert_to_tensor(audio, dtype=tf.float32)
 
     def __call__(self, input):

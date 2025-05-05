@@ -17,4 +17,4 @@ class Model(ModelBaseClass):
         return tf.reshape(tf.convert_to_tensor(audio * 32767, dtype=tf.int16), (1, -1))
 
     def __call__(self, input):
-        return self.model(input[0].numpy())
+        return self.model(input[0].cpu().numpy())
