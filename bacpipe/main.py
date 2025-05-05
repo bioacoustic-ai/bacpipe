@@ -306,7 +306,15 @@ def generate_embeddings(**kwargs):
             ):
                 if not ld.dim_reduction_model:
                     sample = file
-                    embeddings = embed.get_embeddings_from_model(sample)
+                    try:
+                        embeddings = embed.get_embeddings_from_model(sample)
+                    except Exception as e:
+                        logger.debug(
+                            f"Error generating embeddings for {file}. "
+                            f"Skipping {file}."
+                            f"Error: {e}"
+                        )
+                        continue
                     ld.write_audio_file_to_metadata(idx, file, embed, embeddings)
                     embed.save_embeddings(idx, ld, file, embeddings)
                 else:

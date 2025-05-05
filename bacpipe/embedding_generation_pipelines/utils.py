@@ -8,9 +8,6 @@ import logging
 
 logger = logging.getLogger("bacpipe")
 
-MODEL_BASE_PATH = "bacpipe/model_checkpoints"
-GLOBAL_BATCH_SIZE = 16
-
 
 class ModelBaseClass:
     def __init__(self, sr, segment_length, **kwargs):
@@ -20,11 +17,13 @@ class ModelBaseClass:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        self.model_base_path = MODEL_BASE_PATH
+        self.model_base_path = self.config.model_base_path
         self.sr = sr
         self.segment_length = segment_length
         if segment_length:
-            self.batch_size = int(100_000 * GLOBAL_BATCH_SIZE / segment_length)
+            self.batch_size = int(
+                100_000 * self.config.global_batch_size / segment_length
+            )
 
     def prepare_inference(self):
         try:
@@ -39,9 +38,20 @@ class ModelBaseClass:
             pass
 
     def load_and_resample(self, path):
-        audio, sr = ta.load(path, normalize=True)
+        try:
+            audio, sr = ta.load(path, normalize=True)
+        except Exception as e:
+            logger.debug(
+                f"Error loading audio with torchaudio. "
+                f"Skipping {path}."
+                f"Error: {e}"
+            )
+            raise e
         if audio.shape[0] > 1:
             audio = audio.mean(axis=0).unsqueeze(0)
+        if len(audio) == 0:
+            logger.debug(f"Audio file {path} is empty. " f"Skipping {path}.")
+            raise ValueError(f"Audio file {path} is empty.")
         re_audio = ta.functional.resample(audio, sr, self.sr)
         return re_audio
 
