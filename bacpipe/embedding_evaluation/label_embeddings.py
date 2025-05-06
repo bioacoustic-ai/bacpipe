@@ -39,6 +39,8 @@ class DefaultLabels:
 
     @staticmethod
     def get_dt_filename(file):
+        if "+" in file:
+            file = file.split("+")[0]
         numbs = re.findall("[0-9]+", file)
         numbs = [n for n in numbs if len(n) % 2 == 0]
 
@@ -190,7 +192,7 @@ def make_set_paths_func(
         paths : SimpleNamespace
             object containing the paths for the results of the embedding evaluation
         """
-        dataset_path = Path(main_results_dir).joinpath(Path(audio_dir).stem)
+        dataset_path = Path(main_results_dir).joinpath(Path(audio_dir).parts[-1])
         task_path = dataset_path.joinpath("evaluations").joinpath(model_name)
 
         paths = {

@@ -225,7 +225,7 @@ class Loader:
         embed_dirs = [
             d
             for d in self.embed_parent_dir.iterdir()
-            if self.audio_dir.stem in d.stem and self.model_name in d.stem
+            if self.audio_dir.stem in d.parts[-1] and self.model_name in d.stem
         ]
         # check if timestamp of umap is after timestamp of model embeddings
         embed_dirs.sort()
