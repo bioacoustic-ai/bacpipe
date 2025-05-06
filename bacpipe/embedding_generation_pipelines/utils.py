@@ -8,6 +8,12 @@ import logging
 
 logger = logging.getLogger("bacpipe")
 
+with open("bacpipe/settings.yaml", "rb") as f:
+    settings = yaml.load(f, Loader=yaml.CLoader)
+
+MODEL_BASE_PATH = settings["model_base_path"]
+GLOBAL_BATCH_SIZE = settings["global_batch_size"]
+
 
 class ModelBaseClass:
     def __init__(self, sr, segment_length, **kwargs):
@@ -17,13 +23,11 @@ class ModelBaseClass:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        self.model_base_path = self.config["model_base_path"]
+        self.model_base_path = MODEL_BASE_PATH
         self.sr = sr
         self.segment_length = segment_length
         if segment_length:
-            self.batch_size = int(
-                100_000 * self.config["global_batch_size"] / segment_length
-            )
+            self.batch_size = int(100_000 * GLOBAL_BATCH_SIZE / segment_length)
 
     def prepare_inference(self):
         try:
