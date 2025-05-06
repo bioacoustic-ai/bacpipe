@@ -97,7 +97,7 @@ class Loader:
     def _find_existing_embed_dir(self, existing_embed_dirs):
         for d in existing_embed_dirs[::-1]:
 
-            if self.model_name in d.stem and Path(self.audio_dir).stem in d.stem:
+            if self.model_name in d.stem and Path(self.audio_dir).stem in d.parts[-1]:
                 if list(d.glob("*yml")) == []:
                     try:
                         d.rmdir()
