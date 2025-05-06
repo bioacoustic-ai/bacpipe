@@ -144,16 +144,18 @@ def model_specific_evaluation(
         dictionary to specify which distance calculations to perform
     """
     for model_name in model_names:
-        if not evaluation_task == "None":
+        if not evaluation_task in ["None", []]:
             embeds = loader_dict[model_name].embedding_dict()
             paths = get_paths(model_name)
             ground_truth = ground_truth_by_model(paths, model_name, **kwargs)
 
         if "classification" in evaluation_task:
-            print("\nTraining linear classifier to evaluate embeddings")
+            print(
+                "\nTraining classifier to evaluate " f"{model_name.upper()} embeddings"
+            )
 
             assert len(embeds) > 1, (
-                "Too few files to evaluate embeddings with linear classifier. "
+                "Too few files to evaluate embeddings with classifier. "
                 "Are you sure you have selected the right data?"
             )
 
@@ -167,6 +169,11 @@ def model_specific_evaluation(
                     )
 
         if "clustering" in evaluation_task:
+            print(
+                "\nGenerating clusterings to evaluate "
+                f"{model_name.upper()} embeddings"
+            )
+
             embeds_array = np.concatenate(list(embeds.values()))
             clustering(paths, embeds_array, ground_truth, **kwargs)
 

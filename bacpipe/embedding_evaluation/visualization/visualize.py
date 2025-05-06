@@ -44,7 +44,7 @@ def collect_dim_reduced_embeds(dim_reduced_embed_path, dim_reduction_model):
     """
     files = dim_reduced_embed_path.iterdir()
     for file in files:
-        if file.suffix == ".json" and dim_reduction_model in file.stem:
+        if file.suffix == ".json":  # and dim_reduction_model in file.stem:
             with open(file, "r") as f:
                 embeds_dict = json.load(f)
     return embeds_dict
@@ -211,8 +211,11 @@ def get_labels_for_plot(model_name=None, **kwargs):
         ]
         for clust in clusts:
             for name, values in clust.items():
-                labels[name] = np.array(["noise"] * len(bool_noise), dtype=object)
-                labels[name][~bool_noise] = [inv[v] for v in values]
+                if name == "kmeans":
+                    labels[name] = values
+                else:
+                    labels[name] = np.array(["noise"] * len(bool_noise), dtype=object)
+                    labels[name][~bool_noise] = [inv[v] for v in values]
 
     return labels, bool_noise
 
@@ -676,6 +679,78 @@ def iterate_through_subtasks(plot_func, plot_path, task_name, model_list, metric
             k.split("(")[0]: v for k, v in metrics.items() if subtask in k
         }
         plot_func(plot_path, f"{subtask} {task_name}", model_list, sub_task_metrics)
+
+
+def plot_clusterings(
+    path_func, model_name, label_by, no_noise, fig=None, ax=None, **kwargs
+):
+    if no_noise:
+        no_noise = "_no_noise"
+    else:
+        no_noise = ""
+
+    with open(path_func(model_name).clust_path / "clust_metrics.json", "r") as f:
+        metrics = json.load(f)
+
+    if not fig and not ax:
+        fig, ax = plt.subplots(figsize=(7, 4))
+        fig.subplots_adjust(left=0.2, bottom=0.25, right=0.7)
+
+    keys = [
+        l
+        for l in np.unique([k.split("-")[0] for k in metrics["AMI"].keys()])
+        if not "no_noise" in l
+    ]
+    flat_metrics = {k: dict() for k in keys}
+    if label_by == "ground_truth":
+        return None
+    for compared_to in keys:
+        try:
+            flat_metrics[compared_to]["AMI"] = metrics["AMI"][
+                f"{compared_to+no_noise}-{label_by}"
+            ]
+            flat_metrics[compared_to]["ARI"] = metrics["ARI"][
+                f"{compared_to+no_noise}-{label_by}"
+            ]
+        except KeyError:
+            flat_metrics[compared_to]["AMI"] = 0
+            flat_metrics[compared_to]["ARI"] = 0
+
+    return generate_bar_plot(flat_metrics, fig, ax, **kwargs)
+
+
+def generate_bar_plot(
+    metrics, fig, ax, y_label="Metric value", no_legend=False, **kwargs
+):
+    bar_width = 1 / (len(list(metrics.values())[0].keys()) + 1)
+    cmap = plt.cm.tab10
+    colors = cmap(np.arange(len(list(metrics.values())[0].keys())) % cmap.N)
+    metrics_sorted = dict(sorted(metrics.items()))
+
+    for out_idx, (reducer, metric) in enumerate(metrics_sorted.items()):
+        for inner_idx, (key, value) in enumerate(metric.items()):
+            ax.bar(
+                out_idx - bar_width * inner_idx,
+                value,
+                label=key,
+                width=bar_width,
+                color=colors[inner_idx],
+            )
+
+    ax.set_xticks(np.arange(len(metrics_sorted.keys())) - 0.33)
+    ax.set_xticklabels(list(metrics_sorted.keys()), rotation=45, ha="right")
+    ax.set_ylabel(y_label)
+    ax.hlines(0, -1, out_idx, linestyles="dashed", color="black", linewidth=0.3)
+    hand, labl = ax.get_legend_handles_labels()
+    if not no_legend:
+        fig.legend(
+            hand[: inner_idx + 1],
+            labl[: inner_idx + 1],
+            fontsize=10,
+            markerscale=15,
+            loc="outside right",
+        )
+    return fig
 
 
 def plot_overview_metrics(plot_path, task_name, model_list, metrics):

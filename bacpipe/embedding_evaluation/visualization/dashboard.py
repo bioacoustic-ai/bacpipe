@@ -6,7 +6,12 @@ from pathlib import Path
 import numpy as np
 from functools import reduce
 
-from .visualize import plot_embeddings, plot_comparison, EmbedAndLabelLoader
+from .visualize import (
+    plot_embeddings,
+    plot_comparison,
+    plot_clusterings,
+    EmbedAndLabelLoader,
+)
 import bacpipe.embedding_evaluation.label_embeddings as le
 
 sns.set_theme(style="whitegrid")
@@ -32,12 +37,12 @@ class DashBoard:
         self.models = model_names
         self.default_label_keys = default_label_keys
         self.label_by = default_label_keys.copy()
-        get_paths = le.make_set_paths_func(
+        self.path_func = le.make_set_paths_func(
             audio_dir, main_results_dir, dim_reduc_parent_dir, **kwargs
         )
-        self.plot_path = get_paths(model_names[0]).plot_path.parent.parent.joinpath(
-            "overview"
-        )
+        self.plot_path = self.path_func(
+            model_names[0]
+        ).plot_path.parent.parent.joinpath("overview")
         self.dim_reduc_parent_dir = dim_reduc_parent_dir
 
         self.ground_truth = None
@@ -93,13 +98,16 @@ class DashBoard:
                 self.init_widget(
                     widget_idx, "label", name="Label by", options=self.label_by
                 ),
-                self.init_widget(
-                    widget_idx,
-                    "noise",
-                    name="Remove Noise",
-                    options=[True, False],
-                    attr="RadioBoxGroup",
-                    value=False,
+                pn.Column(
+                    pn.widgets.StaticText(name="", value="Remove noise?"),
+                    self.init_widget(
+                        widget_idx,
+                        "noise",
+                        name="Remove Noise",
+                        options=[True, False],
+                        attr="RadioBoxGroup",
+                        value=False,
+                    ),
                 ),
             ),
             self.init_plot(
@@ -115,6 +123,15 @@ class DashBoard:
                 dashboard=True,
                 dashboard_idx=widget_idx,
             ),
+            pn.panel(
+                self.plot_widget(
+                    plot_clusterings,
+                    path_func=self.path_func,
+                    model_name=self.model_select[widget_idx],
+                    label_by=self.label_select[widget_idx],
+                    no_noise=self.noise_select[widget_idx],
+                )
+            ),
             # pn.panel(self.plot_widget(
             #     plot_cluster,
             #     orig_embeds=embed_dict,
@@ -122,13 +139,6 @@ class DashBoard:
             #     label_by=self.label_select[widget_idx],
             #     no_noise=self.noise_select[widget_idx],
             #     tight=True)),
-            # pn.panel(self.plot_widget(
-            #     plot_class,
-            #     orig_embeds=embed_dict,
-            #     model=self.model_select[widget_idx],
-            #     label_by=self.label_select[widget_idx],
-            #     no_noise=self.noise_select[widget_idx],
-            #     tight=True))
         )
 
     def all_models_page(self, widget_idx):
@@ -161,13 +171,15 @@ class DashBoard:
                 dashboard=True,
                 # ), tight=True, dpi=100, height=600, width=800)
             ),
-            # pn.panel(self.plot_widget(
-            #     plot_cluster,
-            #     orig_embeds=embed_dict,
-            #     model=self.model_select[widget_idx],
-            #     label_by=self.label_select[widget_idx],
-            #     no_noise=self.noise_select[widget_idx],
-            #     tight=True)),
+            pn.panel(
+                self.plot_widget(
+                    plot_clusterings,
+                    path_func=self.path_func,
+                    model_name=self.model_select[widget_idx],
+                    label_by=self.label_select[widget_idx],
+                    no_noise=self.noise_select[widget_idx],
+                )
+            ),
             # pn.panel(self.plot_widget(
             #     plot_class,
             #     orig_embeds=embed_dict,
@@ -184,8 +196,8 @@ class DashBoard:
                 "Two models",
                 pn.Row(self.single_model_page(0), self.single_model_page(1)),
             ),
-            (
-                "All models",
-                self.all_models_page(1),
-            ),
+            # (
+            #     "All models",
+            #     self.all_models_page(1),
+            # ),
         )

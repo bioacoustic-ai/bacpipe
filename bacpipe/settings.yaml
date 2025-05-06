@@ -36,7 +36,7 @@ remove_noise: True
 
 # specify if you want to overwrite the existing evaluation results
 # this is useful if you want to re-run the evaluation with different parameters
-overwrite: False
+overwrite: True
 
 
 # specify if you want to visualize the embedding evaluations
@@ -71,6 +71,11 @@ class_configs:
 
 
 ## CLUSTERING SETTINGS ##
+
+# specify if you want to use the silhouette score to evaluate 
+# the clustering results. Can be very slow for large datasets
+# and is not recommended for datasets with a large number of clusters.
+evaluate_with_silhouette: False
 
 clust_configs: 
   config_1: 

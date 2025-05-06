@@ -1,6 +1,4 @@
 import numpy as np
-from sklearn.metrics import adjusted_rand_score as ari_score
-from sklearn.metrics import adjusted_mutual_info_score as ami_score
 
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score as SS
@@ -8,6 +6,8 @@ from sklearn.metrics import adjusted_rand_score as ARI
 from sklearn.metrics import adjusted_mutual_info_score as AMI
 
 import json
+
+import bacpipe.embedding_evaluation.label_embeddings as le
 
 
 def convert_numpy_types(obj):
@@ -19,7 +19,7 @@ def convert_numpy_types(obj):
         return obj.tolist()
 
 
-def save_clustering_performance(paths, clusterings, metrics, remove_noise):
+def save_clustering_performance(paths, clusterings, metrics):
     """
     Save the clustering performance. A json file for the performance
     metrics and a npy file with the cluster labels for visualizations.
@@ -32,23 +32,23 @@ def save_clustering_performance(paths, clusterings, metrics, remove_noise):
         clustering labels
     metrics : dict
         clustering performance
-    remove_noise : bool
-        whether to remove the not annotated segments or not
     """
-    if remove_noise:
-        appendix = ""
-    else:
-        appendix = "_with_noise"
-    clust_path = lambda a, b, c: paths.clust_path.joinpath(f"clust_{a}_{b}.{c}")
-
-    np.save(clust_path("label", appendix, "npy"), clusterings)
+    clusterings = {k: v for k, v in clusterings.items() if not "ground_truth" in k}
+    np.save(paths.clust_path.joinpath(f"clust_labels.npy"), clusterings)
 
     if metrics:
-        with open(clust_path("results", appendix, "json"), "w") as f:
+        with open(paths.clust_path.joinpath(f"clust_metrics.json"), "w") as f:
             json.dump(metrics, f, default=convert_numpy_types)
 
 
-def compute_clusterings(embeds, labels, cluster_configs):
+def compute_clusterings(
+    embeds,
+    labels,
+    cluster_configs,
+    default_labels,
+    evaluate_with_silhouette=False,
+    **kwargs,
+):
     """
     Run clustering algorithms.
 
@@ -60,6 +60,10 @@ def compute_clusterings(embeds, labels, cluster_configs):
         ground truth labels
     cluster_configs : dict
         clustering algorithm objects
+    default_labels : dict
+        default labels for the dataset
+    evaluate_with_silhouette : bool, optional
+        whether to evaluate with silhouette score, by default False
 
     Returns
     -------
@@ -68,18 +72,30 @@ def compute_clusterings(embeds, labels, cluster_configs):
     dict
         labels accordings to clustering algorithms
     """
-    metrics = {}
+    metrics = {"SS": dict(), "AMI": dict(), "ARI": dict()}
     clusterings = {}
     for name, clusterer in cluster_configs.items():
         clusterings[name] = clusterer.fit_predict(embeds)
+        clusterings[name + "_no_noise"] = clusterer.fit_predict(embeds[labels != -1])
+    if len(labels) > 0:
+        clusterings["ground_truth"] = labels
+        clusterings["ground_truth_no_noise"] = labels[labels != -1]
+        default_labels["kmeans"] = clusterings["kmeans"]
 
-    if labels is not None:
-        metrics["SS"] = SS(embeds, labels)
-        for clust_name, cluster_labels in clusterings.items():
-            metrics[f"AMI({clust_name})"] = AMI(labels, cluster_labels)
-            metrics[f"ARI({clust_name})"] = ARI(labels, cluster_labels)
-    else:
-        metrics = None
+    for cl_name, cl_labels in clusterings.items():
+        if cl_name == "ground_truth_no_noise":
+            if -1 in labels:
+                embeds = embeds[labels != -1]
+                cl_labels = labels[labels != -1]
+
+        if evaluate_with_silhouette:
+            metrics["SS"][cl_name] = SS(embeds, cl_labels)
+        for def_name, def_labels in default_labels.items():
+            if "no_noise" in cl_name:
+                def_labels = np.array(def_labels)[labels != -1]
+            metrics[f"AMI"][f"{cl_name}-{def_name}"] = AMI(def_labels, cl_labels)
+            metrics[f"ARI"][f"{cl_name}-{def_name}"] = ARI(def_labels, cl_labels)
+
     return metrics, clusterings
 
 
@@ -142,9 +158,7 @@ def get_nr_of_clusters(labels, clust_configs, **kwargs):
     return clust_params
 
 
-def clustering(
-    paths, embeds, ground_truth, overwrite=False, remove_noise=False, **kwargs
-):
+def clustering(paths, embeds, ground_truth, overwrite=False, **kwargs):
     """
     Clustering pipeline.
 
@@ -158,28 +172,29 @@ def clustering(
         ground truth labels and a label2dict dictionary
     overwrite : bool, optional
         whether to overwrite exisiting clustering files, by default False
-    remove_noise : bool, optional
-        remove embeddings corresponding to non-annotated segments, by default False
     """
     if overwrite or not len(list(paths.clust_path.glob("*.json"))) > 0:
 
+        print()
+
         if ground_truth:
             labels = ground_truth["labels"]
-
-            if remove_noise:
-                if -1 in labels:
-                    embeds = embeds[labels != -1]
-                    labels = labels[labels != -1]
         else:
-            labels = None
+            labels = []
 
         clust_params = get_nr_of_clusters(labels, **kwargs)
 
         cluster_configs = get_clustering_models(clust_params)
 
-        metrics, clusterings = compute_clusterings(embeds, labels, cluster_configs)
+        default_labels = le.create_default_labels(
+            paths, paths.clust_path.parent.stem, **kwargs
+        )
 
-        save_clustering_performance(paths, clusterings, metrics, remove_noise)
+        metrics, clusterings = compute_clusterings(
+            embeds, labels, cluster_configs, default_labels
+        )
+
+        save_clustering_performance(paths, clusterings, metrics)
     else:
         print(
             "Clustering file cluster_metrics.json already exists and"

@@ -22,20 +22,18 @@ overwrite, main_results_dir, audio_dir = (
     Path(config["audio_dir"]).stem,
 )
 
-if __name__ == "__main__":
+get_model_names(**config, **settings)
 
-    get_model_names(**config, **settings)
+if overwrite or not (
+    len(list((Path(main_results_dir) / audio_dir).rglob("*.json"))) > 0
+):
 
-    if overwrite or not (
-        len(list((Path(main_results_dir) / audio_dir).rglob("*.json"))) > 0
-    ):
+    loader_dict = model_specific_embedding_creation(**config, **settings)
 
-        loader_dict = model_specific_embedding_creation(**config, **settings)
+    model_specific_evaluation(loader_dict, **config, **settings)
 
-        model_specific_evaluation(loader_dict, **config, **settings)
+    cross_model_evaluation(**config, **settings)
 
-        cross_model_evaluation(**config, **settings)
+if settings["dashboard"]:
 
-    if settings["dashboard"]:
-
-        visualize_using_dashboard(**config, **settings)
+    visualize_using_dashboard(**config, **settings)
