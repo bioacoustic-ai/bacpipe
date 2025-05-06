@@ -125,27 +125,9 @@ def evaluate_classification(paths, config, metrics, **kwargs):
     metrics : dict
         performance
     """
-    report = dict()
-
-    report["Overall Metrics"] = {
-        "Macro Accuracy": float(metrics["overall"]["macro_accuracy"]),
-        "Micro Accuracy": float(metrics["overall"]["micro_accuracy"]),
-        "AUC": float(metrics["overall"]["auc"]),
-        "Macro F1": float(metrics["overall"]["macro_f1"]),
-        "Micro F1": float(metrics["overall"]["micro_f1"]),
-    }
-
-    report["Per Class Metrics"] = {
-        label: acc for label, acc in metrics["per_class_accuracy"].items()
-    }
-
-    report["Items per Class"] = {
-        label: items for label, items in metrics["items_per_class"].items()
-    }
-
-    report["Task Configuration"] = kwargs
+    metrics["config"] = kwargs
 
     save_path = paths.class_path.joinpath(f"class_results_{config}.json")
-    # save the report as json
+
     with open(save_path, "w") as f:
-        json.dump(report, f)
+        json.dump(metrics, f)

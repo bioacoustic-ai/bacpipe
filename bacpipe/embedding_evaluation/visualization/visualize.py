@@ -519,7 +519,7 @@ def plot_comparison(
 
 
 def reorder_embeddings_by_clustering_performance(
-    plot_path, axes, models, order_metric="ARI(kmeans)"
+    plot_path, axes, models, order_metric="ground_truth-kmeans"
 ):
     """
     Reorder the embedding overview plot by clustering performance.
@@ -538,7 +538,9 @@ def reorder_embeddings_by_clustering_performance(
     """
     clust_dict = json.load(open(plot_path.joinpath("clustering_results.json"), "r"))
     new_order = dict(
-        sorted(clust_dict.items(), key=lambda kv: kv[1][order_metric], reverse=True)
+        sorted(
+            clust_dict.items(), key=lambda kv: kv[1]["ARI"][order_metric], reverse=True
+        )
     )
     positions = {mod: ax.get_position() for mod, ax in zip(new_order, axes.flatten())}
     for model, ax in zip(models, axes.flatten()):
@@ -547,22 +549,56 @@ def reorder_embeddings_by_clustering_performance(
         ax.set_position(positions[model])
 
 
-def plot_classification_results(paths, task_name, metrics):
+def plot_classification_results(
+    task_name,
+    paths=None,
+    metrics=None,
+    return_fig=False,
+    path_func=None,
+    model_name=None,
+):
     """
     Save model specific classification results in the model specific
     plot path.
 
     Parameters
     ----------
-    paths : SimpleNamespace object
-        dictlike object with path attributes to save and load data
     task_name : str
         name of task
+    paths : SimpleNamespace object
+        path to store plots
     metrics : dict
-        performance dictionary
+        classification performance
+    return_fig : bool
+        if True the figure will be returned, by default False
+    path_func : function
+        function to return the paths when model name is given
+    model_name : str
+        name of model, by default None
+
+    Returns
+    -------
+    plt object
+        figure handle
     """
+    if path_func and model_name:
+        paths = path_func(model_name)
+    if not metrics:
+        with open(
+            paths.class_path.joinpath(f"class_results_{task_name}.json"), "r"
+        ) as f:
+            metrics = json.load(f)
+    if return_fig:
+        fig, ax = plt.subplots(1, 1, figsize=(7, 6))
+        fontsize = 10
+        metrics["overall"] = {
+            k: v for k, v in metrics["overall"].items() if not "micro" in k
+        }
+    else:
+        fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+        fontsize = 14
+
     model_name = paths.labels_path.parent.stem
-    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
     cmap = plt.cm.tab10
     colors = cmap(np.arange(len(metrics["per_class_accuracy"].values())) % cmap.N)
     ax.bar(
@@ -577,13 +613,16 @@ def plot_classification_results(paths, task_name, metrics):
     fig.suptitle(
         f"Per Class Metrics for {task_name} "
         f"classification with {model_name.upper()} embeddings\n"
-        f"{metrics_string}"
+        f"{metrics_string}",
+        fontsize=fontsize,
     )
     ax.set_ylabel("Accuracy")
     ax.set_xlabel("Classes")
     ax.set_xticks(range(len(metrics["per_class_accuracy"])))
-    ax.set_xticklabels(metrics["per_class_accuracy"].keys(), rotation=90)
+    ax.set_xticklabels(metrics["per_class_accuracy"].keys(), rotation=45, ha="right")
     fig.subplots_adjust(bottom=0.3)
+    if return_fig:
+        return fig
     path = paths.plot_path
     fig.savefig(
         path.joinpath(f"class_results_{task_name}_{model_name}.png"),
@@ -681,9 +720,76 @@ def iterate_through_subtasks(plot_func, plot_path, task_name, model_list, metric
         plot_func(plot_path, f"{subtask} {task_name}", model_list, sub_task_metrics)
 
 
+def clustering_overview(path_func, label_by, no_noise, model_list, **kwargs):
+    """
+    Create overview plots for clustering metrics.
+
+    Parameters
+    ----------
+    path_func : function
+        function to return the paths when model name is given
+    label_by : str
+        key of default_labels dict
+    no_noise : bool
+        whether to plot the metrics with or without noise
+    model_list : list
+        list of models
+    kwargs : dict
+        additional arguments for plotting
+
+    Returns
+    -------
+    plt.plot object
+        figure handle
+    """
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    fig.subplots_adjust(bottom=0.25, right=0.9)
+    flat_metrics = dict()
+    for model_name in model_list:
+        with open(path_func(model_name).clust_path / "clust_metrics.json", "r") as f:
+            metrics = json.load(f)
+        if no_noise:
+            no_noise = "_no_noise"
+        else:
+            no_noise = ""
+        flat_metrics[model_name] = dict()
+        if not label_by == "kmeans":
+            flat_metrics[model_name]["kmeans"] = metrics["ARI"][
+                f"kmeans{no_noise}-{label_by}"
+            ]
+        flat_metrics[model_name]["ground_truth"] = metrics["ARI"][
+            f"ground_truth{no_noise}-{label_by}"
+        ]
+
+    return generate_bar_plot(flat_metrics, fig, ax, **kwargs)
+
+
 def plot_clusterings(
     path_func, model_name, label_by, no_noise, fig=None, ax=None, **kwargs
 ):
+    """
+    Plot the clustering metrics for a given model and label type.
+
+    Parameters
+    ----------
+    path_func : function
+        function to return the paths when model name is given
+    model_name : str
+        name of model
+    label_by : str
+        key of default_labels dict
+    no_noise : bool
+        whether to plot the metrics with or without noise
+    fig : plt.plot object, optional
+        figure handle, by default None
+    ax : plt.plot object, optional
+        axes handle, by default None
+
+    Returns
+    -------
+    plt.plot object
+        figure handle
+    """
     if no_noise:
         no_noise = "_no_noise"
     else:
@@ -693,7 +799,7 @@ def plot_clusterings(
         metrics = json.load(f)
 
     if not fig and not ax:
-        fig, ax = plt.subplots(figsize=(7, 4))
+        fig, ax = plt.subplots(figsize=(5, 4))
         fig.subplots_adjust(left=0.2, bottom=0.25, right=0.7)
 
     keys = [
@@ -727,7 +833,7 @@ def generate_bar_plot(
     colors = cmap(np.arange(len(list(metrics.values())[0].keys())) % cmap.N)
     metrics_sorted = dict(sorted(metrics.items()))
 
-    for out_idx, (reducer, metric) in enumerate(metrics_sorted.items()):
+    for out_idx, (_, metric) in enumerate(metrics_sorted.items()):
         for inner_idx, (key, value) in enumerate(metric.items()):
             ax.bar(
                 out_idx - bar_width * inner_idx,
@@ -737,7 +843,7 @@ def generate_bar_plot(
                 color=colors[inner_idx],
             )
 
-    ax.set_xticks(np.arange(len(metrics_sorted.keys())) - 0.33)
+    ax.set_xticks(np.arange(len(metrics_sorted.keys())))
     ax.set_xticklabels(list(metrics_sorted.keys()), rotation=45, ha="right")
     ax.set_ylabel(y_label)
     ax.hlines(0, -1, out_idx, linestyles="dashed", color="black", linewidth=0.3)
@@ -753,7 +859,9 @@ def generate_bar_plot(
     return fig
 
 
-def plot_overview_metrics(plot_path, task_name, model_list, metrics):
+def plot_overview_metrics(
+    plot_path, task_name, model_list, metrics, path_func=None, return_fig=False
+):
     """
     Visualization of task performance by model accross all classes.
     Resulting plot is stored in the plot path.
@@ -769,8 +877,16 @@ def plot_overview_metrics(plot_path, task_name, model_list, metrics):
     metrics : dict
         performance dictionary
     """
+    if not metrics:
+        res_path = path_func(model_list[0]).plot_path.parent.parent.joinpath("overview")
+        with open(res_path.joinpath(f"classification_results.json"), "r") as f:
+            metrics = json.load(f)
+        metrics = {
+            k.split("(")[0]: v["overall"] for k, v in metrics.items() if task_name in k
+        }
+
     if "classification" in task_name:
-        metrics = {k: v["Overall Metrics"] for k, v in metrics.items()}
+        metrics = {k: v["overall"] for k, v in metrics.items()}
 
     fig, ax = plt.subplots(1, 1, figsize=(14, 6))
     num_metrics = len(metrics[model_list[0]])
@@ -812,6 +928,8 @@ def plot_overview_metrics(plot_path, task_name, model_list, metrics):
         labels=d.keys(),
         fontsize=10,
     )
+    if return_fig:
+        return fig
     file = f"overview_metrics_{task_name}_" + "-".join(metrics.keys()) + ".png"
     plot_path.mkdir(exist_ok=True, parents=True)
     fig.savefig(
@@ -837,8 +955,8 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
     metrics : dict
         performance dictionary
     """
-    per_class_metrics = {m: v["Per Class Metrics"] for m, v in metrics.items()}
-    overall_metrics = {m: v["Overall Metrics"] for m, v in metrics.items()}
+    per_class_metrics = {m: v["per_class_accuracy"] for m, v in metrics.items()}
+    overall_metrics = {m: v["overall"] for m, v in metrics.items()}
     num_classes = len(per_class_metrics[model_list[0]].keys())
     fig_width = max(12, num_classes * 0.5)
     fig, ax = plt.subplots(1, 1, figsize=(fig_width, 8))
@@ -846,7 +964,7 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
     cmap = plt.cm.tab10
     model_colors = cmap(np.arange(len(model_list)) % cmap.N)
 
-    d = {m: v["Macro Accuracy"] for m, v in overall_metrics.items()}
+    d = {m: v["macro_accuracy"] for m, v in overall_metrics.items()}
     model_list = sorted(d, key=d.get, reverse=True)
     all_classes = sorted(per_class_metrics[model_list[0]].keys())
 
@@ -858,7 +976,7 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
             class_values,
             color=model_colors[i],
             label=f"{model_name.upper()} "
-            + f"(accuracy: {overall_metrics[model_name]['Macro Accuracy']:.3f})",
+            + f"(accuracy: {overall_metrics[model_name]['macro_accuracy']:.3f})",
             s=100,
         )
 

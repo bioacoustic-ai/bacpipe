@@ -191,7 +191,7 @@ def classification_pipeline(
         metrics = classify(paths, dataset_csv_path, embeds, config=name, **kwargs)
 
         evaluate_classification(paths, name, metrics, **kwargs)
-        plot_classification_results(paths, name, metrics)
+        plot_classification_results(paths=paths, task_name=name, metrics=metrics)
     else:
         print(
             f"Classification file class_results_{name}.json already exists and"

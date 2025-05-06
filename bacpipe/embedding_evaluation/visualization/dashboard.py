@@ -10,6 +10,9 @@ from .visualize import (
     plot_embeddings,
     plot_comparison,
     plot_clusterings,
+    clustering_overview,
+    plot_overview_metrics,
+    plot_classification_results,
     EmbedAndLabelLoader,
 )
 import bacpipe.embedding_evaluation.label_embeddings as le
@@ -69,6 +72,7 @@ class DashBoard:
         self.model_select = dict()
         self.label_select = dict()
         self.noise_select = dict()
+        self.class_select = dict()
         self.embed_plot = dict()
 
     def init_plot(self, p_type, plot_func, widget_idx, **kwargs):
@@ -132,13 +136,21 @@ class DashBoard:
                     no_noise=self.noise_select[widget_idx],
                 )
             ),
-            # pn.panel(self.plot_widget(
-            #     plot_cluster,
-            #     orig_embeds=embed_dict,
-            #     model=self.model_select[widget_idx],
-            #     label_by=self.label_select[widget_idx],
-            #     no_noise=self.noise_select[widget_idx],
-            #     tight=True)),
+            self.init_widget(
+                widget_idx,
+                "class",
+                name="Classification type",
+                options=["knn", "linear"],
+            ),
+            pn.panel(
+                self.plot_widget(
+                    plot_classification_results,
+                    path_func=self.path_func,
+                    task_name=self.class_select[widget_idx],
+                    model_name=self.model_select[widget_idx],
+                    return_fig=True,
+                )
+            ),
         )
 
     def all_models_page(self, widget_idx):
@@ -173,20 +185,30 @@ class DashBoard:
             ),
             pn.panel(
                 self.plot_widget(
-                    plot_clusterings,
+                    clustering_overview,
                     path_func=self.path_func,
-                    model_name=self.model_select[widget_idx],
+                    model_list=self.models,
                     label_by=self.label_select[widget_idx],
                     no_noise=self.noise_select[widget_idx],
                 )
             ),
-            # pn.panel(self.plot_widget(
-            #     plot_class,
-            #     orig_embeds=embed_dict,
-            #     model=self.model_select[widget_idx],
-            #     label_by=self.label_select[widget_idx],
-            #     no_noise=self.noise_select[widget_idx],
-            #     tight=True))
+            self.init_widget(
+                widget_idx,
+                "class",
+                name="Classification type",
+                options=["knn", "linear"],
+            ),
+            pn.panel(
+                self.plot_widget(
+                    plot_overview_metrics,
+                    plot_path=None,
+                    metrics=None,
+                    task_name=self.class_select[widget_idx],
+                    path_func=self.path_func,
+                    model_list=self.models,
+                    return_fig=True,
+                )
+            ),
         )
 
     def build_layout(self):
@@ -196,8 +218,8 @@ class DashBoard:
                 "Two models",
                 pn.Row(self.single_model_page(0), self.single_model_page(1)),
             ),
-            # (
-            #     "All models",
-            #     self.all_models_page(1),
-            # ),
+            (
+                "All models",
+                self.all_models_page(1),
+            ),
         )
