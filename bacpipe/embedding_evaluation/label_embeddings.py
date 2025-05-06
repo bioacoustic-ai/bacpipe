@@ -53,6 +53,7 @@ class DefaultLabels:
                     "Creating a default datetime corresponding to 2000, 1, 1."
                 )
                 datetime = "20001010000000"
+                break
             datetime = "".join(numbs[-i:])
             i += 1
 
@@ -76,7 +77,8 @@ class DefaultLabels:
         if not hasattr(self, "timestamp_per_file"):
             self.timestamp_per_file = {}
             for file in self.metadata["files"]["audio_files"]:
-                self.timestamp_per_file.update({file: self.get_dt_filename(file)})
+                file_stem = Path(file).stem
+                self.timestamp_per_file.update({file: self.get_dt_filename(file_stem)})
 
     def time_of_day(self):
         self.get_datetimes()
