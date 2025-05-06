@@ -125,8 +125,24 @@ class Loader:
                     else:
                         return d
                 else:
-                    num_files = len([f for f in list(d.rglob(f"*{self.embed_suffix}"))])
-                    num_audio_files = len(self._get_audio_files())
+                    try:
+                        num_files = len(
+                            [f for f in list(d.rglob(f"*{self.embed_suffix}"))]
+                        )
+                        num_audio_files = len(self._get_audio_files())
+                    except AssertionError as e:
+                        self._get_metadata_dict(d)
+                        self.combination_already_exists = True
+                        print(
+                            f"Error: {e}. "
+                            "Will proceed without veryfying if the number of embeddings "
+                            "is the same as the number of audio files."
+                        )
+                        print(
+                            "\n### Embeddings already exist. "
+                            f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
+                        )
+                        break
 
                     if num_audio_files == num_files:
                         self.combination_already_exists = True
