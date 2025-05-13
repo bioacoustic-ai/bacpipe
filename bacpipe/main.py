@@ -82,6 +82,52 @@ def get_model_names(
         model_names = embedding_model["selected_models"]
 
 
+def evaluation_with_settings_already_exists(
+    audio_dir,
+    dim_reduction_model,
+    **kwargs,
+):
+    """
+    Check if the evaluation with the specified settings already exists.
+    The function checks if the embeddings, dimensionality reduction,
+    classification, clustering, and distance evaluation results
+    already exist in the specified directory. If any of these
+    results do not exist, the function returns False. Otherwise,
+    it returns True.
+
+    Parameters
+    ----------
+    audio_dir : string
+        full path to audio files
+    dim_reduction_model : string
+        name of the dimensionality reduction model to be used
+
+    Returns
+    -------
+    bool
+        True if the evaluation with the specified settings
+    """
+    for model_name in model_names:
+        paths = make_set_paths_func(audio_dir, **kwargs)(model_name)
+        bool_paths = (
+            paths.main_embeds_path.exists()
+            and paths.dim_reduc_parent_dir.exists()
+            and paths.class_path.exists()
+            and paths.clust_path.exists()
+        )
+        if not bool_paths:
+            return False
+        else:
+            bool_dim_reducs = [
+                True
+                for d in paths.dim_reduc_parent_dir.rglob(f"*{dim_reduction_model}*")
+            ]
+            bool_dim_reducs = len(bool_dim_reducs) > 0 and all(bool_dim_reducs)
+        if not bool_dim_reducs:
+            return False
+    return True
+
+
 def model_specific_embedding_creation(audio_dir, dim_reduction_model, **kwargs):
     """
     Generate embeddings for each model in the list of model names.

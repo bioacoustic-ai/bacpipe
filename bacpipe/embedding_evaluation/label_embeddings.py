@@ -221,9 +221,9 @@ def make_set_paths_func(
     return get_paths
 
 
-def get_dim_reduc_path_func(model_name):
+def get_dim_reduc_path_func(model_name, **kwargs):
     return model_specific_embedding_path(
-        get_paths(model_name).dim_reduc_parent_dir, model_name
+        get_paths(model_name).dim_reduc_parent_dir, model_name, **kwargs
     )
 
 
@@ -238,7 +238,34 @@ def get_ground_truth(model_name):
     ).item()
 
 
-def model_specific_embedding_path(path, model):
+def model_specific_embedding_path(path, model, dim_reduction_model=None, **kwargs):
+    """
+    Get the path to the model specific embeddings.
+    This function searches for the most recent directory
+    containing the embeddings for the specified model and
+    dimensionality reduction model.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the main embeddings directory.
+    model : str
+        Name of the model used for embedding.
+    dim_reduction_model : str
+        Name of the dimensionality reduction model used. Default is 'umap'.
+    kwargs : dict
+        Additional keyword arguments.
+
+    Returns
+    -------
+    Path
+        Path to the model specific embeddings directory.
+
+    Raises
+    -------
+    ValueError
+        If no embeddings are found for the specified model.
+    """
     if not isinstance(model, str):
         model = str(model)
     embed_paths_for_this_model = [
@@ -246,6 +273,10 @@ def model_specific_embedding_path(path, model):
         for d in path.iterdir()
         if d.is_dir() and model in d.stem.split("___")[-1].split("-")
     ]
+    if dim_reduction_model is not None:
+        embed_paths_for_this_model = [
+            d for d in embed_paths_for_this_model if dim_reduction_model in d.stem
+        ]
     embed_paths_for_this_model.sort()
     if len(embed_paths_for_this_model) == 0:
         raise ValueError(

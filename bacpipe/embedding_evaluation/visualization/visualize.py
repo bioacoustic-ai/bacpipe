@@ -66,7 +66,9 @@ class EmbedAndLabelLoader:
             tup = get_labels_for_plot(model_name, **self.kwargs)
             self.labels[model_name], self.bool_noise[model_name] = tup
 
-            dim_reduced_embed_path = le.get_dim_reduc_path_func(model_name)
+            dim_reduced_embed_path = le.get_dim_reduc_path_func(
+                model_name, dim_reduction_model=self.dim_reduction_model, **kwargs
+            )
 
             self.embeds[model_name] = collect_dim_reduced_embeds(
                 dim_reduced_embed_path, self.dim_reduction_model
@@ -76,10 +78,12 @@ class EmbedAndLabelLoader:
             return_labels = dict()
             return_embeds = dict()
             for key in self.labels[model_name].keys():
-
-                return_labels[key] = np.array(
-                    self.labels[model_name][key], dtype=object
-                )[~self.bool_noise[model_name]]
+                if "noise" in key:
+                    return_labels[key] = self.labels[model_name][key]
+                else:
+                    return_labels[key] = np.array(
+                        self.labels[model_name][key], dtype=object
+                    )[~self.bool_noise[model_name]]
 
             return_embeds["x"] = np.array(self.embeds[model_name]["x"])[
                 ~self.bool_noise[model_name]
@@ -199,6 +203,7 @@ def get_labels_for_plot(model_name=None, **kwargs):
         ground_truth = le.get_ground_truth(model_name)
         inv = {v: k for k, v in ground_truth["label_dict"].items()}
         inv[-1.0] = "noise"
+        # inv[len(inv.keys())-1] = "noise"
         # TODO -2 still in data
         labels["ground_truth"] = [inv[v] for v in ground_truth["labels"]]
         bool_noise = np.array(labels["ground_truth"]) == "noise"
@@ -211,7 +216,7 @@ def get_labels_for_plot(model_name=None, **kwargs):
         ]
         for clust in clusts:
             for name, values in clust.items():
-                if name == "kmeans":
+                if "kmeans" in name:
                     labels[name] = values
                 else:
                     labels[name] = np.array(["noise"] * len(bool_noise), dtype=object)
@@ -753,13 +758,18 @@ def clustering_overview(path_func, label_by, no_noise, model_list, **kwargs):
         else:
             no_noise = ""
         flat_metrics[model_name] = dict()
-        if not label_by == "kmeans":
+        if label_by == "ground_truth":
+            flat_metrics[model_name]["ground_truth"] = metrics["ARI"][
+                f"ground_truth{no_noise}-kmeans"
+            ]
+        elif not label_by == "kmeans":
             flat_metrics[model_name]["kmeans"] = metrics["ARI"][
                 f"kmeans{no_noise}-{label_by}"
             ]
-        flat_metrics[model_name]["ground_truth"] = metrics["ARI"][
-            f"ground_truth{no_noise}-{label_by}"
-        ]
+        if not label_by == "ground_truth":
+            flat_metrics[model_name]["ground_truth"] = metrics["ARI"][
+                f"ground_truth{no_noise}-{label_by}"
+            ]
 
     return generate_bar_plot(flat_metrics, fig, ax, **kwargs)
 
@@ -860,7 +870,13 @@ def generate_bar_plot(
 
 
 def plot_overview_metrics(
-    plot_path, task_name, model_list, metrics, path_func=None, return_fig=False
+    plot_path,
+    task_name,
+    model_list,
+    metrics,
+    path_func=None,
+    return_fig=False,
+    sort_string="ground_truth-kmeans",
 ):
     """
     Visualization of task performance by model accross all classes.
@@ -876,6 +892,8 @@ def plot_overview_metrics(
         list of models
     metrics : dict
         performance dictionary
+    sort_string : str
+        string to sort the metrics by, defaults to "ground_truth-kmeans"
     """
     if not metrics:
         res_path = path_func(model_list[0]).plot_path.parent.parent.joinpath("overview")
@@ -895,11 +913,20 @@ def plot_overview_metrics(
     cmap = plt.cm.tab10
     cols = cmap(np.arange(num_metrics) % cmap.N)
 
-    metrics = dict(
-        sorted(
-            metrics.items(), key=lambda item: list(item[-1].values())[0], reverse=True
-        )
-    )
+    if task_name == "clustering":
+        sort_by = lambda item: list(item[-1].values())[-1][sort_string]
+    else:
+        sort_by = lambda item: list(item[-1].values())[0]
+    metrics = dict(sorted(metrics.items(), key=sort_by, reverse=True))
+    if task_name == "clustering":
+        metrics = {
+            k: {
+                k: v[sort_string]
+                for k, v in metrics[k].items()
+                if sort_string in v.keys()
+            }
+            for k, v in metrics.items()
+        }
 
     for mod_idx, (model, d) in enumerate(metrics.items()):
         for i, (metric, value) in enumerate(d.items()):

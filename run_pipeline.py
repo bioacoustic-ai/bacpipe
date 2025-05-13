@@ -3,6 +3,7 @@ from pathlib import Path
 
 from bacpipe.main import (
     get_model_names,
+    evaluation_with_settings_already_exists,
     model_specific_embedding_creation,
     model_specific_evaluation,
     cross_model_evaluation,
@@ -24,9 +25,7 @@ overwrite, main_results_dir, audio_dir = (
 
 get_model_names(**config, **settings)
 
-if overwrite or not (
-    len(list((Path(main_results_dir) / audio_dir).rglob("*.json"))) > 0
-):
+if overwrite or not evaluation_with_settings_already_exists(**config, **settings):
 
     loader_dict = model_specific_embedding_creation(**config, **settings)
 
