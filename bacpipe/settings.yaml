@@ -42,6 +42,16 @@ overwrite: True
 # specify if you want to visualize the embedding evaluations
 dashboard: True
 
+# For evaluation using classification it is necessary to have a minimum number 
+# of embeddings for each label. The remaining embeddings will be marked as noise.
+# Change this value at will, but be aware that classification might fail if it's too low. 
+# Default = 150.
+min_label_occurances: 150
+
+# If you want to visualize the embeddings by ground truth with no minimum
+# number of occurances, set this to False.
+bool_filter_labels: True
+
 # kinds of default labels that are created for the embeddings
 default_label_keys: [
   "time_of_day",

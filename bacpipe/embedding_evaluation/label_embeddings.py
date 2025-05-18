@@ -400,9 +400,25 @@ def filter_annotations_by_minimum_number_of_occurrences(
     return filtered_df
 
 
-def load_labels_and_build_dict(paths, label_file):
-    # TODO filter to have at least 150 labels
-    label_df = pd.read_csv(paths.main_embeds_path.parent.joinpath(label_file))
+def load_labels_and_build_dict(
+    paths, label_file, bool_filter_labels=True, min_label_occurances=150, **kwargs
+):
+    try:
+        label_df = pd.read_csv(paths.main_embeds_path.parent.joinpath(label_file))
+    except FileNotFoundError as e:
+        logger.warning(
+            "No annotations file found, not able to create ground_truth.npy file."
+            "bacpipe should still work, but you will not be able to label by ground truth. "
+            "You also will not be able to evaluate using classification."
+        )
+        raise FileNotFoundError("No annotations file found.")
+    if bool_filter_labels:
+        filtered_labels = [
+            lab
+            for lab in np.unique(label_df.label)
+            if len(label_df[label_df.label == lab]) > min_label_occurances
+        ]
+        label_df = label_df[label_df.label.isin(filtered_labels)]
     label_idx_dict = {label: idx for idx, label in enumerate(label_df.label.unique())}
     with open(paths.labels_path.joinpath("label_idx_dict.json"), "w") as f:
         json.dump(label_idx_dict, f)
@@ -550,7 +566,9 @@ def ground_truth_by_model(
 
         path = model_specific_embedding_path(paths.main_embeds_path, model)
 
-        label_df, label_idx_dict = load_labels_and_build_dict(paths, label_file)
+        label_df, label_idx_dict = load_labels_and_build_dict(
+            paths, label_file, **kwargs
+        )
 
         files = list(path.rglob("*.npy"))
         files.sort()

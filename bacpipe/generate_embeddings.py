@@ -287,7 +287,7 @@ class Loader:
                 with open(file, "r") as f:
                     embeds = json.load(f)
                 embeds = np.array(embeds)
-            d[file.stem] = embeds
+            d[str(file.relative_to(self.embed_dir))] = embeds
         return d
 
     def write_audio_file_to_metadata(self, index, file, embed, embeddings):

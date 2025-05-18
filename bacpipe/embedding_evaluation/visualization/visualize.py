@@ -14,7 +14,7 @@ import matplotlib
 
 matplotlib.rcParams.update(
     {
-        "figure.dpi": 150,  # High-resolution figures
+        "figure.dpi": 300,  # High-resolution figures
         "savefig.dpi": 300,  # Exported plot DPI
         "font.size": 12,  # Better font readability
         "axes.labelsize": 12,
@@ -630,9 +630,16 @@ def plot_classification_results(
     if path_func and model_name:
         paths = path_func(model_name)
     if not metrics:
-        with open(
-            paths.class_path.joinpath(f"class_results_{task_name}.json"), "r"
-        ) as f:
+        class_path = paths.class_path / f"class_results_{task_name}.json"
+        if not class_path.exists():
+            raise AssertionError(
+                f"The classification file {class_path} does not exist. Perhaps it was not "
+                "created yet. To avoid getting this error, make sure you have not "
+                " included 'classificaion' in the 'evaluation_tasks'. If you want to compute "
+                "classification, make sure to set `overwrite=True`."
+            )
+
+        with open(paths.class_path / f"class_results_{task_name}.json", "r") as f:
             metrics = json.load(f)
     if return_fig:
         fig, ax = plt.subplots(1, 1, figsize=(7, 6))
@@ -807,7 +814,9 @@ def clustering_overview(path_func, label_by, no_noise, model_list, **kwargs):
             flat_metrics[model_name]["kmeans"] = metrics["ARI"][
                 f"kmeans{no_noise}-{label_by}"
             ]
-        if not label_by == "ground_truth":
+        if not label_by == "ground_truth" and "ground_truth" in [
+            k.split("-")[0] for k in metrics["ARI"].keys()
+        ]:
             flat_metrics[model_name]["ground_truth"] = metrics["ARI"][
                 f"ground_truth{no_noise}-{label_by}"
             ]
@@ -846,7 +855,14 @@ def plot_clusterings(
     else:
         no_noise = ""
 
-    with open(path_func(model_name).clust_path / "clust_metrics.json", "r") as f:
+    clust_path = path_func(model_name).clust_path / "clust_metrics.json"
+    if not clust_path.exists():
+        raise AssertionError(
+            f"The clustering file {clust_path} does not exist. Perhaps it was not "
+            "created yet. To avoid getting this error set `overwrite=True`."
+        )
+
+    with open(clust_path, "r") as f:
         metrics = json.load(f)
 
     if not fig and not ax:

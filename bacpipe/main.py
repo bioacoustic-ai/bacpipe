@@ -193,9 +193,12 @@ def model_specific_evaluation(
         if not evaluation_task in ["None", []]:
             embeds = loader_dict[model_name].embedding_dict()
             paths = get_paths(model_name)
-            ground_truth = ground_truth_by_model(paths, model_name, **kwargs)
+            try:
+                ground_truth = ground_truth_by_model(paths, model_name, **kwargs)
+            except FileNotFoundError as e:
+                ground_truth = None
 
-        if "classification" in evaluation_task:
+        if "classification" in evaluation_task and not ground_truth is None:
             print(
                 "\nTraining classifier to evaluate " f"{model_name.upper()} embeddings"
             )

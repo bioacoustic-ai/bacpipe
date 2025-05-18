@@ -78,7 +78,10 @@ def compute_clusterings(
     clusterings = {}
     for name, clusterer in cluster_configs.items():
         clusterings[name] = clusterer.fit_predict(embeds)
-        clusterings[name + "_no_noise"] = clusterer.fit_predict(embeds[labels != -1])
+        if len(labels) > 0:
+            clusterings[name + "_no_noise"] = clusterer.fit_predict(
+                embeds[labels != -1]
+            )
     if len(labels) > 0:
         clusterings["ground_truth"] = labels
         clusterings["ground_truth_no_noise"] = labels[labels != -1]
@@ -147,7 +150,7 @@ def get_nr_of_clusters(labels, clust_configs, **kwargs):
     clust_params = {}
     for config in clust_configs.values():
         if config["name"] == "kmeans":
-            if labels is not None:
+            if len(labels) > 0:
                 nr_of_classes = len(np.unique(labels))
                 clust_params[config["name"]] = {
                     "n_clusters": nr_of_classes,
@@ -176,8 +179,6 @@ def clustering(paths, embeds, ground_truth, overwrite=False, **kwargs):
         whether to overwrite exisiting clustering files, by default False
     """
     if overwrite or not len(list(paths.clust_path.glob("*.json"))) > 0:
-
-        print()
 
         if ground_truth:
             labels = ground_truth["labels"]
