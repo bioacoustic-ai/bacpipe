@@ -5,6 +5,26 @@ import numpy as np
 
 import bacpipe.embedding_evaluation.label_embeddings as le
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+import matplotlib.pyplot as plt
+import matplotlib
+
+matplotlib.rcParams.update(
+    {
+        "figure.dpi": 150,  # High-resolution figures
+        "savefig.dpi": 300,  # Exported plot DPI
+        "font.size": 12,  # Better font readability
+        "axes.labelsize": 12,
+        "axes.titlesize": 14,
+        "legend.fontsize": 10,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
+    }
+)
+
 
 def darken_hex_color_bitwise(hex_color):
     """
@@ -26,12 +46,16 @@ def darken_hex_color_bitwise(hex_color):
     return f"#{darkened_color_int:06x}"
 
 
-def collect_dim_reduced_embeds(dim_reduced_embed_path, dim_reduction_model):
+def collect_dim_reduced_embeds(
+    model_name, dim_reduced_embed_path, dim_reduction_model, **kwargs
+):
     """
     Return the dimensionality reduced embeddings of a model.
 
     Parameters
     ----------
+    model_name : str
+        name of model
     dim_reduced_embed_path : pathlib.Path object
         path to dim reduced embeddings
     dim_reduction_model : str
@@ -42,7 +66,18 @@ def collect_dim_reduced_embeds(dim_reduced_embed_path, dim_reduction_model):
     dict
         dimensionality reduced embeddings
     """
-    files = dim_reduced_embed_path.iterdir()
+    files = list(dim_reduced_embed_path.iterdir())
+    if len(files) == 0:
+        logger.warning(
+            "No dimensionality reduced embeddings found for "
+            f"{dim_reduction_model}. In fact the directory "
+            f"{dim_reduced_embed_path} is empty. Deleting directory."
+        )
+        dim_reduced_embed_path.rmdir()
+        dim_reduced_embed_path = le.get_dim_reduc_path_func(
+            model_name, dim_reduction_model=dim_reduction_model, **kwargs
+        )
+        files = list(dim_reduced_embed_path.iterdir())
     for file in files:
         if file.suffix == ".json":  # and dim_reduction_model in file.stem:
             with open(file, "r") as f:
@@ -71,7 +106,7 @@ class EmbedAndLabelLoader:
             )
 
             self.embeds[model_name] = collect_dim_reduced_embeds(
-                dim_reduced_embed_path, self.dim_reduction_model
+                model_name, dim_reduced_embed_path, self.dim_reduction_model, **kwargs
             )
 
         if remove_noise:
@@ -203,8 +238,9 @@ def get_labels_for_plot(model_name=None, **kwargs):
         ground_truth = le.get_ground_truth(model_name)
         inv = {v: k for k, v in ground_truth["label_dict"].items()}
         inv[-1.0] = "noise"
-        # inv[len(inv.keys())-1] = "noise"
-        # TODO -2 still in data
+        inv[-2.0] = "noise"
+        # technically -2.0 is not noise, but corresponds to sections
+        # with multiple sources vocalizing simultaneously
         labels["ground_truth"] = [inv[v] for v in ground_truth["labels"]]
         bool_noise = np.array(labels["ground_truth"]) == "noise"
     else:
@@ -295,7 +331,8 @@ def plot_embedding_points(
         )
     else:
         cmap = plt.cm.tab20
-        for label, data in split_data.items():
+        colors = cmap(np.arange(len(c_label_dict.keys())) % cmap.N)
+        for idx, (label, data) in enumerate(split_data.items()):
             if remove_noise and label == "noise":
                 continue
             points = axes.scatter(
@@ -303,7 +340,7 @@ def plot_embedding_points(
                 data[1],
                 label=label,
                 s=1,
-                cmap=cmap,
+                color=colors[idx],
             )
     return points
 
@@ -446,6 +483,7 @@ def plot_comparison(
     bool_spherical=False,
     dashboard=False,
     loader=None,
+    evaluation_task=[],
     **kwargs,
 ):
     """
@@ -467,6 +505,8 @@ def plot_comparison(
         if dashboard called this function or not
     loader : EmbedAndLabelLoader object
         object containing embeds and labels by model for quicker loading
+    evaluation_task : list, optional
+        list of tasks to evaluate, by default []
 
     Returns
     -------
@@ -514,7 +554,8 @@ def plot_comparison(
         fig, axes.flatten()[0], points, c_label_dict, dashboard=dashboard, **kwargs
     )
     [ax.remove() for ax in axes.flatten()[idx + 1 :]]
-    reorder_embeddings_by_clustering_performance(plot_path, axes, models)
+    if "clustering" in evaluation_task:
+        reorder_embeddings_by_clustering_performance(plot_path, axes, models)
 
     fig.suptitle(f"Comparison of {dim_reduction_model} embeddings", fontweight="bold")
     if not dashboard:

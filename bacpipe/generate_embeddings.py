@@ -262,7 +262,7 @@ class Loader:
         try:
             rel_file_path = file.relative_to(self.metadata_dict["embed_dir"])
         except ValueError as e:
-            print(
+            logger.debug(
                 "\nEmbedding file is not in the same directory structure "
                 "as it was when created.\n",
                 e,

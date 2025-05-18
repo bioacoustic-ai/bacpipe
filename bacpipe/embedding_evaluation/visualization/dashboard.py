@@ -82,6 +82,7 @@ class DashBoard:
         return getattr(self, f"{p_type}_plot")[widget_idx]
 
     def plot_widget(self, plot_func, **kwargs):
+        # return pn.bind(lambda **kw: self.add_save_button(plot_func, **kw))
         return pn.bind(plot_func, **kwargs)
 
     def widget(self, name, options, attr="Select", width=120, **kwargs):
@@ -94,132 +95,215 @@ class DashBoard:
         return getattr(self, f"{w_type}_select")[idx]
 
     def single_model_page(self, widget_idx):
-        return pn.Column(
-            pn.Row(
-                self.init_widget(
-                    widget_idx, "model", name="Model", options=self.models
-                ),
-                self.init_widget(
-                    widget_idx, "label", name="Label by", options=self.label_by
-                ),
-                pn.Column(
-                    pn.widgets.StaticText(name="", value="Remove noise?"),
-                    self.init_widget(
+        sidebar = self.make_sidebar(widget_idx, model=True)
+
+        main_content = pn.Column(
+            pn.pane.Markdown("## Single Model Dashboard"),
+            pn.Accordion(
+                (
+                    "2D Embedding Plot",
+                    self.init_plot(
+                        "embed",
+                        plot_embeddings,
                         widget_idx,
-                        "noise",
-                        name="Remove Noise",
-                        options=[True, False],
-                        attr="RadioBoxGroup",
-                        value=False,
+                        loader=self.vis_loader,
+                        model_name=self.model_select[widget_idx],
+                        label_by=self.label_select[widget_idx],
+                        ground_truth=self.ground_truth,
+                        dim_reduction_model=self.dim_reduction_model,
+                        remove_noise=self.noise_select[widget_idx],
+                        dashboard=True,
+                        dashboard_idx=widget_idx,
                     ),
                 ),
+                (
+                    "Clustering Results",
+                    (
+                        self.plot_widget(
+                            plot_clusterings,
+                            path_func=self.path_func,
+                            model_name=self.model_select[widget_idx],
+                            label_by=self.label_select[widget_idx],
+                            no_noise=self.noise_select[widget_idx],
+                        )
+                        if "clustering" in self.evaluation_task
+                        else pn.pane.Markdown(
+                            "No clustering task specified. "
+                            "Please check the config file."
+                        )
+                    ),
+                ),
+                (
+                    "Classification Performance",
+                    (
+                        self.plot_widget(
+                            plot_classification_results,
+                            path_func=self.path_func,
+                            task_name=self.class_select[widget_idx],
+                            model_name=self.model_select[widget_idx],
+                            return_fig=True,
+                        )
+                        if "classification" in self.evaluation_task
+                        else pn.pane.Markdown(
+                            "No classification task specified. "
+                            "Please check the config file."
+                        )
+                    ),
+                ),
+                sizing_mode="stretch_width",
+                active=[0, 1, 2],
             ),
-            self.init_plot(
-                "embed",
-                plot_embeddings,
-                widget_idx,
-                loader=self.vis_loader,
-                model_name=self.model_select[widget_idx],
-                label_by=self.label_select[widget_idx],
-                ground_truth=self.ground_truth,
-                dim_reduction_model=self.dim_reduction_model,
-                remove_noise=self.noise_select[widget_idx],
-                dashboard=True,
-                dashboard_idx=widget_idx,
-            ),
-            pn.panel(
-                self.plot_widget(
-                    plot_clusterings,
-                    path_func=self.path_func,
-                    model_name=self.model_select[widget_idx],
-                    label_by=self.label_select[widget_idx],
-                    no_noise=self.noise_select[widget_idx],
-                )
-            ),
-            self.init_widget(
-                widget_idx,
-                "class",
-                name="Classification type",
-                options=["knn", "linear"],
-            ),
-            pn.panel(
-                self.plot_widget(
-                    plot_classification_results,
-                    path_func=self.path_func,
-                    task_name=self.class_select[widget_idx],
-                    model_name=self.model_select[widget_idx],
-                    return_fig=True,
-                )
-            ),
+            sizing_mode="stretch_both",
         )
 
+        return pn.Row(sidebar, main_content, sizing_mode="stretch_both")
+
     def all_models_page(self, widget_idx):
-        return pn.Column(
-            pn.Row(
+        sidebar = self.make_sidebar(widget_idx, model=False)
+
+        main_content = pn.Column(
+            pn.pane.Markdown("## All Models Dashboard"),
+            pn.Accordion(
+                (
+                    "Embedding Comparison",
+                    self.init_plot(
+                        "embed",
+                        plot_comparison,
+                        widget_idx,
+                        loader=self.vis_loader,
+                        plot_path=self.plot_path,
+                        models=self.models,
+                        dim_reduction_model=self.dim_reduction_model,
+                        label_by=self.label_select[widget_idx],
+                        remove_noise=self.noise_select[widget_idx],
+                        default_label_keys=self.default_label_keys,
+                        dashboard=True,
+                    ),
+                ),
+                (
+                    "Clustering Overview",
+                    (
+                        self.plot_widget(
+                            clustering_overview,
+                            path_func=self.path_func,
+                            model_list=self.models,
+                            label_by=self.label_select[widget_idx],
+                            no_noise=self.noise_select[widget_idx],
+                        )
+                        if "clustering" in self.evaluation_task
+                        else pn.pane.Markdown(
+                            "No clustering task specified. "
+                            "Please check the config file."
+                        )
+                    ),
+                ),
+                (
+                    "Classification Metrics",
+                    (
+                        self.plot_widget(
+                            plot_overview_metrics,
+                            plot_path=None,
+                            metrics=None,
+                            task_name=self.class_select[widget_idx],
+                            path_func=self.path_func,
+                            model_list=self.models,
+                            return_fig=True,
+                        )
+                        if "classification" in self.evaluation_task
+                        else pn.pane.Markdown(
+                            "No classification task specified. "
+                            "Please check the config file."
+                        )
+                    ),
+                ),
+                sizing_mode="stretch_width",
+                active=[0, 1, 2],
+            ),
+            sizing_mode="stretch_both",
+        )
+
+        return pn.Row(sidebar, main_content, sizing_mode="stretch_both")
+
+    def make_sidebar(self, widget_idx, model=True):
+        widgets = [pn.pane.Markdown("## Settings")]
+
+        if model:
+            widgets.append(
+                self.init_widget(widget_idx, "model", name="Model", options=self.models)
+            )
+
+        widgets.extend(
+            [
                 self.init_widget(
                     widget_idx, "label", name="Label by", options=self.label_by
                 ),
+                pn.widgets.StaticText(name="", value="Remove noise?"),
                 self.init_widget(
                     widget_idx,
                     "noise",
-                    name="Noise?",
+                    name="Remove Noise",
                     options=[True, False],
                     attr="RadioBoxGroup",
                     value=False,
                 ),
-            ),
-            # pn.pane.Matplotlib(pn.bind(
-            self.init_plot(
-                "embed",
-                plot_comparison,
-                widget_idx,
-                loader=self.vis_loader,
-                plot_path=self.plot_path,
-                models=self.models,
-                dim_reduction_model=self.dim_reduction_model,
-                label_by=self.label_select[widget_idx],
-                remove_noise=self.noise_select[widget_idx],
-                default_label_keys=self.default_label_keys,
-                dashboard=True,
-                # ), tight=True, dpi=100, height=600, width=800)
-            ),
-            pn.panel(
-                self.plot_widget(
-                    clustering_overview,
-                    path_func=self.path_func,
-                    model_list=self.models,
-                    label_by=self.label_select[widget_idx],
-                    no_noise=self.noise_select[widget_idx],
-                )
-            ),
-            self.init_widget(
-                widget_idx,
-                "class",
-                name="Classification type",
-                options=["knn", "linear"],
-            ),
-            pn.panel(
-                self.plot_widget(
-                    plot_overview_metrics,
-                    plot_path=None,
-                    metrics=None,
-                    task_name=self.class_select[widget_idx],
-                    path_func=self.path_func,
-                    model_list=self.models,
-                    return_fig=True,
-                )
-            ),
+                self.init_widget(
+                    widget_idx,
+                    "class",
+                    name="Classification Type",
+                    options=["knn", "linear"],
+                ),
+            ]
+        )
+
+        return pn.Column(
+            *widgets, width=250, sizing_mode="stretch_height", margin=(10, 10)
         )
 
     def build_layout(self):
+        # Build both model pages to initialize widgets
+        model0_page = self.single_model_page(0)
+        model1_page = self.single_model_page(1)
+
+        # Extract sidebars and content
+        sidebar0, content0 = model0_page.objects
+        sidebar1, content1 = model1_page.objects
+
+        # Wrap sidebars with titles
+        sidebar0 = pn.Column(
+            pn.pane.Markdown("## Settings 1"), sidebar0, sizing_mode="stretch_height"
+        )
+        sidebar1 = pn.Column(
+            pn.pane.Markdown("## Settings 2"), sidebar1, sizing_mode="stretch_height"
+        )
+
         self.app = pn.Tabs(
-            ("Single model", self.single_model_page(1)),
+            ("Single model", model1_page),
             (
                 "Two models",
-                pn.Row(self.single_model_page(0), self.single_model_page(1)),
+                pn.Row(
+                    pn.Column(sidebar0, sidebar1),
+                    pn.Row(content0, content1),
+                    sizing_mode="stretch_both",
+                ),
             ),
-            (
-                "All models",
-                self.all_models_page(1),
-            ),
+            ("All models", self.all_models_page(1)),
         )
+
+    def add_save_button(fig_func, filename="plot.png", **kwargs):
+        from io import BytesIO
+        import base64
+        import matplotlib.pyplot as plt
+
+        def _save():
+            fig = fig_func(**kwargs)
+            buf = BytesIO()
+            fig.savefig(buf, format="png", dpi=300)
+            buf.seek(0)
+            encoded = base64.b64encode(buf.read()).decode()
+            href = f'<a download="{filename}" href="data:image/png;base64,{encoded}">Download Plot</a>'
+            return pn.pane.HTML(href)
+
+        button = pn.widgets.Button(name="Save Plot", button_type="primary")
+        download_link = pn.bind(_save)
+        button.on_click(lambda event: download_link())
+        return pn.Column(fig_func(**kwargs), button)

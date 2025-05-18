@@ -221,9 +221,18 @@ def make_set_paths_func(
     return get_paths
 
 
-def get_dim_reduc_path_func(model_name, **kwargs):
+def get_dim_reduc_path_func(model_name, dim_reduction_model="umap", **kwargs):
+    if dim_reduction_model in [None, "None", "", []]:
+        dim_reduction_model = "umap"
+        logger.warning(
+            f"Dimensionality reduction model not specified. "
+            f"Search for default dim_reduction_model: {dim_reduction_model}."
+        )
     return model_specific_embedding_path(
-        get_paths(model_name).dim_reduc_parent_dir, model_name, **kwargs
+        get_paths(model_name).dim_reduc_parent_dir,
+        model_name,
+        dim_reduction_model=dim_reduction_model,
+        **kwargs,
     )
 
 
@@ -273,7 +282,7 @@ def model_specific_embedding_path(path, model, dim_reduction_model=None, **kwarg
         for d in path.iterdir()
         if d.is_dir() and model in d.stem.split("___")[-1].split("-")
     ]
-    if dim_reduction_model is not None:
+    if not dim_reduction_model in [None, "None", "", []]:
         embed_paths_for_this_model = [
             d for d in embed_paths_for_this_model if dim_reduction_model in d.stem
         ]
@@ -285,8 +294,8 @@ def model_specific_embedding_path(path, model, dim_reduction_model=None, **kwarg
         )
     elif len(embed_paths_for_this_model) > 1:
         logger.info(
-            "Multiple embeddings found for model {model} in {main_embeds_path}. "
-            "Using the mosr recent path."
+            f"Multiple embeddings found for model {model} in {path}. "
+            "Using the most recent path."
         )
     return embed_paths_for_this_model[-1]
 
@@ -595,9 +604,9 @@ def generate_annotations_for_classification_task(paths):
         tr_ar = ar[: int(l * 0.65)]
         te_ar = ar[int(l * 0.65) : int(l * 0.85)]
         va_ar = ar[int(l * 0.85) :]
-        df.predefined_set[tr_ar] = "train"
-        df.predefined_set[te_ar] = "test"
-        df.predefined_set[va_ar] = "val"
+        df.loc[tr_ar, "predefined_set"] = "train"
+        df.loc[te_ar, "predefined_set"] = "test"
+        df.loc[va_ar, "predefined_set"] = "val"
     df.to_csv(
         paths.labels_path.joinpath("classification_dataframe.csv"),
         index=False,

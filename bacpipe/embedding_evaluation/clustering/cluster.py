@@ -1,13 +1,15 @@
 import numpy as np
 
+import json
+import logging
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score as SS
 from sklearn.metrics import adjusted_rand_score as ARI
 from sklearn.metrics import adjusted_mutual_info_score as AMI
 
-import json
-
 import bacpipe.embedding_evaluation.label_embeddings as le
+
+logger = logging.getLogger(__name__)
 
 
 def convert_numpy_types(obj):
@@ -196,7 +198,7 @@ def clustering(paths, embeds, ground_truth, overwrite=False, **kwargs):
 
         save_clustering_performance(paths, clusterings, metrics)
     else:
-        print(
+        logger.info(
             "Clustering file cluster_metrics.json already exists and"
             " so is not computed. If you want to overwrite existing results, "
             "set overwrite to True in settings.yaml."

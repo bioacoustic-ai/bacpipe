@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
+import logging
+
+logger = logging.getLogger(__name__)
 
 from .train_classifier import (
     LinearClassifier,
@@ -193,7 +196,7 @@ def classification_pipeline(
         evaluate_classification(paths, name, metrics, **kwargs)
         plot_classification_results(paths=paths, task_name=name, metrics=metrics)
     else:
-        print(
+        logger.info(
             f"Classification file class_results_{name}.json already exists and"
             " so is not computed. If you want to overwrite existing results, "
             "set overwrite to True in settings.yaml."
