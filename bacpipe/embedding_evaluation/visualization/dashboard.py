@@ -77,7 +77,7 @@ class DashBoard:
 
     def init_plot(self, p_type, plot_func, widget_idx, **kwargs):
         getattr(self, f"{p_type}_plot")[widget_idx] = pn.panel(
-            self.plot_widget(plot_func, widget_idx=widget_idx, **kwargs), tight=True
+            self.plot_widget(plot_func, widget_idx=widget_idx, **kwargs), tight=False
         )
         return getattr(self, f"{p_type}_plot")[widget_idx]
 

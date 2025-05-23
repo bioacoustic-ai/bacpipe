@@ -642,7 +642,7 @@ def plot_classification_results(
         with open(paths.class_path / f"class_results_{task_name}.json", "r") as f:
             metrics = json.load(f)
     if return_fig:
-        fig, ax = plt.subplots(1, 1, figsize=(7, 6))
+        fig, ax = plt.subplots(1, 1, figsize=(5, 4))
         fontsize = 10
         metrics["overall"] = {
             k: v for k, v in metrics["overall"].items() if not "micro" in k
@@ -672,7 +672,9 @@ def plot_classification_results(
     ax.set_ylabel("Accuracy")
     ax.set_xlabel("Classes")
     ax.set_xticks(range(len(metrics["per_class_accuracy"])))
-    ax.set_xticklabels(metrics["per_class_accuracy"].keys(), rotation=45, ha="right")
+    ax.set_xticklabels(
+        metrics["per_class_accuracy"].keys(), rotation=45, ha="right", fontsize=8
+    )
     fig.subplots_adjust(bottom=0.3)
     if return_fig:
         return fig
