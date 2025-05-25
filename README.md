@@ -134,7 +134,7 @@ Download the ones that are available from [here](https://github.com/bioacoustic-
 
 By doing so you will also ensure that the directory structure for the model checkpoints will be created.
 
-`python -m pytest -v --disable-warnings bacpipe/tests/*`
+`pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py`
 
 </details>
 

@@ -61,7 +61,7 @@ embedding_dimensions = {
 
 embeddings = {}
 
-audio_dir = "bacpipe/tests/audio_test_files/dcase_task5"
+audio_dir = "bacpipe/tests/test_data"
 
 # TESTING
 
