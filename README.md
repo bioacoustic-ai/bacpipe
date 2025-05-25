@@ -94,7 +94,7 @@ Once embeddings are generated, they can be easily visualized using a dashboard (
 
 Below you can see a gif showing the basic usage of the dashboard.
 
-DASHBOARD GIF
+![](imgs/bacpipe_demo.gif)
 
 ---
 <details>

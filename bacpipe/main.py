@@ -67,7 +67,7 @@ def get_model_names(
         )
         model_names = [
             d.stem.split("___")[-1].split("-")[0]
-            for d in list(main_results_path.rglob("*"))
+            for d in list(main_results_path.glob("*"))
             if d.is_dir()
         ]
         if not model_names:

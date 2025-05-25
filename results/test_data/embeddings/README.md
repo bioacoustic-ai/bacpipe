@@ -16,6 +16,7 @@ Inside this directory you will find:
     - model_name: _name_of_model_
     - sample_rate (Hz): _sample_rate_
     - segment_length (samples): _length_of_input_segment_in_samples_
+    - total_dataset_length (s): _total_length_of_dataset_in_seconds_
 - either the embeddings files (ending on `.npy`) or directories corresponding to subdirectories in the dataset folder
 
 ### It is important that the name of this directory remains unchanged, so that it can be found automatically. 
