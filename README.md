@@ -140,9 +140,14 @@ Try it out and feel free to give feedback or raise issues if you have any questi
 Create a virtual environment using python3.11 or python3.10 and virtualenv
 `python3.11 -m virtualenv env_bacpipe`
 
+(for windows use `/c/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m virtualenv env_bacpipe`)
+
 activate the environment
 
-`source env_bacpipe/bin/activate`
+`source env_bacpipe/bin/activate` (for windows use `env_bacpipe\Scripts\activate`)
+
+### Clone the repository
+`git clone https://github.com/bioacoustic-ai/bacpipe.git`
 
 ### Ensure you have the following before installing the requirements.
 - for `fairseq` to install you will need python headers:
@@ -155,7 +160,7 @@ activate the environment
 
 #### For Windows use the windows-specific requirements
 
-`pip install -r requirements_windows.txt`
+`pip install -r requirements_windows.txt` (windows does no support `fairseq` and will therefore not be able to run the `animal2vec` models)
 
 If you do not have admin rights and encounter a `permission denied` error when using `pip install`, use `python -m pip install ...` instead.
 
