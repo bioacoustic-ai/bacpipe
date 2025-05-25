@@ -401,10 +401,15 @@ def filter_annotations_by_minimum_number_of_occurrences(
 
 
 def load_labels_and_build_dict(
-    paths, label_file, bool_filter_labels=True, min_label_occurances=150, **kwargs
+    paths,
+    label_file,
+    audio_dir,
+    bool_filter_labels=True,
+    min_label_occurances=150,
+    **kwargs,
 ):
     try:
-        label_df = pd.read_csv(paths.main_embeds_path.parent.joinpath(label_file))
+        label_df = pd.read_csv(Path(audio_dir).joinpath(label_file))
     except FileNotFoundError as e:
         logger.warning(
             "No annotations file found, not able to create ground_truth.npy file."

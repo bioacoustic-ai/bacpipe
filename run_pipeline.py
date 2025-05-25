@@ -18,7 +18,7 @@ with open("bacpipe/settings.yaml", "rb") as p:
     settings = yaml.load(p, Loader=yaml.CLoader)
 
 overwrite, main_results_dir, audio_dir = (
-    settings["overwrite"],
+    config["overwrite"],
     settings["main_results_dir"],
     Path(config["audio_dir"]).stem,
 )
@@ -33,6 +33,6 @@ if overwrite or not evaluation_with_settings_already_exists(**config, **settings
 
     cross_model_evaluation(**config, **settings)
 
-if settings["dashboard"]:
+if config["dashboard"]:
 
     visualize_using_dashboard(**config, **settings)

@@ -6,13 +6,19 @@ bacpipe/tests/.pytest*
 .vscode
 config.yaml
 
-# ignore datasets, embeddings, and task results
-results/embeddings/*
-results/dim_reduced_embeddings/*
-results/evaluations/metrics/*
-results/evaluations/plots/*
-results/by_dataset/*
-bacpipe/evaluation
+# Ignore everything in results
+results/*
+
+# But NOT these specific paths:
+results/test_data/evaluations/
+!results/test_data/
+!results/test_data/embeddings/
+results/test_data/embeddings/*
+!results/test_data/embeddings/README.md
+!results/test_data/dim_reduced_embeddings/
+results/test_data/dim_reduced_embeddings/*
+!results/test_data/dim_reduced_embeddings/README.md
+
 
 # ignore test result files
 bacpipe/tests/results_files/*

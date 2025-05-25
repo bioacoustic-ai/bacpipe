@@ -9,35 +9,30 @@
 
 # PATHS:
 # define paths for your audio data
-# audio_dir :       "/mnt/swap/Work/Data/Birds/neotropical coffee farms in Colombia and Costa Rica/soundscape_data" 
-audio_dir :       "/mnt/swap/Work/Data/Amphibians/AnuranSet/AnuranSet" 
-# audio_dir :       "/mnt/swap/Work/Data/marine/marine mammals/Ilaria_annotated/Ilaria_AL_eval" 
+audio_dir :       "bacpipe/tests/test_data"
 
-# CHOOSE FROM MODELS
-available_models : [
-    "animal2vec_xc",
-    "animal2vec_mk",
-    "audiomae",
-    "aves_especies",
-    "biolingual",
-    "birdaves_especies",
-    "birdnet",
-    "avesecho_passt",
-    "hbdet",
-    "insect66",
-    "insect459",
-    "perch_bird",
-    "mix2",
-    "protoclr",
-    "rcl_fs_bsed",
-    "surfperch",
-    "google_whale",
-    "vggish",
-  ]
+#####################    PROCESS SETTINGS    ##############################
 
+# specify if you want to overwrite the existing evaluation results
+# this is useful if you want to re-run the evaluation with different parameters
+overwrite: False
+
+
+# specify if you want to visualize the embedding evaluations
+dashboard: False
+
+#########################################################################
+####################    SELECT MODELS    ################################
+#########################################################################
 
 # embedding model name
 embedding_model: 
+  selected_models: [
+      "perch_bird",
+      "biolingual",
+      "birdnet",
+  ]
+
   # if already_computed is True, the embeddings will be loaded from the
   # embeddings directory in the dataset path in `results/by_dataset/`
 
@@ -45,46 +40,22 @@ embedding_model:
   # for all selected models
 
   already_computed: False
-  selected_models: [
-      "birdnet",
-      "animal2vec_xc",
-      "animal2vec_mk",
-      "audiomae",
-      "aves_especies",
-      "biolingual",
-      "birdaves_especies",
-      "avesecho_passt",
-      # "hbdet",
-      "insect66",
-      "insect459",
-      "perch_bird",
-      # # "mix2",
-      "protoclr",
-      # # "rcl_fs_bsed",
-      "surfperch",
-      "google_whale",
-      # "vggish",
-      "nonbioaves_especies"
-  ]
 
-# specify the evaluation task to be performed
-available_evaluation_tasks: [
-  "classification",
-  "clustering",
-  "pairwise_distances"
-]
+
+#########################################################################
+############    SELECT DIMENSIONALITY REDUCTION MODELS    ###############
+#########################################################################
+
+dim_reduction_model: "umap"
+
+
+
+#########################################################################
+#################    SELECT EVALUATION MEASURE    #######################
+#########################################################################
 
 evaluation_task: [
-  "classification",
-  "clustering"
 ]
 
-# dimensionality reduction (for visualization) model name.
-available_reduction_models: [
-  "pca",
-  "sparse_pca",
-  "t_sne",
-  "umap"
-]
-dim_reduction_model: "umap"
+
 

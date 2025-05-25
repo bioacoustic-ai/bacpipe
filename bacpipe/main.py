@@ -269,10 +269,42 @@ def embeds_array_without_noise(embeds, ground_truth):
 
 
 def visualize_using_dashboard(**kwargs):
-    dashboard = DashBoard(model_names, **kwargs)
-    dashboard.build_layout()
+    """
+    Create and serve the dashboard for visualization.
 
-    dashboard.app.servable()
+    Parameters
+    ----------
+    kwargs : dict
+        Dictionary with parameters for dashboard creation
+    """
+    from bacpipe.embedding_evaluation.visualization.dashboard import DashBoard
+    import panel as pn
+
+    # Configure dashboard
+    dashboard = DashBoard(model_names, **kwargs)
+
+    # Build the dashboard layout
+    try:
+        dashboard.build_layout()
+    except Exception as e:
+        logger.error(
+            f"Error building dashboard layout: {e}\n \n "
+            "Are you sure all the evaluations have been performed? "
+            "If not, rerun the pipeline with `overwrite=True`.\n \n "
+        )
+        raise e
+
+    # Set up the server parameters
+    serve_kwargs = {"port": 5006, "address": "localhost"}
+
+    # Start the server
+    print(
+        f"Starting dashboard server at {serve_kwargs.get('address', 'localhost')}:{serve_kwargs.get('port', 5006)}"
+    )
+    dashboard.app.show(title="Bacpipe Dashboard", **serve_kwargs)
+
+    # Return the dashboard object in case it's needed elsewhere
+    return dashboard
 
 
 def get_embeddings(

@@ -1,10 +1,9 @@
 # Embeddings directory 
 
-### Embeddings that are created will automatically be saved here unless specified differently in bacpipe/settings.yaml
 
 By default the naming conventions for the embedding directories is:
 
-`\_year-month-day_hour-minute\_\_\_modelname\_datasetname`
+`_year-month-day_hour-minute___modelname_datasetname`
 
 Inside this directory you will find:
 - `metadata.yml`, which contains metadata in the shape of a dictionary with the following keys:

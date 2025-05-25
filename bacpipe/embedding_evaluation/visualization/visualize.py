@@ -17,8 +17,7 @@ matplotlib.rcParams.update(
         "figure.dpi": 300,  # High-resolution figures
         "savefig.dpi": 300,  # Exported plot DPI
         "font.size": 12,  # Better font readability
-        "axes.labelsize": 12,
-        "axes.titlesize": 14,
+        "axes.titlesize": 12,
         "legend.fontsize": 10,
         "xtick.labelsize": 10,
         "ytick.labelsize": 10,
@@ -199,17 +198,22 @@ def plot_embeddings(
     if return_axes:
         return axes, c_label_dict, points
     elif dashboard:
-        if dashboard_idx == 1:
-            fig.set_size_inches(8, 6)
-            set_colorbar_or_legend(
-                fig, axes, points, c_label_dict, dashboard=dashboard, **kwargs
-            )
-        else:
-            fig.set_size_inches(7, 6)
-
+        fig.set_size_inches(6, 5)
+        fig.tight_layout()
+        set_colorbar_or_legend(
+            fig,
+            axes,
+            points,
+            c_label_dict,
+            dashboard=dashboard,
+            label_by=label_by,
+            **kwargs,
+        )
         return fig
     else:
-        set_colorbar_or_legend(fig, axes, points, c_label_dict, **kwargs)
+        set_colorbar_or_legend(
+            fig, axes, points, c_label_dict, label_by=label_by, **kwargs
+        )
 
         axes.set_title(f"{dim_reduction_model.upper()} embeddings")
         fig.savefig(paths.plot_path.joinpath("embeddings.png"), dpi=300)
@@ -261,21 +265,28 @@ def get_labels_for_plot(model_name=None, **kwargs):
     return labels, bool_noise
 
 
-def set_colorbar_or_legend(fig, axes, points, c_label_dict, **kwargs):
+def set_colorbar_or_legend(fig, axes, points, c_label_dict, label_by, **kwargs):
     if len(c_label_dict.keys()) > 20:
+        if len(list(c_label_dict.keys())[0]) < 12:
+            fontsize = 9
+        else:
+            fontsize = 6
+
         # Shrink main plot area to make space for colorbar
-        fig.subplots_adjust(right=0.85)
+        fig.subplots_adjust(right=0.7)
 
         # Add colorbar axis manually (x0, y0, width, height) in figure coords
-        cbar_ax = fig.add_axes([0.9, 0.15, 0.02, 0.7])  # tweak as needed
+        cbar_ax = fig.add_axes([0.72, 0.05, 0.03, 0.9])  # tweak as needed
 
         # Create colorbar in the custom axis
         cbar = fig.colorbar(points, cax=cbar_ax)
 
         locs = [*(int(len(c_label_dict) / 5) * np.arange(5)), -1]
         cbar.set_ticks([list(c_label_dict.values())[loc] for loc in locs])
-        cbar.set_ticklabels([list(c_label_dict.keys())[loc] for loc in locs])
-        cbar.set_label("Label")
+        cbar.set_ticklabels(
+            [list(c_label_dict.keys())[loc] for loc in locs], fontsize=fontsize
+        )
+        cbar.set_label(label_by.replace("_", " "), fontsize=10)
     else:
         hands, labs = axes.get_legend_handles_labels()
         fig, axes = set_legend(hands, labs, fig, axes, **kwargs)
@@ -387,18 +398,16 @@ def set_legend(
     else:
         new_handles = handles
         new_labels = labels
-
-    # Update the legend
     if dashboard:
-        fig.subplots_adjust(right=0.8)
-        ncol = 1
+        fig.subplots_adjust(right=0.7)
+
         fig.legend(
             new_handles,
-            new_labels,  # Use the handles and labels from the plot
-            loc="outside right",  # Center the legend
-            bbox_to_anchor=(1.12, 0.5),
-            ncol=ncol,  # Number of columns
-            markerscale=4,
+            new_labels,
+            loc="outside right",
+            markerscale=4 if dashboard else 6,
+            fontsize=7,
+            frameon=False,
         )
     else:
 
@@ -560,6 +569,7 @@ def plot_comparison(
     fig.suptitle(f"Comparison of {dim_reduction_model} embeddings", fontweight="bold")
     if not dashboard:
         fig.savefig(plot_path.joinpath("comp_fig.png"), dpi=300)
+        plt.close(fig)
     else:
         return fig
 
@@ -605,7 +615,7 @@ def plot_classification_results(
 ):
     """
     Save model specific classification results in the model specific
-    plot path.
+    plot path, displayed as horizontal bars.
 
     Parameters
     ----------
@@ -641,43 +651,77 @@ def plot_classification_results(
 
         with open(paths.class_path / f"class_results_{task_name}.json", "r") as f:
             metrics = json.load(f)
+
+    # Filter overall metrics if needed
+    metrics["overall"] = {
+        k: v for k, v in metrics["overall"].items() if not "micro" in k
+    }
+
+    # Sort classes by accuracy for better visualization
+    class_items = sorted(
+        metrics["per_class_accuracy"].items(), key=lambda x: x[1], reverse=True
+    )
+    class_names = [item[0] for item in class_items]
+    class_values = [item[1] for item in class_items]
+
+    # Set figure size based on number of classes and return_fig
     if return_fig:
-        fig, ax = plt.subplots(1, 1, figsize=(5, 4))
+        # For dashboard, make height adapt to number of classes
+        height = max(4, len(class_names) * 0.3)
+        fig, ax = plt.subplots(1, 1, figsize=(5, height))
         fontsize = 10
-        metrics["overall"] = {
-            k: v for k, v in metrics["overall"].items() if not "micro" in k
-        }
     else:
-        fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+        height = max(8, len(class_names) * 0.4)
+        fig, ax = plt.subplots(1, 1, figsize=(12, height))
         fontsize = 14
 
     model_name = paths.labels_path.parent.stem
     cmap = plt.cm.tab10
-    colors = cmap(np.arange(len(metrics["per_class_accuracy"].values())) % cmap.N)
-    ax.bar(
-        metrics["per_class_accuracy"].keys(),
-        metrics["per_class_accuracy"].values(),
-        width=0.5,
+    colors = cmap(np.arange(len(class_names)) % cmap.N)
+
+    # Create horizontal bars
+    ax.barh(
+        range(len(class_names)),
+        class_values,
+        height=0.6,
         color=colors,
     )
+
+    # Create metrics string
     metrics_string = "".join(
         [f"{k}: {v:.3f} | " for k, v in metrics["overall"].items()]
     )
+
     fig.suptitle(
-        f"Per Class Metrics for {task_name} "
+        f"Classwise accuracy for {task_name} "
         f"classification with {model_name.upper()} embeddings\n"
         f"{metrics_string}",
         fontsize=fontsize,
     )
-    ax.set_ylabel("Accuracy")
-    ax.set_xlabel("Classes")
-    ax.set_xticks(range(len(metrics["per_class_accuracy"])))
-    ax.set_xticklabels(
-        metrics["per_class_accuracy"].keys(), rotation=45, ha="right", fontsize=8
-    )
-    fig.subplots_adjust(bottom=0.3)
+
+    # Adjust labels for horizontal orientation
+    ax.set_xlabel("Accuracy")
+    ax.set_ylabel("Classes")
+    ax.set_yticks(range(len(class_names)))
+    ax.set_yticklabels(class_names, fontsize=8)
+
+    # Add value labels at the end of each bar
+    for i, v in enumerate(class_values):
+        ax.text(v + 0.01, i, f"{v:.2f}", va="center", fontsize=8)
+
+    # Set x-axis limits for better visualization
+    ax.set_xlim(0, min(1.0, max(class_values) * 1.15))
+
+    # Add grid lines for easier reading
+    ax.grid(axis="x", linestyle="--", alpha=0.7)
+
+    # Adjust layout
+    fig.tight_layout()
+    fig.subplots_adjust(top=0.9)
+
     if return_fig:
         return fig
+
     path = paths.plot_path
     fig.savefig(
         path.joinpath(f"class_results_{task_name}_{model_name}.png"),
@@ -869,7 +913,7 @@ def plot_clusterings(
 
     if not fig and not ax:
         fig, ax = plt.subplots(figsize=(5, 4))
-        fig.subplots_adjust(left=0.2, bottom=0.25, right=0.7)
+        fig.subplots_adjust(left=0.4, bottom=0.25)
 
     keys = [
         l
@@ -895,27 +939,27 @@ def plot_clusterings(
 
 
 def generate_bar_plot(
-    metrics, fig, ax, y_label="Metric value", no_legend=False, **kwargs
+    metrics, fig, ax, x_label="Metric value", no_legend=False, **kwargs
 ):
-    bar_width = 1 / (len(list(metrics.values())[0].keys()) + 1)
+    bar_height = 1 / (len(list(metrics.values())[0].keys()) + 1)
     cmap = plt.cm.tab10
     colors = cmap(np.arange(len(list(metrics.values())[0].keys())) % cmap.N)
     metrics_sorted = dict(sorted(metrics.items()))
 
     for out_idx, (_, metric) in enumerate(metrics_sorted.items()):
         for inner_idx, (key, value) in enumerate(metric.items()):
-            ax.bar(
-                out_idx - bar_width * inner_idx,
+            ax.barh(
+                out_idx - bar_height * inner_idx,
                 value,
                 label=key,
-                width=bar_width,
+                height=bar_height,
                 color=colors[inner_idx],
             )
 
-    ax.set_xticks(np.arange(len(metrics_sorted.keys())))
-    ax.set_xticklabels(list(metrics_sorted.keys()), rotation=45, ha="right")
-    ax.set_ylabel(y_label)
-    ax.hlines(0, -1, out_idx, linestyles="dashed", color="black", linewidth=0.3)
+    ax.set_yticks(np.arange(len(metrics_sorted.keys())))
+    ax.set_yticklabels(list(metrics_sorted.keys()))
+    ax.set_xlabel(x_label)
+    ax.vlines(0, -1, out_idx, linestyles="dashed", color="black", linewidth=0.3)
     hand, labl = ax.get_legend_handles_labels()
     if not no_legend:
         fig.legend(
@@ -923,7 +967,8 @@ def generate_bar_plot(
             labl[: inner_idx + 1],
             fontsize=10,
             markerscale=15,
-            loc="outside right",
+            loc="outside lower center",
+            ncol=min(len(labl), 5),
         )
     return fig
 
@@ -935,7 +980,7 @@ def plot_overview_metrics(
     metrics,
     path_func=None,
     return_fig=False,
-    sort_string="ground_truth-kmeans",
+    sort_string="kmeans-audio_file_name",
 ):
     """
     Visualization of task performance by model accross all classes.
@@ -952,7 +997,7 @@ def plot_overview_metrics(
     metrics : dict
         performance dictionary
     sort_string : str
-        string to sort the metrics by, defaults to "ground_truth-kmeans"
+        string to sort the metrics by, defaults to "kmeans-audio_file_name"
     """
     if not metrics:
         res_path = path_func(model_list[0]).plot_path.parent.parent.joinpath("overview")
@@ -965,7 +1010,7 @@ def plot_overview_metrics(
     if "classification" in task_name:
         metrics = {k: v["overall"] for k, v in metrics.items()}
 
-    fig, ax = plt.subplots(1, 1, figsize=(14, 6))
+    fig, ax = plt.subplots(1, 1, figsize=(12, 6))
     num_metrics = len(metrics[model_list[0]])
     bar_width = 1 / (num_metrics + 1)
 

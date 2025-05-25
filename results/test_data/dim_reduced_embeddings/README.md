@@ -1,10 +1,8 @@
 # Reduced dimension embeddings directory 
 
-### Embeddings that are created using dimensionality reduction algorithms will automatically be saved here unless specified differently in bacpipe/settings.yaml
-
 By default the naming conventions for the embedding directories is:
 
-`\_year-month-day_hour-minute\_\_\_DimensionReductionModelName-DatasetName-ModelName`
+`_year-month-day_hour-minute___DimReductionModelName-DatasetName-ModelName`
 
 Inside this directory you will find:
 - `metadata.yml`, which contains metadata in the shape of a dictionary with the following keys:

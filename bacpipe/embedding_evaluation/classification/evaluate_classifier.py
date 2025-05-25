@@ -98,10 +98,12 @@ def compute_task_metrics(y_pred, y_true, probability_scores, label2index):
     metrics["overall"] = {
         "macro_accuracy": macro_accuracy(y_true, y_pred),
         "micro_accuracy": micro_accuracy(y_true, y_pred),
-        "auc": auc(y_true, probability_scores),
+        "auc": auc(y_true, probability_scores) if np.unique(y_true).size > 1 else None,
         "macro_f1": macro_f1(y_true, y_pred),
         "micro_f1": micro_f1(y_true, y_pred),
     }
+    if not metrics["overall"]["auc"]:
+        metrics["overall"].pop("auc")
     metrics["items_per_class"] = {
         name: y_true.count(idx) for name, idx in label2index.items()
     }

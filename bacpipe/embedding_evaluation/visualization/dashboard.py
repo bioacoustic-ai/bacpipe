@@ -43,9 +43,7 @@ class DashBoard:
         self.path_func = le.make_set_paths_func(
             audio_dir, main_results_dir, dim_reduc_parent_dir, **kwargs
         )
-        self.plot_path = self.path_func(
-            model_names[0]
-        ).plot_path.parent.parent.joinpath("overview")
+        self.plot_path = self.path_func(model_names[0]).plot_path.parent.parent
         self.dim_reduc_parent_dir = dim_reduc_parent_dir
 
         self.ground_truth = None
@@ -82,8 +80,10 @@ class DashBoard:
         return getattr(self, f"{p_type}_plot")[widget_idx]
 
     def plot_widget(self, plot_func, **kwargs):
-        # return pn.bind(lambda **kw: self.add_save_button(plot_func, **kw))
-        return pn.bind(plot_func, **kwargs)
+        if kwargs.get("return_fig", False):
+            return pn.bind(plot_func, **kwargs)
+        else:
+            return self.add_save_button(plot_func, **kwargs)
 
     def widget(self, name, options, attr="Select", width=120, **kwargs):
         return getattr(pn.widgets, attr)(
@@ -98,7 +98,7 @@ class DashBoard:
         sidebar = self.make_sidebar(widget_idx, model=True)
 
         main_content = pn.Column(
-            pn.pane.Markdown("## Single Model Dashboard"),
+            pn.pane.Markdown(f"## Model Dashboard"),
             pn.Accordion(
                 (
                     "2D Embedding Plot",
@@ -111,7 +111,11 @@ class DashBoard:
                         label_by=self.label_select[widget_idx],
                         ground_truth=self.ground_truth,
                         dim_reduction_model=self.dim_reduction_model,
-                        remove_noise=self.noise_select[widget_idx],
+                        remove_noise=(
+                            self.noise_select[widget_idx]
+                            if len(self.noise_select.keys()) > 0
+                            else False
+                        ),
                         dashboard=True,
                         dashboard_idx=widget_idx,
                     ),
@@ -124,7 +128,11 @@ class DashBoard:
                             path_func=self.path_func,
                             model_name=self.model_select[widget_idx],
                             label_by=self.label_select[widget_idx],
-                            no_noise=self.noise_select[widget_idx],
+                            no_noise=(
+                                self.noise_select[widget_idx]
+                                if len(self.noise_select.keys()) > 0
+                                else False
+                            ),
                         )
                         if "clustering" in self.evaluation_task
                         else pn.pane.Markdown(
@@ -150,13 +158,14 @@ class DashBoard:
                         )
                     ),
                 ),
-                sizing_mode="stretch_width",
+                # sizing_mode="stretch_width",
                 active=[0, 1, 2],
             ),
-            sizing_mode="stretch_both",
+            width=900,
+            # sizing_mode="stretch_both",
         )
 
-        return pn.Row(sidebar, main_content, sizing_mode="stretch_both")
+        return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
 
     def all_models_page(self, widget_idx):
         sidebar = self.make_sidebar(widget_idx, model=False)
@@ -175,7 +184,11 @@ class DashBoard:
                         models=self.models,
                         dim_reduction_model=self.dim_reduction_model,
                         label_by=self.label_select[widget_idx],
-                        remove_noise=self.noise_select[widget_idx],
+                        remove_noise=(
+                            self.noise_select[widget_idx]
+                            if len(self.noise_select.keys()) > 0
+                            else False
+                        ),
                         default_label_keys=self.default_label_keys,
                         dashboard=True,
                     ),
@@ -188,7 +201,11 @@ class DashBoard:
                             path_func=self.path_func,
                             model_list=self.models,
                             label_by=self.label_select[widget_idx],
-                            no_noise=self.noise_select[widget_idx],
+                            no_noise=(
+                                self.noise_select[widget_idx]
+                                if len(self.noise_select.keys()) > 0
+                                else False
+                            ),
                         )
                         if "clustering" in self.evaluation_task
                         else pn.pane.Markdown(
@@ -216,13 +233,14 @@ class DashBoard:
                         )
                     ),
                 ),
-                sizing_mode="stretch_width",
+                # sizing_mode="stretch_width",
                 active=[0, 1, 2],
             ),
-            sizing_mode="stretch_both",
+            width=1700,
+            # sizing_mode="stretch_both",
         )
 
-        return pn.Row(sidebar, main_content, sizing_mode="stretch_both")
+        return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
 
     def make_sidebar(self, widget_idx, model=True):
         widgets = [pn.pane.Markdown("## Settings")]
@@ -237,29 +255,45 @@ class DashBoard:
                 self.init_widget(
                     widget_idx, "label", name="Label by", options=self.label_by
                 ),
-                pn.widgets.StaticText(name="", value="Remove noise?"),
-                self.init_widget(
-                    widget_idx,
-                    "noise",
-                    name="Remove Noise",
-                    options=[True, False],
-                    attr="RadioBoxGroup",
-                    value=False,
+                (
+                    pn.widgets.StaticText(name="", value="Remove noise?")
+                    if not self.ground_truth is None
+                    else None
                 ),
-                self.init_widget(
-                    widget_idx,
-                    "class",
-                    name="Classification Type",
-                    options=["knn", "linear"],
+                (
+                    self.init_widget(
+                        widget_idx,
+                        "noise",
+                        name="Remove Noise",
+                        options=[True, False],
+                        attr="RadioBoxGroup",
+                        value=False,
+                    )
+                    if not self.ground_truth is None
+                    else None
+                ),
+                (
+                    self.init_widget(
+                        widget_idx,
+                        "class",
+                        name="Classification Type",
+                        options=["knn", "linear"],
+                    )
+                    if "classification" in self.evaluation_task
+                    else None
                 ),
             ]
         )
 
-        return pn.Column(
-            *widgets, width=250, sizing_mode="stretch_height", margin=(10, 10)
-        )
+        return pn.Column(*widgets, width=140, margin=(10, 10))
 
     def build_layout(self):
+        """
+        Builds the layout for the dashboard with two models and a single model page.
+        The layout consists of a single model page, a two-models comparison page,
+        and a page showing all models. Each page contains sidebars with model-specific
+        information and content areas for visualizations.
+        """
         # Build both model pages to initialize widgets
         model0_page = self.single_model_page(0)
         model1_page = self.single_model_page(1)
@@ -270,10 +304,10 @@ class DashBoard:
 
         # Wrap sidebars with titles
         sidebar0 = pn.Column(
-            pn.pane.Markdown("## Settings 1"), sidebar0, sizing_mode="stretch_height"
+            pn.pane.Markdown("## Model 1"), sidebar0  # , sizing_mode="stretch_height"
         )
         sidebar1 = pn.Column(
-            pn.pane.Markdown("## Settings 2"), sidebar1, sizing_mode="stretch_height"
+            pn.pane.Markdown("## Model 2"), sidebar1  # , sizing_mode="stretch_height"
         )
 
         self.app = pn.Tabs(
@@ -289,21 +323,71 @@ class DashBoard:
             ("All models", self.all_models_page(1)),
         )
 
-    def add_save_button(fig_func, filename="plot.png", **kwargs):
-        from io import BytesIO
-        import base64
-        import matplotlib.pyplot as plt
+    def add_save_button(self, plot_func, **kwargs):
+        """
+        Adds a save button to the plot panel that allows saving the figure
+        generated by the provided plotting function. The button will save the
+        figure with a filename based on the model name and plot type.
 
-        def _save():
-            fig = fig_func(**kwargs)
-            buf = BytesIO()
-            fig.savefig(buf, format="png", dpi=300)
-            buf.seek(0)
-            encoded = base64.b64encode(buf.read()).decode()
-            href = f'<a download="{filename}" href="data:image/png;base64,{encoded}">Download Plot</a>'
-            return pn.pane.HTML(href)
+        Parameters
+        ----------
+        plot_func : function
+            The plotting function that generates the figure to be saved.
 
-        button = pn.widgets.Button(name="Save Plot", button_type="primary")
-        download_link = pn.bind(_save)
-        button.on_click(lambda event: download_link())
-        return pn.Column(fig_func(**kwargs), button)
+        Returns
+        -------
+        pn.Column
+            A Panel Column containing the figure panel, a button to save the figure,
+            and a notification area to inform the user about the save status.
+        """
+        # Create the figure panel first using pn.bind
+        fig_panel = pn.panel(pn.bind(plot_func, **kwargs))
+
+        # Define the save function that correctly handles panel widget values
+        def save_figure(event):
+            # Create a copy of kwargs to modify for the direct function call
+            plot_kwargs = {}
+            for key, value in kwargs.items():
+                # Handle panel widgets by getting their value
+                if hasattr(value, "value"):
+                    plot_kwargs[key] = value.value
+                else:
+                    plot_kwargs[key] = value
+
+            # Generate the figure with the processed arguments
+            fig = plot_func(**plot_kwargs)
+
+            # Generate filename based on processed arguments
+            if "model_name" in plot_kwargs:
+                model_name = plot_kwargs["model_name"]
+            else:
+                model_name = "all_models"
+
+            plot_type = plot_func.__name__.replace("plot_", "")
+            default_filename = "{}_{}_{}.png".format(
+                model_name, plot_type, kwargs["label_by"].value
+            )
+
+            # Determine save path
+            if model_name == "all_models":
+                save_dir = (
+                    self.path_func(model_name).plot_path.parent.parent / "overview"
+                )
+            else:
+                save_dir = self.path_func(model_name).plot_path
+            save_dir.mkdir(exist_ok=True, parents=True)
+            save_path = save_dir / default_filename
+
+            # Save the figure
+            fig.savefig(save_path, dpi=300, bbox_inches="tight")
+
+            # Show a notification that saving was successful
+            notification.object = f"✓ Figure saved to: {save_path}"
+
+        # Create the button and notification area
+        button = pn.widgets.Button(name="Save Figure", button_type="primary")
+        button.on_click(save_figure)
+        notification = pn.pane.Markdown("")
+
+        # Return the assembled panel
+        return pn.Column(fig_panel, pn.Row(button), notification)
