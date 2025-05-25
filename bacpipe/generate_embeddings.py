@@ -174,6 +174,7 @@ class Loader:
             [files_list.append(ll) for ll in self.audio_dir.rglob(f"*{string}")]
             for string in self.config["audio_suffixes"]
         ]
+        files_list = np.unique(files_list).tolist()
         assert len(files_list) > 0, "No audio files found in audio_dir."
         return files_list
 
