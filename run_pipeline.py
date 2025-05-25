@@ -1,49 +1,38 @@
-from bacpipe.main import get_embeddings
-from bacpipe.evaluation.visualization import (
-    plot_comparison,
-    visualize_task_results,
-    visualise_classification_results_across_models,
-)
 import yaml
-from bacpipe.evaluation.classification import evaluate_on_task
-from bacpipe.evaluation.classification_utils.evaluation_metrics import (
-    build_results_report,
+from pathlib import Path
+
+from bacpipe.main import (
+    get_model_names,
+    evaluation_with_settings_already_exists,
+    model_specific_embedding_creation,
+    model_specific_evaluation,
+    cross_model_evaluation,
+    visualize_using_dashboard,
 )
+
 
 with open("config.yaml", "rb") as f:
     config = yaml.load(f, Loader=yaml.CLoader)
 
+with open("bacpipe/settings.yaml", "rb") as p:
+    settings = yaml.load(p, Loader=yaml.CLoader)
 
-for model_name in config["embedding_model"]:
-    loader_obj = get_embeddings(
-        model_name=model_name,
-        dim_reduction_model=config["dim_reduction_model"],
-        audio_dir=config["audio_dir"],
-    )
-    if not config["evaluation_task"] == "None":
-        task_name = config["evaluation_task"]
-        print(
-            "\n#### Training linear probe to evaluate embeddings on the "
-            f"classification task {task_name.upper()}. ####"
-        )
-        assert len(loader_obj.files) > 1, (
-            "Too few files to evaluate embeddings with linear probe. "
-            + "Are you sure you have selected the right data?"
-        )
-        metrics, task_config = evaluate_on_task(task_name, model_name, loader_obj)
-        if not task_config:
-            continue
+overwrite, main_results_dir, audio_dir = (
+    config["overwrite"],
+    settings["main_results_dir"],
+    Path(config["audio_dir"]).stem,
+)
 
-        build_results_report(task_name, model_name, metrics, task_config)
-        visualize_task_results(task_name, model_name, metrics)
-if len(config["embedding_model"]) > 1:
-    if not config["evaluation_task"] == "None":
-        visualise_classification_results_across_models(
-            task_name, config["embedding_model"]
-        )
-    if not config["dim_reduction_model"] == "None":
-        plot_comparison(
-            config["audio_dir"],
-            config["embedding_model"],
-            config["dim_reduction_model"],
-        )
+get_model_names(**config, **settings)
+
+if overwrite or not evaluation_with_settings_already_exists(**config, **settings):
+
+    loader_dict = model_specific_embedding_creation(**config, **settings)
+
+    model_specific_evaluation(loader_dict, **config, **settings)
+
+    cross_model_evaluation(**config, **settings)
+
+if config["dashboard"]:
+
+    visualize_using_dashboard(**config, **settings)

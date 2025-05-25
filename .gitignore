@@ -6,14 +6,27 @@ bacpipe/tests/.pytest*
 .vscode
 config.yaml
 
-# ignore datasets, embeddings, and task results
-bacpipe/evaluation/datasets/*
-!bacpipe/evaluation/datasets/audio_test_files
-!bacpipe/evaluation/datasets/embedding_test_files
-bacpipe/evaluation/embeddings/*
-bacpipe/evaluation/dim_reduced_embeddings/*
-bacpipe/evaluation/task_results/metrics/*
-bacpipe/evaluation/task_results/plots/*
+# Ignore everything in results
+results/*
+
+# But NOT these specific paths:
+results/test_data/evaluations/
+!results/test_data/
+!results/test_data/embeddings/
+results/test_data/embeddings/*
+!results/test_data/embeddings/README.md
+!results/test_data/dim_reduced_embeddings/
+results/test_data/dim_reduced_embeddings/*
+!results/test_data/dim_reduced_embeddings/README.md
+
+
+# ignore test result files
+bacpipe/tests/results_files/*
 
 # track all Readme files, including the ones in subdirectories
 !**/README.md
+
+
+exploration/*
+!exploration/explore_embeds.py
+!exploration/explore_dashboard.py
