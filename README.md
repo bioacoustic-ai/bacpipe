@@ -137,14 +137,23 @@ Try it out and feel free to give feedback or raise issues if you have any questi
 
 ### Create and activate your environment
 
-Create a virtual environment using python3.11 or python3.10 and virtualenv
-`python3.11 -m virtualenv env_bacpipe`
+It is recommended to use python 3.11 for this repository, as some of the models require it. 
 
-(for windows use `/c/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m virtualenv env_bacpipe`)
+For speed and stability it is recommended to use `uv` instead of `virtualenv` and `pip`. 
+
+Create a virtual environment using `uv`
+
+`python3.11 -m uv venv env_bacpipe`
+
+(alternatively with virtualenv: `python3.11 -m virtualenv env_bacpipe`)
+
+(for windows use `/c/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m uv venv env_bacpipe`)
+
+(alternatively for windows with `virtualenv` use `/c/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m virtualenv env_bacpipe`)
 
 activate the environment
 
-`source env_bacpipe/bin/activate` (for windows use `env_bacpipe\Scripts\activate`)
+`source env_bacpipe/bin/activate` (for windows use `source env_bacpipe\Scripts\activate`)
 
 ### Clone the repository
 `git clone https://github.com/bioacoustic-ai/bacpipe.git`
@@ -152,15 +161,16 @@ activate the environment
 ### Ensure you have the following before installing the requirements.
 - for `fairseq` to install you will need python headers:
 `sudo apt-get install python3.11-dev`
-- pip version 24.0 (`pip install pip==24.0`, omegaconf 2.0.6 has a non-standard dependency specifier PyYAML>=5.1.*. pip 24.1 will enforce this behaviour change and installation will thus fail.)
+
+- if you're using `pip`, you'll need to ensure you have `pip` version 24.0 (`pip install pip==24.0`, omegaconf 2.0.6 has a non-standard dependency specifier PyYAML>=5.1.*. pip 24.1 will enforce this behaviour change and installation will thus fail. For Windows `env_bacpipe\Scripts\python.exe -m pip install pip==24.0`)
 
 ### Install the dependencies once the prerequisites are satisfied.
 
-`pip install -r requirements.txt`
+`uv pip install -r requirements.txt` (for `pip` users omit `uv`)
 
 #### For Windows use the windows-specific requirements
 
-`pip install -r requirements_windows.txt` (windows does no support `fairseq` and will therefore not be able to run the `animal2vec` models)
+`uv pip install -r requirements_windows.txt` ((for `pip` users omit `uv`)windows does no support `fairseq` and will therefore not be able to run the `animal2vec` models)
 
 If you do not have admin rights and encounter a `permission denied` error when using `pip install`, use `python -m pip install ...` instead.
 
