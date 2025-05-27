@@ -16,7 +16,7 @@ global_batch_size: 16
 
 
 # supported formats of audio files
-audio_suffixes: ['.wav', '.WAV', '.aif', '.mp3', '.MP3', '.flac']
+audio_suffixes: ['.wav', '.WAV', '.aif', '.mp3', '.MP3', '.flac', '.ogg']
 
 
 # To avoid creating embeddings when configurations are still being tested, this is set to True. 
