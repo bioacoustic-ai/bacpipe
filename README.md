@@ -134,20 +134,29 @@ Try it out and feel free to give feedback or raise issues if you have any questi
 <details>
 <summary><b style="font-size: 2em;">Installation</b></summary>
 
-
-### Create and activate your environment
+### Install `uv` (recommended) or `virtualenv`
 
 It is recommended to use python 3.11 for this repository, as some of the models require it. 
 
-For speed and stability it is recommended to use `uv` instead of `virtualenv` and `pip`. 
+For speed and stability it is recommended to use `uv` instead of `virtualenv` and `pip`. To install `uv` use the following command:
 
-Create a virtual environment using `uv`
+`pip install uv` 
+
+(for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m pip install uv`)
+
+If you prefer to use `virtualenv`, you can install it using the following command:
+
+`pip install virtualenv`
+
+(for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m pip install virtualenv`)
+
+### Create a virtual environment
 
 `python3.11 -m uv venv env_bacpipe`
 
-(alternatively with virtualenv: `python3.11 -m virtualenv env_bacpipe`)
+(for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m uv venv env_bacpipe`)
 
-(for windows use `/c/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m uv venv env_bacpipe`)
+(alternatively with virtualenv: `python3.11 -m virtualenv env_bacpipe`)
 
 (alternatively for windows with `virtualenv` use `/c/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m virtualenv env_bacpipe`)
 
@@ -159,10 +168,12 @@ activate the environment
 `git clone https://github.com/bioacoustic-ai/bacpipe.git`
 
 ### Ensure you have the following before installing the requirements.
+For non-windows users:
+
 - for `fairseq` to install you will need python headers:
 `sudo apt-get install python3.11-dev`
 
-- if you're using `pip`, you'll need to ensure you have `pip` version 24.0 (`pip install pip==24.0`, omegaconf 2.0.6 has a non-standard dependency specifier PyYAML>=5.1.*. pip 24.1 will enforce this behaviour change and installation will thus fail. For Windows `env_bacpipe\Scripts\python.exe -m pip install pip==24.0`)
+- if you're not using `uv`, you'll need to ensure you have `pip` version 24.0 (`pip install pip==24.0`, omegaconf 2.0.6 has a non-standard dependency specifier PyYAML>=5.1.*. pip 24.1 will enforce this behaviour change and installation will thus fail. For Windows `env_bacpipe\Scripts\python.exe -m pip install pip==24.0`)
 
 ### Install the dependencies once the prerequisites are satisfied.
 
@@ -170,7 +181,9 @@ activate the environment
 
 #### For Windows use the windows-specific requirements
 
-`uv pip install -r requirements_windows.txt` ((for `pip` users omit `uv`)windows does no support `fairseq` and will therefore not be able to run the `animal2vec` models)
+`uv pip install -r requirements_windows.txt` 
+
+((for `pip` users omit `uv`) windows does no support `fairseq` and will therefore not be able to run the `animal2vec` models)
 
 If you do not have admin rights and encounter a `permission denied` error when using `pip install`, use `python -m pip install ...` instead.
 
