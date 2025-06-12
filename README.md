@@ -131,8 +131,7 @@ Try it out and feel free to give feedback or raise issues if you have any questi
 
 
 ---
-<details>
-<summary><b style="font-size: 2em;">Installation</b></summary>
+# Installation
 
 ### Install `uv` (recommended) or `virtualenv`
 
@@ -167,13 +166,7 @@ activate the environment
 ### Clone the repository
 `git clone https://github.com/bioacoustic-ai/bacpipe.git`
 
-### Ensure you have the following before installing the requirements.
-For non-windows users:
-
-- for `fairseq` to install you will need python headers:
-`sudo apt-get install python3.11-dev`
-
-- if you're not using `uv`, you'll need to ensure you have `pip` version 24.0 (`pip install pip==24.0`, omegaconf 2.0.6 has a non-standard dependency specifier PyYAML>=5.1.*. pip 24.1 will enforce this behaviour change and installation will thus fail. For Windows `env_bacpipe\Scripts\python.exe -m pip install pip==24.0`)
+cd into the bacpipe directory (`cd bacpipe`)
 
 ### Install the dependencies once the prerequisites are satisfied.
 
@@ -187,17 +180,31 @@ For non-windows users:
 
 If you do not have admin rights and encounter a `permission denied` error when using `pip install`, use `python -m pip install ...` instead.
 
-### Add the model checkpoints that are not included by default.
+### OPTIONAL: Add other model checkpoints that are not included by default.
 
 Download the ones that are available from [here](https://github.com/bioacoustic-ai/bacpipe/tree/main/bacpipe/pipelines) and create directories corresponding to the pipeline-names and place the checkpoints within them. 
 
-### To test the installation you can execute the test suite. 
+## Test the installation was successfull
 
 By doing so you will also ensure that the directory structure for the model checkpoints will be created.
 
 `pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py`
 
-</details>
+In case of a permission denied error, run
+`python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py`
+
+If everything passes then you've successfully installed bacpipe and can now proceed to use it.
+
+## Known installation issues
+
+### python headers needed for animal2vec requirements to work
+For non-windows users:
+
+- for `fairseq` to install you will need python headers:
+`sudo apt-get install python3.11-dev`
+
+- if you're not using `uv`, you'll need to ensure you have `pip` version 24.0 (`pip install pip==24.0`, omegaconf 2.0.6 has a non-standard dependency specifier PyYAML>=5.1.*. pip 24.1 will enforce this behaviour change and installation will thus fail. For Windows `env_bacpipe\Scripts\python.exe -m pip install pip==24.0`)
+
 
 ---
 

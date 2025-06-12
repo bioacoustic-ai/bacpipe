@@ -9,7 +9,6 @@ SAMPLE_RATE = 8000
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
 with open("bacpipe/settings.yaml", "r") as f:
     settings = yaml.safe_load(f)
-DEVICE = settings["device"]
 
 
 class Model(ModelBaseClass):
@@ -30,7 +29,7 @@ class Model(ModelBaseClass):
         models, _ = checkpoint_utils.load_model_ensemble(
             [path_to_pt_file]
         )  # , weights_only=True)
-        self.model = models[0].to(DEVICE)
+        self.model = models[0].to(self.device)
         self.model.eval()
 
     def preprocess(self, audio):

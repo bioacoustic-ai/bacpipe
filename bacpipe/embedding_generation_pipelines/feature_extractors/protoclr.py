@@ -10,15 +10,11 @@ BATCH_SIZE = 8
 
 
 # Mel Spectrogram
-with open("bacpipe/settings.yaml", "r") as f:
-    settings = yaml.safe_load(f)
-DEVICE = settings["device"]
 NMELS = 128  # number of mels
 NFFT = 1024  # size of FFT
 HOPLEN = 320  # hop between STFT windows
 FMAX = 8000  # fmax
 FMIN = 50  # fmin
-print(DEVICE)
 
 
 class Normalization(torch.nn.Module):
@@ -44,7 +40,7 @@ class Model(ModelBaseClass):
                 f_max=FMAX,
                 n_mels=NMELS,
             )
-            .to(DEVICE)
+            .to(self.device)
             .eval()
         )
         self.power_to_db = T.AmplitudeToDB().eval()
@@ -53,15 +49,15 @@ class Model(ModelBaseClass):
         self.model = cvt13()
         state_dict = torch.load(
             self.model_base_path + "/protoclr/protoclr.pth",
-            map_location=DEVICE,
+            map_location=self.device,
             weights_only=True,
         )
         self.model.load_state_dict(state_dict)
-        self.model.to(DEVICE)
+        self.model.to(self.device)
         self.model.eval()
 
     def preprocess(self, audio):
-        audio = audio.to(DEVICE)
+        audio = audio.to(self.device)
         mel = self.mel(audio)
         mel = self.power_to_db(mel)
         mel = self.norm(mel)

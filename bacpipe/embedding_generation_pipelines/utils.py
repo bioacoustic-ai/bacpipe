@@ -13,6 +13,7 @@ with open("bacpipe/settings.yaml", "rb") as f:
 
 MODEL_BASE_PATH = settings["model_base_path"]
 GLOBAL_BATCH_SIZE = settings["global_batch_size"]
+DEVICE = settings["device"]
 
 
 class ModelBaseClass:
@@ -23,6 +24,7 @@ class ModelBaseClass:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+        self.device = DEVICE
         self.model_base_path = MODEL_BASE_PATH
         self.sr = sr
         self.segment_length = segment_length
