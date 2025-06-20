@@ -203,6 +203,9 @@ For non-windows users:
 - for `fairseq` to install you will need python headers:
 `sudo apt-get install python3.11-dev`
 
+- once completed install fairseq:
+`uv pip install fairseq==0.12.2`
+
 - if you're not using `uv`, you'll need to ensure you have `pip` version 24.0 (`pip install pip==24.0`, omegaconf 2.0.6 has a non-standard dependency specifier PyYAML>=5.1.*. pip 24.1 will enforce this behaviour change and installation will thus fail. For Windows `env_bacpipe\Scripts\python.exe -m pip install pip==24.0`)
 
 
