@@ -13,11 +13,12 @@ The below image shows a comparison of umap embeddings based on 15 different bioa
 - [Dashboard visualization](#dashboard-visualization)
 - [Installation](#installation)
 - [Usage](#usage)
+  - [Configurations and settings](#configurations-and-settings)
+  - [Running the pipeline](#running-the-pipeline)
   - [Model selection](#model-selection)
   - [Dimensionality reduction](#dimensionality-reduction)
-  - [Evaluation](#evaluation)
   - [Dashboard](#dashboard)
-  - [Running the pipeline](#running-the-pipeline)
+  - [Evaluation](#evaluation)
 - [Available models](#available-models)
 - [Contribute](#contribute)
 - [Known issues](#known-issues)
@@ -233,6 +234,33 @@ Once the configuration is complete, execute the run_pipeline.py file (make sure 
 `python run_pipeline.py`
 
 While the scripts are executed, directories will be created in the `bacpipe/results` directory. Embeddings will be saved in `bacpipe/results/YOUR_DATASET/embeddings` (see [here](results/test_data/embeddings/README.md) for more info) and if selected, reduced dimensionality embeddings will be saved in `bacpipe/evaluation/dim_reduced_embeddings` (see [here](results/test_data/dim_reduced_embeddings/README.md) for more infor) . 
+
+
+## Model selection
+
+Select the models you want to run in the [config.yaml](config.yaml) file. The models are specified in the `available_models` list. You can select the models you want to run by adding them to the `selected_models` list.
+
+## Dimensionality reduction
+
+Different dimensionality reduction models can be selected in the [config.yaml](config.yaml) file. The available models are specified in the section [Dimensionality reduction models](#dimensionality-reduction-models). Insert the name of the selected model in the `dim_reduction_model` variable in the [config.yaml](config.yaml) file. The default is `umap`, but you can also select `pca`, `sparse_pca` or `t_sne`.
+
+
+## Dashboard
+
+The dashboard is a panel application that allows you to visualize the generated embeddings. To enable the dashboard, set the `dashboard` variable in the [config.yaml](config.yaml) file to `True`. The dashboard will automatically open in your browser (at `http://localhost:8050`) after running the `run_dashboard.py` script.
+
+## Evaluation
+
+You can use `bacpipe` to evaluate the generated embeddings using different metrics. To evaluate the embeddings, you need annotations for your dataset. The annotations should be in a file called `annotations.csv` in the directory specified in the `audio_dir` variable in the [config.yaml](config.yaml) file. The file should contain the following columns:
+```csv
+audiofilename,start,end,label
+```
+Where `audiofilename` is the name of the audio file, `start` and `end` are the start and end times of the annotation in seconds, and `label` is the label of the annotation.
+
+See the file [annotations.csv](bacpipe/tests/test_data/annotations.csv) for an example of how the annotations file should look like.
+
+Once the annotations file is created, add either `classification` or `clustering` (or both) to the `evaluation_task` variable in the [config.yaml](config.yaml) file (use double quotes: "classification" or "clustering"). You can run the evaluation script using normal `python run_pipeline.py` command. The evaluation script will automatically use the annotations to compute the clustering and classification performance of the embeddings. The results will be saved in the `bacpipe/results/YOUR_DATASET/evaluation` directory.
+
 
 # Available models
 
