@@ -9,7 +9,7 @@
 
 # PATHS:
 # define paths for your audio data
-audio_dir :       'bacpipe/tests/test_data'
+audio_dir :       '/mnt/swap/Work/Data/Amphibians/AnuranSet/AnuranSet'
 
 #####################    PROCESS SETTINGS    ##############################
 
@@ -19,7 +19,7 @@ overwrite: False
 
 
 # specify if you want to visualize the embedding evaluations
-dashboard: False
+dashboard: True
 
 #########################################################################
 ####################    SELECT MODELS    ################################
