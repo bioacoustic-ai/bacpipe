@@ -126,7 +126,7 @@ The noise removal is done by removing the embeddings that do not correspond to a
 
 The visualizations can be saved as png files by clicking the save button in the bottom right corner of the plot.
 
-Try it out and feel free to give feedback or raise issues if you have any questions or suggestions for improvements.
+__Try it out__ and (__please__) feel free to give feedback and ask questions (or suggestions for improvements) - or in case something does not work raise issues.
 
 
 
@@ -215,6 +215,10 @@ For non-windows users:
 # Usage
 
 ## Configurations and settings
+
+To see the capabilities of bacpipe, go ahead and run the `run_pipeline.py` script. This will run the pipeline with the default settings and configurations on a small set of test data. 
+
+### To use bacpipe on your own data, you will need to modify the configuration files.
 
 The only two files that need to be modified are the [config.yaml](config.yaml) and [settings.yaml](bacpipe/settings.yaml) files. The [config.yaml](config.yaml) is used for the standard configurations: 
 - path to audio files
