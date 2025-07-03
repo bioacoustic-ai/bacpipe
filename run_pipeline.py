@@ -32,6 +32,19 @@ if overwrite or not evaluation_with_settings_already_exists(**config, **settings
 
     loader_dict = model_specific_embedding_creation(**config, **settings)
 
+    import numpy as np
+
+    a = []
+    for i, f in enumerate(loader_dict["birdnet"].files):
+        a.append(np.load(f))
+    embeds = np.vstack(a)
+
+    from sklearn.neighbors import LocalOutlierFactor
+
+    clf = LocalOutlierFactor(n_neighbors=5)
+    points = clf.fit_predict(embeds)
+    in_or_out = clf.negative_outlier_factor_
+
     model_specific_evaluation(loader_dict, **config, **settings)
 
     cross_model_evaluation(**config, **settings)

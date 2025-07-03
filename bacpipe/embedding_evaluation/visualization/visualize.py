@@ -14,8 +14,8 @@ import matplotlib
 
 matplotlib.rcParams.update(
     {
-        "figure.dpi": 300,  # High-resolution figures
-        "savefig.dpi": 300,  # Exported plot DPI
+        "figure.dpi": 600,  # High-resolution figures
+        "savefig.dpi": 600,  # Exported plot DPI
         "font.size": 12,  # Better font readability
         "axes.titlesize": 12,
         "legend.fontsize": 10,
@@ -199,6 +199,7 @@ def plot_embeddings(
         return axes, c_label_dict, points
     elif dashboard:
         fig.set_size_inches(6, 5)
+        fig.set_dpi(300)
         fig.tight_layout()
         set_colorbar_or_legend(
             fig,
@@ -225,7 +226,7 @@ def init_embed_figure(fig, axes, bool_3d=False, **kwargs):
         if bool_3d:
             fig, axes = plt.subplots(subplot_kw={"projection": "3d"}, figsize=(12, 8))
         else:
-            fig, axes = plt.subplots(figsize=(12, 8))
+            fig, axes = plt.subplots(figsize=(12, 8), dpi=400)
         return_axes = False
     else:
         return_axes = True
