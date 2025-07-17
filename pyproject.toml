@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "bacpipe"
+version = "0.1.0"
+description = ""
+authors = ["Vincent Kather"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+matplotlib = "^3.10.0"
+numpy = ">=1.26.0"
+scikit-learn = "^1.6.1"
+pandas = "^2.2.3"
+torch = "^2.4.1"
+llvmlite = ">=0.43.0"
+librosa = "^0.10.2.post1"
+tqdm = "^4.67.1"
+pyyaml = "^6.0.2"
+ml-collections = "^0.1.1"
+apache-beam = {extras = ["gpc"], version = "^2.61.0"}
+jax = {version="0.4.33"}
+etils = "^1.12.0"
+importlib-resources = "^6.5.2"
+tensorflow = "2.16.1"
+flax = "^0.10.3"
+tensorflow-hub = "^0.16.1"
+torchaudio = "^2.6.0"
+panel = "^1.7.2"
+seaborn = "^0.13.2"
+tensorflow-io-gcs-filesystem = "0.37.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

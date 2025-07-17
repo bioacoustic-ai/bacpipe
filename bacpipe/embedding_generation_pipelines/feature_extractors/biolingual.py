@@ -14,7 +14,6 @@ BATCH_SIZE = 16
 class Model(ModelBaseClass):
     def __init__(self):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
-
         self.audio_classifier = pipeline(
             task="zero-shot-audio-classification", model="davidrrobinson/BioLingual"
         )
@@ -33,4 +32,4 @@ class Model(ModelBaseClass):
 
     @torch.inference_mode()
     def __call__(self, input):
-        return self.model(input)
+        return self.model(input.cuda())
