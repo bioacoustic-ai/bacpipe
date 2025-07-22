@@ -1,39 +1,6 @@
-[tool.poetry]
-name = "bacpipe"
-version = "0.1.0"
-description = ""
-authors = ["Vincent Kather"]
-readme = "README.md"
-
-[tool.poetry.dependencies]
-python = ">=3.10,<3.12"
-absl-py = "^1.4.0"
-ml-collections = "^0.1.1"
-tensorflow = "^2.16"
-etils = {version = "^1.5.0", extras = ["epath"]}
-imageio = "^2.5.0"
-matplotlib = "^3.6.1"
-notebook = "^7.0.4"
-librosa = "^0.10.1"
-numpy = "^1.24.0"
-usearch = "^2.15"
-tensorflow-hub = "^0.16.0"
-pandas = {version = "^2.1.1", extras=["gcp"]}
-ipywidgets = "^8.1"
-jax = {extras = ["cuda12-pip"], version = ">0.4.36, <0.4.38"}
-apache-beam = {extras = ["gpc"], version = "^2.61.0"}
-flax = "^0.10.2"
-torch = "^2.7.1"
-panel = "^1.7.2"
-seaborn = "^0.13.2"
-torchaudio = "^2.7.1"
-umap-learn = "^0.5.9.post2"
-transformers = "^4.53.1"
-
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
-
 
 [project]
 authors = [
