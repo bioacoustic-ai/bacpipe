@@ -134,11 +134,17 @@ __Try it out__ and (__please__) feel free to give feedback and ask questions (or
 ---
 # Installation
 
-### Install `uv` (recommended) or `virtualenv`
+### Install `uv` (recommended) or `virtualenv` or `poetry'
 
 It is recommended to use python 3.11 for this repository, as some of the models require it. 
 
 For speed and stability it is recommended to use `uv` instead of `virtualenv` and `pip`. To install `uv` use the following command:
+
+`pipx install uv` 
+
+You can install pipx following these instructions: https://pipx.pypa.io/latest/installation/
+
+Otherwise, regular pip will also work: 
 
 `pip install uv` 
 
@@ -150,6 +156,10 @@ If you prefer to use `virtualenv`, you can install it using the following comman
 
 (for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m pip install virtualenv`)
 
+If you prefer to use `poetry`, you can install it using: 
+
+`pipx install poetry` 
+
 ### Create a virtual environment
 
 `python3.11 -m uv venv env_bacpipe`
@@ -157,6 +167,8 @@ If you prefer to use `virtualenv`, you can install it using the following comman
 (for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m uv venv env_bacpipe`)
 
 (alternatively with virtualenv: `python3.11 -m virtualenv env_bacpipe`)
+
+(alternatively for `poetry` use `poetry env use 3.11`)
 
 (alternatively for windows with `virtualenv` use `/c/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m virtualenv env_bacpipe`)
 
@@ -172,6 +184,19 @@ cd into the bacpipe directory (`cd bacpipe`)
 ### Install the dependencies once the prerequisites are satisfied.
 
 `uv pip install -r requirements.txt` (for `pip` users omit `uv`)
+
+If you want to use GPU, we recommend to use the pyproject approach, either with `uv` or `poetry`. 
+To do that, follow: 
+
+For `poetry`:
+
+`poetry lock`
+`poetry install`
+
+For `uv`: 
+
+`uv sync`
+
 
 #### For Windows use the windows-specific requirements
 
