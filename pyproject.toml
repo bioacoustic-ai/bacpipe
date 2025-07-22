@@ -7,29 +7,29 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.12"
-matplotlib = "^3.10.0"
-numpy = ">=1.26.0"
-scikit-learn = "^1.6.1"
-pandas = "^2.2.3"
-torch = "^2.4.1"
-llvmlite = ">=0.43.0"
-librosa = "^0.10.2.post1"
-tqdm = "^4.67.1"
-pyyaml = "^6.0.2"
+absl-py = "^1.4.0"
 ml-collections = "^0.1.1"
+tensorflow = "^2.16"
+etils = {version = "^1.5.0", extras = ["epath"]}
+imageio = "^2.5.0"
+matplotlib = "^3.6.1"
+notebook = "^7.0.4"
+librosa = "^0.10.1"
+numpy = "^1.24.0"
+usearch = "^2.15"
+tensorflow-hub = "^0.16.0"
+pandas = {version = "^2.1.1", extras=["gcp"]}
+ipywidgets = "^8.1"
+jax = {extras = ["cuda12-pip"], version = ">0.4.36, <0.4.38"}
 apache-beam = {extras = ["gpc"], version = "^2.61.0"}
-jax = {version="0.4.33"}
-etils = "^1.12.0"
-importlib-resources = "^6.5.2"
-tensorflow = "2.16.1"
-flax = "^0.10.3"
-tensorflow-hub = "^0.16.1"
-torchaudio = "^2.6.0"
+flax = "^0.10.2"
+torch = "^2.7.1"
 panel = "^1.7.2"
 seaborn = "^0.13.2"
-tensorflow-io-gcs-filesystem = "0.37.0"
-
+torchaudio = "^2.7.1"
+umap-learn = "^0.5.9.post2"
+transformers = "^4.53.1"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.5.0"]
 build-backend = "poetry.core.masonry.api"
