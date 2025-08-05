@@ -9,7 +9,7 @@
 
 # PATHS:
 # define paths for your audio data
-audio_dir :       '/mnt/swap/Work/Data/Amphibians/AnuranSet/AnuranSet'
+audio_dir :       "bacpipe/tests/test_data"
 
 #####################    PROCESS SETTINGS    ##############################
 
