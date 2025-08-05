@@ -95,6 +95,8 @@ def test_embedding_generation(model):
     embeddings[model] = get_embeddings(
         model_name=model,
         dim_reduction_model="umap",
+        check_if_primary_combination_exists=False,
+        check_if_secondary_combination_exists=False,
         audio_dir=audio_dir,
         testing=True,
     )

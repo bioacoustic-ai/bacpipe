@@ -140,13 +140,13 @@ It is recommended to use python 3.11 for this repository, as some of the models 
 
 For speed and stability it is recommended to use `uv` instead of `virtualenv` and `pip`. To install `uv` use the following command:
 
+`pip install uv` 
+
+Otherwise, `pipx` will also work: 
+
 `pipx install uv` 
 
 You can install pipx following these instructions: https://pipx.pypa.io/latest/installation/
-
-Otherwise, regular pip will also work: 
-
-`pip install uv` 
 
 (for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m pip install uv`)
 
@@ -166,7 +166,7 @@ If you prefer to use `poetry`, you can install it using:
 
 (for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m uv venv env_bacpipe`)
 
-(alternatively with virtualenv: `python3.11 -m virtualenv env_bacpipe`)
+(alternatively with `virtualenv`: `python3.11 -m virtualenv env_bacpipe`)
 
 (alternatively for `poetry` use `poetry env use 3.11`)
 
