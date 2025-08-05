@@ -9,7 +9,7 @@
 
 # PATHS:
 # define paths for your audio data
-audio_dir :       'bacpipe/tests/test_data'
+audio_dir :       '/mnt/swap/Work/Data/Amphibians/AnuranSet/AnuranSet'
 
 #####################    PROCESS SETTINGS    ##############################
 
@@ -54,7 +54,10 @@ dim_reduction_model: "umap"
 #########################################################################
 
 evaluation_task: [
+  "clustering",
+  "classification"
 ]
+
 
 
 
