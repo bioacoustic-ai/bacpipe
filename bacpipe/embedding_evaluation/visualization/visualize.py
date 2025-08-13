@@ -1104,7 +1104,7 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
         class_values = per_class_metrics[model_name].values()
 
         ax.scatter(
-            np.arange(len(all_classes)),
+            np.arange(len(class_values)),
             class_values,
             color=model_colors[i],
             label=f"{model_name.upper()} "
@@ -1113,7 +1113,7 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
         )
 
         ax.plot(
-            np.arange(len(all_classes)),
+            np.arange(len(class_values)),
             class_values,
             color=model_colors[i],
             linestyle="-",  # Solid line
