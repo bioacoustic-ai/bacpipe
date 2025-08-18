@@ -1,0 +1,37 @@
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[project]
+authors = [
+    {name = "Vincent Kather"},
+]
+requires-python = "<3.12,>=3.10"
+dependencies = [
+    "absl-py<2.0.0,>=1.4.0",
+    "ml-collections<1.0.0,>=0.1.1",
+    "tensorflow<3.0,>=2.16",
+    "etils[epath]<2.0.0,>=1.5.0",
+    "imageio<3.0.0,>=2.5.0",
+    "matplotlib<4.0.0,>=3.6.1",
+    "notebook<8.0.0,>=7.0.4",
+    "librosa<1.0.0,>=0.10.1",
+    "numpy<2.0.0,>=1.24.0",
+    "usearch<3.0,>=2.15",
+    "tensorflow-hub<1.0.0,>=0.16.0",
+    "pandas[gcp]<3.0.0,>=2.1.1",
+    "ipywidgets<9.0,>=8.1",
+    "jax[cuda12-pip]<0.4.38,>0.4.36",
+    "apache-beam[gpc]<3.0.0,>=2.61.0",
+    "flax<1.0.0,>=0.10.2",
+    "torch<3.0.0,>=2.7.1",
+    "panel<2.0.0,>=1.7.2",
+    "seaborn<1.0.0,>=0.13.2",
+    "torchaudio<3.0.0,>=2.7.1",
+    "umap-learn<1.0.0.0,>=0.5.9.post2",
+    "transformers<5.0.0,>=4.53.1",
+]
+name = "bacpipe"
+version = "0.1.0"
+description = ""
+readme = "README.md"

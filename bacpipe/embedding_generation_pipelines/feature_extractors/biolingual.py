@@ -1,9 +1,15 @@
 import torch
 from transformers import pipeline
-import librosa as lb
 from ..utils import ModelBaseClass
 import numpy as np
-from tqdm import tqdm
+import yaml
+
+
+with open("bacpipe/settings.yaml", "rb") as f:
+    settings = yaml.load(f, Loader=yaml.CLoader)
+
+DEVICE = settings["device"]
+
 
 SAMPLE_RATE = 48_000
 LENGTH_IN_SAMPLES = 480_000
@@ -14,7 +20,6 @@ BATCH_SIZE = 16
 class Model(ModelBaseClass):
     def __init__(self):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
-
         self.audio_classifier = pipeline(
             task="zero-shot-audio-classification", model="davidrrobinson/BioLingual"
         )
@@ -33,4 +38,7 @@ class Model(ModelBaseClass):
 
     @torch.inference_mode()
     def __call__(self, input):
-        return self.model(input)
+        if DEVICE == 'cuda':
+            return self.model(input.cuda())
+        else:
+            return self.model(input)
