@@ -105,9 +105,7 @@ class InferenceModel:
     #  Public API
     # ----------------------------------------------------------------------
     def forward(
-        self,
-        x: torch.Tensor,
-        padding_mask=None,
+        self, x: torch.Tensor, padding_mask=None, dont_pool=False
     ) -> torch.Tensor:  # noqa: D401 – keep signature consistent
         """Forward pass.
 
@@ -143,7 +141,9 @@ class InferenceModel:
         else:
             pooled = features.mean(dim=1)
 
-        if self._return_features_only:
+        if dont_pool:
+            return features
+        elif self._return_features_only:
             return pooled
         else:
             return self.classifier(pooled)
