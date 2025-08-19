@@ -213,6 +213,13 @@ def model_specific_evaluation(
             class_embeds = embeds_array_without_noise(embeds, ground_truth)
             for class_config in class_configs.values():
                 if class_config["bool"]:
+                    if not len(class_embeds) > 0:
+                        raise AssertionError(
+                            "No embeddings were found for classification task. "
+                            "Are you sure there are annotations for the data and the annotations.csv file "
+                            "has been correctly linked? If you didn't intent do do classification, "
+                            "simply remove it from the evaluation tasks list in the config.yaml file."
+                        )
                     classification_pipeline(
                         paths, class_embeds, **class_config, **kwargs
                     )
