@@ -6,6 +6,7 @@ bacpipe/tests/.pytest*
 .vscode
 .idea/
 config.yaml
+venv/
 
 # Ignore everything in results
 results/*
