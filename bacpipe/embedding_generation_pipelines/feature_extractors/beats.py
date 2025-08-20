@@ -1,9 +1,5 @@
 import torch
-from torch import nn
 import yaml
-from pydantic import BaseModel
-
-# from .naturelm_audio import InferenceModel
 
 from bacpipe.model_specific_utils.naturelm_audio.BEATs import BEATs, BEATsConfig
 from ..utils import ModelBaseClass
