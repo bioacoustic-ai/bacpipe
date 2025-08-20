@@ -1,0 +1,39 @@
+import torch
+from transformers import AutoFeatureExtractor, AutoModel
+
+from ..utils import ModelBaseClass
+import yaml
+
+with open("bacpipe/settings.yaml", "rb") as f:
+    settings = yaml.load(f, Loader=yaml.CLoader)
+
+DEVICE = settings["device"]
+
+SAMPLE_RATE = 32_000
+LENGTH_IN_SAMPLES = 160_000
+
+
+class Model(ModelBaseClass):
+    def __init__(self):
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+
+        self.audio_processor = AutoFeatureExtractor.from_pretrained(
+            "DBD-research-group/Bird-MAE-Base", trust_remote_code=True
+        )
+        self.model = AutoModel.from_pretrained(
+            "DBD-research-group/Bird-MAE-Huge",
+            trust_remote_code=True,
+            torch_dtype="auto",
+        )
+        self.model.eval()
+        self.model.to(DEVICE)
+
+    def preprocess(self, audio):
+        return self.audio_processor(audio).unsqueeze(1)
+
+    @torch.inference_mode()
+    def __call__(self, input):
+        if DEVICE == "cuda":
+            return self.model(input.cuda()).last_hidden_state
+        else:
+            return self.model(input).last_hidden_state
