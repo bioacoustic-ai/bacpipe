@@ -134,6 +134,11 @@ __Try it out__ and (__please__) feel free to give feedback and ask questions (or
 ---
 # Installation
 
+The provided `setup.sh` bash script attempts to automate environment setup. It ensures Python 3.11 (recommended) is available (prompting to install it on macOS/Linux if missing), creates a virtual environment, installs dependencies and bacpipe, and can optionally add a Jupyter kernel. Manual setup instructions are as follows:
+
+<details>
+<summary>Click to see manual installation details</summary>
+
 ### Install `uv` (recommended) or `virtualenv` or `poetry'
 
 It is recommended to use python 3.11 for this repository, as some of the models require it. 
@@ -210,6 +215,8 @@ If you do not have admin rights and encounter a `permission denied` error when u
 
 Download the ones that are available from [here](https://github.com/bioacoustic-ai/bacpipe/tree/main/bacpipe/pipelines) and create directories corresponding to the pipeline-names and place the checkpoints within them. 
 
+</details>
+
 ## Test the installation was successfull
 
 By doing so you will also ensure that the directory structure for the model checkpoints will be created.
@@ -233,7 +240,6 @@ For non-windows users:
 `uv pip install fairseq==0.12.2`
 
 - if you're not using `uv`, you'll need to ensure you have `pip` version 24.0 (`pip install pip==24.0`, omegaconf 2.0.6 has a non-standard dependency specifier PyYAML>=5.1.*. pip 24.1 will enforce this behaviour change and installation will thus fail. For Windows `env_bacpipe\Scripts\python.exe -m pip install pip==24.0`)
-
 
 ---
 
