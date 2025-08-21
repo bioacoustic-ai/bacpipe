@@ -1,7 +1,7 @@
 import torch
 import yaml
 
-from bacpipe.model_specific_utils.naturelm_audio.BEATs import BEATs, BEATsConfig
+from bacpipe.model_specific_utils.naturebeats.BEATs import BEATs, BEATsConfig
 from ..utils import ModelBaseClass
 
 SAMPLE_RATE = 16_000
@@ -12,7 +12,7 @@ with open("bacpipe/settings.yaml", "r") as f:
 DEVICE = settings["device"]
 
 BEATS_PRETRAINED_PATH_FT = (
-    "bacpipe/model_checkpoints/naturelm_audio/BEATs_iter1_finetuned_on_AS2M_cpt1.pt"
+    "bacpipe/model_checkpoints/naturebeats/BEATs_iter1_finetuned_on_AS2M_cpt1.pt"
 )
 
 

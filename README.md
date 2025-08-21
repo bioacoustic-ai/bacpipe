@@ -317,7 +317,7 @@ Models currently include:
 |   Insect66NET |   [paper](https://doi.org/10.1371/journal.pcbi.1011541)   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   44.1 kHz|   5.5 s| 1280 |
 |   Insect459NET |   [paper](https://arxiv.org/pdf/2503.15074)   |   pending    |   44.1 kHz|   5.5 s| 1280 |
 |   Mix2        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   16 kHz|   3 s| 960 |
-|   NatureLM_Audio        |   [paper](https://arxiv.org/abs/2411.07186)   |   [code](https://github.com/earthspecies/NatureLM-audio)    |   16 kHz|   10 s| 768 |
+|   NatureBEATs        |   [paper](https://arxiv.org/abs/2411.07186)   |   [code](https://github.com/earthspecies/NatureLM-audio)    |   16 kHz|   10 s| 768 |
 |   NonBioAVES_ESpecies    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 768 |
 |   Perch_Bird       |   [paper](https://www.nature.com/articles/s41598-023-49989-z.epdf)   |   [code](https://github.com/google-research/perch)    |   32 kHz|   5 s| 1280 |
 |   ProtoCLR     |   [paper](https://arxiv.org/pdf/2409.08589)   |   [code](https://github.com/ilyassmoummad/ProtoCLR)    |   16 kHz|   6 s| 384 |
@@ -346,7 +346,7 @@ Models currently include:
 |   [Insect66NET](#insect66net) |   paper   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   sup l|   CNN | EffNetv2s | [weights](https://gitlab.com/arise-biodiversity/DSI/algorithms/cricket-cicada-detector-capgemini/-/blob/main/src/model_traced.pt?ref_type=heads)|
 |   [Insect459NET](#insect459net) |   paper   |   pending    |   sup l|   CNN | EffNetv2s | pending |
 |   [Mix2](#mix2)        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   sup l|   CNN| MobNetv3 | release pending|
-|   [NatureLM_Audio](#naturelm_audio)        |   [paper](https://arxiv.org/abs/2411.07186)   |   [code](https://github.com/earthspecies/NatureLM-audio)    | ssl | trafo | BEATs | [weights](https://drive.google.com/file/d/12BrWRbxJsuwZHOkzX8HEpGgSMy5VnwCp/view?usp=sharing) |
+|   [NatureBEATs](#naturebeats)        |   [paper](https://arxiv.org/abs/2411.07186)   |   [code](https://github.com/earthspecies/NatureLM-audio)    | ssl | trafo | BEATs | [weights](https://drive.google.com/file/d/12BrWRbxJsuwZHOkzX8HEpGgSMy5VnwCp/view?usp=sharing) |
 |   [Perch_Bird](#perch_bird)       |   [paper](https://www.nature.com/articles/s41598-023-49989-z.epdf)   |   [code](https://github.com/google-research/perch)    |   sup l|   CNN| EffNetb0 | included |
 |   [ProtoCLR](#protoclr)     |   [paper](https://arxiv.org/pdf/2409.08589)   |   [code](https://github.com/ilyassmoummad/ProtoCLR)    |   sup cl|   trafo| CvT-13 | [weights](https://huggingface.co/ilyassmoummad/ProtoCLR)|
 |   [RCL_FS_BSED](#rcl_fs_bsed)     |   [paper](https://arxiv.org/abs/2309.08971)   |   [code](https://github.com/ilyassmoummad/RCL_FS_BSED)    |   sup cl|   CNN| ResNet9 | [weights](https://zenodo.org/records/11353694)|
@@ -471,12 +471,12 @@ InsectNET459 is a [EfficientNet v2 s](https://pytorch.org/vision/main/models/gen
 
 Mix2 is a [MobileNet v3](https://github.com/pytorch/vision/blob/main/torchvision/models/mobilenetv3.py) model trained on the [AnuranSet](https://github.com/soundclim/anuraset) which includes sounds of 42 different species of frogs from different regions in Brazil. The model was trained using a mixture of Mixup augmentations to handle the class imbalance of the data.
 
-### NatureLM_Audio
+### NatureBEATs
 - trafo
 - self-supervised training model
 - trained on diverse set of bioacoustics, general sound, music, human speech
 
-NatureLM-Audio is a very ambitious foundational model specifically for bioacoustics. It uses Microsoft's BEATs backbone as an audio encoder along with Meta's Llama-3.1-8B large language model capabilities. In the implementation used here in bacpipe, only the support for BEATs audio-encoder with NatureLM-Audio's weights is provided. 
+NatureLM-Audio is a very ambitious foundational model specifically for bioacoustics. It uses Microsoft's BEATs backbone as an audio encoder along with Meta's Llama-3.1-8B large language model capabilities. In the implementation used here in bacpipe, only the support for BEATs audio-encoder with NatureLM-Audio's weights, referred to here as NatureBEATs, is provided. 
 
 ### RCL_FS_BSED
 - CNN

@@ -12,11 +12,9 @@ with open("bacpipe/settings.yaml", "r") as f:
 DEVICE = settings["device"]
 
 BEATS_PRETRAINED_PATH_SSL = (
-    "bacpipe/model_checkpoints/naturelm_audio/BEATs_iter3_plus_AS2M.pt"
+    "bacpipe/model_checkpoints/naturebeats/BEATs_iter3_plus_AS2M.pt"
 )
-BEATS_PRETRAINED_PATH_NATURELM = (
-    "bacpipe/model_checkpoints/naturelm_audio/naturebeats.pt"
-)
+BEATS_PRETRAINED_PATH_NATURELM = "bacpipe/model_checkpoints/naturebeats/naturebeats.pt"
 
 
 class Model(ModelBaseClass):
