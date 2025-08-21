@@ -65,28 +65,28 @@ fi
 
 # Create venv (idempotent)
 if command -v uv >/dev/null 2>&1; then
-say "Creating venv with uv (Python 3.11)"
-python3.11 -m uv venv "$ENV_DIR"
+  say "Creating venv with uv (Python 3.11)"
+  python3.11 -m uv venv "$ENV_DIR"
 elif command -v venv >/dev/null 2>&1; then
-say "Creating venv with venv (Python 3.11)"
-python3.11 -m venv "$ENV_DIR"
+  say "Creating venv with venv (Python 3.11)"
+  python3.11 -m venv "$ENV_DIR"
 elif [ "${USE_CONDA:-0}" = "1" ]; then
-say "Creating venv with conda (Python 3.11)"
-PY_BOOT_ENV="${PY_BOOT_ENV:-py311}"
-conda run -n "$PY_BOOT_ENV" python -V >/dev/null 2>&1 || conda create -y -n "$PY_BOOT_ENV" python=3.11
-PY311=$(conda run -n "$PY_BOOT_ENV" python -c "import sys,shlex; print(shlex.quote(sys.executable))")
-conda run -n "$PY_BOOT_ENV" "$PY311" -m venv "$ENV_DIR"
+  say "Creating venv with conda (Python 3.11)"
+  PY_BOOT_ENV="${PY_BOOT_ENV:-py311}"
+  conda run -n "$PY_BOOT_ENV" python -V >/dev/null 2>&1 || conda create -y -n "$PY_BOOT_ENV" python=3.11
+  PY311=$(conda run -n "$PY_BOOT_ENV" python -c "import sys,shlex; print(shlex.quote(sys.executable))")
+  conda run -n "$PY_BOOT_ENV" "$PY311" -m venv "$ENV_DIR"
 else
-say "Creating venv with python3.11 built-in venv"
-python3.11 -m venv "$ENV_DIR"
+  say "Creating venv with python3.11 built-in venv"
+  python3.11 -m venv "$ENV_DIR"
 fi
 
 VENV_PY="$ENV_DIR/bin/python"
 
 # check for pip
 if ! "$VENV_PY" -m pip --version >/dev/null 2>&1; then
-    say "no pip found in venv, bootstrapping with ensurepip"
-    "$VENV_PY" -m ensurepip --upgrade
+  say "no pip found in venv, bootstrapping with ensurepip"
+  "$VENV_PY" -m ensurepip --upgrade
 fi
 
 say "seed build tools + numpy in venv"
@@ -104,6 +104,7 @@ else
   case "$UNAME_OUT" in
     Linux*)   REQS_FILE="requirements.txt";;
     Darwin*)  REQS_FILE="requirements_mac.txt";;
+    CYGWIN*|MINGW*|MSYS*|Windows_NT*) REQS_FILE="requirements_windows.txt";;
     *)        REQS_FILE="requirements.txt";;
   esac
 fi
