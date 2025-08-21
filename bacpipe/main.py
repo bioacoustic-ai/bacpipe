@@ -120,7 +120,9 @@ def evaluation_with_settings_already_exists(
         else:
             bool_dim_reducs = [
                 True
-                for d in paths.dim_reduc_parent_dir.rglob(f"*{dim_reduction_model}*")
+                for d in paths.dim_reduc_parent_dir.rglob(
+                    f"*{dim_reduction_model}*{model_name}*"
+                )
             ]
             bool_dim_reducs = len(bool_dim_reducs) > 0 and all(bool_dim_reducs)
         if not bool_dim_reducs:
