@@ -412,7 +412,7 @@ def load_labels_and_build_dict(
         label_df = pd.read_csv(Path(audio_dir).joinpath(label_file))
     except FileNotFoundError as e:
         logger.warning(
-            "No annotations file found, not able to create ground_truth.npy file."
+            "No annotations file found, not able to create ground_truth.npy file. "
             "bacpipe should still work, but you will not be able to label by ground truth. "
             "You also will not be able to evaluate using classification."
         )
@@ -627,9 +627,12 @@ def generate_annotations_for_classification_task(paths):
         tr_ar = ar[: int(l * 0.65)]
         te_ar = ar[int(l * 0.65) : int(l * 0.85)]
         va_ar = ar[int(l * 0.85) :]
+        if not all([tr_ar, te_ar, va_ar]):
+            continue
         df.loc[tr_ar, "predefined_set"] = "train"
         df.loc[te_ar, "predefined_set"] = "test"
         df.loc[va_ar, "predefined_set"] = "val"
+    df = df[df.predefined_set.isin(["train", "val", "test"])]
     df.to_csv(
         paths.labels_path.joinpath("classification_dataframe.csv"),
         index=False,
