@@ -24,8 +24,11 @@ class ModelBaseClass:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+        self.bool_classifier = True
+        self.classifier_outputs = torch.tensor([])
         self.device = DEVICE
         self.model_base_path = MODEL_BASE_PATH
+        self.classification_threshold = 0.1
         self.sr = sr
         self.segment_length = segment_length
         if segment_length:
@@ -89,7 +92,13 @@ class ModelBaseClass:
             batched_samples, desc=" processing batches", position=0, leave=False
         ):
             with torch.no_grad():
-                embedding = self.__call__(batch)
+                if self.bool_classifier:
+                    embedding, cls_vals = self.__call__(batch)
+                    self.classifier_outputs = torch.cat(
+                        [self.classifier_outputs, torch.tensor(cls_vals)]
+                    )
+                else:
+                    embedding = self.__call__(batch)
             if isinstance(embedding, torch.Tensor) and embedding.dim() == 1:
                 embedding = embedding.unsqueeze(0)
             embeds.append(embedding)
@@ -100,3 +109,18 @@ class ModelBaseClass:
 
             return_embeds = tf.concat(embeds, axis=0).numpy().squeeze()
             return return_embeds
+
+    def filter_classifier_predictions(self, cls_vals):
+        if not isinstance(self.classes, np.ndarray):
+            self.classes = np.array(self.classes)
+
+        bool_exceeding_threshold = np.where(cls_vals > self.classification_threshold)[1]
+        classes_exceeding_thresh = np.unique(self.classes[bool_exceeding_threshold])
+
+        cls_results = {
+            k: cls_vals[:, idx]
+            for idx, k in enumerate(self.classes)
+            if k in classes_exceeding_thresh
+        }
+
+        return cls_results

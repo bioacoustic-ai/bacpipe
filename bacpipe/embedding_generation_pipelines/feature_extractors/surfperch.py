@@ -9,3 +9,4 @@ class Model(Model):
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGH_IN_SAMPLES, model_choice="surfperch"
         )
+        self.class_labels = "reef_label"

@@ -413,6 +413,8 @@ def generate_embeddings(**kwargs):
                         continue
                     ld.write_audio_file_to_metadata(idx, file, embed, embeddings)
                     embed.save_embeddings(idx, ld, file, embeddings)
+                    if embed.model.bool_classifier:
+                        embed.save_classification_outputs()
                 else:
                     if idx == 0:
                         embeddings = ld.embed_read(idx, file)
