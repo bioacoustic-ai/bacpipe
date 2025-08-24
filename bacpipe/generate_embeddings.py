@@ -319,11 +319,15 @@ class Loader:
 
 
 class Embedder:
-    def __init__(self, model_name, dim_reduction_model=False, testing=False, **kwargs):
+    def __init__(
+        self, model_name, dim_reduction_model=False, paths=None, testing=False, **kwargs
+    ):
         import yaml
 
         with open("bacpipe/settings.yaml", "rb") as f:
             self.config = yaml.load(f, Loader=yaml.CLoader)
+
+        self.paths = paths
 
         if testing:
             self.config["main_results_dir"] = "bacpipe/tests/results_files"
@@ -411,6 +415,22 @@ class Embedder:
             if len(embeds.shape) == 1:
                 embeds = np.expand_dims(embeds, axis=0)
             np.save(file_dest, embeds)
+
+    def save_classifier_outputs(self, fileloader_obj, file):
+        relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
+        results_path = self.paths.class_path.joinpath(
+            "original_classifier_outputs"
+        ).joinpath(relative_parent_path)
+        results_path.mkdir(exist_ok=True, parents=True)
+        file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
+        file_dest = str(file_dest) + ".json"
+        cls_results = {
+            k: v.numpy().tolist()
+            for k, v in zip(self.model.classes, self.model.classifier_outputs)
+        }
+
+        with open(file_dest, "w") as f:
+            json.dump(cls_results, f)
 
 
 def save_embeddings_dict_with_timestamps(

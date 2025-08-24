@@ -326,16 +326,18 @@ def get_embeddings(
     testing=False,
     **kwargs,
 ):
+    global get_paths
+    get_paths = make_set_paths_func(audio_dir, testing=testing, **kwargs)
+    paths = get_paths(model_name)
+
     loader_embeddings = generate_embeddings(
         model_name=model_name,
         audio_dir=audio_dir,
         check_if_combination_exists=check_if_primary_combination_exists,
+        paths=paths,
         testing=testing,
         **kwargs,
     )
-    global get_paths
-    get_paths = make_set_paths_func(audio_dir, testing=testing, **kwargs)
-    paths = get_paths(model_name)
 
     if not dim_reduction_model == "None":
 
@@ -414,7 +416,7 @@ def generate_embeddings(**kwargs):
                     ld.write_audio_file_to_metadata(idx, file, embed, embeddings)
                     embed.save_embeddings(idx, ld, file, embeddings)
                     if embed.model.bool_classifier:
-                        embed.save_classification_outputs()
+                        embed.save_classifier_outputs(ld, file)
                 else:
                     if idx == 0:
                         embeddings = ld.embed_read(idx, file)
