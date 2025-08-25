@@ -8,7 +8,10 @@ import logging
 
 logger = logging.getLogger("bacpipe")
 
-with open("bacpipe/settings.yaml", "rb") as f:
+import importlib.resources as pkg_resources
+import bacpipe
+
+with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
     settings = yaml.load(f, Loader=yaml.CLoader)
 
 MODEL_BASE_PATH = settings["model_base_path"]
@@ -18,8 +21,7 @@ DEVICE = settings["device"]
 
 class ModelBaseClass:
     def __init__(self, sr, segment_length, **kwargs):
-        with open("bacpipe/settings.yaml", "rb") as f:
-            self.config = yaml.load(f, Loader=yaml.CLoader)
+        self.config = settings
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -67,8 +69,9 @@ class ModelBaseClass:
     def window_audio(self, audio):
         num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
         padded_audio = lb.util.fix_length(
-            audio, size=int(num_frames * self.segment_length), mode="reflect"
+            audio, size=int(num_frames * self.segment_length), mode=settings["padding"]
         )
+        logger.debug(f"{settings['padding']} was used on an audio segment.")
         frames = padded_audio.reshape([num_frames, self.segment_length])
         if not isinstance(frames, torch.Tensor):
             frames = torch.tensor(frames)

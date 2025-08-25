@@ -57,7 +57,10 @@ class Loader:
             )
 
     def initialize_path_structure(self, testing=False):
-        with open("bacpipe/settings.yaml", "r") as f:
+        import importlib.resources as pkg_resources
+        import bacpipe
+
+        with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
             self.config = yaml.load(f, Loader=yaml.CLoader)
 
         if testing:
@@ -324,7 +327,7 @@ class Embedder:
     ):
         import yaml
 
-        with open("bacpipe/settings.yaml", "rb") as f:
+        with open(Path(__file__).parent / "settings.yaml", "rb") as f:
             self.config = yaml.load(f, Loader=yaml.CLoader)
 
         self.paths = paths

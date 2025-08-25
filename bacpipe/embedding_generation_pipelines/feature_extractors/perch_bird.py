@@ -9,12 +9,12 @@ import numpy as np
 from ..utils import ModelBaseClass
 
 SAMPLE_RATE = 32000
-LENGH_IN_SAMPLES = 160000
+LENGTH_IN_SAMPLES = 160000
 
 
 class Model(ModelBaseClass):
     def __init__(
-        self, model_choice="perch_8", sr=SAMPLE_RATE, segment_length=LENGH_IN_SAMPLES
+        self, model_choice="perch_8", sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES
     ):
         super().__init__(sr=sr, segment_length=segment_length)
 

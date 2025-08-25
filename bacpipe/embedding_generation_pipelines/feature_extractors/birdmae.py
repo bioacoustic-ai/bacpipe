@@ -1,10 +1,13 @@
+import importlib.resources as pkg_resources
 import torch
-from transformers import AutoFeatureExtractor, AutoModel
-
-from ..utils import ModelBaseClass
 import yaml
 
-with open("bacpipe/settings.yaml", "rb") as f:
+
+import bacpipe
+from transformers import AutoFeatureExtractor, AutoModel
+from ..utils import ModelBaseClass
+
+with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
     settings = yaml.load(f, Loader=yaml.CLoader)
 
 DEVICE = settings["device"]

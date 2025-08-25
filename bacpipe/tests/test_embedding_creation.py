@@ -6,14 +6,16 @@ from bacpipe.generate_embeddings import Loader, Embedder
 import numpy as np
 from pathlib import Path
 
+import importlib.resources as pkg_resources
+import bacpipe
 
 # INITIALIZATION
 # Find all models in the pipelines directory
 models = [  # "avesecho_passt"]
     mod.stem
-    for mod in Path("bacpipe/embedding_generation_pipelines/feature_extractors").glob(
-        "*.py"
-    )
+    for mod in Path(
+        bacpipe.PACKAGE_ROOT / "embedding_generation_pipelines/feature_extractors"
+    ).glob("*.py")
 ]
 
 # Only test models whos checkpoints have been downloaded

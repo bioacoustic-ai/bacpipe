@@ -1,13 +1,16 @@
+import importlib.resources as pkg_resources
 import torch
 import yaml
 
+import bacpipe
 from bacpipe.model_specific_utils.naturebeats.BEATs import BEATs, BEATsConfig
 from ..utils import ModelBaseClass
 
+
 SAMPLE_RATE = 16_000
 LENGTH_IN_SAMPLES = int(5 * SAMPLE_RATE)
-with open("bacpipe/settings.yaml", "r") as f:
-    settings = yaml.safe_load(f)
+with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
+    settings = yaml.load(f, Loader=yaml.CLoader)
 
 DEVICE = settings["device"]
 

@@ -1,14 +1,20 @@
-from fairseq import checkpoint_utils
+import importlib.resources as pkg_resources
+
 import numpy as np
 import torch
+import yaml
+
+import bacpipe
 from bacpipe.model_specific_utils.animal2vec_nn.nn import chunk_and_normalize
 from ..utils import ModelBaseClass
-import yaml
+
+from fairseq import checkpoint_utils
 
 SAMPLE_RATE = 8000
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
-with open("bacpipe/settings.yaml", "r") as f:
-    settings = yaml.safe_load(f)
+
+with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
+    settings = yaml.load(f, Loader=yaml.CLoader)
 
 
 class Model(ModelBaseClass):
