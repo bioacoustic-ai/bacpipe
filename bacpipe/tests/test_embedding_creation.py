@@ -14,7 +14,7 @@ import bacpipe
 models = [  # "avesecho_passt"]
     mod.stem
     for mod in Path(
-        bacpipe.PACKAGE_ROOT / "embedding_generation_pipelines/feature_extractors"
+        bacpipe.PACKAGE_MAIN / "embedding_generation_pipelines/feature_extractors"
     ).glob("*.py")
 ]
 

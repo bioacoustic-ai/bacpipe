@@ -170,7 +170,7 @@ def make_set_paths_func(
 ):
     if testing:
         main_results_dir = Path("bacpipe/tests/results_files")
-        dim_reduc_parent_dir = "dimensionality_reduction"
+        dim_reduc_parent_dir = "dim_reduced_embeddings"
     global get_paths
 
     def get_paths(model_name):

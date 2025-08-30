@@ -12,7 +12,7 @@ from bacpipe.main import (
     visualize_using_dashboard,
 )
 
-with pkg_resources.open_text(bacpipe, "config.yaml") as f:
+with open(bacpipe.PACKAGE_ROOT / "config.yaml") as f:
     config = yaml.load(f, Loader=yaml.CLoader)
 
 with pkg_resources.open_text(bacpipe, "settings.yaml") as f:

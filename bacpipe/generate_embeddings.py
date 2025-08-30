@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 import yaml
 import time
-from tqdm import tqdm
+import torch
 import logging
 import importlib
 import json
@@ -87,6 +87,8 @@ class Loader:
                 existing_embed_dirs = Path(self.dim_reduc_parent_dir).iterdir()
             else:
                 existing_embed_dirs = Path(self.embed_parent_dir).iterdir()
+                if self.testing:
+                    return
             existing_embed_dirs = list(existing_embed_dirs)
             if isinstance(self.check_if_combination_exists, str):
                 existing_embed_dirs = [
@@ -332,8 +334,8 @@ class Embedder:
 
         self.paths = paths
 
-        if testing:
-            self.config["main_results_dir"] = "bacpipe/tests/results_files"
+        # if testing:
+        #     self.config["main_results_dir"] = "bacpipe/tests/results_files"
 
         self.dim_reduction_model = dim_reduction_model
         if dim_reduction_model:
@@ -427,6 +429,8 @@ class Embedder:
         results_path.mkdir(exist_ok=True, parents=True)
         file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
         file_dest = str(file_dest) + ".json"
+        if self.model.classifier_outputs.shape[0] != len(self.model.classes):
+            self.model.classifier_outputs = self.model.classifier_outputs.swapaxes(0, 1)
         cls_results = {
             k: v.numpy().tolist()
             for k, v in zip(self.model.classes, self.model.classifier_outputs)
@@ -434,6 +438,7 @@ class Embedder:
 
         with open(file_dest, "w") as f:
             json.dump(cls_results, f)
+        self.model.classifier_outputs = torch.tensor([])
 
 
 def save_embeddings_dict_with_timestamps(

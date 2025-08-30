@@ -5,6 +5,7 @@ import torchaudio as ta
 import torch
 from tqdm import tqdm
 import logging
+from pathlib import Path
 
 logger = logging.getLogger("bacpipe")
 
@@ -14,7 +15,7 @@ import bacpipe
 with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
     settings = yaml.load(f, Loader=yaml.CLoader)
 
-MODEL_BASE_PATH = settings["model_base_path"]
+MODEL_BASE_PATH = bacpipe.PACKAGE_ROOT / settings["model_base_path"]
 GLOBAL_BATCH_SIZE = settings["global_batch_size"]
 DEVICE = settings["device"]
 
