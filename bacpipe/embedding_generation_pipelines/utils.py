@@ -27,7 +27,10 @@ class ModelBaseClass:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        self.bool_classifier = True
+        if hasattr(self, "classifier_predictions"):
+            self.bool_classifier = True
+        else:
+            self.bool_classifier = False
         self.classifier_outputs = torch.tensor([])
         self.device = DEVICE
         self.model_base_path = MODEL_BASE_PATH

@@ -36,7 +36,4 @@ class Model(ModelBaseClass):
 
     @torch.inference_mode()
     def __call__(self, input):
-        if DEVICE == "cuda":
-            return self.model(input.cuda()).last_hidden_state
-        else:
-            return self.model(input).last_hidden_state
+        return self.model(input).last_hidden_state
