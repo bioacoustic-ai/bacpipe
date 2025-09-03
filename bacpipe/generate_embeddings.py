@@ -381,7 +381,6 @@ class Embedder:
             try:
                 embeds = embeds.numpy()
             except:
-                print(type(embeds))
                 try:
                     embeds = embeds.detach().numpy()
                 except:
