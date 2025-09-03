@@ -56,6 +56,12 @@ default_label_keys: [
 
 ## CLASSIFICATION SETTINGS ##
 
+# if the model has a classifier that ships with the model, by default 
+# it will be used, to provide another option to colorcode embeddings
+# and visualize differences between embeddings. 
+run_pretrained_classifer: True
+classifier_threshold: 0.3
+
 class_configs:
   config_1:
     bool: True
@@ -116,3 +122,6 @@ main_results_dir :      "results"
 embed_parent_dir :      "embeddings"
 dim_reduc_parent_dir :  "dim_reduced_embeddings"
 evaluations_dir :       "evaluations"
+
+
+testing: False

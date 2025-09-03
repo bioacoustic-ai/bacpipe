@@ -4,7 +4,7 @@ from bacpipe.model_specific_utils.perch_chirp.chirp.projects.zoo.models import (
     get_preset_model_config,
 )
 import tensorflow as tf
-import numpy as np
+import pandas as pd
 
 from ..utils import ModelBaseClass
 
@@ -37,7 +37,20 @@ class Model(ModelBaseClass):
         self.class_list = embed_fn.embedding_model.class_list
         self.class_label_key = "label"
         if not model_choice == "multispecies_whale":
+            self.ebird2name = pd.read_csv(
+                "bacpipe/model_specific_utils/perch_chirp/chirp/eBird2name.csv"
+            )
             self.classes = self.class_list[self.class_label_key].classes
+            self.classes = [
+                (
+                    self.ebird2name["English name"][
+                        self.ebird2name.species_code == cls
+                    ].iloc[0]
+                    if cls in self.ebird2name.species_code.values
+                    else cls
+                )
+                for cls in self.classes
+            ]
 
     def preprocess(self, audio):
         audio = audio.cpu()

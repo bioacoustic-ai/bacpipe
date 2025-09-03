@@ -325,7 +325,13 @@ class Loader:
 
 class Embedder:
     def __init__(
-        self, model_name, dim_reduction_model=False, paths=None, testing=False, **kwargs
+        self,
+        model_name,
+        dim_reduction_model=False,
+        paths=None,
+        testing=False,
+        classifier_threshold=None,
+        **kwargs,
     ):
         import yaml
 
@@ -334,8 +340,11 @@ class Embedder:
 
         self.paths = paths
 
-        # if testing:
-        #     self.config["main_results_dir"] = "bacpipe/tests/results_files"
+        if classifier_threshold:
+            self.classifier_threshold = classifier_threshold
+
+        if testing:
+            self.config["main_results_dir"] = "bacpipe/tests/results_files"
 
         self.dim_reduction_model = dim_reduction_model
         if dim_reduction_model:
@@ -431,9 +440,27 @@ class Embedder:
         file_dest = str(file_dest) + ".json"
         if self.model.classifier_outputs.shape[0] != len(self.model.classes):
             self.model.classifier_outputs = self.model.classifier_outputs.swapaxes(0, 1)
+
+        tmp_bins = self.model.classifier_outputs.shape[-1]
+        cls_idx, tmp_idx = np.where(
+            self.model.classifier_outputs > self.classifier_threshold
+        )
+
         cls_results = {
-            k: v.numpy().tolist()
-            for k, v in zip(self.model.classes, self.model.classifier_outputs)
+            self.model.classes[k]: {
+                "time_bins_exceeding_threshold": tmp_idx[cls_idx == k].tolist(),
+                "classifier_predictions": self.model.classifier_outputs[
+                    cls_idx[cls_idx == k], tmp_idx[cls_idx == k]
+                ]
+                .numpy()
+                .tolist(),
+            }
+            for k in cls_idx
+        }
+
+        cls_results["head"] = {
+            "Time bins in this file": tmp_bins,
+            "Threshold for classifier predictions": self.classifier_threshold,
         }
 
         with open(file_dest, "w") as f:
