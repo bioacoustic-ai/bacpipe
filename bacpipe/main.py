@@ -416,7 +416,7 @@ def generate_embeddings(**kwargs):
                 dim_reduced_embeddings = embed.get_embeddings_from_model(embeddings)
                 embed.save_embeddings(idx, ld, file, dim_reduced_embeddings)
 
-            elif embed.model.DEVICE == "cuda":
+            elif embed.model.device == "cuda":
                 # (2) GPU path → pipelined embedding (better throughput)
                 embed.get_pipelined_embeddings_from_model(ld)
 
