@@ -32,7 +32,8 @@ class Model(ModelBaseClass):
         self.model.to(DEVICE)
 
     def preprocess(self, audio):
-        return self.audio_processor(audio).unsqueeze(1)
+        processed_audio = self.audio_processor(audio).unsqueeze(1)
+        return processed_audio.to(DEVICE)
 
     @torch.inference_mode()
     def __call__(self, input):

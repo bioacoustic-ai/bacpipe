@@ -37,6 +37,7 @@ class Model(ModelBaseClass):
 
         self.beats.model.load_state_dict(beats_ckpt_naturelm, strict=True)
         self.beats.model.eval()
+        self.beats.model.to(DEVICE)
 
     def preprocess(self, audio):
         audio = torch.clamp(audio, -1.0, 1.0)

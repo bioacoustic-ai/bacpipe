@@ -68,7 +68,7 @@ class ModelBaseClass:
             logger.debug(f"Audio file {path} is empty. " f"Skipping {path}.")
             raise ValueError(f"Audio file {path} is empty.")
         re_audio = ta.functional.resample(audio, sr, self.sr)
-        return re_audio
+        return re_audio.to(self.config["device"])
 
     def window_audio(self, audio):
         num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
