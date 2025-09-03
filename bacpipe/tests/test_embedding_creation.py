@@ -100,6 +100,7 @@ def test_embedding_generation(model):
         check_if_primary_combination_exists=False,
         check_if_secondary_combination_exists=False,
         audio_dir=audio_dir,
+        classifier_threshold=0.3,
         testing=True,
     )
     assert embeddings[model].files is not None and len(embeddings[model].files) > 0

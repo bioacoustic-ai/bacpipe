@@ -23,6 +23,7 @@ The below image shows a comparison of umap embeddings based on 15 different bioa
 - [Contribute](#contribute)
 - [Known issues](#known-issues)
 - [Citation](#citation)
+- [Newsletter and Q&A sessions](#newsletter-and-qa-sessions)
 
 
 ---
@@ -624,3 +625,6 @@ This work is first described in a conference paper. If you use **bacpipe** for y
 ```
 
 
+# Newsletter and Q&A sessions
+
+Reading from the traffic on the repository, there seems to be an interest in bacpipe. I have set up a newsletter under this link: https://buttondown.com/vskode. Once more than 30 people have signed up for the newsletter, I will schedule a Q&A session and post the link in the newsletter. Hopefully I can then help answer questions and address issues that people are running into. 
