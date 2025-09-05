@@ -391,8 +391,7 @@ AudioMAE from the facebook research group is a vision transformer pretrained on 
 - ConvNext architecture
 - trained on the xeno-canto large section of BirdSet
 
-This CNN is trained in two phases. The main contribution of this model is its interpretability. Tt learns prototypes in the second training phase which can be used during inference time to visualize sections of the spectrogam that were most important for classification.
-The (include) classifier can distinguish 9736 classes. 
+This CNN is trained in two phases. The main contribution of this model is its interpretability. It learned prototypes during its second training phase which can be used during inference time to visualize sections of the spectrogram that were most important for classification. It also reaches competitive performance on bird classification tasks. The (include) classifier can distinguish 9736 classes. 
 
 ### AvesEcho_PaSST
 - transformer
