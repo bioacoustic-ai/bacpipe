@@ -9,8 +9,12 @@ from bacpipe.embedding_evaluation.clustering.cluster import clustering
 import numpy as np
 import yaml
 
-with open("bacpipe/settings.yaml", "r") as f:
-    settings = yaml.safe_load(f)
+import importlib.resources as pkg_resources
+import bacpipe
+
+with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
+    settings = yaml.load(f, Loader=yaml.CLoader)
+
 
 settings["overwrite"] = True
 

@@ -1,10 +1,13 @@
+import importlib.resources as pkg_resources
 import torch
-from transformers import AutoFeatureExtractor, AutoModel
-
-from ..utils import ModelBaseClass
 import yaml
 
-with open("bacpipe/settings.yaml", "rb") as f:
+
+import bacpipe
+from transformers import AutoFeatureExtractor, AutoModel
+from ..utils import ModelBaseClass
+
+with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
     settings = yaml.load(f, Loader=yaml.CLoader)
 
 DEVICE = settings["device"]
@@ -29,11 +32,9 @@ class Model(ModelBaseClass):
         self.model.to(DEVICE)
 
     def preprocess(self, audio):
-        return self.audio_processor(audio).unsqueeze(1)
+        processed_audio = self.audio_processor(audio).unsqueeze(1)
+        return processed_audio.to(DEVICE)
 
     @torch.inference_mode()
     def __call__(self, input):
-        if DEVICE == "cuda":
-            return self.model(input.cuda()).last_hidden_state
-        else:
-            return self.model(input).last_hidden_state
+        return self.model(input).last_hidden_state

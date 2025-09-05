@@ -1,6 +1,8 @@
 import yaml
 from pathlib import Path
+import importlib.resources as pkg_resources
 
+import bacpipe
 from bacpipe.main import (
     get_model_names,
     evaluation_with_settings_already_exists,
@@ -10,12 +12,11 @@ from bacpipe.main import (
     visualize_using_dashboard,
 )
 
-
-with open("config.yaml", "r", encoding="utf-8") as f:
+with open(bacpipe.PACKAGE_ROOT / "config.yaml") as f:
     config = yaml.load(f, Loader=yaml.CLoader)
 
-with open("bacpipe/settings.yaml", "r", encoding="utf-8") as p:
-    settings = yaml.load(p, Loader=yaml.CLoader)
+with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
+    settings = yaml.load(f, Loader=yaml.CLoader)
 
 overwrite, dashboard = config["overwrite"], config["dashboard"]
 

@@ -5,12 +5,12 @@ import tensorflow as tf
 
 
 SAMPLE_RATE = 16000
-LENGH_IN_SAMPLES = int(0.96 * SAMPLE_RATE)
+LENGTH_IN_SAMPLES = int(0.96 * SAMPLE_RATE)
 
 
 class Model(ModelBaseClass):
     def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGH_IN_SAMPLES)
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         self.model = hub.load(self.model_base_path + "/vggish")
 
     def preprocess(self, audio):

@@ -23,6 +23,12 @@ audio_suffixes: ['.wav', '.WAV', '.aif', '.mp3', '.MP3', '.flac', '.ogg']
 # Set to False if you want to keep embeddings even if the process is interrupted.
 rm_embedding_on_keyboard_interrupt: True
 
+# When audio get's imported and windowed, the last frame might
+# end up not being long enough to fit a full context window, as a 
+# result the frame get's padded. Specify how it should get padded.
+# Choose values from the np.pad function documentation
+# (https://numpy.org/devdocs/reference/generated/numpy.pad.html).
+padding: 'wrap'
 
 ######################################################
 ###############   EVALUATION SETTINGS ################
@@ -49,6 +55,12 @@ default_label_keys: [
 
 
 ## CLASSIFICATION SETTINGS ##
+
+# if the model has a classifier that ships with the model, by default 
+# it will be used, to provide another option to colorcode embeddings
+# and visualize differences between embeddings. 
+run_pretrained_classifer: True
+classifier_threshold: 0.3
 
 class_configs:
   config_1:
@@ -110,3 +122,6 @@ main_results_dir :      "results"
 embed_parent_dir :      "embeddings"
 dim_reduc_parent_dir :  "dim_reduced_embeddings"
 evaluations_dir :       "evaluations"
+
+
+testing: False

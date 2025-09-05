@@ -1,11 +1,13 @@
+import importlib.resources as pkg_resources
 import torch
-from transformers import pipeline
-from ..utils import ModelBaseClass
 import numpy as np
 import yaml
 
+import bacpipe
+from transformers import pipeline
+from ..utils import ModelBaseClass
 
-with open("bacpipe/settings.yaml", "rb") as f:
+with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
     settings = yaml.load(f, Loader=yaml.CLoader)
 
 DEVICE = settings["device"]
@@ -38,7 +40,7 @@ class Model(ModelBaseClass):
 
     @torch.inference_mode()
     def __call__(self, input):
-        if DEVICE == 'cuda':
+        if DEVICE == "cuda":
             return self.model(input.cuda())
         else:
             return self.model(input)

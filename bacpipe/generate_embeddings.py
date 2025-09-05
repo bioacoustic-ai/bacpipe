@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 import yaml
 import time
-from tqdm import tqdm
+import torch
 import logging
 import importlib
 import json
@@ -57,7 +57,10 @@ class Loader:
             )
 
     def initialize_path_structure(self, testing=False):
-        with open("bacpipe/settings.yaml", "r") as f:
+        import importlib.resources as pkg_resources
+        import bacpipe
+
+        with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
             self.config = yaml.load(f, Loader=yaml.CLoader)
 
         if testing:
@@ -84,6 +87,8 @@ class Loader:
                 existing_embed_dirs = Path(self.dim_reduc_parent_dir).iterdir()
             else:
                 existing_embed_dirs = Path(self.embed_parent_dir).iterdir()
+                if self.testing:
+                    return
             existing_embed_dirs = list(existing_embed_dirs)
             if isinstance(self.check_if_combination_exists, str):
                 existing_embed_dirs = [
@@ -319,11 +324,24 @@ class Loader:
 
 
 class Embedder:
-    def __init__(self, model_name, dim_reduction_model=False, testing=False, **kwargs):
+    def __init__(
+        self,
+        model_name,
+        dim_reduction_model=False,
+        paths=None,
+        testing=False,
+        classifier_threshold=None,
+        **kwargs,
+    ):
         import yaml
 
-        with open("bacpipe/settings.yaml", "rb") as f:
+        with open(Path(__file__).parent / "settings.yaml", "rb") as f:
             self.config = yaml.load(f, Loader=yaml.CLoader)
+
+        self.paths = paths
+
+        if classifier_threshold:
+            self.classifier_threshold = classifier_threshold
 
         if testing:
             self.config["main_results_dir"] = "bacpipe/tests/results_files"
@@ -363,7 +381,6 @@ class Embedder:
             try:
                 embeds = embeds.numpy()
             except:
-                print(type(embeds))
                 try:
                     embeds = embeds.detach().numpy()
                 except:
@@ -411,6 +428,43 @@ class Embedder:
             if len(embeds.shape) == 1:
                 embeds = np.expand_dims(embeds, axis=0)
             np.save(file_dest, embeds)
+
+    def save_classifier_outputs(self, fileloader_obj, file):
+        relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
+        results_path = self.paths.class_path.joinpath(
+            "original_classifier_outputs"
+        ).joinpath(relative_parent_path)
+        results_path.mkdir(exist_ok=True, parents=True)
+        file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
+        file_dest = str(file_dest) + ".json"
+        if self.model.classifier_outputs.shape[0] != len(self.model.classes):
+            self.model.classifier_outputs = self.model.classifier_outputs.swapaxes(0, 1)
+
+        tmp_bins = self.model.classifier_outputs.shape[-1]
+        cls_idx, tmp_idx = np.where(
+            self.model.classifier_outputs > self.classifier_threshold
+        )
+
+        cls_results = {
+            self.model.classes[k]: {
+                "time_bins_exceeding_threshold": tmp_idx[cls_idx == k].tolist(),
+                "classifier_predictions": self.model.classifier_outputs[
+                    cls_idx[cls_idx == k], tmp_idx[cls_idx == k]
+                ]
+                .numpy()
+                .tolist(),
+            }
+            for k in cls_idx
+        }
+
+        cls_results["head"] = {
+            "Time bins in this file": tmp_bins,
+            "Threshold for classifier predictions": self.classifier_threshold,
+        }
+
+        with open(file_dest, "w") as f:
+            json.dump(cls_results, f)
+        self.model.classifier_outputs = torch.tensor([])
 
 
 def save_embeddings_dict_with_timestamps(

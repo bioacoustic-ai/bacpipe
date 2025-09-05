@@ -1,13 +1,17 @@
+import importlib.resources as pkg_resources
+
 import torch
 import yaml
 
+import bacpipe
 from .beats import BeatsModel
 from ..utils import ModelBaseClass
 
+
 SAMPLE_RATE = 16_000
 LENGTH_IN_SAMPLES = int(5 * SAMPLE_RATE)
-with open("bacpipe/settings.yaml", "r") as f:
-    settings = yaml.safe_load(f)
+with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
+    settings = yaml.load(f, Loader=yaml.CLoader)
 
 DEVICE = settings["device"]
 
@@ -33,6 +37,7 @@ class Model(ModelBaseClass):
 
         self.beats.model.load_state_dict(beats_ckpt_naturelm, strict=True)
         self.beats.model.eval()
+        self.beats.model.to(DEVICE)
 
     def preprocess(self, audio):
         audio = torch.clamp(audio, -1.0, 1.0)
