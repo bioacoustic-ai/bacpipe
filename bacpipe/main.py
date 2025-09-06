@@ -400,13 +400,33 @@ def generate_embeddings(**kwargs):
         logger.debug(f"Loading the data took {time.time()-start:.2f}s.")
         if not ld.combination_already_exists:
             embed = ge.Embedder(**kwargs)
-            for idx, file in enumerate(
-                tqdm(ld.files, desc="processing files", position=1, leave=False)
-            ):
-                if not ld.dim_reduction_model:
-                    sample = file
+
+            if ld.dim_reduction_model:
+                # (1) Dimensionality reduction stage → always sequential
+                for idx, file in enumerate(
+                    tqdm(ld.files, desc="processing files", position=1, leave=False)
+                ):
+                    if idx == 0:
+                        embeddings = ld.embed_read(idx, file)
+                    else:
+                        embeddings = np.concatenate(
+                            [embeddings, ld.embed_read(idx, file)]
+                        )
+
+                dim_reduced_embeddings = embed.get_embeddings_from_model(embeddings)
+                embed.save_embeddings(idx, ld, file, dim_reduced_embeddings)
+
+            elif embed.model.device == "cuda":
+                # (2) GPU path → pipelined embedding (better throughput)
+                embed.get_pipelined_embeddings_from_model(ld)
+
+            else:
+                # (3) CPU path → sequential (avoid threading overhead)
+                for idx, file in enumerate(
+                    tqdm(ld.files, desc="processing files", position=1, leave=False)
+                ):
                     try:
-                        embeddings = embed.get_embeddings_from_model(sample)
+                        embeddings = embed.get_embeddings_from_model(file)
                     except Exception as e:
                         logger.warning(
                             f"Error generating embeddings, skipping file. \n"
@@ -417,18 +437,11 @@ def generate_embeddings(**kwargs):
                     embed.save_embeddings(idx, ld, file, embeddings)
                     if embed.model.bool_classifier:
                         embed.save_classifier_outputs(ld, file)
-                else:
-                    if idx == 0:
-                        embeddings = ld.embed_read(idx, file)
-                    else:
-                        embeddings = np.concatenate(
-                            [embeddings, ld.embed_read(idx, file)]
-                        )
-            if ld.dim_reduction_model:
-                dim_reduced_embeddings = embed.get_embeddings_from_model(embeddings)
-                embed.save_embeddings(idx, ld, file, dim_reduced_embeddings)
+
+            # Finalize
             ld.write_metadata_file()
             ld.update_files()
+
         return ld
     except KeyboardInterrupt:
         if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:

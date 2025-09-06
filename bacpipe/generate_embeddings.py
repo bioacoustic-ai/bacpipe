@@ -323,6 +323,11 @@ class Loader:
             self.files = list(self.embed_dir.rglob("*.npy"))
 
 
+import queue
+import threading
+from tqdm import tqdm
+
+
 class Embedder:
     def __init__(
         self,
@@ -390,6 +395,66 @@ class Embedder:
     def get_reduced_dimensionality_embeddings(self, embeds):
         samples = self.model.preprocess(embeds)
         return self.model(samples)
+
+    def get_pipelined_embeddings_from_model(self, fileloader_obj):
+        """
+        Generate embeddings for all files in a pipelined manner:
+        - Producer thread loads and preprocesses audio
+        - Consumer (main thread) embeds audio while producer prepares next batch
+        Ensures metadata and embeddings are written exactly like in the sequential version.
+        """
+        task_queue = queue.Queue(maxsize=4)  # small buffer to balance I/O vs compute
+
+        # --- Producer: load + preprocess in background ---
+        def producer():
+            for idx, file in enumerate(fileloader_obj.files):
+                try:
+                    preprocessed = self.prepare_audio(file)
+                    task_queue.put((idx, file, preprocessed))
+                except Exception as e:
+                    task_queue.put((idx, file, e))
+            task_queue.put(None)  # sentinel = done
+
+        threading.Thread(target=producer, daemon=True).start()
+
+        # --- Consumer: embed + save metadata/embeddings ---
+        with tqdm(
+            total=len(fileloader_obj.files),
+            desc="processing files",
+            position=1,
+            leave=False,
+        ) as pbar:
+            while True:
+                item = task_queue.get()
+                if item is None:
+                    break
+
+                idx, file, data = item
+                if isinstance(data, Exception):
+                    logger.warning(
+                        f"Error preprocessing {file}, skipping file.\nError: {data}"
+                    )
+                    pbar.update(1)
+                    continue
+
+                try:
+                    embeddings = self.get_embeddings_for_audio(data)
+                except Exception as e:
+                    logger.warning(
+                        f"Error generating embeddings for {file}, skipping file.\nError: {e}"
+                    )
+                    pbar.update(1)
+                    continue
+
+                # ✅ keep behavior identical to sequential path
+                fileloader_obj.write_audio_file_to_metadata(idx, file, self, embeddings)
+                self.save_embeddings(idx, fileloader_obj, file, embeddings)
+                if self.model.bool_classifier:
+                    self.save_classifier_outputs(fileloader_obj, file)
+
+                pbar.update(1)
+
+        return fileloader_obj  # same return type as sequential version
 
     def get_embeddings_from_model(self, sample):
 
