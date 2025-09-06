@@ -6,14 +6,16 @@ from bacpipe.generate_embeddings import Loader, Embedder
 import numpy as np
 from pathlib import Path
 
+import importlib.resources as pkg_resources
+import bacpipe
 
 # INITIALIZATION
 # Find all models in the pipelines directory
 models = [  # "avesecho_passt"]
     mod.stem
-    for mod in Path("bacpipe/embedding_generation_pipelines/feature_extractors").glob(
-        "*.py"
-    )
+    for mod in Path(
+        bacpipe.PACKAGE_MAIN / "embedding_generation_pipelines/feature_extractors"
+    ).glob("*.py")
 ]
 
 # Only test models whos checkpoints have been downloaded
@@ -98,6 +100,7 @@ def test_embedding_generation(model):
         check_if_primary_combination_exists=False,
         check_if_secondary_combination_exists=False,
         audio_dir=audio_dir,
+        classifier_threshold=0.3,
         testing=True,
     )
     assert embeddings[model].files is not None and len(embeddings[model].files) > 0

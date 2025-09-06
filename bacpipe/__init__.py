@@ -4,10 +4,18 @@ import logging
 import zipfile
 from pathlib import Path
 
-if not Path("bacpipe/model_checkpoints").exists():
-    with zipfile.ZipFile("bacpipe/model_checkpoints.zip", "r") as zip_ref:
-        zip_ref.extractall("bacpipe")
 
+# Determine package root directory
+PACKAGE_ROOT = Path(__file__).parent.parent
+PACKAGE_MAIN = Path(__file__).parent
+
+# Unzip models_example.zip if needed
+models_dir = PACKAGE_MAIN / "model_checkpoints"
+zip_file = PACKAGE_MAIN / "model_checkpoints.zip"
+
+if not models_dir.exists() and zip_file.exists():
+    with zipfile.ZipFile(zip_file, "r") as zip_ref:
+        zip_ref.extractall(PACKAGE_MAIN)
 
 # Initialize Logger
 logger = logging.getLogger("bacpipe")

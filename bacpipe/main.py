@@ -120,7 +120,9 @@ def evaluation_with_settings_already_exists(
         else:
             bool_dim_reducs = [
                 True
-                for d in paths.dim_reduc_parent_dir.rglob(f"*{dim_reduction_model}*")
+                for d in paths.dim_reduc_parent_dir.rglob(
+                    f"*{dim_reduction_model}*{model_name}*"
+                )
             ]
             bool_dim_reducs = len(bool_dim_reducs) > 0 and all(bool_dim_reducs)
         if not bool_dim_reducs:
@@ -213,6 +215,13 @@ def model_specific_evaluation(
             class_embeds = embeds_array_without_noise(embeds, ground_truth)
             for class_config in class_configs.values():
                 if class_config["bool"]:
+                    if not len(class_embeds) > 0:
+                        raise AssertionError(
+                            "No embeddings were found for classification task. "
+                            "Are you sure there are annotations for the data and the annotations.csv file "
+                            "has been correctly linked? If you didn't intent do do classification, "
+                            "simply remove it from the evaluation tasks list in the config.yaml file."
+                        )
                     classification_pipeline(
                         paths, class_embeds, **class_config, **kwargs
                     )
@@ -317,16 +326,18 @@ def get_embeddings(
     testing=False,
     **kwargs,
 ):
+    global get_paths
+    get_paths = make_set_paths_func(audio_dir, testing=testing, **kwargs)
+    paths = get_paths(model_name)
+
     loader_embeddings = generate_embeddings(
         model_name=model_name,
         audio_dir=audio_dir,
         check_if_combination_exists=check_if_primary_combination_exists,
+        paths=paths,
         testing=testing,
         **kwargs,
     )
-    global get_paths
-    get_paths = make_set_paths_func(audio_dir, testing=testing, **kwargs)
-    paths = get_paths(model_name)
 
     if not dim_reduction_model == "None":
 
@@ -404,6 +415,8 @@ def generate_embeddings(**kwargs):
                         continue
                     ld.write_audio_file_to_metadata(idx, file, embed, embeddings)
                     embed.save_embeddings(idx, ld, file, embeddings)
+                    if embed.model.bool_classifier:
+                        embed.save_classifier_outputs(ld, file)
                 else:
                     if idx == 0:
                         embeddings = ld.embed_read(idx, file)

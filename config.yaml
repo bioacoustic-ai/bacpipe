@@ -54,7 +54,10 @@ dim_reduction_model: "umap"
 #########################################################################
 
 evaluation_task: [
+  # "clustering",
+  # "classification"
 ]
+
 
 
 

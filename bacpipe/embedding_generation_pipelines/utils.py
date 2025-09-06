@@ -5,27 +5,36 @@ import torchaudio as ta
 import torch
 from tqdm import tqdm
 import logging
+from pathlib import Path
 
 logger = logging.getLogger("bacpipe")
 
-with open("bacpipe/settings.yaml", "rb") as f:
+import importlib.resources as pkg_resources
+import bacpipe
+
+with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
     settings = yaml.load(f, Loader=yaml.CLoader)
 
-MODEL_BASE_PATH = settings["model_base_path"]
+MODEL_BASE_PATH = bacpipe.PACKAGE_ROOT / settings["model_base_path"]
 GLOBAL_BATCH_SIZE = settings["global_batch_size"]
 DEVICE = settings["device"]
 
 
 class ModelBaseClass:
     def __init__(self, sr, segment_length, **kwargs):
-        with open("bacpipe/settings.yaml", "rb") as f:
-            self.config = yaml.load(f, Loader=yaml.CLoader)
+        self.config = settings
 
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+        if hasattr(self, "classifier_predictions"):
+            self.bool_classifier = True
+        else:
+            self.bool_classifier = False
+        self.classifier_outputs = torch.tensor([])
         self.device = DEVICE
         self.model_base_path = MODEL_BASE_PATH
+        self.classification_threshold = 0.1
         self.sr = sr
         self.segment_length = segment_length
         if segment_length:
@@ -59,13 +68,14 @@ class ModelBaseClass:
             logger.debug(f"Audio file {path} is empty. " f"Skipping {path}.")
             raise ValueError(f"Audio file {path} is empty.")
         re_audio = ta.functional.resample(audio, sr, self.sr)
-        return re_audio
+        return re_audio.to(self.config["device"])
 
     def window_audio(self, audio):
         num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
         padded_audio = lb.util.fix_length(
-            audio, size=int(num_frames * self.segment_length), mode="reflect"
+            audio, size=int(num_frames * self.segment_length), mode=settings["padding"]
         )
+        logger.debug(f"{settings['padding']} was used on an audio segment.")
         frames = padded_audio.reshape([num_frames, self.segment_length])
         if not isinstance(frames, torch.Tensor):
             frames = torch.tensor(frames)
@@ -89,7 +99,13 @@ class ModelBaseClass:
             batched_samples, desc=" processing batches", position=0, leave=False
         ):
             with torch.no_grad():
-                embedding = self.__call__(batch)
+                if self.bool_classifier:
+                    embedding, cls_vals = self.__call__(batch)
+                    self.classifier_outputs = torch.cat(
+                        [self.classifier_outputs, torch.tensor(cls_vals)]
+                    )
+                else:
+                    embedding = self.__call__(batch)
             if isinstance(embedding, torch.Tensor) and embedding.dim() == 1:
                 embedding = embedding.unsqueeze(0)
             embeds.append(embedding)
@@ -100,3 +116,18 @@ class ModelBaseClass:
 
             return_embeds = tf.concat(embeds, axis=0).numpy().squeeze()
             return return_embeds
+
+    def filter_classifier_predictions(self, cls_vals):
+        if not isinstance(self.classes, np.ndarray):
+            self.classes = np.array(self.classes)
+
+        bool_exceeding_threshold = np.where(cls_vals > self.classification_threshold)[1]
+        classes_exceeding_thresh = np.unique(self.classes[bool_exceeding_threshold])
+
+        cls_results = {
+            k: cls_vals[:, idx]
+            for idx, k in enumerate(self.classes)
+            if k in classes_exceeding_thresh
+        }
+
+        return cls_results
