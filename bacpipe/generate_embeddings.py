@@ -402,6 +402,16 @@ class Embedder:
         - Producer thread loads and preprocesses audio
         - Consumer (main thread) embeds audio while producer prepares next batch
         Ensures metadata and embeddings are written exactly like in the sequential version.
+
+        Parameters
+        ----------
+        fileloader_obj : Loader object
+            contains all metadata of a model specific embedding creation session
+
+        Returns
+        -------
+        Loader object
+            updated object with metadata on embedding creation session
         """
         task_queue = queue.Queue(maxsize=4)  # small buffer to balance I/O vs compute
 
@@ -446,7 +456,6 @@ class Embedder:
                     pbar.update(1)
                     continue
 
-                # ✅ keep behavior identical to sequential path
                 fileloader_obj.write_audio_file_to_metadata(idx, file, self, embeddings)
                 self.save_embeddings(idx, fileloader_obj, file, embeddings)
                 if self.model.bool_classifier:

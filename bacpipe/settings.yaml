@@ -30,6 +30,14 @@ rm_embedding_on_keyboard_interrupt: True
 # (https://numpy.org/devdocs/reference/generated/numpy.pad.html).
 padding: 'wrap'
 
+# To increase performance when running inference on a GPU, bacpipe will use threads
+# to load audio data in one thread and compute embeddings in another. That way audio 
+# loading can happen while embeddings are being calculated. This is especially 
+# effective for datasets with a lot of small files and can separate the cpu and gpu 
+# tasks nicely. If you happen to have problems with this, you can set the following
+# to true and thereby it will always revert to a sequential operation, also on gpu's.
+avoid_pipelined_gpu_inference: False
+
 ######################################################
 ###############   EVALUATION SETTINGS ################
 ######################################################
@@ -123,5 +131,7 @@ embed_parent_dir :      "embeddings"
 dim_reduc_parent_dir :  "dim_reduced_embeddings"
 evaluations_dir :       "evaluations"
 
-
+# If set to true bacpipe will always use the same test files and save it in a 
+# directory other than the results directory. Results will also be deleted at 
+# of the computation.
 testing: False
