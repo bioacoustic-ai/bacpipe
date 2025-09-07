@@ -39,6 +39,7 @@ class Model(ModelBaseClass):
         self.model.eval()
 
     def preprocess(self, audio):
+        audio = audio.cpu()
         mel = self.mel(torch.tensor(audio))
         mel_db = self.power_to_db(mel)
         return mel_db

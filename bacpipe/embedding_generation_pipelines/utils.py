@@ -6,6 +6,7 @@ import torch
 from tqdm import tqdm
 import logging
 from pathlib import Path
+import tensorflow
 
 logger = logging.getLogger("bacpipe")
 
@@ -102,17 +103,26 @@ class ModelBaseClass:
         ):
             with torch.no_grad():
                 if self.bool_classifier:
-                    if self.device == "cuda":
+                    if self.device == "cuda" and not isinstance(
+                        batch, tensorflow.Tensor
+                    ):
                         batch = batch.cuda()
                         self.classifier_outputs = self.classifier_outputs.cuda()
                         self.classifier = self.classifier.cuda()
 
                     embedding, cls_vals = self.__call__(batch)
-                    self.classifier_outputs = torch.cat(
-                        [self.classifier_outputs, cls_vals.clone().detach()]
-                    )
+                    if not isinstance(batch, tensorflow.Tensor):
+                        self.classifier_outputs = torch.cat(
+                            [self.classifier_outputs, cls_vals.clone().detach()]
+                        )
+                    else:
+                        self.classifier_outputs = torch.cat(
+                            [self.classifier_outputs, torch.Tensor(cls_vals)]
+                        )
                 else:
-                    if self.device == "cuda":
+                    if self.device == "cuda" and not isinstance(
+                        batch, tensorflow.Tensor
+                    ):
                         batch = batch.cuda()
                     embedding = self.__call__(batch)
             if isinstance(embedding, torch.Tensor) and embedding.dim() == 1:

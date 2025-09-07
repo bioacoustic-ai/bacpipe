@@ -14,6 +14,7 @@ class Model(ModelBaseClass):
         self.model = hub.load(str(self.model_base_path / "vggish"))
 
     def preprocess(self, audio):
+        audio = audio.cpu()
         return tf.reshape(tf.convert_to_tensor(audio * 32767, dtype=tf.int16), (1, -1))
 
     def __call__(self, input):

@@ -23,6 +23,7 @@ class Model(ModelBaseClass):
         self.min_max_norm = MinMaxNorm()
 
     def preprocess(self, audio):
+        audio = audio.cpu()
         audio = self.mel(audio)
         audio = self.ampl2db(audio)
         audio = self.min_max_norm(audio)
