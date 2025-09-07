@@ -303,8 +303,6 @@ Models currently include:
 
 |   Name|   ref paper|   ref code|   sampling rate|   input length| embedding dimension |
 |---|---|---|---|---|---|
-|  Animal2vec_MK|   [paper](https://arxiv.org/abs/2406.01253)   |   [code](https://github.com/livingingroups/animal2vec)    |   8 kHz|   10 s| 1024 |
-|  Animal2vec_XC|   [paper](https://arxiv.org/abs/2406.01253)   |   [code](https://github.com/livingingroups/animal2vec)    |   24 kHz|   5 s| 768 |
 |   AudioMAE    |   [paper](https://proceedings.neurips.cc/paper_files/paper/2022/hash/b89d5e209990b19e33b418e14f323998-Abstract-Conference.html)   |   [code](https://github.com/facebookresearch/AudioMAE)    |   16 kHz|   10 s| 768 |
 |   AudioProtoPNet   |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954125000901)   |   [code](https://github.com/DBD-research-group/AudioProtoPNet)    |   32 kHz|   5 s| 1024 |
 |   AvesEcho_PASST   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   32 kHz|   3 s| 768 |
@@ -332,8 +330,6 @@ Models currently include:
 
 |   Name|   paper|   code|   training|   CNN/Trafo| architecture | checkpoint link |
 |---|---|---|---|---|---|---|
-|  [Animal2vec_MK](#animal2vec_mk) |   [paper](https://arxiv.org/abs/2406.01253)   |   [code](https://github.com/livingingroups/animal2vec)    |   ssl + ft|   trafo | d2v2.0 | [weights](https://edmond.mpg.de/dataset.xhtml?persistentId=doi:10.17617/3.ETPUKU)|
-|  [Animal2vec_XC](#animal2vec_xc)|   [paper](https://arxiv.org/abs/2406.01253)   |   [code](https://github.com/livingingroups/animal2vec)    |   ssl + ft|   trafo | d2v2.0 | release pending |
 |   [AudioMAE](#audiomae)    |   [paper](https://proceedings.neurips.cc/paper_files/paper/2022/hash/b89d5e209990b19e33b418e14f323998-Abstract-Conference.html)   |   [code](https://github.com/facebookresearch/AudioMAE)    | ssl + ft|   trafo| ViT | [weights](https://drive.google.com/file/d/18EsFOyZYvBYHkJ7_n7JFFWbj6crz01gq/view)|
 |   [AudioProtoPNet](#audioprotopnet)   |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954125000901)   |   [code](https://github.com/DBD-research-group/AudioProtoPNet)    |  sup l |   CNN | ConvNext | included|
 |   [AvesEcho_PaSST](#avesecho_passt)   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   sup l |   trafo | PaSST | [weights](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1/-/blob/main/checkpoints/best_model_passt.pt?ref_type=heads) |
@@ -357,24 +353,6 @@ Models currently include:
 
 ## Brief description of models
 All information is extracted from the respective repositories and manuscripts. Please refer to them for more details
-
-### Animal2vec_MK 
-- raw waveform input
-- self-supervised pretrained model, fine-tuned
-- transformer
-- trained on meerkat vocalizations
-
-animal2vec model weights are from self-supervised pretraining on meerkat data with fine tuning on a curated meerkat dataset. The model is based on data2vec2.0 with a number of bioacoustic-specific model implementations. See paper for more details.
-
-
-### Animal2vec_XC
-- raw waveform input
-- self-supervised model
-- transformer
-- trained on bird song data
-
-animal2vec model weights are from self-supervised pretraining on xeno-canto data. The model is based on data2vec2.0 with a number of bioacoustic-specific model implementations. See paper for more details.
-
 
 ### AudioMAE
 - spectrogram input

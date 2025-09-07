@@ -118,7 +118,7 @@ class Model(ModelBaseClass):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         self.model = get_basic_model(mode="logits", arch="passt_s_kd_p16_128_ap486")
         self.model.net = get_model_passt(arch="passt_s_kd_p16_128_ap486", n_classes=585)
-        self.model.net.to("cpu")
+        self.model.net.to(self.device)
         ckpnt = torch.load(
             f"{MODEL_BASE_PATH}/avesecho_passt/best_model_passt.pt",
             weights_only=True,

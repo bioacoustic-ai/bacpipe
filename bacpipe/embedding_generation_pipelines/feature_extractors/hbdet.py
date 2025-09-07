@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import tensorflow as tf
-import librosa as lb
-from tensorflow_addons import metrics
+
 import collections
 from ..utils import ModelBaseClass
 
@@ -46,6 +44,72 @@ Config.__new__.__defaults__ = (
     0.0,
     SAMPLE_RATE / 2,
 )
+
+
+class FBetaScore(tf.keras.metrics.Metric):
+    def __init__(
+        self,
+        num_classes=1,
+        average=None,
+        beta=0.5,
+        threshold=0.5,
+        name="fbeta",
+        dtype=tf.float32,
+        **kwargs,
+    ):
+        super().__init__(name=name, dtype=dtype, **kwargs)
+        self.num_classes = num_classes
+        self.average = average
+        self.beta = beta
+        self.threshold = threshold
+
+        # Must match variable names used in TFA version
+        self.true_positives = self.add_weight(
+            name="true_positives", shape=(num_classes,), initializer="zeros"
+        )
+        self.false_positives = self.add_weight(
+            name="false_positives", shape=(num_classes,), initializer="zeros"
+        )
+        self.false_negatives = self.add_weight(
+            name="false_negatives", shape=(num_classes,), initializer="zeros"
+        )
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_pred = tf.cast(y_pred > self.threshold, self.dtype)
+        y_true = tf.cast(y_true, self.dtype)
+
+        tp = tf.reduce_sum(y_true * y_pred, axis=0)
+        fp = tf.reduce_sum((1 - y_true) * y_pred, axis=0)
+        fn = tf.reduce_sum(y_true * (1 - y_pred), axis=0)
+
+        self.true_positives.assign_add(tp)
+        self.false_positives.assign_add(fp)
+        self.false_negatives.assign_add(fn)
+
+    def result(self):
+        beta_sq = self.beta**2
+        precision = self.true_positives / (
+            self.true_positives + self.false_positives + 1e-7
+        )
+        recall = self.true_positives / (
+            self.true_positives + self.false_negatives + 1e-7
+        )
+
+        return (
+            (1 + beta_sq) * precision * recall / (beta_sq * precision + recall + 1e-7)
+        )
+
+    def reset_state(self):
+        for v in self.variables:
+            v.assign(tf.zeros_like(v))
+
+    def get_config(self):
+        return {
+            "num_classes": self.num_classes,
+            "average": self.average,
+            "beta": self.beta,
+            "threshold": self.threshold,
+        }
 
 
 class MelSpectrogram(tf.keras.layers.Layer):
@@ -99,7 +163,7 @@ class Model(ModelBaseClass):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         orig_model = tf.keras.models.load_model(
             self.model_base_path / "hbdet",
-            custom_objects={"FBetaScote": metrics.FBetaScore},
+            custom_objects={"Addons>FBetaScore": FBetaScore},
         )
         model_list = orig_model.layers[:-2]
         model_list.insert(0, tf.keras.layers.Input([LENGTH_IN_SAMPLES]))
