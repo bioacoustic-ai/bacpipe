@@ -51,7 +51,7 @@ embedding_dimensions = {
     "birdaves_especies": 1024,
     "biolingual": 512,
     "birdnet": 1024,
-    "birdmae": 768,
+    "birdmae": 1280,
     "hbdet": 2048,
     "insect66": 1280,
     "insect459": 1280,
