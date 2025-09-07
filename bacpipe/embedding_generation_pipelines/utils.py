@@ -73,7 +73,9 @@ class ModelBaseClass:
     def window_audio(self, audio):
         num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
         padded_audio = lb.util.fix_length(
-            audio, size=int(num_frames * self.segment_length), mode=settings["padding"]
+            audio.cpu(),
+            size=int(num_frames * self.segment_length),
+            mode=settings["padding"],
         )
         logger.debug(f"{settings['padding']} was used on an audio segment.")
         frames = padded_audio.reshape([num_frames, self.segment_length])
