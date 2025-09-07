@@ -1,5 +1,9 @@
 import torch
-from transformers import AutoFeatureExtractor, AutoModelForSequenceClassification
+from transformers import (
+    AutoFeatureExtractor,
+    AutoModel,
+    AutoModelForSequenceClassification,
+)
 import pandas as pd
 
 
@@ -15,6 +19,11 @@ class Model(ModelBaseClass):
         model = AutoModelForSequenceClassification.from_pretrained(
             "DBD-research-group/AudioProtoPNet-5-BirdSet-XCL", trust_remote_code=True
         )
+
+        # optional: patch missing attribute if other code expects it
+        if not hasattr(model, "incorrect_class_connection"):
+            model.incorrect_class_connection = None
+
         self.preprocessor = AutoFeatureExtractor.from_pretrained(
             "DBD-research-group/AudioProtoPNet-5-BirdSet-XCL", trust_remote_code=True
         )

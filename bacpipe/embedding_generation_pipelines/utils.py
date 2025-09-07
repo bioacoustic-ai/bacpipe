@@ -102,15 +102,24 @@ class ModelBaseClass:
         ):
             with torch.no_grad():
                 if self.bool_classifier:
+                    if self.device == "cuda":
+                        batch = batch.cuda()
+                        self.classifier_outputs = self.classifier_outputs.cuda()
+                        self.classifier = self.classifier.cuda()
+
                     embedding, cls_vals = self.__call__(batch)
                     self.classifier_outputs = torch.cat(
-                        [self.classifier_outputs, torch.tensor(cls_vals)]
+                        [self.classifier_outputs, cls_vals.clone().detach()]
                     )
                 else:
+                    if self.device == "cuda":
+                        batch = batch.cuda()
                     embedding = self.__call__(batch)
             if isinstance(embedding, torch.Tensor) and embedding.dim() == 1:
                 embedding = embedding.unsqueeze(0)
             embeds.append(embedding)
+        if self.bool_classifier:
+            self.classifier_outputs = self.classifier_outputs.cpu()
         if isinstance(embeds[0], torch.Tensor):
             return torch.cat(embeds, axis=0)
         else:
