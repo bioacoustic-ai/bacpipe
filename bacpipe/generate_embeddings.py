@@ -297,7 +297,11 @@ class Loader:
         return d
 
     def write_audio_file_to_metadata(self, index, file, embed, embeddings):
-        if index == 0:
+        if (
+            not "segment_length (samples)" in self.metadata_dict.keys()
+            or not "sample_rate (Hz)" in self.metadata_dict.keys()
+            or not "embedding_size" in self.metadata_dict.keys()
+        ):
             self.metadata_dict["segment_length (samples)"] = embed.model.segment_length
             self.metadata_dict["sample_rate (Hz)"] = embed.model.sr
             self.metadata_dict["embedding_size"] = embeddings.shape[-1]
