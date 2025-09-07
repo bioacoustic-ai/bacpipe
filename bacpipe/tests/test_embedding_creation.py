@@ -11,7 +11,7 @@ import bacpipe
 
 # INITIALIZATION
 # Find all models in the pipelines directory
-models = [  # "avesecho_passt"]
+models = [
     mod.stem
     for mod in Path(
         bacpipe.PACKAGE_MAIN / "embedding_generation_pipelines/feature_extractors"
@@ -36,14 +36,14 @@ models_requiring_checkpoints = [
     "vggish",
 ]
 for model in models_requiring_checkpoints:
-    if not Path(f"bacpipe/model_checkpoints/{model}").exists():
+    if not Path(f"bacpipe/model_checkpoints/{model}").exists() and model in models:
         models.remove(model)
 
 
 embedding_dimensions = {
     "animal2vec_xc": 768,
     "animal2vec_mk": 1024,
-    "audiomae": 1280,
+    "audiomae": 768,
     "audioprotopnet": 1024,
     "avesecho_passt": 768,
     "aves_especies": 768,
@@ -51,6 +51,7 @@ embedding_dimensions = {
     "birdaves_especies": 1024,
     "biolingual": 512,
     "birdnet": 1024,
+    "birdmae": 768,
     "hbdet": 2048,
     "insect66": 1280,
     "insect459": 1280,

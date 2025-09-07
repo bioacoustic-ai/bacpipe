@@ -16,7 +16,9 @@ class Model(ModelBaseClass):
             cfg = SimpleNamespace(**yaml.safe_load(infp))
 
         checkpoint = torch.load(
-            f"{MODEL_BASE_PATH}/insect459/last-v3-insecteffnet459-mel-mambo.ckpt"
+            f"{MODEL_BASE_PATH}/insect459/last-v3-insecteffnet459-mel-mambo.ckpt",
+            weights_only=False,
+            map_location=self.device,
         )
         state_dict = {
             k.replace("model.", ""): v

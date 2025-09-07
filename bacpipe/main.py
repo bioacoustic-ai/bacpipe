@@ -85,6 +85,7 @@ def get_model_names(
 def evaluation_with_settings_already_exists(
     audio_dir,
     dim_reduction_model,
+    testing=False,
     **kwargs,
 ):
     """
@@ -107,6 +108,8 @@ def evaluation_with_settings_already_exists(
     bool
         True if the evaluation with the specified settings
     """
+    if testing:
+        return False
     for model_name in model_names:
         paths = make_set_paths_func(audio_dir, **kwargs)(model_name)
         bool_paths = (
@@ -383,7 +386,7 @@ def get_embeddings(
     return loader_embeddings
 
 
-def generate_embeddings(**kwargs):
+def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
     if "dim_reduction_model" in kwargs:
         print(
             f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"
@@ -416,7 +419,7 @@ def generate_embeddings(**kwargs):
                 dim_reduced_embeddings = embed.get_embeddings_from_model(embeddings)
                 embed.save_embeddings(idx, ld, file, dim_reduced_embeddings)
 
-            elif embed.model.device == "cuda":
+            elif embed.model.device == "cuda" and not avoid_pipelined_gpu_inference:
                 # (2) GPU path → pipelined embedding (better throughput)
                 embed.get_pipelined_embeddings_from_model(ld)
 

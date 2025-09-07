@@ -87,8 +87,8 @@ class Loader:
                 existing_embed_dirs = Path(self.dim_reduc_parent_dir).iterdir()
             else:
                 existing_embed_dirs = Path(self.embed_parent_dir).iterdir()
-                if self.testing:
-                    return
+            if self.testing:
+                return
             existing_embed_dirs = list(existing_embed_dirs)
             if isinstance(self.check_if_combination_exists, str):
                 existing_embed_dirs = [
@@ -394,6 +394,13 @@ class Embedder:
 
     def get_reduced_dimensionality_embeddings(self, embeds):
         samples = self.model.preprocess(embeds)
+        if "umap" in self.model.__module__:
+            if samples.shape[0] <= self.model.umap_config["n_neighbors"]:
+                logger.warning(
+                    "Not enough embeddings were created to compute a dimensionality"
+                    " reduction with the chosen settings. Please embed more audio or "
+                    "reduce the n_neighbors in the umap config."
+                )
         return self.model(samples)
 
     def get_pipelined_embeddings_from_model(self, fileloader_obj):

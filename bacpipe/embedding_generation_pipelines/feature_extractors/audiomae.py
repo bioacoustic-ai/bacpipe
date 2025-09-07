@@ -72,7 +72,7 @@ class Model(ModelBaseClass):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
         self.nb_classes = 527
         self.model = "vit_base_patch16"
-        self.model_path = self.model_base_path + "/audiomae/finetuned.pth"
+        self.model_path = self.model_base_path / "audiomae/finetuned.pth"
         self.global_pool = True
 
         self.drop_path = 0.1
@@ -116,7 +116,9 @@ class Model(ModelBaseClass):
             torch.zeros(1, num_patches + 1, self.emb_dim), requires_grad=False
         )  # fixed sin-cos embedding
 
-        checkpoint = torch.load(self.model_path, map_location="cpu")
+        checkpoint = torch.load(
+            self.model_path, map_location=self.device, weights_only=False
+        )
         checkpoint_model = checkpoint["model"]
         # load pre-trained model
         self.model.load_state_dict(checkpoint_model)

@@ -48,7 +48,7 @@ class Model(ModelBaseClass):
 
         self.model = cvt13()
         state_dict = torch.load(
-            self.model_base_path + "/protoclr/protoclr.pth",
+            self.model_base_path / "protoclr/protoclr.pth",
             map_location=self.device,
             weights_only=True,
         )
