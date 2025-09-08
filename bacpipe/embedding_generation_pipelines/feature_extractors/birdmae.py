@@ -26,7 +26,7 @@ class Model(ModelBaseClass):
         self.model = AutoModel.from_pretrained(
             "DBD-research-group/Bird-MAE-Huge",
             trust_remote_code=True,
-            torch_dtype="auto",
+            dtype="auto",
         )
         self.model.eval()
         self.model.to(DEVICE)

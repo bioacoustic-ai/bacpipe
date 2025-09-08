@@ -753,7 +753,7 @@ def load_results(path_func, task, model_list):
     metrics = {}
     for model_name in model_list:
         paths = path_func(model_name)
-        for file in getattr(paths, f"{task[:5]}_path").rglob("*.json"):
+        for file in getattr(paths, f"{task[:5]}_path").rglob("*results*.json"):
             if task == "classification":
                 subtask = file.stem.split("_")[-1]
                 metrics[f"{model_name}({subtask})"] = json.load(open(file, "r"))
@@ -846,7 +846,7 @@ def clustering_overview(path_func, label_by, no_noise, model_list, **kwargs):
     fig.subplots_adjust(bottom=0.25, right=0.9)
     flat_metrics = dict()
     for model_name in model_list:
-        with open(path_func(model_name).clust_path / "clust_metrics.json", "r") as f:
+        with open(path_func(model_name).clust_path / "clust_results.json", "r") as f:
             metrics = json.load(f)
         if no_noise:
             no_noise = "_no_noise"
@@ -902,7 +902,7 @@ def plot_clusterings(
     else:
         no_noise = ""
 
-    clust_path = path_func(model_name).clust_path / "clust_metrics.json"
+    clust_path = path_func(model_name).clust_path / "clust_results.json"
     if not clust_path.exists():
         raise AssertionError(
             f"The clustering file {clust_path} does not exist. Perhaps it was not "

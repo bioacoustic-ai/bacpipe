@@ -47,7 +47,7 @@ class Model(ModelBaseClass):
     def preprocess(self, audio):
         return self.preprocessor(audio)
 
-    def __call__(self, x, return_class_results=True):
+    def __call__(self, x, return_class_results=False):
         if not return_class_results:
             return self.model(x).pooler_output
         else:

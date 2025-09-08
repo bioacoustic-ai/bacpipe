@@ -307,7 +307,9 @@ class Loader:
             self.metadata_dict["embedding_size"] = embeddings.shape[-1]
         rel_file_path = Path(file).relative_to(self.audio_dir)
         self.metadata_dict["files"]["audio_files"].append(str(rel_file_path))
-        self.metadata_dict["files"]["file_lengths (s)"].append(embed.file_length)
+        self.metadata_dict["files"]["file_lengths (s)"].append(
+            embed.file_length[file.stem]
+        )
         self.metadata_dict["files"]["nr_embeds_per_file"].append(embeddings.shape[0])
 
     def write_metadata_file(self):
@@ -348,6 +350,7 @@ class Embedder:
             self.config = yaml.load(f, Loader=yaml.CLoader)
 
         self.paths = paths
+        self.file_length = {}
 
         if classifier_threshold:
             self.classifier_threshold = classifier_threshold
@@ -379,7 +382,7 @@ class Embedder:
         audio = self.model.load_and_resample(sample)
         frames = self.model.window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
-        self.file_length = len(audio[0]) / self.model.sr
+        self.file_length[sample.stem] = len(audio[0]) / self.model.sr
         self.preprocessed_shape = tuple(preprocessed_frames.shape)
         return preprocessed_frames
 
@@ -514,6 +517,29 @@ class Embedder:
                 embeds = np.expand_dims(embeds, axis=0)
             np.save(file_dest, embeds)
 
+    @staticmethod
+    def make_classification_dict(probabilities, classes, threshold):
+        if probabilities.shape[0] != len(classes):
+            probabilities = probabilities.swapaxes(0, 1)
+
+        cls_idx, tmp_idx = np.where(probabilities > threshold)
+
+        cls_results = {
+            classes[k]: {
+                "time_bins_exceeding_threshold": tmp_idx[cls_idx == k].tolist(),
+                "classifier_predictions": np.array(
+                    probabilities[cls_idx[cls_idx == k], tmp_idx[cls_idx == k]]
+                ).tolist(),
+            }
+            for k in cls_idx
+        }
+
+        cls_results["head"] = {
+            "Time bins in this file": probabilities.shape[0],
+            "Threshold for classifier predictions": threshold,
+        }
+        return cls_results
+
     def save_classifier_outputs(self, fileloader_obj, file):
         relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
         results_path = self.paths.class_path.joinpath(
@@ -522,30 +548,14 @@ class Embedder:
         results_path.mkdir(exist_ok=True, parents=True)
         file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
         file_dest = str(file_dest) + ".json"
-        if self.model.classifier_outputs.shape[0] != len(self.model.classes):
-            self.model.classifier_outputs = self.model.classifier_outputs.swapaxes(0, 1)
 
         tmp_bins = self.model.classifier_outputs.shape[-1]
-        cls_idx, tmp_idx = np.where(
-            self.model.classifier_outputs > self.classifier_threshold
+        cls_results = self.make_classification_dict(
+            self.model.classifier_outputs,
+            self.model.classes,
+            self.classifier_threshold,
+            tmp_bins,
         )
-
-        cls_results = {
-            self.model.classes[k]: {
-                "time_bins_exceeding_threshold": tmp_idx[cls_idx == k].tolist(),
-                "classifier_predictions": self.model.classifier_outputs[
-                    cls_idx[cls_idx == k], tmp_idx[cls_idx == k]
-                ]
-                .numpy()
-                .tolist(),
-            }
-            for k in cls_idx
-        }
-
-        cls_results["head"] = {
-            "Time bins in this file": tmp_bins,
-            "Threshold for classifier predictions": self.classifier_threshold,
-        }
 
         with open(file_dest, "w") as f:
             json.dump(cls_results, f)

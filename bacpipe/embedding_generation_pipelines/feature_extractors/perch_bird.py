@@ -38,7 +38,8 @@ class Model(ModelBaseClass):
         self.class_label_key = "label"
         if not model_choice == "multispecies_whale":
             self.ebird2name = pd.read_csv(
-                "bacpipe/model_specific_utils/perch_chirp/chirp/eBird2name.csv"
+                self.model_base_path
+                / "../model_specific_utils/perch_chirp/chirp/eBird2name.csv"
             )
             self.classes = self.class_list[self.class_label_key].classes
             self.classes = [
@@ -56,7 +57,7 @@ class Model(ModelBaseClass):
         audio = audio.cpu()
         return tf.convert_to_tensor(audio, dtype=tf.float32)
 
-    def __call__(self, input, return_class_results=True):
+    def __call__(self, input, return_class_results=False):
         results = self.model.embed(input)
         embeddings = results.embeddings
         if return_class_results:

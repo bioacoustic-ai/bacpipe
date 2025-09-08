@@ -14,9 +14,7 @@ with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
 
 DEVICE = settings["device"]
 
-BEATS_PRETRAINED_PATH_FT = (
-    "bacpipe/model_checkpoints/naturebeats/BEATs_iter1_finetuned_on_AS2M_cpt1.pt"
-)
+BEATS_PRETRAINED_PATH_FT = "naturebeats/BEATs_iter1_finetuned_on_AS2M_cpt1.pt"
 
 
 class BeatsModel:
@@ -77,7 +75,9 @@ class Model(ModelBaseClass):
     def __init__(self):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
 
-        self.model = BeatsModel(checkpoint_path=BEATS_PRETRAINED_PATH_FT)
+        self.model = BeatsModel(
+            checkpoint_path=self.model_base_path / BEATS_PRETRAINED_PATH_FT
+        )
 
     def preprocess(self, audio):
         return self.model.process_audio_beats(audio)

@@ -30,7 +30,7 @@ class Model(ModelBaseClass):
         # then embed using self.model.layers[0].layers[5:]
         return tf.convert_to_tensor(audio, dtype=tf.float32)
 
-    def __call__(self, input, return_class_results=True):
+    def __call__(self, input, return_class_results=False):
         if not return_class_results:
             return self.embeds(input, training=False)
         else:

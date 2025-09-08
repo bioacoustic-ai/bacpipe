@@ -32,7 +32,7 @@ class Model(Model):
         self.class_label_key = "multispecies_whale"
         self.classes = [self.abbrev2label[v] for v in self.class_list.classes]
 
-    def __call__(self, input, return_class_results=True):
+    def __call__(self, input, return_class_results=False):
         if return_class_results:
             embeds, class_preds = [], []
         embeds = []

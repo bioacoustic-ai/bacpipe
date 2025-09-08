@@ -73,8 +73,10 @@ class ModelBaseClass:
 
     def window_audio(self, audio):
         num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
+        if isinstance(audio, torch.Tensor):
+            audio = audio.cpu()
         padded_audio = lb.util.fix_length(
-            audio.cpu(),
+            audio,
             size=int(num_frames * self.segment_length),
             mode=settings["padding"],
         )
@@ -110,7 +112,9 @@ class ModelBaseClass:
                         self.classifier_outputs = self.classifier_outputs.cuda()
                         self.classifier = self.classifier.cuda()
 
-                    embedding, cls_vals = self.__call__(batch)
+                    embedding, cls_vals = self.__call__(
+                        batch, return_class_results=True
+                    )
                     if not isinstance(batch, tensorflow.Tensor):
                         self.classifier_outputs = torch.cat(
                             [self.classifier_outputs, cls_vals.clone().detach()]

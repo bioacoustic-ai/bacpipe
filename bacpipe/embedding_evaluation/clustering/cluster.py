@@ -39,7 +39,7 @@ def save_clustering_performance(paths, clusterings, metrics):
     np.save(paths.clust_path.joinpath(f"clust_labels.npy"), clusterings)
 
     if metrics:
-        with open(paths.clust_path.joinpath(f"clust_metrics.json"), "w") as f:
+        with open(paths.clust_path.joinpath(f"clust_results.json"), "w") as f:
             json.dump(metrics, f, default=convert_numpy_types)
 
 

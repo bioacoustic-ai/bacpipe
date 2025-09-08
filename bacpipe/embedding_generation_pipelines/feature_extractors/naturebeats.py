@@ -15,19 +15,21 @@ with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
 
 DEVICE = settings["device"]
 
-BEATS_PRETRAINED_PATH_SSL = (
-    "bacpipe/model_checkpoints/naturebeats/BEATs_iter3_plus_AS2M.pt"
-)
-BEATS_PRETRAINED_PATH_NATURELM = "bacpipe/model_checkpoints/naturebeats/naturebeats.pt"
+BEATS_PRETRAINED_PATH_SSL = "naturebeats/BEATs_iter3_plus_AS2M.pt"
+BEATS_PRETRAINED_PATH_NATURELM = "naturebeats/naturebeats.pt"
 
 
 class Model(ModelBaseClass):
     def __init__(self):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
 
-        self.beats = BeatsModel(checkpoint_path=BEATS_PRETRAINED_PATH_SSL)
+        self.beats = BeatsModel(
+            checkpoint_path=self.model_base_path / BEATS_PRETRAINED_PATH_SSL
+        )
         beats_ckpt_naturelm = torch.load(
-            BEATS_PRETRAINED_PATH_NATURELM, map_location=DEVICE, weights_only=True
+            self.model_base_path / BEATS_PRETRAINED_PATH_NATURELM,
+            map_location=DEVICE,
+            weights_only=True,
         )
 
         if "predictor.weight" in beats_ckpt_naturelm.keys():
