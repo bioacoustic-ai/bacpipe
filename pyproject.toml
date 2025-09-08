@@ -157,11 +157,9 @@ dependencies = [
     "nvidia-nccl-cu12==2.21.5; sys_platform != 'win32'",
     "nvidia-nvjitlink-cu12==12.4.127; sys_platform != 'win32'",
     "nvidia-nvtx-cu12==12.4.127; sys_platform != 'win32'",
-    "tensorflow-io-gcs-filesystem==0.37.1; sys_platform != 'win32'",
     "triton==3.2.0; sys_platform != 'win32'",
     "uvloop==0.20.0; sys_platform != 'win32'",
 
-    "tensoflow-io-gcs-filesystem==0.37.1; sys_platform != 'win32'",
     "tensorstore==0.1.74",
     "termcolor==3.1.0",
     "threadpoolctl==3.6.0",
