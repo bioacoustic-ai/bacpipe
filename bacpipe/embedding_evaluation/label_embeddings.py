@@ -507,7 +507,7 @@ def build_ground_truth_labels_by_file(
 ):
     audio_file = metadata["files"]["audio_files"][ind]
 
-    df = label_df[label_df.audiofilename == audio_file]
+    df = label_df[label_df.audiofilename == Path(audio_file).as_posix()]
 
     if df.empty:
         all_labels = np.concatenate((all_labels, np.ones(num_embeds) * -1))
