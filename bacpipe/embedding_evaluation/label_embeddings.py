@@ -422,6 +422,7 @@ def load_labels_and_build_dict(
     bool_filter_labels=True,
     min_label_occurances=150,
     label_column=None,
+    testing=False,
     **kwargs,
 ):
     try:
@@ -440,7 +441,7 @@ def load_labels_and_build_dict(
                 "You also will not be able to evaluate using classification."
             )
             raise FileNotFoundError("No annotations file found.")
-    if bool_filter_labels:
+    if bool_filter_labels and not testing:
         filtered_labels = [
             lab
             for lab in np.unique(label_df[f"label:{label_column}"])
@@ -501,11 +502,11 @@ def build_ground_truth_labels_by_file(
     all_labels,
     label_df=None,
     label_idx_dict=None,
+    label_column=None,
     **kwargs,
 ):
     audio_file = metadata["files"]["audio_files"][ind]
-    if "/" in audio_file:
-        audio_file = Path(audio_file).stem + Path(audio_file).suffix
+
     df = label_df[label_df.audiofilename == audio_file]
 
     if df.empty:
@@ -513,7 +514,7 @@ def build_ground_truth_labels_by_file(
         return all_labels
 
     file_labels = fit_labels_to_embedding_timestamps(
-        df, label_idx_dict, num_embeds, segment_s, **kwargs
+        df, label_idx_dict, num_embeds, segment_s, label_column=label_column, **kwargs
     )
     all_labels = np.concatenate((all_labels, file_labels))
 
@@ -529,21 +530,23 @@ def build_ground_truth_labels_by_file(
             df_file_fit["start"] = embed_timestamps[file_labels > -1]
             df_file_fit["end"] = embed_timestamps[file_labels > -1] + segment_s
             inv = {v: k for k, v in label_idx_dict.items()}
-            df_file_fit["label"] = [inv[i] for i in file_labels[file_labels > -1]]
-            raven_gt = create_Raven_annotation_table(df_file_gt)
-            raven_fit = create_Raven_annotation_table(df_file_fit)
+            df_file_fit[f"label:{label_column}"] = [
+                inv[i] for i in file_labels[file_labels > -1]
+            ]
+            raven_gt = create_Raven_annotation_table(df_file_gt, label_column)
+            raven_fit = create_Raven_annotation_table(df_file_fit, label_column)
             raven_fit["Low Freq (Hz)"] = 1500
             raven_fit["High Freq (Hz)"] = 2000
             raven_gt.to_csv(
-                path.joinpath(f"{audio_file}_gt.txt"), sep="\t", index=False
+                path.joinpath(f"{Path(audio_file).stem}_gt.txt"), sep="\t", index=False
             )
             raven_fit.to_csv(
-                path.joinpath(f"{audio_file}_fit.txt"), sep="\t", index=False
+                path.joinpath(f"{Path(audio_file).stem}_fit.txt"), sep="\t", index=False
             )
     return all_labels
 
 
-def create_Raven_annotation_table(df):
+def create_Raven_annotation_table(df, label_column):
     df.index = np.arange(1, len(df) + 1)
     raven_df = pd.DataFrame()
     raven_df["Selection"] = df.index
@@ -554,7 +557,7 @@ def create_Raven_annotation_table(df):
     raven_df["End Time (s)"] = df.end
     raven_df["High Freq (Hz)"] = 1000
     raven_df["Low Freq (Hz)"] = 0
-    raven_df["Label"] = df.label
+    raven_df["Label"] = df[f"label:{label_column}"]
     return raven_df
 
 
