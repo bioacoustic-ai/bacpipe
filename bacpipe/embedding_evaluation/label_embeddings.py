@@ -449,7 +449,17 @@ def load_labels_and_build_dict(
             if len(label_df[label_df[f"label:{label_column}"] == lab])
             > min_label_occurances
         ]
-        label_df = label_df[label_df[f"label:{label_column}"].isin(filtered_labels)]
+        if not filtered_labels:
+            logger.debug(
+                "By filtering the annotations.csv file using the "
+                f"{min_label_occurances=}, no labels are left. In "
+                "case you are just testing, the labels will not be filtered"
+                f" and {bool_filter_labels=} will be ignored. If this "
+                "a serious classification task, you will need more annotations. "
+                "This might cause the classification or clustering to crash."
+            )
+        else:
+            label_df = label_df[label_df[f"label:{label_column}"].isin(filtered_labels)]
     label_idx_dict = {
         label: idx
         for idx, label in enumerate(label_df[f"label:{label_column}"].unique())

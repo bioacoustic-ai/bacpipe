@@ -14,8 +14,8 @@ from ..utils import ModelBaseClass
 
 
 class Model(ModelBaseClass):
-    def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+    def __init__(self, **kwargs):
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         model = AutoModelForSequenceClassification.from_pretrained(
             "DBD-research-group/AudioProtoPNet-5-BirdSet-XCL", trust_remote_code=True
         )

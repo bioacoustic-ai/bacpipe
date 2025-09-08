@@ -1,18 +1,12 @@
-import importlib.resources as pkg_resources
 import torch
-import yaml
 
-import bacpipe
 from bacpipe.model_specific_utils.naturebeats.BEATs import BEATs, BEATsConfig
 from ..utils import ModelBaseClass
 
 
 SAMPLE_RATE = 16_000
 LENGTH_IN_SAMPLES = int(5 * SAMPLE_RATE)
-with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
-    settings = yaml.load(f, Loader=yaml.CLoader)
 
-DEVICE = settings["device"]
 
 BEATS_PRETRAINED_PATH_FT = "naturebeats/BEATs_iter1_finetuned_on_AS2M_cpt1.pt"
 
@@ -72,12 +66,14 @@ class BeatsModel:
 
 
 class Model(ModelBaseClass):
-    def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+    def __init__(self, **kwargs):
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
 
         self.model = BeatsModel(
             checkpoint_path=self.model_base_path / BEATS_PRETRAINED_PATH_FT
         )
+        self.model.model.eval()
+        self.model.model.to(self.device)
 
     def preprocess(self, audio):
         return self.model.process_audio_beats(audio)

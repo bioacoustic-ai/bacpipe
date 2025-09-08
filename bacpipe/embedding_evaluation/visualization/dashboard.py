@@ -84,6 +84,7 @@ class DashBoard:
         self.noise_select = dict()
         self.class_select = dict()
         self.embed_plot = dict()
+        self.kwargs = kwargs
 
     def init_plot(self, p_type, plot_func, widget_idx, **kwargs):
         getattr(self, f"{p_type}_plot")[widget_idx] = pn.panel(
@@ -218,6 +219,7 @@ class DashBoard:
                                 if len(self.noise_select.keys()) > 0
                                 else False
                             ),
+                            **self.kwargs
                         )
                         if "clustering" in self.evaluation_task
                         else pn.pane.Markdown(

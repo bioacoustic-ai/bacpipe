@@ -68,17 +68,16 @@ get_paths = make_set_paths_func(**kwargs)
 # -------------------------------------------------------------------------
 def embedder_fn(loader, model_name):
     """Return embeddings from a single model using the test loader."""
-    embedder = Embedder(model_name, testing=True)
+    embedder = Embedder(model_name, **kwargs)
     return embedder.get_embeddings_from_model(loader.files[0])
 
 
 def loader_fn():
     """Return a Loader for the test audio directory."""
     loader = Loader(
-        audio_dir=audio_dir,
         check_if_combination_exists=False,
         model_name="aves",
-        testing=True,
+        **kwargs
     )
     assert loader.files, "No audio files found in test data directory"
     return loader
@@ -90,12 +89,9 @@ def loader_fn():
 def test_embedding_generation(model):
     embeddings[model] = get_embeddings(
         model_name=model,
-        dim_reduction_model="umap",
         check_if_primary_combination_exists=False,
         check_if_secondary_combination_exists=False,
-        audio_dir=audio_dir,
-        classifier_threshold=0.3,
-        testing=True,
+        **kwargs
     )
     assert embeddings[model].files, f"No embeddings generated for {model}"
 

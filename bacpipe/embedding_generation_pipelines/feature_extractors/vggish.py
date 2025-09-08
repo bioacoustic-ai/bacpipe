@@ -9,8 +9,8 @@ LENGTH_IN_SAMPLES = int(0.96 * SAMPLE_RATE)
 
 
 class Model(ModelBaseClass):
-    def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+    def __init__(self, **kwargs):
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         self.model = hub.load(str(self.model_base_path / "vggish"))
 
     def preprocess(self, audio):

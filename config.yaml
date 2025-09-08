@@ -26,8 +26,7 @@ dashboard: True
 #########################################################################
 
 # embedding model name
-embedding_model: 
-  selected_models: [
+models: [
       "birdnet",
       "perch_bird",
   ]
@@ -38,7 +37,7 @@ embedding_model:
   # if already_computed is False, the embeddings will be computed 
   # for all selected models
 
-  already_computed: False
+already_computed: False
 
 
 #########################################################################

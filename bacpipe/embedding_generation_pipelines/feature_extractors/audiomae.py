@@ -68,8 +68,8 @@ class PatchEmbed_new(nn.Module):
 
 
 class Model(ModelBaseClass):
-    def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+    def __init__(self, **kwargs):
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         self.nb_classes = 527
         self.model = "vit_base_patch16"
         self.model_path = self.model_base_path / "audiomae/finetuned.pth"

@@ -14,9 +14,9 @@ LENGTH_IN_SAMPLES = 160000
 
 class Model(ModelBaseClass):
     def __init__(
-        self, model_choice="perch_8", sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES
+        self, model_choice="perch_8", sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
     ):
-        super().__init__(sr=sr, segment_length=segment_length)
+        super().__init__(sr=sr, segment_length=segment_length, **kwargs)
 
         config = config_dict.ConfigDict()
         config.embed_fn_config = config_dict.ConfigDict()

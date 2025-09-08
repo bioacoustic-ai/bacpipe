@@ -27,8 +27,8 @@ class Normalization(torch.nn.Module):
 
 
 class Model(ModelBaseClass):
-    def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+    def __init__(self, **kwargs):
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         self.batch_size = 2
 
         self.mel = (

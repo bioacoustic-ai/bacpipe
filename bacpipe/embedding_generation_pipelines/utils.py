@@ -10,21 +10,11 @@ import tensorflow
 
 logger = logging.getLogger("bacpipe")
 
-import importlib.resources as pkg_resources
-import bacpipe
-
-with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
-    settings = yaml.load(f, Loader=yaml.CLoader)
-
-MODEL_BASE_PATH = bacpipe.PACKAGE_ROOT / settings["model_base_path"]
-GLOBAL_BATCH_SIZE = settings["global_batch_size"]
-DEVICE = settings["device"]
-
-
 class ModelBaseClass:
-    def __init__(self, sr, segment_length, **kwargs):
-        self.config = settings
-
+    def __init__(self, sr, segment_length, device, 
+                 model_base_path, global_batch_size, 
+                 padding, **kwargs):
+        
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -32,20 +22,26 @@ class ModelBaseClass:
             self.bool_classifier = True
         else:
             self.bool_classifier = False
+            
+        self.device = device
+        self.model_base_path = Path(model_base_path)
+        self.global_batch_size = global_batch_size
+        self.padding = padding
+        
         self.classifier_outputs = torch.tensor([])
-        self.device = DEVICE
-        self.model_base_path = MODEL_BASE_PATH
+        self.device = self.device
+        self.model_base_path = self.model_base_path
         self.classification_threshold = 0.1
         self.sr = sr
         self.segment_length = segment_length
         if segment_length:
-            self.batch_size = int(100_000 * GLOBAL_BATCH_SIZE / segment_length)
+            self.batch_size = int(100_000 * self.global_batch_size / segment_length)
 
     def prepare_inference(self):
         try:
             self.model.eval()
             try:
-                self.model = self.model.to(self.config["device"])
+                self.model = self.model.to(self.device)
             except AttributeError as e:
                 print(e)
                 pass
@@ -69,7 +65,7 @@ class ModelBaseClass:
             logger.debug(f"Audio file {path} is empty. " f"Skipping {path}.")
             raise ValueError(f"Audio file {path} is empty.")
         re_audio = ta.functional.resample(audio, sr, self.sr)
-        return re_audio.to(self.config["device"])
+        return re_audio.to(self.device)
 
     def window_audio(self, audio):
         num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
@@ -78,13 +74,13 @@ class ModelBaseClass:
         padded_audio = lb.util.fix_length(
             audio,
             size=int(num_frames * self.segment_length),
-            mode=settings["padding"],
+            mode=self.padding,
         )
-        logger.debug(f"{settings['padding']} was used on an audio segment.")
+        logger.debug(f"{self.padding} was used on an audio segment.")
         frames = padded_audio.reshape([num_frames, self.segment_length])
         if not isinstance(frames, torch.Tensor):
             frames = torch.tensor(frames)
-        frames = frames.to(self.config["device"])
+        frames = frames.to(self.device)
         return frames
 
     def init_dataloader(self, audio):

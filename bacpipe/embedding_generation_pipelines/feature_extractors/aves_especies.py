@@ -15,9 +15,9 @@ LENGTH_IN_SAMPLES = 16000
 
 
 class Model(ModelBaseClass, nn.Module):
-    def __init__(self, birdaves=False, nonbioaves=False):
+    def __init__(self, birdaves=False, nonbioaves=False, **kwargs):
 
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         nn.Module.__init__(self)
 
         # reference: https://pytorch.org/audio/stable/_modules/torchaudio/models/wav2vec2/utils/import_fairseq.html

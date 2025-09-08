@@ -33,7 +33,7 @@ logger = logging.getLogger("bacpipe")
 
 
 def get_model_names(
-    embedding_model, audio_dir, main_results_dir, embed_parent_dir, **kwargs
+    models, audio_dir, main_results_dir, embed_parent_dir, already_computed=False, **kwargs
 ):
     """
     Get the names of the models used for embedding. This is either done
@@ -43,14 +43,17 @@ def get_model_names(
 
     Parameters
     ----------
-    embedding_model : dict
-        dict containing the configuration for the embedding models
+    models : list
+        list of embedding models
     audio_dir : string
         full path to audio files
     main_results_dir : string
         top level directory for the results of the embedding evaluation
     embed_parent_dir : string
         parent directory for the embeddings
+    already_computed : bool, Default is False
+        ignore model list and use only models whos embeddings already have
+        been computed and are saved in the results dir
 
     Raises
     ------
@@ -58,8 +61,7 @@ def get_model_names(
         If already computed embeddings are used, but no embeddings
         are found in the specified directory.
     """
-    global model_names
-    if embedding_model["already_computed"]:
+    if already_computed:
 
         dataset_name = Path(audio_dir).stem
         main_results_path = (
@@ -78,13 +80,16 @@ def get_model_names(
                 " If you want to compute new embeddings, please set the "
                 "'already_computed' option to False in the config.yaml file."
             )
+        else:
+            return np.unique(model_names).tolist()
     else:
-        model_names = embedding_model["selected_models"]
+        return models
 
 
 def evaluation_with_settings_already_exists(
     audio_dir,
     dim_reduction_model,
+    models, 
     testing=False,
     **kwargs,
 ):
@@ -102,6 +107,8 @@ def evaluation_with_settings_already_exists(
         full path to audio files
     dim_reduction_model : string
         name of the dimensionality reduction model to be used
+    models : list
+        embedding models
 
     Returns
     -------
@@ -110,7 +117,7 @@ def evaluation_with_settings_already_exists(
     """
     if testing:
         return False
-    for model_name in model_names:
+    for model_name in models:
         paths = make_set_paths_func(audio_dir, **kwargs)(model_name)
         bool_paths = (
             paths.main_embeds_path.exists()
@@ -133,7 +140,7 @@ def evaluation_with_settings_already_exists(
     return True
 
 
-def model_specific_embedding_creation(audio_dir, dim_reduction_model, **kwargs):
+def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **kwargs):
     """
     Generate embeddings for each model in the list of model names.
     The embeddings are generated using the generate_embeddings function
@@ -150,6 +157,8 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, **kwargs):
         name of the dimensionality reduction model to be used
         for the embeddings. If "None" is selected, no
         dimensionality reduction is performed.
+    models : list
+        embedding models
 
     Returns
     -------
@@ -157,7 +166,7 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, **kwargs):
         dictionary containing the loader objects for each model
     """
     loader_dict = {}
-    for model_name in model_names:
+    for model_name in models:
         loader_dict[model_name] = get_embeddings(
             model_name=model_name,
             dim_reduction_model=dim_reduction_model,
@@ -168,7 +177,7 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, **kwargs):
 
 
 def model_specific_evaluation(
-    loader_dict, evaluation_task, class_configs, distance_configs, **kwargs
+    loader_dict, evaluation_task, class_configs, distance_configs, models, **kwargs
 ):
     """
     Perform evaluation of the embeddings using the specified
@@ -193,8 +202,10 @@ def model_specific_evaluation(
         in the bacpipe/settings.yaml file.
     distance_configs : dict
         dictionary to specify which distance calculations to perform
+    models : list
+        embedding models
     """
-    for model_name in model_names:
+    for model_name in models:
         if not evaluation_task in ["None", []]:
             embeds = loader_dict[model_name].embedding_dict()
             paths = get_paths(model_name)
@@ -245,7 +256,7 @@ def model_specific_evaluation(
 
 
 def cross_model_evaluation(
-    dim_reduction_model, evaluation_task, dashboard=False, **kwargs
+    dim_reduction_model, evaluation_task, models, **kwargs
 ):
     """
     Generate plots to compare models by the specified tasks.
@@ -256,19 +267,22 @@ def cross_model_evaluation(
         name of dimensionality reduction model
     evaluation_task : list
         tasks to evaluate models by
+    models : list
+        embedding models
     """
-    if len(model_names) > 1:
-        plot_path = get_paths(model_names[0]).plot_path.parent.parent.joinpath(
+    if len(models) > 1:
+        plot_path = get_paths(models[0]).plot_path.parent.parent.joinpath(
             "overview"
         )
         plot_path.mkdir(exist_ok=True, parents=True)
         if not len(evaluation_task) == 0:
             for task in evaluation_task:
-                visualise_results_across_models(plot_path, task, model_names)
+                visualise_results_across_models(plot_path, task, models)
         if not dim_reduction_model == "None":
+            kwargs.pop('dashboard')
             plot_comparison(
                 plot_path,
-                model_names,
+                models,
                 dim_reduction_model,
                 label_by="time_of_day",
                 dashboard=False,
@@ -282,12 +296,14 @@ def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
     ]
 
 
-def visualize_using_dashboard(**kwargs):
+def visualize_using_dashboard(models, **kwargs):
     """
     Create and serve the dashboard for visualization.
 
     Parameters
     ----------
+    models : list
+        embedding models
     kwargs : dict
         Dictionary with parameters for dashboard creation
     """
@@ -295,7 +311,7 @@ def visualize_using_dashboard(**kwargs):
     import panel as pn
 
     # Configure dashboard
-    dashboard = DashBoard(model_names, **kwargs)
+    dashboard = DashBoard(models, **kwargs)
 
     # Build the dashboard layout
     try:

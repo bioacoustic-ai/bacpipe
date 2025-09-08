@@ -9,8 +9,8 @@ from ..utils import ModelBaseClass
 
 class Model(ModelBaseClass):
 
-    def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+    def __init__(self, **kwargs):
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         model = tf.keras.models.load_model(
             self.model_base_path / "birdnet", compile=False
         )

@@ -478,6 +478,8 @@ def return_rows_cols(num):
         return 4, 4
     elif num > 16 and num <= 20:
         return 4, 5
+    else:
+        return 5, num // 5
 
 
 def set_figsize_for_comparison(rows, cols):
@@ -825,7 +827,7 @@ def iterate_through_subtasks(plot_func, plot_path, task_name, model_list, metric
         plot_func(plot_path, f"{subtask} {task_name}", model_list, sub_task_metrics)
 
 
-def clustering_overview(path_func, label_by, no_noise, model_list, **kwargs):
+def clustering_overview(path_func, label_by, no_noise, model_list, label_column, **kwargs):
     """
     Create overview plots for clustering metrics.
 
@@ -839,6 +841,8 @@ def clustering_overview(path_func, label_by, no_noise, model_list, **kwargs):
         whether to plot the metrics with or without noise
     model_list : list
         list of models
+    label_column : str
+        label as defined in the annotations.csv file
     kwargs : dict
         additional arguments for plotting
 
@@ -858,19 +862,19 @@ def clustering_overview(path_func, label_by, no_noise, model_list, **kwargs):
         else:
             no_noise = ""
         flat_metrics[model_name] = dict()
-        if label_by == "ground_truth":
-            flat_metrics[model_name]["ground_truth"] = metrics["ARI"][
-                f"ground_truth{no_noise}-kmeans"
+        if label_by == label_column:
+            flat_metrics[model_name][label_column] = metrics["ARI"][
+                f"{label_column}{no_noise}-kmeans"
             ]
         elif not label_by == "kmeans":
             flat_metrics[model_name]["kmeans"] = metrics["ARI"][
                 f"kmeans{no_noise}-{label_by}"
             ]
-        if not label_by == "ground_truth" and "ground_truth" in [
+        if not label_by == label_column and label_column in [
             k.split("-")[0] for k in metrics["ARI"].keys()
         ]:
-            flat_metrics[model_name]["ground_truth"] = metrics["ARI"][
-                f"ground_truth{no_noise}-{label_by}"
+            flat_metrics[model_name][label_column] = metrics["ARI"][
+                f"{label_column}{no_noise}-{label_by}"
             ]
 
     return generate_bar_plot(flat_metrics, fig, ax, **kwargs)

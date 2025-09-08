@@ -129,7 +129,7 @@ distance_configs:
 
 # fixed path, embeddings will be stored here, advised not to change
 # because this is also where bacpipe will look for existing embeddings
-main_results_dir :      "results"
+main_results_dir :      "bacpipe_results"
 embed_parent_dir :      "embeddings"
 dim_reduc_parent_dir :  "dim_reduced_embeddings"
 evaluations_dir :       "evaluations"

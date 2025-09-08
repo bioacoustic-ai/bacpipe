@@ -1,15 +1,19 @@
 import logging
-
-# Unzip models_example.zip to initiate models dir structure
 import zipfile
+import yaml
 from pathlib import Path
+from types import SimpleNamespace
+import importlib.resources as pkg_resources
 
+# --------------------------------------------------------------------
+# Package paths
+# --------------------------------------------------------------------
+PACKAGE_ROOT = Path(__file__).parent.parent   # repo root
+PACKAGE_MAIN = Path(__file__).parent          # bacpipe/
 
-# Determine package root directory
-PACKAGE_ROOT = Path(__file__).parent.parent
-PACKAGE_MAIN = Path(__file__).parent
-
-# Unzip models_example.zip if needed
+# --------------------------------------------------------------------
+# Ensure model checkpoints folder exists (unzip if needed)
+# --------------------------------------------------------------------
 models_dir = PACKAGE_MAIN / "model_checkpoints"
 zip_file = PACKAGE_MAIN / "model_checkpoints.zip"
 
@@ -17,21 +21,33 @@ if not models_dir.exists() and zip_file.exists():
     with zipfile.ZipFile(zip_file, "r") as zip_ref:
         zip_ref.extractall(PACKAGE_MAIN)
 
-# Initialize Logger
+# --------------------------------------------------------------------
+# Logging
+# --------------------------------------------------------------------
 logger = logging.getLogger("bacpipe")
-c_handler = logging.StreamHandler()
-c_format = logging.Formatter("%(name)s::%(levelname)s:%(message)s")
-c_handler.setFormatter(c_format)
-logger.addHandler(c_handler)
+if not logger.handlers:  # avoid duplicate handlers
+    c_handler = logging.StreamHandler()
+    c_format = logging.Formatter("%(name)s::%(levelname)s:%(message)s")
+    c_handler.setFormatter(c_format)
+    logger.addHandler(c_handler)
 logger.setLevel(logging.WARNING)
 
-## Expose common functions
+# --------------------------------------------------------------------
+# Load config & settings
+# --------------------------------------------------------------------
+with open(PACKAGE_ROOT / "config.yaml") as f:
+    _config_dict = yaml.load(f, Loader=yaml.CLoader)
 
-import yaml
-from pathlib import Path
-import importlib.resources as pkg_resources
+with pkg_resources.open_text(__package__, "settings.yaml") as f:
+    _settings_dict = yaml.load(f, Loader=yaml.CLoader)
 
-import bacpipe
+# Expose as mutable namespaces
+config = SimpleNamespace(**_config_dict)
+settings = SimpleNamespace(**_settings_dict)
+
+# --------------------------------------------------------------------
+# Expose core API functions
+# --------------------------------------------------------------------
 from bacpipe.main import (
     get_model_names,
     evaluation_with_settings_already_exists,
@@ -41,33 +57,73 @@ from bacpipe.main import (
     visualize_using_dashboard,
 )
 
-with open(bacpipe.PACKAGE_ROOT / "config.yaml") as f:
-    config = yaml.load(f, Loader=yaml.CLoader)
+def play(config=config, settings=settings, save_logs=False):
+    """
+    Play the bacpipe! The pipeline will run using the models specified in 
+    bacpipe.config.models and generate results in the directory
+    bacpipe.settings.results_dir. For more details see the ReadMe file on the 
+    repository page https://github.com/bioacoustic-ai/bacpipe.
 
-with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
-    settings = yaml.load(f, Loader=yaml.CLoader)
+    Parameters
+    ----------
+    config : dict, optional
+        configurations for pipeline execution, by default config
+    settings : dict, optional
+        settings for pipeline execution, by default settings
+    save_logs : bool, optional
+        Save logs, config and settings file. This is important if you get a bug,
+        sharing this will be very helpful to find the source of 
+        the problem, by default False
 
 
-def run(config, settings):
-    overwrite, dashboard = config["overwrite"], config["dashboard"]
+    Raises
+    ------
+    FileNotFoundError
+        If no audio files are found we can't compute any embeddings. So make
+        sure the path is correct :)
+    """
+    overwrite, dashboard = config.overwrite, config.dashboard
 
-    if not Path(config["audio_dir"]).exists():
+    if not Path(config.audio_dir).exists():
         raise FileNotFoundError(
-            f"Audio directory {config['audio_dir']} does not exist. Please check the path. "
+            f"Audio directory {config.audio_dir} does not exist. Please check the path. "
             "It should be in the format 'C:\\path\\to\\audio' on Windows or "
-            "'/path/to/audio' on Linux/Mac. But be sure to use single quotes '!"
+            "'/path/to/audio' on Linux/Mac. Use single quotes '!"
         )
+        
+        # ----------------------------------------------------------------
+    # Setup logging to file if requested
+    # ----------------------------------------------------------------
+    if save_logs:
+        import datetime
+        import json
+        Path(settings.main_results_dir).mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        log_file = Path(settings.main_results_dir) / f"bacpipe_{timestamp}.log"
 
-    get_model_names(**config, **settings)
+        f_handler = logging.FileHandler(log_file)
+        f_format = logging.Formatter("%(asctime)s :: %(name)s :: %(levelname)s :: %(message)s")
+        f_handler.setFormatter(f_format)
+        logger.addHandler(f_handler)
 
-    if overwrite or not evaluation_with_settings_already_exists(**config, **settings):
+        # Save current config + settings snapshot
+        with open(Path(settings.main_results_dir) / f"config_{timestamp}.json", "w") as f:
+            json.dump(vars(config), f, indent=2)
+        with open(Path(settings.main_results_dir) / f"settings_{timestamp}.json", "w") as f:
+            json.dump(vars(settings), f, indent=2)
 
-        loader_dict = model_specific_embedding_creation(**config, **settings)
+        logger.info("Saved config, settings, and logs to %s", settings.main_results_dir)
 
-        model_specific_evaluation(loader_dict, **config, **settings)
 
-        cross_model_evaluation(**config, **settings)
+    config.models = get_model_names(**vars(config), **vars(settings))
+
+    if overwrite or not evaluation_with_settings_already_exists(**vars(config), **vars(settings)):
+        
+        loader_dict = model_specific_embedding_creation(**vars(config), **vars(settings))
+        
+        model_specific_evaluation(loader_dict, **vars(config), **vars(settings))
+        
+        cross_model_evaluation(**vars(config), **vars(settings))
 
     if dashboard:
-
-        visualize_using_dashboard(**config, **settings)
+        visualize_using_dashboard(**vars(config), **vars(settings))

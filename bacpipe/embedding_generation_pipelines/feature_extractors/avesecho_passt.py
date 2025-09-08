@@ -1,5 +1,5 @@
 from hear21passt.base import get_basic_model, get_model_passt
-from ..utils import ModelBaseClass, MODEL_BASE_PATH
+from ..utils import ModelBaseClass
 import torch.nn as nn
 import torchaudio
 import torch
@@ -114,13 +114,13 @@ class AugmentMelSTFT(nn.Module):
 
 
 class Model(ModelBaseClass):
-    def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+    def __init__(self, **kwargs):
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         self.model = get_basic_model(mode="logits", arch="passt_s_kd_p16_128_ap486")
         self.model.net = get_model_passt(arch="passt_s_kd_p16_128_ap486", n_classes=585)
         self.model.net.to(self.device)
         ckpnt = torch.load(
-            f"{MODEL_BASE_PATH}/avesecho_passt/best_model_passt.pt",
+            self.model_base_path / "avesecho_passt/best_model_passt.pt",
             weights_only=True,
             map_location=torch.device(self.device),
         )

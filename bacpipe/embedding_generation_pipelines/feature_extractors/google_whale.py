@@ -8,11 +8,12 @@ LENGTH_IN_SAMPLES = 50_000
 
 
 class Model(Model):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__(
             sr=SAMPLE_RATE,
             segment_length=LENGTH_IN_SAMPLES,
             model_choice="multispecies_whale",
+            **kwargs
         )
 
         self.abbrev2label = {

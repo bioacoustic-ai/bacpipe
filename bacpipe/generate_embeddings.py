@@ -27,7 +27,7 @@ class Loader:
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
 
-        self.initialize_path_structure(testing=testing)
+        self.initialize_path_structure(testing=testing, **kwargs)
 
         self.check_if_combination_exists = check_if_combination_exists
         if self.dim_reduction_model:
@@ -57,22 +57,16 @@ class Loader:
                 )
             )
 
-    def initialize_path_structure(self, testing=False):
-        import importlib.resources as pkg_resources
-        import bacpipe
-
-        with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
-            self.config = yaml.load(f, Loader=yaml.CLoader)
-
+    def initialize_path_structure(self, testing=False, **kwargs):
         if testing:
-            self.config["main_results_dir"] = "bacpipe/tests/results_files"
+            kwargs["main_results_dir"] = "bacpipe/tests/results_files"
 
-        for key, val in self.config.items():
+        for key, val in kwargs.items():
             if key == "main_results_dir":
                 continue
             if key in ["embed_parent_dir", "dim_reduc_parent_dir", "evaluations_dir"]:
                 val = (
-                    Path(self.config["main_results_dir"])
+                    Path(kwargs["main_results_dir"])
                     .joinpath(self.audio_dir.stem)
                     .joinpath(val)
                 )
@@ -88,8 +82,8 @@ class Loader:
                 existing_embed_dirs = Path(self.dim_reduc_parent_dir).iterdir()
             else:
                 existing_embed_dirs = Path(self.embed_parent_dir).iterdir()
-            if self.testing:
-                return
+            # if self.testing:
+            #     return
             existing_embed_dirs = list(existing_embed_dirs)
             if isinstance(self.check_if_combination_exists, str):
                 existing_embed_dirs = [
@@ -178,7 +172,7 @@ class Loader:
         files_list = []
         [
             [files_list.append(ll) for ll in self.audio_dir.rglob(f"*{string}")]
-            for string in self.config["audio_suffixes"]
+            for string in self.audio_suffixes
         ]
         files_list = np.unique(files_list).tolist()
         assert len(files_list) > 0, "No audio files found in audio_dir."
@@ -365,9 +359,9 @@ class Embedder:
             self.model_name = dim_reduction_model
         else:
             self.model_name = model_name
-        self._init_model()
+        self._init_model(**kwargs)
 
-    def _init_model(self):
+    def _init_model(self, **kwargs):
         if self.dim_reduction_model:
             module = importlib.import_module(
                 f"bacpipe.embedding_generation_pipelines.dimensionality_reduction.{self.model_name}"
@@ -376,7 +370,7 @@ class Embedder:
             module = importlib.import_module(
                 f"bacpipe.embedding_generation_pipelines.feature_extractors.{self.model_name}"
             )
-        self.model = module.Model()
+        self.model = module.Model(**kwargs)
         self.model.prepare_inference()
 
     def prepare_audio(self, sample):
