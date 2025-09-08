@@ -61,13 +61,16 @@ default_label_keys: [
   "audio_file_name"
   ]
 
+# key corresponding to the label in the annotation.csv file, if labeled data exists
+# by default this is species, but change if needed
+label_column: 'species'
 
 ## CLASSIFICATION SETTINGS ##
 
 # if the model has a classifier that ships with the model, by default 
 # it will be used, to provide another option to colorcode embeddings
 # and visualize differences between embeddings. 
-run_pretrained_classifer: True
+run_pretrained_classifer: False
 classifier_threshold: 0.3
 
 class_configs:

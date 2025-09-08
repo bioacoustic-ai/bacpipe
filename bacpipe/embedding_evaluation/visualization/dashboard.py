@@ -39,10 +39,15 @@ class DashBoard:
     ):
         self.models = model_names
         self.default_label_keys = default_label_keys
-        self.label_by = default_label_keys.copy()
         self.path_func = le.make_set_paths_func(
             audio_dir, main_results_dir, dim_reduc_parent_dir, **kwargs
         )
+        self.label_by = default_label_keys.copy()
+        if (
+            self.path_func(model_names[0]).class_path
+            / "default_classifier_annotations.csv"
+        ).exists() and not "default_classifier" in self.label_by:
+            self.label_by += ["default_classifier"]
         self.plot_path = self.path_func(model_names[0]).plot_path.parent.parent
         self.dim_reduc_parent_dir = dim_reduc_parent_dir
 
@@ -52,15 +57,22 @@ class DashBoard:
             .labels_path.joinpath("ground_truth.npy")
             .exists()
         ):
+            ground_truth = np.load(
+                le.get_paths(model_names[0]).labels_path.joinpath("ground_truth.npy"),
+                allow_pickle=True,
+            ).item()
+            labels = np.unique(
+                [lab.split(":")[-1] for lab in ground_truth.keys()]
+            ).tolist()
             self.ground_truth = True
-            self.label_by += ["ground_truth"]
+            self.label_by += labels
 
         if len(list(le.get_paths(model_names[0]).clust_path.glob("*.npy"))) > 0:
             self.label_by += ["kmeans"]
 
         self.evaluation_task = evaluation_task
         self.dim_reduction_model = dim_reduction_model
-        self.widget_width = 120
+        self.widget_width = 100
         self.vis_loader = EmbedAndLabelLoader(
             dim_reduction_model=dim_reduction_model,
             default_label_keys=default_label_keys,

@@ -163,7 +163,7 @@ def get_nr_of_clusters(labels, clust_configs, **kwargs):
     return clust_params
 
 
-def clustering(paths, embeds, ground_truth, overwrite=False, **kwargs):
+def clustering(paths, embeds, ground_truth, label_column, overwrite=False, **kwargs):
     """
     Clustering pipeline.
 
@@ -181,7 +181,7 @@ def clustering(paths, embeds, ground_truth, overwrite=False, **kwargs):
     if overwrite or not len(list(paths.clust_path.glob("*.json"))) > 0:
 
         if ground_truth:
-            labels = ground_truth["labels"]
+            labels = ground_truth[f"label:{label_column}"]
         else:
             labels = []
 

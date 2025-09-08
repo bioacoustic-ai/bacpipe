@@ -213,9 +213,9 @@ def model_specific_evaluation(
                 "Are you sure you have selected the right data?"
             )
 
-            generate_annotations_for_classification_task(paths)
+            generate_annotations_for_classification_task(paths, **kwargs)
 
-            class_embeds = embeds_array_without_noise(embeds, ground_truth)
+            class_embeds = embeds_array_without_noise(embeds, ground_truth, **kwargs)
             for class_config in class_configs.values():
                 if class_config["bool"]:
                     if not len(class_embeds) > 0:
@@ -276,8 +276,10 @@ def cross_model_evaluation(
             )
 
 
-def embeds_array_without_noise(embeds, ground_truth):
-    return np.concatenate(list(embeds.values()))[ground_truth["labels"] > -1]
+def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
+    return np.concatenate(list(embeds.values()))[
+        ground_truth[f"label:{label_column}"] > -1
+    ]
 
 
 def visualize_using_dashboard(**kwargs):
@@ -442,6 +444,11 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                         embed.save_classifier_outputs(ld, file)
 
             # Finalize
+            if embed.model.bool_classifier:
+                embed.cumulative_annotations.to_csv(
+                    embed.paths.class_path / "default_classifier_annotations.csv",
+                    index=False,
+                )
             ld.write_metadata_file()
             ld.update_files()
 

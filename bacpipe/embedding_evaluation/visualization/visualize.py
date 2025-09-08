@@ -241,13 +241,15 @@ def get_labels_for_plot(model_name=None, **kwargs):
 
     if le.get_paths(model_name).labels_path.joinpath("ground_truth.npy").exists():
         ground_truth = le.get_ground_truth(model_name)
-        inv = {v: k for k, v in ground_truth["label_dict"].items()}
-        inv[-1.0] = "noise"
-        inv[-2.0] = "noise"
-        # technically -2.0 is not noise, but corresponds to sections
-        # with multiple sources vocalizing simultaneously
-        labels["ground_truth"] = [inv[v] for v in ground_truth["labels"]]
-        bool_noise = np.array(labels["ground_truth"]) == "noise"
+        for label_column in [key for key in ground_truth.keys() if "label:" in key]:
+            label = label_column.split("label:")[-1]
+            inv = {v: k for k, v in ground_truth[f"label_dict:{label}"].items()}
+            inv[-1.0] = "noise"
+            inv[-2.0] = "noise"
+            # technically -2.0 is not noise, but corresponds to sections
+            # with multiple sources vocalizing simultaneously
+            labels[label] = [inv[v] for v in ground_truth[label_column]]
+            bool_noise = np.array(labels[label]) == "noise"
     else:
         bool_noise = np.array([False] * len(list(labels.values())[0]))
     if len(list(le.get_paths(model_name).clust_path.glob("*.npy"))) > 0:

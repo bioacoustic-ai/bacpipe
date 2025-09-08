@@ -1,5 +1,6 @@
 import librosa as lb
 import numpy as np
+import pandas as pd
 from pathlib import Path
 import yaml
 import time
@@ -519,9 +520,6 @@ class Embedder:
 
     @staticmethod
     def make_classification_dict(probabilities, classes, threshold):
-        if probabilities.shape[0] != len(classes):
-            probabilities = probabilities.swapaxes(0, 1)
-
         cls_idx, tmp_idx = np.where(probabilities > threshold)
 
         cls_results = {
@@ -549,13 +547,35 @@ class Embedder:
         file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
         file_dest = str(file_dest) + ".json"
 
-        tmp_bins = self.model.classifier_outputs.shape[-1]
+        if self.model.classifier_outputs.shape[0] != len(self.model.classes):
+            self.model.classifier_outputs = self.model.classifier_outputs.swapaxes(0, 1)
+
         cls_results = self.make_classification_dict(
-            self.model.classifier_outputs,
-            self.model.classes,
-            self.classifier_threshold,
-            tmp_bins,
+            self.model.classifier_outputs, self.model.classes, self.classifier_threshold
         )
+
+        classifier_annotations = pd.DataFrame()
+
+        tmp_bins = self.model.classifier_outputs.shape[-1]
+        classifier_annotations["start"] = np.arange(tmp_bins) * (
+            self.model.segment_length / self.model.sr
+        )
+        classifier_annotations["end"] = classifier_annotations["start"] + (
+            self.model.segment_length / self.model.sr
+        )
+        classifier_annotations["audiofilename"] = str(
+            file.relative_to(fileloader_obj.audio_dir)
+        )
+        classifier_annotations["label:default_classifier"] = np.array(
+            self.model.classes
+        )[torch.argmax(self.model.classifier_outputs, dim=0)].tolist()
+
+        if not hasattr(self, "cumulative_annotations"):
+            self.cumulative_annotations = classifier_annotations
+        else:
+            self.cumulative_annotations = pd.concat(
+                [self.cumulative_annotations, classifier_annotations], ignore_index=True
+            )
 
         with open(file_dest, "w") as f:
             json.dump(cls_results, f)

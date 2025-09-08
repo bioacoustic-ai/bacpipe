@@ -19,6 +19,11 @@ class DefaultLabels:
     def __init__(self, paths, model, default_label_keys, **kwargs):
         self.model = model
         self.default_label_keys = default_label_keys
+        self.paths = paths
+        if (
+            self.paths.class_path / "original_classifier_outputs"
+        ).exists() and not "default_classifier" in self.default_label_keys:
+            self.default_label_keys += ["default_classifier"]
         embed_path = model_specific_embedding_path(paths.main_embeds_path, model)
         self.metadata = yaml.safe_load(open(embed_path.joinpath("metadata.yml"), "r"))
         self.nr_embeds_per_file = self.metadata["files"]["nr_embeds_per_file"]
@@ -159,6 +164,16 @@ class DefaultLabels:
             self.audio_file_name_per_embedding.extend(
                 np.repeat(file, self.nr_embeds_per_file[file_idx])
             )
+
+    def default_classifier(self):
+        path = self.paths.class_path / "default_classifier_annotations.csv"
+        if not path.exists():
+            self.default_classifier_per_embedding = []
+        else:
+            df = pd.read_csv(path)
+            self.default_classifier_per_embedding = df[
+                "label:default_classifier"
+            ].values
 
 
 def make_set_paths_func(
@@ -406,32 +421,50 @@ def load_labels_and_build_dict(
     audio_dir,
     bool_filter_labels=True,
     min_label_occurances=150,
+    label_column=None,
     **kwargs,
 ):
     try:
         label_df = pd.read_csv(Path(audio_dir).joinpath(label_file))
     except FileNotFoundError as e:
         logger.warning(
-            "No annotations file found, not able to create ground_truth.npy file. "
-            "bacpipe should still work, but you will not be able to label by ground truth. "
-            "You also will not be able to evaluate using classification."
+            f"No annotations file found in {audio_dir}, trying in "
+            f"{str(paths.dataset_path.resolve())}."
         )
-        raise FileNotFoundError("No annotations file found.")
+        try:
+            label_df = pd.read_csv(paths.dataset_path.joinpath(label_file))
+        except:
+            logger.warning(
+                "No annotations file found, not able to create ground_truth.npy file. "
+                "bacpipe should still work, but you will not be able to label by ground truth. "
+                "You also will not be able to evaluate using classification."
+            )
+            raise FileNotFoundError("No annotations file found.")
     if bool_filter_labels:
         filtered_labels = [
             lab
-            for lab in np.unique(label_df.label)
-            if len(label_df[label_df.label == lab]) > min_label_occurances
+            for lab in np.unique(label_df[f"label:{label_column}"])
+            if len(label_df[label_df[f"label:{label_column}"] == lab])
+            > min_label_occurances
         ]
-        label_df = label_df[label_df.label.isin(filtered_labels)]
-    label_idx_dict = {label: idx for idx, label in enumerate(label_df.label.unique())}
+        label_df = label_df[label_df[f"label:{label_column}"].isin(filtered_labels)]
+    label_idx_dict = {
+        label: idx
+        for idx, label in enumerate(label_df[f"label:{label_column}"].unique())
+    }
     with open(paths.labels_path.joinpath("label_idx_dict.json"), "w") as f:
         json.dump(label_idx_dict, f)
     return label_df, label_idx_dict
 
 
 def fit_labels_to_embedding_timestamps(
-    df, label_idx_dict, num_embeds, segment_s, single_label=True, **kwargs
+    df,
+    label_idx_dict,
+    num_embeds,
+    segment_s,
+    label_column=None,
+    single_label=True,
+    **kwargs,
 ):
     file_labels = np.ones(num_embeds) * -1
     embed_timestamps = np.arange(num_embeds) * segment_s
@@ -444,14 +477,15 @@ def fit_labels_to_embedding_timestamps(
         if single_label:
             if (
                 not all(file_labels[em_start:em_end] == -1)
-                and not label_idx_dict[row.label] in file_labels[em_start:em_end]
+                and not label_idx_dict[row[f"label:{label_column}"]]
+                in file_labels[em_start:em_end]
             ):
                 single_label_arr[em_start:em_end] = [False] * (em_end - em_start)
 
         # at least 0.65 seconds of the bbox have
         # to be in the embedding timestamp window
         if row.end - row.start > 0.65:
-            file_labels[em_start:em_end] = label_idx_dict[row.label]
+            file_labels[em_start:em_end] = label_idx_dict[row[f"label:{label_column}"]]
     if single_label:
         file_labels[~np.array(single_label_arr)] = -2
     return file_labels
@@ -562,6 +596,7 @@ def collect_ground_truth_labels_by_file(
 def ground_truth_by_model(
     paths,
     model,
+    label_column,
     label_file="annotations.csv",
     overwrite=False,
     single_label=True,
@@ -572,7 +607,7 @@ def ground_truth_by_model(
         path = model_specific_embedding_path(paths.main_embeds_path, model)
 
         label_df, label_idx_dict = load_labels_and_build_dict(
-            paths, label_file, **kwargs
+            paths, label_file, label_column=label_column, **kwargs
         )
 
         files = list(path.rglob("*.npy"))
@@ -581,21 +616,26 @@ def ground_truth_by_model(
         metadata = yaml.safe_load(open(path.joinpath("metadata.yml"), "r"))
         segment_s = metadata["segment_length (samples)"] / metadata["sample_rate (Hz)"]
 
-        ground_truth = collect_ground_truth_labels_by_file(
-            paths,
-            files,
-            model,
-            segment_s,
-            metadata,
-            label_df,
-            label_idx_dict,
-            single_label=single_label,
-        )
+        label_columns = [col for col in label_df.columns if "label:" in col]
+        for label_col in label_columns:
+            labels = label_col.split("label:")[-1]
+            ground_truth = collect_ground_truth_labels_by_file(
+                paths,
+                files,
+                model,
+                segment_s,
+                metadata,
+                label_df,
+                label_idx_dict,
+                single_label=single_label,
+                label_column=labels,
+                **kwargs,
+            )
 
-        ground_truth_dict = {
-            "labels": ground_truth,
-            "label_dict": label_idx_dict,
-        }
+            ground_truth_dict = {
+                f"label:{labels}": ground_truth,
+                f"label_dict:{labels}": label_idx_dict,
+            }
         np.save(paths.labels_path.joinpath("ground_truth.npy"), ground_truth_dict)
     else:
         ground_truth_dict = np.load(
@@ -604,7 +644,7 @@ def ground_truth_by_model(
     return ground_truth_dict
 
 
-def generate_annotations_for_classification_task(paths):
+def generate_annotations_for_classification_task(paths, label_column, **kwargs):
     if not paths.labels_path.joinpath("ground_truth.npy").exists():
         raise ValueError(
             "The ground truth label file ground_truth.npy does not exist. "
@@ -614,8 +654,10 @@ def generate_annotations_for_classification_task(paths):
         paths.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
     ).item()
 
-    inv = {v: k for k, v in ground_truth["label_dict"].items()}
-    labels = ground_truth["labels"][ground_truth["labels"] > -1]
+    inv = {v: k for k, v in ground_truth[f"label_dict:{label_column}"].items()}
+    labels = ground_truth[f"label:{label_column}"][
+        ground_truth[f"label:{label_column}"] > -1
+    ]
     labs = [inv[i] for i in labels]
     df = pd.DataFrame()
     df["label"] = labs
