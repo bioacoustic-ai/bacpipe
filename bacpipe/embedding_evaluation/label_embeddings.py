@@ -20,10 +20,11 @@ class DefaultLabels:
         self.model = model
         self.default_label_keys = default_label_keys
         self.paths = paths
-        if (
-            self.paths.class_path / "original_classifier_outputs"
-        ).exists() and not "default_classifier" in self.default_label_keys:
-            self.default_label_keys += ["default_classifier"]
+        if (self.paths.class_path / "original_classifier_outputs").exists():
+            if not "default_classifier" in self.default_label_keys:
+                self.default_label_keys += ["default_classifier"]
+        elif "default_classifier" in self.default_label_keys:
+            self.default_label_keys.remove("default_classifier")
         embed_path = model_specific_embedding_path(paths.main_embeds_path, model)
         self.metadata = yaml.safe_load(open(embed_path.joinpath("metadata.yml"), "r"))
         self.nr_embeds_per_file = self.metadata["files"]["nr_embeds_per_file"]
@@ -508,6 +509,10 @@ def build_ground_truth_labels_by_file(
     audio_file = metadata["files"]["audio_files"][ind]
 
     df = label_df[label_df.audiofilename == Path(audio_file).as_posix()]
+    if len(df) == 0:
+        df = label_df[
+            label_df.audiofilename == Path(audio_file).stem + Path(audio_file).suffix
+        ]
 
     if df.empty:
         all_labels = np.concatenate((all_labels, np.ones(num_embeds) * -1))

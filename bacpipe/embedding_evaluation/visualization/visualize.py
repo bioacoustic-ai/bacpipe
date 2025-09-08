@@ -270,7 +270,10 @@ def get_labels_for_plot(model_name=None, **kwargs):
 
 def set_colorbar_or_legend(fig, axes, points, c_label_dict, label_by, **kwargs):
     if len(c_label_dict.keys()) > 20:
-        if len(list(c_label_dict.keys())[0]) < 12:
+        if (
+            isinstance(list(c_label_dict.keys())[0], int)
+            or len(list(c_label_dict.keys())[0]) < 12
+        ):
             fontsize = 9
         else:
             fontsize = 6
