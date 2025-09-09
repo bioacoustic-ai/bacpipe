@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import yaml
 import importlib.resources as pkg_resources
+from pathlib import Path
 
 sys.path.insert(0, ".")
 
@@ -75,7 +76,9 @@ needs_checkpoint = [
 ]
 
 embeddings = {}
-audio_dir = "bacpipe/tests/test_data"
+with pkg_resources.path(__package__ + ".tests.test_files", "") as audio_dir:
+    audio_dir = Path(audio_dir)
+config["audio_dir"] = audio_dir
 get_paths = make_set_paths_func(**kwargs)
 
 

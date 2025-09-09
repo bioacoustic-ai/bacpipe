@@ -108,12 +108,17 @@ def play(config=config, settings=settings, save_logs=False):
     settings.model_base_path = ensure_std_models(Path(settings.model_base_path))
     overwrite, dashboard = config.overwrite, config.dashboard
 
-    if not Path(config.audio_dir).exists():
+    with pkg_resources.path(__package__ + ".tests.test_files", "") as audio_dir:
+        audio_dir = Path(audio_dir)
+
+    if not audio_dir.exists():
         raise FileNotFoundError(
             f"Audio directory {config.audio_dir} does not exist. Please check the path. "
             "It should be in the format 'C:\\path\\to\\audio' on Windows or "
             "'/path/to/audio' on Linux/Mac. Use single quotes '!"
         )
+    else:
+        config.audio_dir = audio_dir
 
         # ----------------------------------------------------------------
     # Setup logging to file if requested
