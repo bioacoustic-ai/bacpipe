@@ -82,8 +82,8 @@ class Loader:
                 existing_embed_dirs = Path(self.dim_reduc_parent_dir).iterdir()
             else:
                 existing_embed_dirs = Path(self.embed_parent_dir).iterdir()
-            # if self.testing:
-            #     return
+            if self.testing:
+                return
             existing_embed_dirs = list(existing_embed_dirs)
             if isinstance(self.check_if_combination_exists, str):
                 existing_embed_dirs = [
@@ -103,7 +103,7 @@ class Loader:
                         d.rmdir()
                         continue
                     except OSError:
-                        print(
+                        logger.info(
                             f"Directory {d} is not empty. ",
                             "Please remove it manually.",
                         )
@@ -116,7 +116,7 @@ class Loader:
                 if self.dim_reduction_model:
                     if self.dim_reduction_model in d.stem:
                         self.combination_already_exists = True
-                        print(
+                        logger.info(
                             "\n### Embeddings already exist. "
                             f"Using embeddings in {str(d)} ###"
                         )
@@ -133,12 +133,12 @@ class Loader:
                     except AssertionError as e:
                         self._get_metadata_dict(d)
                         self.combination_already_exists = True
-                        print(
+                        logger.info(
                             f"Error: {e}. "
                             "Will proceed without veryfying if the number of embeddings "
                             "is the same as the number of audio files."
                         )
-                        print(
+                        logger.info(
                             "\n### Embeddings already exist. "
                             f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
                         )
@@ -147,8 +147,24 @@ class Loader:
                     if num_audio_files == num_files:
                         self.combination_already_exists = True
                         self._get_metadata_dict(d)
-                        print(
+                        logger.info(
                             "\n### Embeddings already exist. "
+                            f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
+                        )
+                        break
+                    elif (
+                        np.round(num_files / num_audio_files, 1) == 1
+                        and num_files > 100
+                    ):
+                        self.combination_already_exists = True
+                        self._get_metadata_dict(d)
+                        logger.info(
+                            "\n### Embeddings already exist. "
+                            f"The number of audio files ({num_audio_files}) "
+                            f"and the number of embeddings files ({num_files}) don't "
+                            "exactly match. That could be down to some of the audio files "
+                            "being corrupt. If you changed the source files and want the "
+                            f"embeddings to be computed again, delete or move {d.stem}. \n\n"
                             f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
                         )
                         break
@@ -199,7 +215,7 @@ class Loader:
                     if key == "embed_dir":
                         val = folder.parent.joinpath(Path(val).stem)
                     elif key == "audio_dir":
-                        print(
+                        logger.info(
                             "The audio files are no longer where they used to be "
                             "during the previous run. This might cause a problem."
                         )

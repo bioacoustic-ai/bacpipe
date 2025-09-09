@@ -33,7 +33,12 @@ logger = logging.getLogger("bacpipe")
 
 
 def get_model_names(
-    models, audio_dir, main_results_dir, embed_parent_dir, already_computed=False, **kwargs
+    models,
+    audio_dir,
+    main_results_dir,
+    embed_parent_dir,
+    already_computed=False,
+    **kwargs,
 ):
     """
     Get the names of the models used for embedding. This is either done
@@ -89,7 +94,7 @@ def get_model_names(
 def evaluation_with_settings_already_exists(
     audio_dir,
     dim_reduction_model,
-    models, 
+    models,
     testing=False,
     **kwargs,
 ):
@@ -255,9 +260,7 @@ def model_specific_evaluation(
                     calc_distances(paths, embeds, **dist_config)
 
 
-def cross_model_evaluation(
-    dim_reduction_model, evaluation_task, models, **kwargs
-):
+def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwargs):
     """
     Generate plots to compare models by the specified tasks.
 
@@ -271,15 +274,13 @@ def cross_model_evaluation(
         embedding models
     """
     if len(models) > 1:
-        plot_path = get_paths(models[0]).plot_path.parent.parent.joinpath(
-            "overview"
-        )
+        plot_path = get_paths(models[0]).plot_path.parent.parent.joinpath("overview")
         plot_path.mkdir(exist_ok=True, parents=True)
         if not len(evaluation_task) == 0:
             for task in evaluation_task:
                 visualise_results_across_models(plot_path, task, models)
         if not dim_reduction_model == "None":
-            kwargs.pop('dashboard')
+            kwargs.pop("dashboard")
             plot_comparison(
                 plot_path,
                 models,
@@ -423,7 +424,7 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
             embed = ge.Embedder(**kwargs)
 
             if ld.dim_reduction_model:
-                # (1) Dimensionality reduction stage → always sequential
+                # (1) Dimensionality reduction stage
                 for idx, file in enumerate(
                     tqdm(ld.files, desc="processing files", position=1, leave=False)
                 ):
@@ -438,11 +439,11 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                 embed.save_embeddings(idx, ld, file, dim_reduced_embeddings)
 
             elif embed.model.device == "cuda" and not avoid_pipelined_gpu_inference:
-                # (2) GPU path → pipelined embedding (better throughput)
+                # (2) GPU path with pipelined embedding generation
                 embed.get_pipelined_embeddings_from_model(ld)
 
             else:
-                # (3) CPU path → sequential (avoid threading overhead)
+                # (3) CPU path with sequential embedding generation
                 for idx, file in enumerate(
                     tqdm(ld.files, desc="processing files", position=1, leave=False)
                 ):

@@ -8,7 +8,7 @@ bacpipe/tests/.pytest*
 config.yaml
 
 # Ignore everything in results
-results/*
+*results/*
 
 # But NOT these specific paths:
 results/test_data/evaluations/
