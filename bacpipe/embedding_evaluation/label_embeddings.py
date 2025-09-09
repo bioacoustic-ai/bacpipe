@@ -465,7 +465,7 @@ def load_labels_and_build_dict(
         for idx, label in enumerate(label_df[f"label:{label_column}"].unique())
     }
     with open(paths.labels_path.joinpath("label_idx_dict.json"), "w") as f:
-        json.dump(label_idx_dict, f)
+        json.dump(label_idx_dict, f, indent=1)
     return label_df, label_idx_dict
 
 

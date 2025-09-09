@@ -162,7 +162,7 @@ def classify(paths, dataset_csv_path, embeds, config="linear", **kwargs):
         state_dict = clfier.state_dict()
         torch.save(state_dict, paths.class_path / f"{config}_classifier.pt")
         with open(paths.class_path / "label2index.json", "w") as f:
-            json.dump(label2index, f)
+            json.dump(label2index, f, indent=1)
 
     elif config == "knn":
         clfier = KNN(**kwargs)

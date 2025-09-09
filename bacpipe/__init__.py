@@ -101,9 +101,11 @@ def play(config=config, settings=settings, save_logs=False):
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         log_file = Path(settings.main_results_dir) / f"bacpipe_{timestamp}.log"
 
-        f_handler = logging.FileHandler(log_file)
         f_format = logging.Formatter("%(asctime)s :: %(name)s :: %(levelname)s :: %(message)s")
+        f_handler = logging.FileHandler(log_file, mode="w", encoding="utf-8")
+        f_handler.setLevel(logging.INFO)
         f_handler.setFormatter(f_format)
+        f_handler.flush = lambda: f_handler.stream.flush()  # optional, for clarity
         logger.addHandler(f_handler)
 
         # Save current config + settings snapshot

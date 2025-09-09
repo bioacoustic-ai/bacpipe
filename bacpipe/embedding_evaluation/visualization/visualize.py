@@ -786,7 +786,7 @@ def visualise_results_across_models(plot_path, task_name, model_list):
     """
     metrics = load_results(le.get_paths, task_name, model_list)
     with open(plot_path.joinpath(f"{task_name}_results.json"), "w") as f:
-        json.dump(metrics, f)
+        json.dump(metrics, f, indent=2)
 
     if task_name == "classification":
         iterate_through_subtasks(

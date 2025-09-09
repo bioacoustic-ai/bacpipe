@@ -572,7 +572,7 @@ class Embedder:
             )
 
         with open(file_dest, "w") as f:
-            json.dump(cls_results, f)
+            json.dump(cls_results, f, indent=2)
         self.model.classifier_outputs = torch.tensor([])
 
 
@@ -599,7 +599,7 @@ def save_embeddings_dict_with_timestamps(
     import json
 
     with open(file_dest, "w") as f:
-        json.dump(d, f)
+        json.dump(d, f, indent=2)
 
     if embeds.shape[-1] > 2:
         embed_dict = {}
