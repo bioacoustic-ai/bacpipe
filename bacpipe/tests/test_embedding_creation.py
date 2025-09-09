@@ -1,7 +1,6 @@
 import sys
 import numpy as np
 import yaml
-from pathlib import Path
 import importlib.resources as pkg_resources
 
 sys.path.insert(0, ".")
@@ -24,7 +23,7 @@ from bacpipe.embedding_evaluation.clustering.cluster import clustering
 with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
     settings = yaml.load(f, Loader=yaml.CLoader)
 
-with open(bacpipe.PACKAGE_ROOT / "config.yaml") as f:
+with pkg_resources.open_text(bacpipe, "config.yaml") as f:
     config = yaml.load(f, Loader=yaml.CLoader)
 
 settings["overwrite"] = True

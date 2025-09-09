@@ -51,7 +51,7 @@ logger.setLevel(logging.INFO)
 # --------------------------------------------------------------------
 # Load config & settings
 # --------------------------------------------------------------------
-with pkg_resources.open_text("bacpipe", "config.yaml") as f:
+with pkg_resources.open_text(__package__, "config.yaml") as f:
     _config_dict = yaml.load(f, Loader=yaml.CLoader)
 
 with pkg_resources.open_text(__package__, "settings.yaml") as f:
