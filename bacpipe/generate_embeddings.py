@@ -355,19 +355,11 @@ class Embedder:
         classifier_threshold=None,
         **kwargs,
     ):
-        import yaml
-
-        with open(Path(__file__).parent / "settings.yaml", "rb") as f:
-            self.config = yaml.load(f, Loader=yaml.CLoader)
-
         self.paths = paths
         self.file_length = {}
 
         if classifier_threshold:
             self.classifier_threshold = classifier_threshold
-
-        if testing:
-            self.config["main_results_dir"] = "bacpipe/tests/results_files"
 
         self.dim_reduction_model = dim_reduction_model
         if dim_reduction_model:
@@ -530,6 +522,9 @@ class Embedder:
 
     @staticmethod
     def make_classification_dict(probabilities, classes, threshold):
+        if probabilities.shape[0] != len(classes):
+            probabilities = probabilities.swapaxes(0, 1)
+
         cls_idx, tmp_idx = np.where(probabilities > threshold)
 
         cls_results = {
