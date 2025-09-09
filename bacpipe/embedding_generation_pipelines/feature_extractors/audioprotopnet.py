@@ -17,7 +17,9 @@ class Model(ModelBaseClass):
     def __init__(self, **kwargs):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         model = AutoModelForSequenceClassification.from_pretrained(
-            "DBD-research-group/AudioProtoPNet-5-BirdSet-XCL", trust_remote_code=True
+            "DBD-research-group/AudioProtoPNet-5-BirdSet-XCL",
+            trust_remote_code=True,
+            device_map={"", self.device},
         )
 
         # optional: patch missing attribute if other code expects it
@@ -25,7 +27,9 @@ class Model(ModelBaseClass):
             model.incorrect_class_connection = None
 
         self.preprocessor = AutoFeatureExtractor.from_pretrained(
-            "DBD-research-group/AudioProtoPNet-5-BirdSet-XCL", trust_remote_code=True
+            "DBD-research-group/AudioProtoPNet-5-BirdSet-XCL",
+            trust_remote_code=True,
+            device_map={"", self.device},
         )
         self.model = model.model.backbone
         self.classifier = model.head
@@ -33,8 +37,7 @@ class Model(ModelBaseClass):
 
         id2label = model.config.id2label
         ebird2name = pd.read_csv(
-            self.model_utils_base_path / 
-            "perch_chirp/chirp/eBird2name.csv"
+            self.model_utils_base_path / "perch_chirp/chirp/eBird2name.csv"
         )
         self.classes = [
             (

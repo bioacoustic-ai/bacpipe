@@ -11,12 +11,15 @@ class Model(ModelBaseClass):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
 
         self.audio_processor = AutoFeatureExtractor.from_pretrained(
-            "DBD-research-group/Bird-MAE-Base", trust_remote_code=True
+            "DBD-research-group/Bird-MAE-Base",
+            trust_remote_code=True,
+            device_map={"", self.device},
         )
         self.model = AutoModel.from_pretrained(
             "DBD-research-group/Bird-MAE-Huge",
             trust_remote_code=True,
             dtype="auto",
+            device_map={"", self.device},
         )
         self.model.eval()
         self.model.to(self.device)
