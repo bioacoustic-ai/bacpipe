@@ -105,7 +105,7 @@ def play(config=config, settings=settings, save_logs=False):
         If no audio files are found we can't compute any embeddings. So make
         sure the path is correct :)
     """
-    config.model_base_path = ensure_std_models(Path(config.model_base_path))
+    settings.model_base_path = ensure_std_models(Path(settings.model_base_path))
     overwrite, dashboard = config.overwrite, config.dashboard
 
     if not Path(config.audio_dir).exists():
