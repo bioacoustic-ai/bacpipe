@@ -58,6 +58,23 @@ embedding_dimensions = {
     "vggish": 128,
 }
 
+needs_checkpoint = [
+    "audiomae",
+    "avesecho_passt",
+    "aves_especies",
+    "beats",
+    "birdaves_especies",
+    "birdnet",
+    "hbdet",
+    "insect66",
+    "insect459",
+    "mix2",
+    "naturebeats",
+    "protoclr",
+    "rcl_fs_bsed",
+    "vggish",
+]
+
 embeddings = {}
 audio_dir = "bacpipe/tests/test_data"
 get_paths = make_set_paths_func(**kwargs)
@@ -74,11 +91,7 @@ def embedder_fn(loader, model_name):
 
 def loader_fn():
     """Return a Loader for the test audio directory."""
-    loader = Loader(
-        check_if_combination_exists=False,
-        model_name="aves",
-        **kwargs
-    )
+    loader = Loader(check_if_combination_exists=False, model_name="aves", **kwargs)
     assert loader.files, "No audio files found in test data directory"
     return loader
 
@@ -91,7 +104,7 @@ def test_embedding_generation(model):
         model_name=model,
         check_if_primary_combination_exists=False,
         check_if_secondary_combination_exists=False,
-        **kwargs
+        **kwargs,
     )
     assert embeddings[model].files, f"No embeddings generated for {model}"
 

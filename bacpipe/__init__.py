@@ -4,22 +4,38 @@ import yaml
 from pathlib import Path
 from types import SimpleNamespace
 import importlib.resources as pkg_resources
+from huggingface_hub import hf_hub_download
 
-# --------------------------------------------------------------------
-# Package paths
-# --------------------------------------------------------------------
-PACKAGE_ROOT = Path(__file__).parent.parent  # repo root
-PACKAGE_MAIN = Path(__file__).parent  # bacpipe/
 
-# --------------------------------------------------------------------
-# Ensure model checkpoints folder exists (unzip if needed)
-# --------------------------------------------------------------------
-models_dir = PACKAGE_MAIN / "model_checkpoints"
-zip_file = PACKAGE_MAIN / "model_checkpoints.zip"
+def ensure_std_models(model_base_path, repo_id="vinikay/bacpipe_models"):
+    """
+    Ensure that the model checkpoints for birdnetv2.4 and perchv1 are
+    available locally. Downloads from Hugging Face Hub if missing.
 
-if not models_dir.exists() and zip_file.exists():
-    with zipfile.ZipFile(zip_file, "r") as zip_ref:
-        zip_ref.extractall(PACKAGE_MAIN)
+    Parameters
+    ----------
+    model_base_path : Path
+        Local base directory where the checkpoints should be stored.
+    repo_id : str, optional
+        Hugging Face Hub repo ID, by default "vinikay/bacpipe_models"
+    """
+    model_base_path.parent.mkdir(exist_ok=True, parents=True)
+
+    if model_base_path.exists():
+        return model_base_path.parent / "model_checkpoints"
+
+    print("Downloading model checkpoints from Hugging Face Hub...")
+    zip_path = hf_hub_download(
+        repo_id=repo_id,
+        filename="model_checkpoints.zip",
+        repo_type="dataset",
+    )
+
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+        zip_ref.extractall(model_base_path.parent)
+
+    return model_base_path.parent / "model_checkpoints"
+
 
 # --------------------------------------------------------------------
 # Logging
@@ -35,7 +51,7 @@ logger.setLevel(logging.INFO)
 # --------------------------------------------------------------------
 # Load config & settings
 # --------------------------------------------------------------------
-with open(PACKAGE_ROOT / "config.yaml") as f:
+with pkg_resources.open_text("bacpipe", "config.yaml") as f:
     _config_dict = yaml.load(f, Loader=yaml.CLoader)
 
 with pkg_resources.open_text(__package__, "settings.yaml") as f:
@@ -48,6 +64,12 @@ settings = SimpleNamespace(**_settings_dict)
 # --------------------------------------------------------------------
 # Expose core API functions
 # --------------------------------------------------------------------
+from bacpipe.tests.test_embedding_creation import embedding_dimensions, needs_checkpoint
+
+supported_models = list(embedding_dimensions.keys())
+models_needing_checkpoint = needs_checkpoint
+
+
 from bacpipe.main import (
     get_model_names,
     evaluation_with_settings_already_exists,
@@ -83,6 +105,7 @@ def play(config=config, settings=settings, save_logs=False):
         If no audio files are found we can't compute any embeddings. So make
         sure the path is correct :)
     """
+    config.model_base_path = ensure_std_models(Path(config.model_base_path))
     overwrite, dashboard = config.overwrite, config.dashboard
 
     if not Path(config.audio_dir).exists():

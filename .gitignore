@@ -4,8 +4,6 @@ bacpipe/model_checkpoints/*
 bacpipe/tests/.pytest*
 *__pycache__*
 .vscode
-.idea/
-config.yaml
 
 # Ignore everything in results
 *results/*
