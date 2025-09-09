@@ -33,7 +33,8 @@ class Model(ModelBaseClass):
 
         id2label = model.config.id2label
         ebird2name = pd.read_csv(
-            "bacpipe/model_specific_utils/perch_chirp/chirp/eBird2name.csv"
+            self.model_utils_base_path / 
+            "perch_chirp/chirp/eBird2name.csv"
         )
         self.classes = [
             (

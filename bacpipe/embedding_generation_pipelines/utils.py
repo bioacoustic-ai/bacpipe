@@ -1,11 +1,14 @@
-import yaml
+import logging
+from pathlib import Path
+import importlib.resources as pkg_resources
+from tqdm import tqdm
+
+import bacpipe
+        
 import librosa as lb
 import numpy as np
 import torchaudio as ta
 import torch
-from tqdm import tqdm
-import logging
-from pathlib import Path
 import tensorflow
 
 logger = logging.getLogger("bacpipe")
@@ -25,6 +28,9 @@ class ModelBaseClass:
             
         self.device = device
         self.model_base_path = Path(model_base_path)
+        with pkg_resources.path(bacpipe, "model_specific_utils") as utils_path:
+            self.model_utils_base_path = Path(utils_path)
+        
         self.global_batch_size = global_batch_size
         self.padding = padding
         

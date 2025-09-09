@@ -25,9 +25,6 @@ bacpipe/tests/results_files/*
 # track all Readme files, including the ones in subdirectories
 !**/README.md
 
-bacpipe/model_specific_utils/perch_hoplite*
-bacpipe/embedding_generation_pipelines/feature_extractors/perch2.py
-
 exploration/*
 !exploration/explore_embeds.py
 !exploration/explore_dashboard.py

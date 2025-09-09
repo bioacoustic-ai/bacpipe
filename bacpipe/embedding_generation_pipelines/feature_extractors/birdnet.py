@@ -15,8 +15,8 @@ class Model(ModelBaseClass):
             self.model_base_path / "birdnet", compile=False
         )
         all_classes = pd.read_csv(
-            self.model_base_path.parent
-            / "model_specific_utils/birdnet/BirdNET_GLOBAL_6K_V2.4_Labels_en_uk.txt",
+            self.model_utils_base_path /
+            "birdnet/BirdNET_GLOBAL_6K_V2.4_Labels_en_uk.txt",
             header=None,
         )
         self.classes = [s.split("_")[-1] for s in all_classes.values.squeeze()]

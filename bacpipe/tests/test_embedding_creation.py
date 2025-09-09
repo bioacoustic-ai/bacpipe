@@ -76,7 +76,7 @@ needs_checkpoint = [
 ]
 
 embeddings = {}
-with pkg_resources.path(__package__ + ".tests.test_files", "") as audio_dir:
+with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
     audio_dir = Path(audio_dir)
 config["audio_dir"] = audio_dir
 get_paths = make_set_paths_func(**kwargs)

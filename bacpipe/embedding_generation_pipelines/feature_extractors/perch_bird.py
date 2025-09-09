@@ -38,8 +38,8 @@ class Model(ModelBaseClass):
         self.class_label_key = "label"
         if not model_choice == "multispecies_whale":
             self.ebird2name = pd.read_csv(
-                self.model_base_path
-                / "../model_specific_utils/perch_chirp/chirp/eBird2name.csv"
+                self.model_utils_base_path /
+                "perch_chirp/chirp/eBird2name.csv"
             )
             self.classes = self.class_list[self.class_label_key].classes
             self.classes = [

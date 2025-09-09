@@ -108,7 +108,7 @@ def play(config=config, settings=settings, save_logs=False):
     settings.model_base_path = ensure_std_models(Path(settings.model_base_path))
     overwrite, dashboard = config.overwrite, config.dashboard
 
-    with pkg_resources.path(__package__ + ".tests.test_files", "") as audio_dir:
+    with pkg_resources.path(__package__ + ".tests.test_data", "") as audio_dir:
         audio_dir = Path(audio_dir)
 
     if not audio_dir.exists():
