@@ -174,7 +174,7 @@ class DefaultLabels:
             df = pd.read_csv(path)
             self.default_classifier_per_embedding = df[
                 "label:default_classifier"
-            ].values
+            ].values.tolist()
 
 
 def make_set_paths_func(

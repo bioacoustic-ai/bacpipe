@@ -548,10 +548,11 @@ def plot_comparison(
     else:
         vis_loader = loader
 
+    c_label_dict, points = {}, {}
     for idx, model in enumerate(models):
         paths = le.get_paths(model)
 
-        axes.flatten()[idx], c_label_dict, points = plot_embeddings(
+        axes.flatten()[idx], c_label_dict[idx], points[idx] = plot_embeddings(
             vis_loader,
             model,
             paths=paths,
@@ -566,9 +567,15 @@ def plot_comparison(
 
     fig.tight_layout()
     fig.subplots_adjust(top=0.9, bottom=0.2)
+    colorbar_idx = np.argmax([len(d) for d in c_label_dict.values()])
 
     fig, _ = set_colorbar_or_legend(
-        fig, axes.flatten()[0], points, c_label_dict, dashboard=dashboard, **kwargs
+        fig,
+        axes.flatten()[colorbar_idx],
+        points[colorbar_idx],
+        c_label_dict[colorbar_idx],
+        dashboard=dashboard,
+        **kwargs,
     )
     [ax.remove() for ax in axes.flatten()[idx + 1 :]]
     if "clustering" in evaluation_task:
@@ -827,7 +834,9 @@ def iterate_through_subtasks(plot_func, plot_path, task_name, model_list, metric
         plot_func(plot_path, f"{subtask} {task_name}", model_list, sub_task_metrics)
 
 
-def clustering_overview(path_func, label_by, no_noise, model_list, label_column, **kwargs):
+def clustering_overview(
+    path_func, label_by, no_noise, model_list, label_column, **kwargs
+):
     """
     Create overview plots for clustering metrics.
 
