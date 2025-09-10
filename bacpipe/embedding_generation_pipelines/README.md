@@ -199,8 +199,8 @@ LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
 
 
 class Model(ModelBaseClass):
-    def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+    def __init__(self, **kwargs):
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         self.model = MyClass()
         state_dict = torch.load(
             self.model_base_path + "/newmodel/checkpoint_path.pth",

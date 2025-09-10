@@ -4,11 +4,9 @@ bacpipe/model_checkpoints/*
 bacpipe/tests/.pytest*
 *__pycache__*
 .vscode
-.idea/
-config.yaml
 
 # Ignore everything in results
-results/*
+*results/*
 
 # But NOT these specific paths:
 results/test_data/evaluations/
@@ -26,7 +24,6 @@ bacpipe/tests/results_files/*
 
 # track all Readme files, including the ones in subdirectories
 !**/README.md
-
 
 exploration/*
 !exploration/explore_embeds.py

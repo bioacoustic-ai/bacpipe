@@ -27,8 +27,8 @@ class Normalization(torch.nn.Module):
 
 
 class Model(ModelBaseClass):
-    def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+    def __init__(self, **kwargs):
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         self.batch_size = 2
 
         self.mel = (
@@ -48,7 +48,7 @@ class Model(ModelBaseClass):
 
         self.model = cvt13()
         state_dict = torch.load(
-            self.model_base_path + "/protoclr/protoclr.pth",
+            self.model_base_path / "protoclr/protoclr.pth",
             map_location=self.device,
             weights_only=True,
         )

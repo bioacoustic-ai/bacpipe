@@ -1,41 +1,25 @@
-import yaml
-from pathlib import Path
+import bacpipe
 
-from bacpipe.main import (
-    get_model_names,
-    evaluation_with_settings_already_exists,
-    model_specific_embedding_creation,
-    model_specific_evaluation,
-    cross_model_evaluation,
-    visualize_using_dashboard,
-)
+if __name__ == "__main__":
+    # Run with defaults
 
+    # To modify config or settings you can use the following:
+    # bacpipe.config.audio_dir = "data/audio"
+    # this will specify that the audio data is in 'data/audio'
+    
+    # bacpipe.settings.main_results_dir = "../bacpipe_results"
+    # this will ensure results are saved in the directory '../bacpipe_results'
 
-with open("config.yaml", "r", encoding="utf-8") as f:
-    config = yaml.load(f, Loader=yaml.CLoader)
-
-with open("bacpipe/settings.yaml", "r", encoding="utf-8") as p:
-    settings = yaml.load(p, Loader=yaml.CLoader)
-
-overwrite, dashboard = config["overwrite"], config["dashboard"]
-
-if not Path(config["audio_dir"]).exists():
-    raise FileNotFoundError(
-        f"Audio directory {config['audio_dir']} does not exist. Please check the path. "
-        "It should be in the format 'C:\\path\\to\\audio' on Windows or "
-        "'/path/to/audio' on Linux/Mac. But be sure to use single quotes '!"
-    )
-
-get_model_names(**config, **settings)
-
-if overwrite or not evaluation_with_settings_already_exists(**config, **settings):
-
-    loader_dict = model_specific_embedding_creation(**config, **settings)
-
-    model_specific_evaluation(loader_dict, **config, **settings)
-
-    cross_model_evaluation(**config, **settings)
-
-if dashboard:
-
-    visualize_using_dashboard(**config, **settings)
+    # bacpipe.config.models = ['birdmae', 'naturebeats']
+    # this will run the models birdmae and naturebeats, for which you will have 
+    # to download the checkpoints first (see ReadMe file)
+        
+    # bacpipe.play(save_logs=True)
+    # this will save log files, configs and settings, which can be helpful
+    # to retrace your steps if something malfunctions
+    
+    # But it's probably easier if you just modify the config.yaml or bacpipe/settings.yaml files
+    
+    
+    bacpipe.play()
+    

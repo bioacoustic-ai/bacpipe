@@ -11,8 +11,8 @@ tsne_config = {
 
 
 class Model(ModelBaseClass):
-    def __init__(self):
-        super().__init__(sr=None, segment_length=None)
+    def __init__(self, **kwargs):
+        super().__init__(sr=None, segment_length=None, **kwargs)
         self.model = TSNE(**tsne_config).fit_transform
 
     def preprocess(self, embeddings):

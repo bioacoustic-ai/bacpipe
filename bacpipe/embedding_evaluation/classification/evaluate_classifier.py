@@ -132,4 +132,4 @@ def evaluate_classification(paths, config, metrics, **kwargs):
     save_path = paths.class_path.joinpath(f"class_results_{config}.json")
 
     with open(save_path, "w") as f:
-        json.dump(metrics, f)
+        json.dump(metrics, f, indent=2)

@@ -15,13 +15,13 @@ N_MELS = 128
 
 
 class Model(ModelBaseClass):
-    def __init__(self):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES)
+    def __init__(self, **kwargs):
+        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         self.model = ResNet()
         state_dict = torch.load(
-            self.model_base_path + "/rcl_fs_bsed/bioacoustics_model.pth",
+            self.model_base_path / "rcl_fs_bsed/bioacoustics_model.pth",
             weights_only=True,
-            map_location=self.device
+            map_location=self.device,
         )
         enc_sd = state_dict["encoder"]
         drop_keys = ["lin.0.weight", "lin.0.bias", "lin.2.weight", "lin.2.bias"]
@@ -39,6 +39,7 @@ class Model(ModelBaseClass):
         self.model.eval()
 
     def preprocess(self, audio):
+        audio = audio.cpu()
         mel = self.mel(torch.tensor(audio))
         mel_db = self.power_to_db(mel)
         return mel_db

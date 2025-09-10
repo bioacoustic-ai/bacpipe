@@ -2,6 +2,7 @@ import json
 
 import matplotlib.pyplot as plt
 import numpy as np
+from pathlib import Path
 
 import bacpipe.embedding_evaluation.label_embeddings as le
 
@@ -14,8 +15,8 @@ import matplotlib
 
 matplotlib.rcParams.update(
     {
-        "figure.dpi": 300,  # High-resolution figures
-        "savefig.dpi": 300,  # Exported plot DPI
+        "figure.dpi": 600,  # High-resolution figures
+        "savefig.dpi": 600,  # Exported plot DPI
         "font.size": 12,  # Better font readability
         "axes.titlesize": 12,
         "legend.fontsize": 10,
@@ -190,6 +191,14 @@ def plot_embeddings(
 
     fig, axes, return_axes = init_embed_figure(fig, axes, **kwargs)
 
+    if label_by == 'audio_file_name':
+        new_labels = [Path(l).stem+Path(l).suffix for l in labels]
+        new_split_data = dict()
+        for label in split_data.keys():
+            new_label = Path(label).stem+Path(label).suffix
+            new_split_data[new_label] = split_data[label]
+        split_data = new_split_data
+
     c_label_dict = {lab: i for i, lab in enumerate(np.unique(labels))}
     points = plot_embedding_points(
         axes, embeds, split_data, labels, c_label_dict, **kwargs
@@ -199,6 +208,7 @@ def plot_embeddings(
         return axes, c_label_dict, points
     elif dashboard:
         fig.set_size_inches(6, 5)
+        fig.set_dpi(300)
         fig.tight_layout()
         set_colorbar_or_legend(
             fig,
@@ -225,7 +235,7 @@ def init_embed_figure(fig, axes, bool_3d=False, **kwargs):
         if bool_3d:
             fig, axes = plt.subplots(subplot_kw={"projection": "3d"}, figsize=(12, 8))
         else:
-            fig, axes = plt.subplots(figsize=(12, 8))
+            fig, axes = plt.subplots(figsize=(12, 8), dpi=400)
         return_axes = False
     else:
         return_axes = True
@@ -240,13 +250,15 @@ def get_labels_for_plot(model_name=None, **kwargs):
 
     if le.get_paths(model_name).labels_path.joinpath("ground_truth.npy").exists():
         ground_truth = le.get_ground_truth(model_name)
-        inv = {v: k for k, v in ground_truth["label_dict"].items()}
-        inv[-1.0] = "noise"
-        inv[-2.0] = "noise"
-        # technically -2.0 is not noise, but corresponds to sections
-        # with multiple sources vocalizing simultaneously
-        labels["ground_truth"] = [inv[v] for v in ground_truth["labels"]]
-        bool_noise = np.array(labels["ground_truth"]) == "noise"
+        for label_column in [key for key in ground_truth.keys() if "label:" in key]:
+            label = label_column.split("label:")[-1]
+            inv = {v: k for k, v in ground_truth[f"label_dict:{label}"].items()}
+            inv[-1.0] = "noise"
+            inv[-2.0] = "noise"
+            # technically -2.0 is not noise, but corresponds to sections
+            # with multiple sources vocalizing simultaneously
+            labels[label] = [inv[v] for v in ground_truth[label_column]]
+            bool_noise = np.array(labels[label]) == "noise"
     else:
         bool_noise = np.array([False] * len(list(labels.values())[0]))
     if len(list(le.get_paths(model_name).clust_path.glob("*.npy"))) > 0:
@@ -267,7 +279,10 @@ def get_labels_for_plot(model_name=None, **kwargs):
 
 def set_colorbar_or_legend(fig, axes, points, c_label_dict, label_by, **kwargs):
     if len(c_label_dict.keys()) > 20:
-        if len(list(c_label_dict.keys())[0]) < 12:
+        if (
+            isinstance(list(c_label_dict.keys())[0], int)
+            or len(list(c_label_dict.keys())[0]) < 12
+        ):
             fontsize = 9
         else:
             fontsize = 6
@@ -472,6 +487,8 @@ def return_rows_cols(num):
         return 4, 4
     elif num > 16 and num <= 20:
         return 4, 5
+    else:
+        return 5, num // 5
 
 
 def set_figsize_for_comparison(rows, cols):
@@ -540,10 +557,11 @@ def plot_comparison(
     else:
         vis_loader = loader
 
+    c_label_dict, points = {}, {}
     for idx, model in enumerate(models):
         paths = le.get_paths(model)
 
-        axes.flatten()[idx], c_label_dict, points = plot_embeddings(
+        axes.flatten()[idx], c_label_dict[idx], points[idx] = plot_embeddings(
             vis_loader,
             model,
             paths=paths,
@@ -558,9 +576,15 @@ def plot_comparison(
 
     fig.tight_layout()
     fig.subplots_adjust(top=0.9, bottom=0.2)
+    colorbar_idx = np.argmax([len(d) for d in c_label_dict.values()])
 
     fig, _ = set_colorbar_or_legend(
-        fig, axes.flatten()[0], points, c_label_dict, dashboard=dashboard, **kwargs
+        fig,
+        axes.flatten()[colorbar_idx],
+        points[colorbar_idx],
+        c_label_dict[colorbar_idx],
+        dashboard=dashboard,
+        **kwargs,
     )
     [ax.remove() for ax in axes.flatten()[idx + 1 :]]
     if "clustering" in evaluation_task:
@@ -752,7 +776,7 @@ def load_results(path_func, task, model_list):
     metrics = {}
     for model_name in model_list:
         paths = path_func(model_name)
-        for file in getattr(paths, f"{task[:5]}_path").rglob("*.json"):
+        for file in getattr(paths, f"{task[:5]}_path").rglob("*results*.json"):
             if task == "classification":
                 subtask = file.stem.split("_")[-1]
                 metrics[f"{model_name}({subtask})"] = json.load(open(file, "r"))
@@ -778,7 +802,7 @@ def visualise_results_across_models(plot_path, task_name, model_list):
     """
     metrics = load_results(le.get_paths, task_name, model_list)
     with open(plot_path.joinpath(f"{task_name}_results.json"), "w") as f:
-        json.dump(metrics, f)
+        json.dump(metrics, f, indent=2)
 
     if task_name == "classification":
         iterate_through_subtasks(
@@ -819,7 +843,9 @@ def iterate_through_subtasks(plot_func, plot_path, task_name, model_list, metric
         plot_func(plot_path, f"{subtask} {task_name}", model_list, sub_task_metrics)
 
 
-def clustering_overview(path_func, label_by, no_noise, model_list, **kwargs):
+def clustering_overview(
+    path_func, label_by, no_noise, model_list, label_column, **kwargs
+):
     """
     Create overview plots for clustering metrics.
 
@@ -833,6 +859,8 @@ def clustering_overview(path_func, label_by, no_noise, model_list, **kwargs):
         whether to plot the metrics with or without noise
     model_list : list
         list of models
+    label_column : str
+        label as defined in the annotations.csv file
     kwargs : dict
         additional arguments for plotting
 
@@ -845,26 +873,26 @@ def clustering_overview(path_func, label_by, no_noise, model_list, **kwargs):
     fig.subplots_adjust(bottom=0.25, right=0.9)
     flat_metrics = dict()
     for model_name in model_list:
-        with open(path_func(model_name).clust_path / "clust_metrics.json", "r") as f:
+        with open(path_func(model_name).clust_path / "clust_results.json", "r") as f:
             metrics = json.load(f)
         if no_noise:
             no_noise = "_no_noise"
         else:
             no_noise = ""
         flat_metrics[model_name] = dict()
-        if label_by == "ground_truth":
-            flat_metrics[model_name]["ground_truth"] = metrics["ARI"][
-                f"ground_truth{no_noise}-kmeans"
+        if label_by == label_column:
+            flat_metrics[model_name][label_column] = metrics["ARI"][
+                f"{label_column}{no_noise}-kmeans"
             ]
         elif not label_by == "kmeans":
             flat_metrics[model_name]["kmeans"] = metrics["ARI"][
                 f"kmeans{no_noise}-{label_by}"
             ]
-        if not label_by == "ground_truth" and "ground_truth" in [
+        if not label_by == label_column and label_column in [
             k.split("-")[0] for k in metrics["ARI"].keys()
         ]:
-            flat_metrics[model_name]["ground_truth"] = metrics["ARI"][
-                f"ground_truth{no_noise}-{label_by}"
+            flat_metrics[model_name][label_column] = metrics["ARI"][
+                f"{label_column}{no_noise}-{label_by}"
             ]
 
     return generate_bar_plot(flat_metrics, fig, ax, **kwargs)
@@ -901,7 +929,7 @@ def plot_clusterings(
     else:
         no_noise = ""
 
-    clust_path = path_func(model_name).clust_path / "clust_metrics.json"
+    clust_path = path_func(model_name).clust_path / "clust_results.json"
     if not clust_path.exists():
         raise AssertionError(
             f"The clustering file {clust_path} does not exist. Perhaps it was not "
@@ -1103,7 +1131,7 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
         class_values = per_class_metrics[model_name].values()
 
         ax.scatter(
-            np.arange(len(all_classes)),
+            np.arange(len(class_values)),
             class_values,
             color=model_colors[i],
             label=f"{model_name.upper()} "
@@ -1112,7 +1140,7 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
         )
 
         ax.plot(
-            np.arange(len(all_classes)),
+            np.arange(len(class_values)),
             class_values,
             color=model_colors[i],
             linestyle="-",  # Solid line

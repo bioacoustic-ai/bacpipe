@@ -21,7 +21,7 @@ def convert_numpy_types(obj):
         return obj.tolist()
 
 
-def save_clustering_performance(paths, clusterings, metrics):
+def save_clustering_performance(paths, clusterings, metrics, label_column):
     """
     Save the clustering performance. A json file for the performance
     metrics and a npy file with the cluster labels for visualizations.
@@ -34,13 +34,15 @@ def save_clustering_performance(paths, clusterings, metrics):
         clustering labels
     metrics : dict
         clustering performance
+    label_column : str
+        label as defined in annotation.csv file
     """
-    clusterings = {k: v for k, v in clusterings.items() if not "ground_truth" in k}
+    clusterings = {k: v for k, v in clusterings.items() if not label_column in k}
     np.save(paths.clust_path.joinpath(f"clust_labels.npy"), clusterings)
 
     if metrics:
-        with open(paths.clust_path.joinpath(f"clust_metrics.json"), "w") as f:
-            json.dump(metrics, f, default=convert_numpy_types)
+        with open(paths.clust_path.joinpath(f"clust_results.json"), "w") as f:
+            json.dump(metrics, f, default=convert_numpy_types, indent=2)
 
 
 def compute_clusterings(
@@ -48,6 +50,7 @@ def compute_clusterings(
     labels,
     cluster_configs,
     default_labels,
+    label_column,
     evaluate_with_silhouette=False,
     **kwargs,
 ):
@@ -64,6 +67,8 @@ def compute_clusterings(
         clustering algorithm objects
     default_labels : dict
         default labels for the dataset
+    label_column : string
+        label type defined in annotations.csv file
     evaluate_with_silhouette : bool, optional
         whether to evaluate with silhouette score, by default False
 
@@ -83,12 +88,12 @@ def compute_clusterings(
                 embeds[labels != -1]
             )
     if len(labels) > 0:
-        clusterings["ground_truth"] = labels
-        clusterings["ground_truth_no_noise"] = labels[labels != -1]
+        clusterings[label_column] = labels
+        clusterings[f"{label_column}_no_noise"] = labels[labels != -1]
         default_labels["kmeans"] = clusterings["kmeans"]
 
     for cl_name, cl_labels in clusterings.items():
-        if cl_name == "ground_truth_no_noise":
+        if cl_name == f"{label_column}_no_noise":
             if -1 in labels:
                 embeds = embeds[labels != -1]
                 cl_labels = labels[labels != -1]
@@ -163,7 +168,7 @@ def get_nr_of_clusters(labels, clust_configs, **kwargs):
     return clust_params
 
 
-def clustering(paths, embeds, ground_truth, overwrite=False, **kwargs):
+def clustering(paths, embeds, ground_truth, label_column, overwrite=False, **kwargs):
     """
     Clustering pipeline.
 
@@ -181,7 +186,7 @@ def clustering(paths, embeds, ground_truth, overwrite=False, **kwargs):
     if overwrite or not len(list(paths.clust_path.glob("*.json"))) > 0:
 
         if ground_truth:
-            labels = ground_truth["labels"]
+            labels = ground_truth[f"label:{label_column}"]
         else:
             labels = []
 
@@ -194,10 +199,10 @@ def clustering(paths, embeds, ground_truth, overwrite=False, **kwargs):
         )
 
         metrics, clusterings = compute_clusterings(
-            embeds, labels, cluster_configs, default_labels
+            embeds, labels, cluster_configs, default_labels, label_column
         )
 
-        save_clustering_performance(paths, clusterings, metrics)
+        save_clustering_performance(paths, clusterings, metrics, label_column)
     else:
         logger.info(
             "Clustering file cluster_metrics.json already exists and"

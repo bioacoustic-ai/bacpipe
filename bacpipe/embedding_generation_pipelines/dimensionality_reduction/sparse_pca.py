@@ -7,8 +7,8 @@ tsne_config = {"n_components": 2}
 
 
 class Model(ModelBaseClass):
-    def __init__(self):
-        super().__init__(sr=None, segment_length=None)
+    def __init__(self, **kwargs):
+        super().__init__(sr=None, segment_length=None, **kwargs)
         self.model = SparsePCA(**tsne_config).fit_transform
 
     def preprocess(self, embeddings):

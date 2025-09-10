@@ -1,6 +1,8 @@
 import time
 import logging
 from pathlib import Path
+import importlib.resources as pkg_resources
+import bacpipe.imgs
 
 import numpy as np
 from tqdm import tqdm
@@ -33,7 +35,12 @@ logger = logging.getLogger("bacpipe")
 
 
 def get_model_names(
-    embedding_model, audio_dir, main_results_dir, embed_parent_dir, **kwargs
+    models,
+    audio_dir,
+    main_results_dir,
+    embed_parent_dir,
+    already_computed=False,
+    **kwargs,
 ):
     """
     Get the names of the models used for embedding. This is either done
@@ -43,14 +50,17 @@ def get_model_names(
 
     Parameters
     ----------
-    embedding_model : dict
-        dict containing the configuration for the embedding models
+    models : list
+        list of embedding models
     audio_dir : string
         full path to audio files
     main_results_dir : string
         top level directory for the results of the embedding evaluation
     embed_parent_dir : string
         parent directory for the embeddings
+    already_computed : bool, Default is False
+        ignore model list and use only models whos embeddings already have
+        been computed and are saved in the results dir
 
     Raises
     ------
@@ -58,8 +68,7 @@ def get_model_names(
         If already computed embeddings are used, but no embeddings
         are found in the specified directory.
     """
-    global model_names
-    if embedding_model["already_computed"]:
+    if already_computed:
 
         dataset_name = Path(audio_dir).stem
         main_results_path = (
@@ -78,13 +87,17 @@ def get_model_names(
                 " If you want to compute new embeddings, please set the "
                 "'already_computed' option to False in the config.yaml file."
             )
+        else:
+            return np.unique(model_names).tolist()
     else:
-        model_names = embedding_model["selected_models"]
+        return models
 
 
 def evaluation_with_settings_already_exists(
     audio_dir,
     dim_reduction_model,
+    models,
+    testing=False,
     **kwargs,
 ):
     """
@@ -101,13 +114,17 @@ def evaluation_with_settings_already_exists(
         full path to audio files
     dim_reduction_model : string
         name of the dimensionality reduction model to be used
+    models : list
+        embedding models
 
     Returns
     -------
     bool
         True if the evaluation with the specified settings
     """
-    for model_name in model_names:
+    if testing:
+        return False
+    for model_name in models:
         paths = make_set_paths_func(audio_dir, **kwargs)(model_name)
         bool_paths = (
             paths.main_embeds_path.exists()
@@ -120,7 +137,9 @@ def evaluation_with_settings_already_exists(
         else:
             bool_dim_reducs = [
                 True
-                for d in paths.dim_reduc_parent_dir.rglob(f"*{dim_reduction_model}*")
+                for d in paths.dim_reduc_parent_dir.rglob(
+                    f"*{dim_reduction_model}*{model_name}*"
+                )
             ]
             bool_dim_reducs = len(bool_dim_reducs) > 0 and all(bool_dim_reducs)
         if not bool_dim_reducs:
@@ -128,7 +147,7 @@ def evaluation_with_settings_already_exists(
     return True
 
 
-def model_specific_embedding_creation(audio_dir, dim_reduction_model, **kwargs):
+def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **kwargs):
     """
     Generate embeddings for each model in the list of model names.
     The embeddings are generated using the generate_embeddings function
@@ -145,6 +164,8 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, **kwargs):
         name of the dimensionality reduction model to be used
         for the embeddings. If "None" is selected, no
         dimensionality reduction is performed.
+    models : list
+        embedding models
 
     Returns
     -------
@@ -152,7 +173,7 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, **kwargs):
         dictionary containing the loader objects for each model
     """
     loader_dict = {}
-    for model_name in model_names:
+    for model_name in models:
         loader_dict[model_name] = get_embeddings(
             model_name=model_name,
             dim_reduction_model=dim_reduction_model,
@@ -163,7 +184,7 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, **kwargs):
 
 
 def model_specific_evaluation(
-    loader_dict, evaluation_task, class_configs, distance_configs, **kwargs
+    loader_dict, evaluation_task, class_configs, distance_configs, models, **kwargs
 ):
     """
     Perform evaluation of the embeddings using the specified
@@ -188,8 +209,10 @@ def model_specific_evaluation(
         in the bacpipe/settings.yaml file.
     distance_configs : dict
         dictionary to specify which distance calculations to perform
+    models : list
+        embedding models
     """
-    for model_name in model_names:
+    for model_name in models:
         if not evaluation_task in ["None", []]:
             embeds = loader_dict[model_name].embedding_dict()
             paths = get_paths(model_name)
@@ -208,11 +231,18 @@ def model_specific_evaluation(
                 "Are you sure you have selected the right data?"
             )
 
-            generate_annotations_for_classification_task(paths)
+            generate_annotations_for_classification_task(paths, **kwargs)
 
-            class_embeds = embeds_array_without_noise(embeds, ground_truth)
+            class_embeds = embeds_array_without_noise(embeds, ground_truth, **kwargs)
             for class_config in class_configs.values():
                 if class_config["bool"]:
+                    if not len(class_embeds) > 0:
+                        raise AssertionError(
+                            "No embeddings were found for classification task. "
+                            "Are you sure there are annotations for the data and the annotations.csv file "
+                            "has been correctly linked? If you didn't intent do do classification, "
+                            "simply remove it from the evaluation tasks list in the config.yaml file."
+                        )
                     classification_pipeline(
                         paths, class_embeds, **class_config, **kwargs
                     )
@@ -232,9 +262,7 @@ def model_specific_evaluation(
                     calc_distances(paths, embeds, **dist_config)
 
 
-def cross_model_evaluation(
-    dim_reduction_model, evaluation_task, dashboard=False, **kwargs
-):
+def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwargs):
     """
     Generate plots to compare models by the specified tasks.
 
@@ -244,19 +272,20 @@ def cross_model_evaluation(
         name of dimensionality reduction model
     evaluation_task : list
         tasks to evaluate models by
+    models : list
+        embedding models
     """
-    if len(model_names) > 1:
-        plot_path = get_paths(model_names[0]).plot_path.parent.parent.joinpath(
-            "overview"
-        )
+    if len(models) > 1:
+        plot_path = get_paths(models[0]).plot_path.parent.parent.joinpath("overview")
         plot_path.mkdir(exist_ok=True, parents=True)
         if not len(evaluation_task) == 0:
             for task in evaluation_task:
-                visualise_results_across_models(plot_path, task, model_names)
+                visualise_results_across_models(plot_path, task, models)
         if not dim_reduction_model == "None":
+            kwargs.pop("dashboard")
             plot_comparison(
                 plot_path,
-                model_names,
+                models,
                 dim_reduction_model,
                 label_by="time_of_day",
                 dashboard=False,
@@ -264,16 +293,20 @@ def cross_model_evaluation(
             )
 
 
-def embeds_array_without_noise(embeds, ground_truth):
-    return np.concatenate(list(embeds.values()))[ground_truth["labels"] > -1]
+def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
+    return np.concatenate(list(embeds.values()))[
+        ground_truth[f"label:{label_column}"] > -1
+    ]
 
 
-def visualize_using_dashboard(**kwargs):
+def visualize_using_dashboard(models, **kwargs):
     """
     Create and serve the dashboard for visualization.
 
     Parameters
     ----------
+    models : list
+        embedding models
     kwargs : dict
         Dictionary with parameters for dashboard creation
     """
@@ -281,7 +314,7 @@ def visualize_using_dashboard(**kwargs):
     import panel as pn
 
     # Configure dashboard
-    dashboard = DashBoard(model_names, **kwargs)
+    dashboard = DashBoard(models, **kwargs)
 
     # Build the dashboard layout
     try:
@@ -294,17 +327,18 @@ def visualize_using_dashboard(**kwargs):
         )
         raise e
 
-    # Set up the server parameters
-    serve_kwargs = {"port": 5006, "address": "localhost"}
+    with pkg_resources.path(bacpipe.imgs, 'bacpipe_favicon_white.png') as p:
+        favicon_path = str(p)
 
-    # Start the server
-    print(
-        f"Starting dashboard server at {serve_kwargs.get('address', 'localhost')}:{serve_kwargs.get('port', 5006)}"
+    template = pn.template.BootstrapTemplate(
+        site="bacpipe dashboard",
+        title="Explore embeddings of audio data",
+        favicon=str(favicon_path),  # must be a path ending in .ico, .png, etc.
+        main=[dashboard.app],
     )
-    dashboard.app.show(title="Bacpipe Dashboard", **serve_kwargs)
+    
 
-    # Return the dashboard object in case it's needed elsewhere
-    return dashboard
+    template.show(port=5006, address="localhost")
 
 
 def get_embeddings(
@@ -317,16 +351,18 @@ def get_embeddings(
     testing=False,
     **kwargs,
 ):
+    global get_paths
+    get_paths = make_set_paths_func(audio_dir, testing=testing, **kwargs)
+    paths = get_paths(model_name)
+
     loader_embeddings = generate_embeddings(
         model_name=model_name,
         audio_dir=audio_dir,
         check_if_combination_exists=check_if_primary_combination_exists,
+        paths=paths,
         testing=testing,
         **kwargs,
     )
-    global get_paths
-    get_paths = make_set_paths_func(audio_dir, testing=testing, **kwargs)
-    paths = get_paths(model_name)
 
     if not dim_reduction_model == "None":
 
@@ -372,7 +408,7 @@ def get_embeddings(
     return loader_embeddings
 
 
-def generate_embeddings(**kwargs):
+def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
     if "dim_reduction_model" in kwargs:
         print(
             f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"
@@ -389,13 +425,33 @@ def generate_embeddings(**kwargs):
         logger.debug(f"Loading the data took {time.time()-start:.2f}s.")
         if not ld.combination_already_exists:
             embed = ge.Embedder(**kwargs)
-            for idx, file in enumerate(
-                tqdm(ld.files, desc="processing files", position=1, leave=False)
-            ):
-                if not ld.dim_reduction_model:
-                    sample = file
+
+            if ld.dim_reduction_model:
+                # (1) Dimensionality reduction stage
+                for idx, file in enumerate(
+                    tqdm(ld.files, desc="processing files", position=1, leave=False)
+                ):
+                    if idx == 0:
+                        embeddings = ld.embed_read(idx, file)
+                    else:
+                        embeddings = np.concatenate(
+                            [embeddings, ld.embed_read(idx, file)]
+                        )
+
+                dim_reduced_embeddings = embed.get_embeddings_from_model(embeddings)
+                embed.save_embeddings(idx, ld, file, dim_reduced_embeddings)
+
+            elif embed.model.device == "cuda" and not avoid_pipelined_gpu_inference:
+                # (2) GPU path with pipelined embedding generation
+                embed.get_pipelined_embeddings_from_model(ld)
+
+            else:
+                # (3) CPU path with sequential embedding generation
+                for idx, file in enumerate(
+                    tqdm(ld.files, desc="processing files", position=1, leave=False)
+                ):
                     try:
-                        embeddings = embed.get_embeddings_from_model(sample)
+                        embeddings = embed.get_embeddings_from_model(file)
                     except Exception as e:
                         logger.warning(
                             f"Error generating embeddings, skipping file. \n"
@@ -404,18 +460,18 @@ def generate_embeddings(**kwargs):
                         continue
                     ld.write_audio_file_to_metadata(idx, file, embed, embeddings)
                     embed.save_embeddings(idx, ld, file, embeddings)
-                else:
-                    if idx == 0:
-                        embeddings = ld.embed_read(idx, file)
-                    else:
-                        embeddings = np.concatenate(
-                            [embeddings, ld.embed_read(idx, file)]
-                        )
-            if ld.dim_reduction_model:
-                dim_reduced_embeddings = embed.get_embeddings_from_model(embeddings)
-                embed.save_embeddings(idx, ld, file, dim_reduced_embeddings)
+                    if embed.model.bool_classifier:
+                        embed.save_classifier_outputs(ld, file)
+
+            # Finalize
+            if embed.model.bool_classifier:
+                embed.cumulative_annotations.to_csv(
+                    embed.paths.class_path / "default_classifier_annotations.csv",
+                    index=False,
+                )
             ld.write_metadata_file()
             ld.update_files()
+
         return ld
     except KeyboardInterrupt:
         if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:

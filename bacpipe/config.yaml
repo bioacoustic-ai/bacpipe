@@ -1,0 +1,62 @@
+#################### CONFIGURATION FILE ####################
+# This file contains the configuration for the audio data path,
+# the embedding model, and the dimensionality reduction model.
+#
+# The embedding model must be a list either of one or multiple models.
+# 
+# The dimensionality reduction model must be just one of the supported models.
+
+
+# PATHS:
+# define paths for your audio data
+audio_dir :       "bacpipe/tests/test_data"
+
+#####################    PROCESS SETTINGS    ##############################
+
+# specify if you want to overwrite the existing evaluation results
+# this is useful if you want to re-run the evaluation with different parameters
+overwrite: False
+
+
+# specify if you want to visualize the embedding evaluations
+dashboard: True
+
+#########################################################################
+####################    SELECT MODELS    ################################
+#########################################################################
+
+# embedding model name
+models: [
+      "birdnet",
+      "perch_bird",
+  ]
+
+  # if already_computed is True, the embeddings will be loaded from the
+  # embeddings directory in the dataset path in `results/by_dataset/`
+
+  # if already_computed is False, the embeddings will be computed 
+  # for all selected models
+
+already_computed: False
+
+
+#########################################################################
+############    SELECT DIMENSIONALITY REDUCTION MODELS    ###############
+#########################################################################
+
+dim_reduction_model: "umap"
+
+
+
+#########################################################################
+#################    SELECT EVALUATION MEASURE    #######################
+#########################################################################
+
+evaluation_task: [
+  # "clustering",
+  # "classification"
+]
+
+
+
+

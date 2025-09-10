@@ -1,11 +1,10 @@
 import panel as pn
 import matplotlib
-import copy
+import sys
 import seaborn as sns
-from pathlib import Path
 import numpy as np
-from functools import reduce
-
+import importlib.resources as pkg_resources
+import bacpipe.imgs
 from .visualize import (
     plot_embeddings,
     plot_comparison,
@@ -39,10 +38,15 @@ class DashBoard:
     ):
         self.models = model_names
         self.default_label_keys = default_label_keys
-        self.label_by = default_label_keys.copy()
         self.path_func = le.make_set_paths_func(
             audio_dir, main_results_dir, dim_reduc_parent_dir, **kwargs
         )
+        self.label_by = default_label_keys.copy()
+        if (
+            self.path_func(model_names[0]).class_path
+            / "default_classifier_annotations.csv"
+        ).exists() and not "default_classifier" in self.label_by:
+            self.label_by += ["default_classifier"]
         self.plot_path = self.path_func(model_names[0]).plot_path.parent.parent
         self.dim_reduc_parent_dir = dim_reduc_parent_dir
 
@@ -52,15 +56,22 @@ class DashBoard:
             .labels_path.joinpath("ground_truth.npy")
             .exists()
         ):
+            ground_truth = np.load(
+                le.get_paths(model_names[0]).labels_path.joinpath("ground_truth.npy"),
+                allow_pickle=True,
+            ).item()
+            labels = np.unique(
+                [lab.split(":")[-1] for lab in ground_truth.keys()]
+            ).tolist()
             self.ground_truth = True
-            self.label_by += ["ground_truth"]
+            self.label_by += labels
 
         if len(list(le.get_paths(model_names[0]).clust_path.glob("*.npy"))) > 0:
             self.label_by += ["kmeans"]
 
         self.evaluation_task = evaluation_task
         self.dim_reduction_model = dim_reduction_model
-        self.widget_width = 120
+        self.widget_width = 100
         self.vis_loader = EmbedAndLabelLoader(
             dim_reduction_model=dim_reduction_model,
             default_label_keys=default_label_keys,
@@ -72,6 +83,7 @@ class DashBoard:
         self.noise_select = dict()
         self.class_select = dict()
         self.embed_plot = dict()
+        self.kwargs = kwargs
 
     def init_plot(self, p_type, plot_func, widget_idx, **kwargs):
         getattr(self, f"{p_type}_plot")[widget_idx] = pn.panel(
@@ -206,6 +218,7 @@ class DashBoard:
                                 if len(self.noise_select.keys()) > 0
                                 else False
                             ),
+                            **self.kwargs
                         )
                         if "clustering" in self.evaluation_task
                         else pn.pane.Markdown(
@@ -285,7 +298,7 @@ class DashBoard:
             ]
         )
 
-        return pn.Column(*widgets, width=140, margin=(10, 10))
+        return pn.Column(*widgets, width=200, margin=(10, 10))
 
     def build_layout(self):
         """
@@ -294,9 +307,12 @@ class DashBoard:
         and a page showing all models. Each page contains sidebars with model-specific
         information and content areas for visualizations.
         """
+        
+        
         # Build both model pages to initialize widgets
         model0_page = self.single_model_page(0)
         model1_page = self.single_model_page(1)
+        model_all_page = self.all_models_page(1)
 
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
@@ -320,8 +336,49 @@ class DashBoard:
                     sizing_mode="stretch_both",
                 ),
             ),
-            ("All models", self.all_models_page(1)),
+            ("All models", model_all_page),
         )
+        
+        self.add_styling(model1_page, model_all_page)
+        
+    def add_styling(self, model1_page, model_all_page):
+        with pkg_resources.path(bacpipe.imgs, 'bacpipe_unlabelled.png') as p:
+            logo_path = str(p)
+
+        for sidebar in [model1_page.objects[0], model_all_page.objects[0]]:
+            # Add logo to the sidebar
+            sidebar.append(
+                pn.pane.PNG(logo_path, sizing_mode="scale_width")
+            )
+
+            # Add a spacer + contact info below the logo
+            sidebar.append(pn.Spacer(height=20))
+            sidebar.append(
+                pn.pane.Markdown(
+                    """
+                    **Contact**
+                    
+                    If you run into problems, please raise issues on github
+                    
+                    Please collaborate and help make bacpipe as convenient for many as possible
+                    
+                    🌍 [github](https://github.com/bioacoustic-ai/bacpipe)  
+                    
+                    To stay updated with new releases, subscribe to the [newsletter](https://buttondown.com/vskode)
+                    """
+                )
+            )
+            # Add close button to the header
+            close_button = pn.widgets.Button(name="❌ close dashboard")
+
+            def shutdown_callback(event):
+                print("Shutting down dashboard server...")
+                sys.exit(0)
+
+            close_button.on_click(shutdown_callback)
+
+            sidebar.append(close_button)
+        
 
     def add_save_button(self, plot_func, **kwargs):
         """
