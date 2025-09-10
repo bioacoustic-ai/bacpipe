@@ -1,6 +1,6 @@
 [project]
 name = "bacpipe"
-version = "1.1"
+version = "1.1.00"
 description = "Use bacpipe to streamline the process of generating embeddings and analysing your PAM datasets."
 readme = "README.md"
 authors = [
