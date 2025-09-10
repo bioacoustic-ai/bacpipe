@@ -165,6 +165,10 @@ bacpipe.settings.model_base_path = '/path/to/model_checkpoints'
 # If you just want to run models and get embeddings and don't want 
 # the dashboard and all of that, define an embedder object and pass it
 # the model name, and the settings you modified
+# To ensure birdnet is downloaded, run the following (this is done by default
+# if you run bacpipe.play(), but without that, you need to call this explicitly)
+bacpipe.ensure_std_models(bacpipe.settings.model_base_path)
+
 em = bacpipe.Embedder('birdnet', **vars(bacpipe.settings)) 
 # the vars part is important!
 

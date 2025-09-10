@@ -6,7 +6,6 @@ from types import SimpleNamespace
 import importlib.resources as pkg_resources
 from huggingface_hub import hf_hub_download
 
-
 def ensure_std_models(model_base_path, repo_id="vinikay/bacpipe_models"):
     """
     Ensure that the model checkpoints for birdnetv2.4 and perchv1 are
@@ -19,12 +18,16 @@ def ensure_std_models(model_base_path, repo_id="vinikay/bacpipe_models"):
     repo_id : str, optional
         Hugging Face Hub repo ID, by default "vinikay/bacpipe_models"
     """
-    model_base_path.parent.mkdir(exist_ok=True, parents=True)
+    Path(model_base_path).parent.mkdir(exist_ok=True, parents=True)
 
     if model_base_path.exists():
         return model_base_path.parent / "model_checkpoints"
 
-    print("Downloading model checkpoints from Hugging Face Hub...")
+    logger.INFO(
+        "This seems to be the first call. Hi there! "
+        "Downloading model checkpoints from Hugging Face Hub for "
+        "BirdNet. Because let's face it, everyone needs to at least have BirdNet."
+        )
     zip_path = hf_hub_download(
         repo_id=repo_id,
         filename="model_checkpoints.zip",
