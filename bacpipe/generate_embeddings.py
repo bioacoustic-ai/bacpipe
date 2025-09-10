@@ -351,10 +351,28 @@ class Embedder:
         model_name,
         dim_reduction_model=False,
         paths=None,
-        testing=False,
         classifier_threshold=None,
         **kwargs,
     ):
+        """
+        This class defines all the entry points to generate embedding files. 
+        Parameters are kept minimal, to accomodate as many cases as possible.
+        At the end if instantiation, the selected model is loaded and the 
+        model is associated with the device specified.
+
+        Parameters
+        ----------
+        model_name : str
+            name of selected embedding model
+        dim_reduction_model : bool, optional
+            Can be bool or the string corresponding to the dimensionality reduction model, by default False
+        paths : SimpleNamespace, optional
+            dict-like structure with all the results paths, by default None
+        testing : bool, optional
+            _description_, by default False
+        classifier_threshold : float, optional
+            Value under which class predictions are discarded, by default None
+        """
         self.paths = paths
         self.file_length = {}
 
@@ -370,6 +388,9 @@ class Embedder:
         self._init_model(**kwargs)
 
     def _init_model(self, **kwargs):
+        """
+        Load model specific module, instantiate model and allocate device for model.
+        """
         if self.dim_reduction_model:
             module = importlib.import_module(
                 f"bacpipe.embedding_generation_pipelines.dimensionality_reduction.{self.model_name}"
@@ -382,6 +403,22 @@ class Embedder:
         self.model.prepare_inference()
 
     def prepare_audio(self, sample):
+        """
+        Use bacpipe pipeline to load audio file, window it according to 
+        model specific window length and preprocess the data, ready for 
+        batch inference computation. Also log file length and shape for
+        metadata files.
+
+        Parameters
+        ----------
+        sample : pathlib.Path or str
+            path to audio file
+
+        Returns
+        -------
+        torch.Tensor
+            audio frames preprocessed with model specific preprocessing
+        """
         audio = self.model.load_and_resample(sample)
         frames = self.model.window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
@@ -390,6 +427,21 @@ class Embedder:
         return preprocessed_frames
 
     def get_embeddings_for_audio(self, sample):
+        """
+        Create a dataloader for the processed audio frames and 
+        run batch inference. Both are methods of the self.model
+        class, which can be found in the utils.py file.
+
+        Parameters
+        ----------
+        sample : torch.Tensor
+            preprocessed audio frames
+
+        Returns
+        -------
+        np.array
+            embeddings from model
+        """
         batched_samples = self.model.init_dataloader(sample)
         embeds = self.model.batch_inference(batched_samples)
         if not isinstance(embeds, np.ndarray):
@@ -483,7 +535,22 @@ class Embedder:
         return fileloader_obj  # same return type as sequential version
 
     def get_embeddings_from_model(self, sample):
+        """
+        Run full embedding generation pipeline, both for generating
+        embeddings from audio data or generating dimensionality reductions
+        from embedding data. Depending on that sample can be an embedding
+        array or a audio file path.
 
+        Parameters
+        ----------
+        sample : np.array or string-like
+            embedding array of path to audio file
+
+        Returns
+        -------
+        np.array
+            embeddings
+        """
         start = time.time()
         if self.dim_reduction_model:
             embeds = self.get_reduced_dimensionality_embeddings(sample)

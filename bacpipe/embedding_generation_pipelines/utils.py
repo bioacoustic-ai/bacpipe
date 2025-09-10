@@ -35,7 +35,6 @@ class ModelBaseClass:
         self.padding = padding
         
         self.classifier_outputs = torch.tensor([])
-        self.device = self.device
         self.model_base_path = self.model_base_path
         self.classification_threshold = 0.1
         self.sr = sr
@@ -48,7 +47,7 @@ class ModelBaseClass:
             self.model.eval()
             try:
                 self.model = self.model.to(self.device)
-            except AttributeError as e:
+            except Exception as e:
                 print(e)
                 pass
         except AttributeError:
@@ -100,23 +99,21 @@ class ModelBaseClass:
                 audio, batch_size=self.batch_size, shuffle=False
             )
 
-    def batch_inference(self, batched_samples):
+    def batch_inference(self, batched_samples, callback=None):
         embeds = []
-        for batch in tqdm(
-            batched_samples, desc=" processing batches", position=0, leave=False
+        total_batches = len(batched_samples)
+
+        for idx, batch in enumerate(
+            tqdm(batched_samples, desc=" processing batches", position=0, leave=False)
         ):
             with torch.no_grad():
                 if self.bool_classifier:
-                    if self.device == "cuda" and not isinstance(
-                        batch, tensorflow.Tensor
-                    ):
+                    if self.device == "cuda" and not isinstance(batch, tensorflow.Tensor):
                         batch = batch.cuda()
                         self.classifier_outputs = self.classifier_outputs.cuda()
                         self.classifier = self.classifier.cuda()
 
-                    embedding, cls_vals = self.__call__(
-                        batch, return_class_results=True
-                    )
+                    embedding, cls_vals = self.__call__(batch, return_class_results=True)
                     if not isinstance(batch, tensorflow.Tensor):
                         self.classifier_outputs = torch.cat(
                             [self.classifier_outputs, cls_vals.clone().detach()]
@@ -126,21 +123,26 @@ class ModelBaseClass:
                             [self.classifier_outputs, torch.Tensor(cls_vals)]
                         )
                 else:
-                    if self.device == "cuda" and not isinstance(
-                        batch, tensorflow.Tensor
-                    ):
+                    if self.device == "cuda" and not isinstance(batch, tensorflow.Tensor):
                         batch = batch.cuda()
                     embedding = self.__call__(batch)
+
             if isinstance(embedding, torch.Tensor) and embedding.dim() == 1:
                 embedding = embedding.unsqueeze(0)
             embeds.append(embedding)
+
+            # callback with progress if progressbar should be updated
+            if callback and total_batches > 0:
+                fraction = (idx + 1) / total_batches
+                callback(fraction)
+
         if self.bool_classifier:
             self.classifier_outputs = self.classifier_outputs.cpu()
+
         if isinstance(embeds[0], torch.Tensor):
             return torch.cat(embeds, axis=0)
         else:
             import tensorflow as tf
-
             return_embeds = tf.concat(embeds, axis=0).numpy().squeeze()
             return return_embeds
 

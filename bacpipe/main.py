@@ -325,17 +325,16 @@ def visualize_using_dashboard(models, **kwargs):
         )
         raise e
 
-    # Set up the server parameters
-    serve_kwargs = {"port": 5006, "address": "localhost"}
+    favicon_path = 'src/bacpipe_favicon_white.png'
 
-    # Start the server
-    print(
-        f"Starting dashboard server at {serve_kwargs.get('address', 'localhost')}:{serve_kwargs.get('port', 5006)}"
+    template = pn.template.BootstrapTemplate(
+        site="bacpipe",
+        title="bacpipe dashboard",
+        favicon=str(favicon_path),  # must be a path ending in .ico, .png, etc.
+        main=[dashboard.app],
     )
-    dashboard.app.show(title="Bacpipe Dashboard", **serve_kwargs)
 
-    # Return the dashboard object in case it's needed elsewhere
-    return dashboard
+    template.show(port=5006, address="localhost")
 
 
 def get_embeddings(

@@ -13,16 +13,15 @@ class Model(ModelBaseClass):
         self.audio_processor = AutoFeatureExtractor.from_pretrained(
             "DBD-research-group/Bird-MAE-Base",
             trust_remote_code=True,
-            device_map={"", self.device},
         )
         self.model = AutoModel.from_pretrained(
             "DBD-research-group/Bird-MAE-Huge",
             trust_remote_code=True,
             dtype="auto",
-            device_map={"", self.device},
         )
-        self.model.eval()
         self.model.to(self.device)
+        self.audio_processor.to(self.device)
+        self.model.eval()
 
     def preprocess(self, audio):
         processed_audio = self.audio_processor(audio).unsqueeze(1)

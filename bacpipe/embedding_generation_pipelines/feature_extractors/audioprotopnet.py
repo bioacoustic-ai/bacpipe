@@ -19,7 +19,6 @@ class Model(ModelBaseClass):
         model = AutoModelForSequenceClassification.from_pretrained(
             "DBD-research-group/AudioProtoPNet-5-BirdSet-XCL",
             trust_remote_code=True,
-            device_map={"", self.device},
         )
 
         # optional: patch missing attribute if other code expects it
@@ -29,10 +28,11 @@ class Model(ModelBaseClass):
         self.preprocessor = AutoFeatureExtractor.from_pretrained(
             "DBD-research-group/AudioProtoPNet-5-BirdSet-XCL",
             trust_remote_code=True,
-            device_map={"", self.device},
         )
-        self.model = model.model.backbone
-        self.classifier = model.head
+        
+        self.model = model.model.backbone.to(self.device)
+        self.classifier = model.head.to(self.device)
+        
         self.model.eval()
 
         id2label = model.config.id2label
@@ -47,6 +47,7 @@ class Model(ModelBaseClass):
             )
             for cls in id2label.values()
         ]
+
 
     def preprocess(self, audio):
         return self.preprocessor(audio)
