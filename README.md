@@ -215,7 +215,7 @@ __Try it out__ and (__please__) feel free to give feedback and ask questions (or
 ---
 # Installation
 
-### Install `uv` (recommended) or `poetry'
+### Install `uv` (recommended) or `poetry`
 
 It is recommended to use python 3.11 for this repository, as some of the models require it. 
 
