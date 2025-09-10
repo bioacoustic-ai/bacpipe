@@ -1,11 +1,10 @@
 import panel as pn
 import matplotlib
-import copy
+import sys
 import seaborn as sns
-from pathlib import Path
 import numpy as np
-from functools import reduce
-
+import importlib.resources as pkg_resources
+import bacpipe.imgs
 from .visualize import (
     plot_embeddings,
     plot_comparison,
@@ -299,7 +298,7 @@ class DashBoard:
             ]
         )
 
-        return pn.Column(*widgets, width=140, margin=(10, 10))
+        return pn.Column(*widgets, width=200, margin=(10, 10))
 
     def build_layout(self):
         """
@@ -308,9 +307,12 @@ class DashBoard:
         and a page showing all models. Each page contains sidebars with model-specific
         information and content areas for visualizations.
         """
+        
+        
         # Build both model pages to initialize widgets
         model0_page = self.single_model_page(0)
         model1_page = self.single_model_page(1)
+        model_all_page = self.all_models_page(1)
 
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
@@ -334,8 +336,49 @@ class DashBoard:
                     sizing_mode="stretch_both",
                 ),
             ),
-            ("All models", self.all_models_page(1)),
+            ("All models", model_all_page),
         )
+        
+        self.add_styling(model1_page, model_all_page)
+        
+    def add_styling(self, model1_page, model_all_page):
+        with pkg_resources.path(bacpipe.imgs, 'bacpipe_unlabelled.png') as p:
+            logo_path = str(p)
+
+        for sidebar in [model1_page.objects[0], model_all_page.objects[0]]:
+            # Add logo to the sidebar
+            sidebar.append(
+                pn.pane.PNG(logo_path, sizing_mode="scale_width")
+            )
+
+            # Add a spacer + contact info below the logo
+            sidebar.append(pn.Spacer(height=20))
+            sidebar.append(
+                pn.pane.Markdown(
+                    """
+                    **Contact**
+                    
+                    If you run into problems, please raise issues on github
+                    
+                    Please collaborate and help make bacpipe as convenient for many as possible
+                    
+                    🌍 [github](https://github.com/bioacoustic-ai/bacpipe)  
+                    
+                    To stay updated with new releases, subscribe to the [newsletter](https://buttondown.com/vskode)
+                    """
+                )
+            )
+            # Add close button to the header
+            close_button = pn.widgets.Button(name="❌ close dashboard")
+
+            def shutdown_callback(event):
+                print("Shutting down dashboard server...")
+                sys.exit(0)
+
+            close_button.on_click(shutdown_callback)
+
+            sidebar.append(close_button)
+        
 
     def add_save_button(self, plot_func, **kwargs):
         """

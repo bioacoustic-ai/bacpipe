@@ -555,6 +555,8 @@ class Embedder:
         if self.dim_reduction_model:
             embeds = self.get_reduced_dimensionality_embeddings(sample)
         else:
+            if not isinstance(sample, Path):
+                sample = Path(sample)
             sample = self.prepare_audio(sample)
             embeds = self.get_embeddings_for_audio(sample)
 

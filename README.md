@@ -1,15 +1,32 @@
 # Welcome to **bacpipe** (**B**io**A**coustic **C**ollection **Pipe**line)
 
-### This repository aims to streamline the generation and evaluation of embeddings using a large variety of bioacoustic models.
+![](src/bacpipe_logo.png)
 
-The below image shows a comparison of umap embeddings based on 15 different bioacoustic models. The models are being evaluated on a bird and frog dataset (more details in [this conference paper](https://arxiv.org/abs/2504.06710)). This repository is an attempt to enable a comparison of bioacoustic models based on their embedding spaces, rather than their classification results.
+**bacpipe** makes using deep learning models for bioacoustics easy!
+Using **bacpipe** you can generate embeddings, classification predictions and clusters. All you need is your audio data and to customize the settings.
 
-![](imgs/normal_overview.png)
+And the best part is, it comes with a GUI for you to explore the results.
+
+**bacpipe** also ties in nicely with [acodet](https://github.com/vskode/acodet), allowing you to generate heatmaps of species activity from your datasets based on predictions of deep learning models. But keep in mind predictions are only as good as the model's you are using - they can seem confident but still be very wrong - **bacpipe**'s aim is to make model evaluations easier and let us improve them.
+
+**bacpipe** is also available on pip: `pip install bacpipe`
+
+```python
+import bacpipe
+
+# This will execute the whole pipeline
+# if nothing is specified it will generate embeddings on
+# a set of audio test data using the models birdnet and perch
+
+bacpipe.play()
+```
+A more detailed description of the API can be found under [API](#api)
 
 
 ## 📚 Table of Contents
 
 - [How it works](#how-it-works)
+- [API](#api)
 - [Dashboard visualization](#dashboard-visualization)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -31,6 +48,14 @@ The below image shows a comparison of umap embeddings based on 15 different bioa
 <!-- <summary><b style="font-size: 2em;">How it works</b></summary> -->
 # How it works
 
+
+
+### This repository aims to streamline the generation and evaluation of embeddings using a large variety of bioacoustic models.
+
+The below image shows a comparison of umap embeddings based on 15 different bioacoustic models. The models are being evaluated on a bird and frog dataset (more details in [this conference paper](https://arxiv.org/abs/2504.06710)). 
+
+![](src/normal_overview.png)
+
 **bacpipe** requires a dataset of audio files, runs them through a series of models, and generates embeddings. These embeddings can then be used visualized and evaluated for various tasks such as clustering or classification.
 
 By default the embeddings will be generated for the models specified in the [config.yaml](config.yaml) file. 
@@ -39,24 +64,26 @@ Currently these bioacoustic models are supported (more details below):
 ```yaml
 
 available_models : [
-    "animal2vec_xc",
-    "animal2vec_mk",
-    "audiomae",
-    "aves_especies",
-    "biolingual",
-    "birdaves_especies",
-    "birdnet",
-    "avesecho_passt",
-    "hbdet",
-    "insect66",
-    "insect459",
-    "perch_bird",
-    "mix2",
-    "protoclr",
-    "rcl_fs_bsed",
-    "surfperch",
-    "google_whale",
-    "vggish",
+    "audiomae"
+    "audioprotopnet"
+    "avesecho_passt"
+    "aves_especies"
+    "beats"
+    "birdaves_especies"
+    "biolingual"
+    "birdnet"
+    "birdmae"
+    "hbdet"
+    "insect66"
+    "insect459"
+    "mix2"
+    "naturebeats"
+    "perch_bird"
+    "protoclr"
+    "rcl_fs_bsed"
+    "surfperch"
+    "google_whale"
+    "vggish"
   ]
 ```
 Once the embeddings are generated, 2d reduced embeddings will be created using the dimensionality reduction model specified in the [config.yaml](config.yaml) file. 
@@ -100,6 +127,59 @@ For reference see the [example annotations file](bacpipe/tests/test_data/annotat
 
 If this file exists, the evaluation script will automatically use the annotations to compute the clustering and classification performance of the embeddings. The labels will also be used to color the points in the dashboard visualization showing the embeddings.
 
+# API
+
+**bacpipe** can be used as a package and installed from pip
+
+`pip install bacpipe`
+
+```python
+import bacpipe
+
+# This will execute the whole pipeline
+# if nothing is specified it will generate embeddings on
+# a set of audio test data using the models birdnet and perch
+
+bacpipe.play()
+
+# to modify configurations and settings, you can simply access them
+# as attributes
+
+# to see available settings and configs run the above commands
+bacpipe.config
+bacpipe.settings
+
+# to modify the audio data path for example, do
+bacpipe.config.audio_dir = '/path/to/your/audio/dir'
+
+# to modify the models you want to run, do
+bacpipe.config.models = ['birdnet', 'birdmae', 'naturebeats']
+# keep in mind some models require checkpoints, to find out which ones, run
+bacpipe.models_needing_checkpoint
+# links to checkpoints are to be found in this readme file, 
+# location of the checkpoints is specified under 
+bacpipe.settings.model_base_path = '/path/to/model_checkpoints'
+# On first execution the birdnet checkpoint is downloaded and the
+# model_checkpoints folder is created from the current working directory
+
+# If you just want to run models and get embeddings and don't want 
+# the dashboard and all of that, define an embedder object and pass it
+# the model name, and the settings you modified
+em = bacpipe.Embedder('birdnet', **vars(bacpipe.settings)) 
+# the vars part is important!
+
+audio_file = '/path/to/all/the/audio/file'
+embeddings = em.get_embeddings_from_model(audio_file)
+
+# if the model has a built in classifier, like birdnet
+# you can make sure the class predictions are also saved 
+# by setting 
+bacpipe.settings.run_pretrained_classifier = True
+# the generating of embeddings above will then let you access 
+# the class predictions using
+em.model.classifier_outputs
+```
+
 
 # Dashboard visualization
 
@@ -109,7 +189,7 @@ Once embeddings are generated, they can be easily visualized using a dashboard (
 
 Below you can see a gif showing the basic usage of the dashboard.
 
-![](imgs/bacpipe_demo.gif)
+![](src/bacpipe_demo.gif)
 
 The dashboard has 3 main sections:
 1. Single model

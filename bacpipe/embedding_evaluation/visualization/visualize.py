@@ -2,6 +2,7 @@ import json
 
 import matplotlib.pyplot as plt
 import numpy as np
+from pathlib import Path
 
 import bacpipe.embedding_evaluation.label_embeddings as le
 
@@ -189,6 +190,14 @@ def plot_embeddings(
     labels, embeds, split_data = loader.get_data(model_name, label_by, **kwargs)
 
     fig, axes, return_axes = init_embed_figure(fig, axes, **kwargs)
+
+    if label_by == 'audio_file_name':
+        new_labels = [Path(l).stem+Path(l).suffix for l in labels]
+        new_split_data = dict()
+        for label in split_data.keys():
+            new_label = Path(label).stem+Path(label).suffix
+            new_split_data[new_label] = split_data[label]
+        split_data = new_split_data
 
     c_label_dict = {lab: i for i, lab in enumerate(np.unique(labels))}
     points = plot_embedding_points(

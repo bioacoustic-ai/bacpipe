@@ -192,4 +192,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.setuptools.package-data]
-"bacpipe" = ["*.yaml"]
+"bacpipe" = ["*.yaml", "*.png"]

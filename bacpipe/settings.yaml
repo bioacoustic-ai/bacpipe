@@ -70,7 +70,7 @@ label_column: 'species'
 # if the model has a classifier that ships with the model, by default 
 # it will be used, to provide another option to colorcode embeddings
 # and visualize differences between embeddings. 
-run_pretrained_classifer: False
+run_pretrained_classifier: False
 classifier_threshold: 0.3
 
 class_configs:

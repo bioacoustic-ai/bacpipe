@@ -65,6 +65,7 @@ settings = SimpleNamespace(**_settings_dict)
 # Expose core API functions
 # --------------------------------------------------------------------
 from bacpipe.tests.test_embedding_creation import embedding_dimensions, needs_checkpoint
+from bacpipe.generate_embeddings import Embedder
 
 supported_models = list(embedding_dimensions.keys())
 models_needing_checkpoint = needs_checkpoint

@@ -1,6 +1,8 @@
 import time
 import logging
 from pathlib import Path
+import importlib.resources as pkg_resources
+import bacpipe.imgs
 
 import numpy as np
 from tqdm import tqdm
@@ -325,14 +327,16 @@ def visualize_using_dashboard(models, **kwargs):
         )
         raise e
 
-    favicon_path = 'src/bacpipe_favicon_white.png'
+    with pkg_resources.path(bacpipe.imgs, 'bacpipe_favicon_white.png') as p:
+        favicon_path = str(p)
 
     template = pn.template.BootstrapTemplate(
-        site="bacpipe",
-        title="bacpipe dashboard",
+        site="bacpipe dashboard",
+        title="Explore embeddings of audio data",
         favicon=str(favicon_path),  # must be a path ending in .ico, .png, etc.
         main=[dashboard.app],
     )
+    
 
     template.show(port=5006, address="localhost")
 
