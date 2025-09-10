@@ -58,7 +58,7 @@ The below image shows a comparison of umap embeddings based on 15 different bioa
 
 **bacpipe** requires a dataset of audio files, runs them through a series of models, and generates embeddings. These embeddings can then be used visualized and evaluated for various tasks such as clustering or classification.
 
-By default the embeddings will be generated for the models specified in the [config.yaml](config.yaml) file. 
+By default the embeddings will be generated for the models specified in the [config.yaml](bacpipe/config.yaml) file. 
 
 Currently these bioacoustic models are supported (more details below):
 ```yaml
@@ -86,7 +86,7 @@ available_models : [
     "vggish"
   ]
 ```
-Once the embeddings are generated, 2d reduced embeddings will be created using the dimensionality reduction model specified in the [config.yaml](config.yaml) file. 
+Once the embeddings are generated, 2d reduced embeddings will be created using the dimensionality reduction model specified in the [config.yaml](bacpipe/config.yaml) file. 
 And these dimensionality reduction models are supported:
 
 ```yaml
@@ -117,7 +117,7 @@ The pipeline is designed to be modular, so you can easily add or remove models a
 
 If you have annotations for your dataset, you can use them to evaluate the generated embeddings. The labels will be used to compute the clustering and classification performance of the embeddings. 
 
-To use the annotations for evaluation, create a file called `annotations.csv` in the directory specified in the `audio_dir` variable in the [config.yaml](config.yaml) file. The file should contain the following columns:
+To use the annotations for evaluation, create a file called `annotations.csv` in the directory specified in the `audio_dir` variable in the [config.yaml](bacpipe/config.yaml) file. The file should contain the following columns:
 ```csv
 audiofilename,start,end,label
 ```
@@ -185,7 +185,7 @@ em.model.classifier_outputs
 
 ### bacpipe includes a dashboard visualization by default allowing you to easily explore the generated embeddings
 
-Once embeddings are generated, they can be easily visualized using a dashboard (built using `panel`) by simply setting the `dashboard` setting in the [config.yaml](config.yaml) file to `True`.
+Once embeddings are generated, they can be easily visualized using a dashboard (built using `panel`) by simply setting the `dashboard` setting in the [config.yaml](bacpipe/config.yaml) file to `True`.
 
 Below you can see a gif showing the basic usage of the dashboard.
 
@@ -215,27 +215,15 @@ __Try it out__ and (__please__) feel free to give feedback and ask questions (or
 ---
 # Installation
 
-### Install `uv` (recommended) or `virtualenv` or `poetry'
+### Install `uv` (recommended) or `poetry'
 
 It is recommended to use python 3.11 for this repository, as some of the models require it. 
 
-For speed and stability it is recommended to use `uv` instead of `virtualenv` and `pip`. To install `uv` use the following command:
+For speed and stability it is recommended to use `uv`. To install `uv` use the following command (you can also do it all without `uv` then, just leave the `uv` part away, as all the commands are also `pip` commands):
 
 `pip install uv` 
 
-Otherwise, `pipx` will also work: 
-
-`pipx install uv` 
-
-You can install pipx following these instructions: https://pipx.pypa.io/latest/installation/
-
 (for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m pip install uv`)
-
-If you prefer to use `virtualenv`, you can install it using the following command:
-
-`pip install virtualenv`
-
-(for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m pip install virtualenv`)
 
 If you prefer to use `poetry`, you can install it using: 
 
@@ -243,19 +231,15 @@ If you prefer to use `poetry`, you can install it using:
 
 ### Create a virtual environment
 
-`python3.11 -m uv venv env_bacpipe`
+`python3.11 -m uv venv .env_bacpipe`
 
-(for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m uv venv env_bacpipe`)
-
-(alternatively with `virtualenv`: `python3.11 -m virtualenv env_bacpipe`)
+(for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m uv venv .env_bacpipe`)
 
 (alternatively for `poetry` use `poetry env use 3.11`)
 
-(alternatively for windows with `virtualenv` use `/c/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m virtualenv env_bacpipe`)
-
 activate the environment
 
-`source env_bacpipe/bin/activate` (for windows use `source env_bacpipe\Scripts\activate`)
+`source .env_bacpipe/bin/activate` (for windows use `source .env_bacpipe\Scripts\activate`)
 
 ### Clone the repository
 `git clone https://github.com/bioacoustic-ai/bacpipe.git`
@@ -264,26 +248,22 @@ cd into the bacpipe directory (`cd bacpipe`)
 
 ### Install the dependencies once the prerequisites are satisfied.
 
-`uv pip install -r requirements.txt` (for `pip` users omit `uv`)
+`uv pip install -r pyproject.toml`
 
-If you want to use GPU, we recommend to use the pyproject approach, either with `uv` or `poetry`. 
-To do that, follow: 
+- this will automatically install requirements based on your os, so windows should also work fine. However, gpu support is not available on windows
 
 For `poetry`:
 
 `poetry lock`
 `poetry install`
 
-For `uv`: 
+Alternatively: 
 
 `uv sync`
 
-
-#### For Windows use the windows-specific requirements
+If for some reasons you would prefer requirements, use the these for windows:
 
 `uv pip install -r requirements_windows.txt` 
-
-((for `pip` users omit `uv`) windows does no support `fairseq` and will therefore not be able to run the `animal2vec` models)
 
 If you do not have admin rights and encounter a `permission denied` error when using `pip install`, use `python -m pip install ...` instead.
 
@@ -291,32 +271,22 @@ If you do not have admin rights and encounter a `permission denied` error when u
 
 Download the ones that are available from [here](https://github.com/bioacoustic-ai/bacpipe/tree/main/bacpipe/pipelines) and create directories corresponding to the pipeline-names and place the checkpoints within them. 
 
-## Test the installation was successfull
+## Test the installation was successful
 
-By doing so you will also ensure that the directory structure for the model checkpoints will be created.
+By doing so you will also ensure that the directory structure for the model checkpoints will be created. 
 
 `pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py`
+
+The tests could take a while, so to run a small test, you can also pass the model you would like to test:
+
+`pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py --models=birdnet,perch`
+
+(keep in mind you have to have the checkpoints locally for the models that require it)
 
 In case of a permission denied error, run
 `python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py`
 
 If everything passes then you've successfully installed bacpipe and can now proceed to use it.
-
-## Known installation issues
-
-### python headers needed for animal2vec requirements to work
-For non-windows users:
-
-- for `fairseq` to install you will need python headers:
-`sudo apt-get install python3.11-dev`
-
-- once completed install fairseq:
-`uv pip install fairseq==0.12.2`
-
-- if you're not using `uv`, you'll need to ensure you have `pip` version 24.0 (`pip install pip==24.0`, omegaconf 2.0.6 has a non-standard dependency specifier PyYAML>=5.1.*. pip 24.1 will enforce this behaviour change and installation will thus fail. For Windows `env_bacpipe\Scripts\python.exe -m pip install pip==24.0`)
-
-
----
 
 # Usage
 
@@ -326,54 +296,71 @@ To see the capabilities of bacpipe, go ahead and run the `run_pipeline.py` scrip
 
 ### To use bacpipe on your own data, you will need to modify the configuration files.
 
-The only two files that need to be modified are the [config.yaml](config.yaml) and [settings.yaml](bacpipe/settings.yaml) files. The [config.yaml](config.yaml) is used for the standard configurations: 
+The only two files that need to be modified are the [config.yaml](bacpipe/config.yaml) and [settings.yaml](bacpipe/settings.yaml) files. The [config.yaml](bacpipe/config.yaml) is used for the standard configurations: 
 - path to audio files
 - models to run
 - dimensionality reduction model
 - evaluation tasks
 - whether to run the dashboard or not
 
-The [settings.yaml](bacpipe/settings.yaml) file is used for more advanced configurations and does not need to be modified unless you have specific preferences. It includes settings such as to run on a `cpu` or a `gpu` (by default `cpu`), the paths where results are saved, configurations for the evaluation tasks and more. 
+The [settings.yaml](bacpipe/settings.yaml) file is used for more advanced configurations and does not need to be modified unless you have specific preferences. It includes settings such as to run on a `cpu` or a `cuda` (gpu) (by default `cpu`), the paths where results are saved, configurations for the evaluation tasks and more. 
 
-Modify the [config.yaml](config.yaml) file in the root directory to specify the path to your `dataset`. Define what models to run (from the `available_models`) by specifying the strings in the `selected_models` list (copy and paste as needed, I usually just comment the model's I don't want to run). 
+Modify the [config.yaml](bacpipe/config.yaml) file in the root directory to specify the path to your `dataset`. Define what models to run by specifying the strings in the `models` list (copy and paste as needed, I usually just comment the model's I don't want to run). 
 
-If you have already computed embeddings and you want to do the dimensionality reduction and evaluation for the models you have already run, you can set the `already_computed` variable to `True`. This will only select the models that have already been computed.
+If you have already computed embeddings on the dataset specified in audio_data, and you want to do the dimensionality reduction and evaluation for the models you have already run, you can set the `already_computed` variable to `True`. This will only select the models that have already been computed.
 
-In either case if you have already computed embeddings with a model, **bacpipe** will skip the model and use the **already computed** embeddings (if they are still located in the same directory). Even if `overwrite` is set to `True`, **bacpipe** will not overwrite the embeddings if they already exist. 
+In either case if you have already computed embeddings with a model, **bacpipe** will skip the model and use the **already computed** embeddings (if they are still located in the same directory). Even if `overwrite` is set to `True`, **bacpipe** will not overwrite the embeddings if they already exist. It will recompute clusterings and label generation.
 
 ## Running the pipeline
 
 Once the configuration is complete, execute the run_pipeline.py file (make sure the environment is activated)
 `python run_pipeline.py`
 
-While the scripts are executed, directories will be created in the `bacpipe/results` directory. Embeddings will be saved in `bacpipe/results/YOUR_DATASET/embeddings` (see [here](results/test_data/embeddings/README.md) for more info) and if selected, reduced dimensionality embeddings will be saved in `bacpipe/evaluation/dim_reduced_embeddings` (see [here](results/test_data/dim_reduced_embeddings/README.md) for more infor) . 
+While the scripts are executed, directories will be created corresponding to the `main_results_dir` setting. Embeddings will be saved in `main_results_dir/YOUR_DATASET/embeddings` (see [here](results/test_data/embeddings/README.md) for more info) and if selected, reduced dimensionality embeddings will be saved in `main_results_dir/evaluation/dim_reduced_embeddings` (see [here](results/test_data/dim_reduced_embeddings/README.md) for more info).
 
 
 ## Model selection
 
-Select the models you want to run in the [config.yaml](config.yaml) file. The models are specified in the `available_models` list. You can select the models you want to run by adding them to the `selected_models` list.
+Select the models you want to run in the [config.yaml](bacpipe/config.yaml) file. The models are specified in this ReadMe and in the [test_file](bacpipe/tests/test_embedding_creation.py). You can select the models you want to run by adding them to the `models` list in the [config.yaml](bacpipe/config.yaml) file.
 
 ## Dimensionality reduction
 
-Different dimensionality reduction models can be selected in the [config.yaml](config.yaml) file. The available models are specified in the section [Dimensionality reduction models](#dimensionality-reduction-models). Insert the name of the selected model in the `dim_reduction_model` variable in the [config.yaml](config.yaml) file. The default is `umap`, but you can also select `pca`, `sparse_pca` or `t_sne`.
+Different dimensionality reduction models can be selected in the [config.yaml](bacpipe/config.yaml) file. The available models are specified in the section [Dimensionality reduction models](#dimensionality-reduction-models). Insert the name of the selected model in the `dim_reduction_model` variable in the [config.yaml](bacpipe/config.yaml) file. The default is `umap`, but you can also select `pca`, `sparse_pca` or `t_sne`.
 
 
 ## Dashboard
 
-The dashboard is a panel application that allows you to visualize the generated embeddings. To enable the dashboard, set the `dashboard` variable in the [config.yaml](config.yaml) file to `True`. The dashboard will automatically open in your browser (at `http://localhost:8050`) after running the `run_dashboard.py` script.
+The dashboard is a panel application that allows you to visualize the generated embeddings. To enable the dashboard, set the `dashboard` variable in the [config.yaml](bacpipe/config.yaml) file to `True`. The dashboard will automatically open in your browser (at `http://localhost:8050`) after running the `run_dashboard.py` script.
 
 ## Evaluation
 
-You can use `bacpipe` to evaluate the generated embeddings using different metrics. To evaluate the embeddings, you need annotations for your dataset. The annotations should be in a file called `annotations.csv` in the directory specified in the `audio_dir` variable in the [config.yaml](config.yaml) file. The file should contain the following columns:
+You can use `bacpipe` to evaluate the generated embeddings using different metrics. To evaluate the embeddings, you need annotations for your dataset. The annotations should be in a file called `annotations.csv` in the directory specified in the `audio_dir` variable in the [config.yaml](bacpipe/config.yaml) file or the results directory of your dataset `main_results_dir/YOUR_DATASET`. The file should contain the following columns:
 ```csv
-audiofilename,start,end,label
+audiofilename,start,end,label:species
 ```
+
 Where `audiofilename` is the name of the audio file, `start` and `end` are the start and end times of the annotation in seconds, and `label` is the label of the annotation.
+
+`species` is a placeholder here and can be replaced with any label description. So if you have labelled call types, change it to `label:call_type`. But it's important that there are no spaces and that it contains `label:`. By doing this you will be able to visualize your data based on all of these label columns.
+
+The labels can then be used to perform clustering and classification evaluation. This can be done only in regard to one label, so specify the main label column in the `label_column` variable in [settings.yaml](bacpipe/settings.yaml). This defaults to `species`. Only labels that exceed the `min_label_occurances` value will be used. This is to make sure you have enough data to train linear classifiers and do meaningful evaluations. If you have enough labeled data, feel free to increase this. 
 
 See the file [annotations.csv](bacpipe/tests/test_data/annotations.csv) for an example of how the annotations file should look like.
 
-Once the annotations file is created, add either `classification` or `clustering` (or both) to the `evaluation_task` variable in the [config.yaml](config.yaml) file (use double quotes: "classification" or "clustering"). You can run the evaluation script using normal `python run_pipeline.py` command. The evaluation script will automatically use the annotations to compute the clustering and classification performance of the embeddings. The results will be saved in the `bacpipe/results/YOUR_DATASET/evaluation` directory.
+Once the annotations file is created, add either `classification` or `clustering` (or both) to the `evaluation_task` variable in the [config.yaml](bacpipe/config.yaml) file (use double quotes: "classification" or "clustering"). You can run the evaluation script using normal `python run_pipeline.py` command. The evaluation script will automatically use the annotations to compute the clustering and classification performance of the embeddings. The results will be saved in the `bacpipe/results/YOUR_DATASET/evaluation` directory.
 
+If you selected classification, a linear classifier will be trained and saved in the classification subdirectory of the evaluation folder. This .pt file can be used to generate class predictions with a model that wasn't originally trained on these classes. A tutorial will be available shortly explaining this in more detail. The .pt file can be used in the repository [acodet](https://github.com/vskode/acodet) to generate class predictions with the combination of a feature extractor and the trained linear classifier.
+
+## Models with classifiers
+
+Models that already contain classification heads, are the following:
+- AudioProtoPNet
+- BirdNET
+- Perch_bird
+- SurfPerch
+- google_whale
+
+With all of these models, you only need to set `run_pretrained_classifier` to True and then the model will save the classification outputs in the `classification/original_classifier_outputs` folder. Only predictions exceeding the `classifier_threshold` value will be saved. A csv file in the shape of the annotations.csv file is also saved corresponding to the class predictions. The dashboard will also contain an extra `label_by` option `default_classifier`.
 
 # Available models
 
@@ -671,6 +658,8 @@ There should always be a baseline minimal use case, where embeddings are created
 Given that this repository compiles a large number of very different deep learning models with different requirements, some issues have been noted. 
 
 Please raise issues if there are questions or bugs. 
+
+Previous versions of **bacpipe** included models like animal2vec, but the requirements conflicts led me to remove them. In the future I hope there will be an updated version of those models and then they will be included again.
 
 # Citation
 

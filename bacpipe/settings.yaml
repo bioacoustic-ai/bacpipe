@@ -46,7 +46,7 @@ avoid_pipelined_gpu_inference: False
 # of embeddings for each label. The remaining embeddings will be marked as noise.
 # Change this value at will, but be aware that classification might fail if it's too low. 
 # Default = 150.
-min_label_occurances: 50
+min_label_occurrences: 50
 
 # If you want to visualize the embeddings by ground truth with no minimum
 # number of occurances, set this to False.
