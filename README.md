@@ -167,7 +167,8 @@ bacpipe.settings.model_base_path = '/path/to/model_checkpoints'
 # the model name, and the settings you modified
 # To ensure birdnet is downloaded, run the following (this is done by default
 # if you run bacpipe.play(), but without that, you need to call this explicitly)
-bacpipe.ensure_std_models(bacpipe.settings.model_base_path)
+from pathlib import Path
+bacpipe.ensure_std_models(Path(bacpipe.settings.model_base_path))
 
 em = bacpipe.Embedder('birdnet', **vars(bacpipe.settings)) 
 # the vars part is important!
