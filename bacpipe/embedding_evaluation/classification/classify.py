@@ -15,7 +15,7 @@ from .train_classifier import (
     KNN,
     train_knn_classifier,
 )
-from .evaluate_classifier import compute_task_metrics, evaluate_classification
+from .evaluate_classifier import compute_task_metrics, save_classification
 from bacpipe.embedding_evaluation.visualization.visualize import (
     plot_classification_results,
 )
@@ -201,7 +201,7 @@ def classification_pipeline(
     ):
         metrics = classify(paths, dataset_csv_path, embeds, config=name, **kwargs)
 
-        evaluate_classification(paths, name, metrics, **kwargs)
+        save_classification(paths, name, metrics, **kwargs)
         plot_classification_results(paths=paths, task_name=name, metrics=metrics)
     else:
         logger.info(

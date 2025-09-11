@@ -2,6 +2,7 @@ import json
 
 import sklearn.metrics as metrics
 import numpy as np
+from pathlib import Path
 
 
 #  accuracy per class
@@ -114,7 +115,7 @@ def compute_task_metrics(y_pred, y_true, probability_scores, label2index):
     return metrics
 
 
-def evaluate_classification(paths, config, metrics, **kwargs):
+def save_classification(paths, config, metrics, **kwargs):
     """
     Save a dict with all performance metrics.
 
@@ -127,9 +128,16 @@ def evaluate_classification(paths, config, metrics, **kwargs):
     metrics : dict
         performance
     """
+    
+    for k, v in kwargs.items():
+        if isinstance(v, Path):
+            kwargs[k] = v.as_posix()
+            
     metrics["config"] = kwargs
 
     save_path = paths.class_path.joinpath(f"class_results_{config}.json")
+    
+    
 
     with open(save_path, "w") as f:
         json.dump(metrics, f, indent=2)

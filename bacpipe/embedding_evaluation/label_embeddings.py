@@ -421,8 +421,8 @@ def load_labels_and_build_dict(
     label_file,
     audio_dir,
     bool_filter_labels=True,
-    min_label_occurances=150,
-    label_column=None,
+    min_label_occurrences=150,
+    main_label_column=None,
     testing=False,
     **kwargs,
 ):
@@ -445,25 +445,27 @@ def load_labels_and_build_dict(
     if bool_filter_labels and not testing:
         filtered_labels = [
             lab
-            for lab in np.unique(label_df[f"label:{label_column}"])
-            if len(label_df[label_df[f"label:{label_column}"] == lab])
-            > min_label_occurances
+            for lab in np.unique(label_df[f"label:{main_label_column}"])
+            if len(label_df[label_df[f"label:{main_label_column}"] == lab])
+            > min_label_occurrences
         ]
         if not filtered_labels:
             logger.debug(
                 "By filtering the annotations.csv file using the "
-                f"{min_label_occurances=}, no labels are left. In "
+                f"{min_label_occurrences=}, no labels are left. In "
                 "case you are just testing, the labels will not be filtered"
                 f" and {bool_filter_labels=} will be ignored. If this "
                 "a serious classification task, you will need more annotations. "
                 "This might cause the classification or clustering to crash."
             )
         else:
-            label_df = label_df[label_df[f"label:{label_column}"].isin(filtered_labels)]
-    label_idx_dict = {
-        label: idx
-        for idx, label in enumerate(label_df[f"label:{label_column}"].unique())
-    }
+            label_df = label_df[label_df[f"label:{main_label_column}"].isin(filtered_labels)]
+    label_idx_dict = {}
+    for label_column in [l for l in label_df.columns if 'label:' in l]:
+        label_idx_dict[label_column] = {
+            label: idx
+            for idx, label in enumerate(label_df[label_column].unique())
+        }
     with open(paths.labels_path.joinpath("label_idx_dict.json"), "w") as f:
         json.dump(label_idx_dict, f, indent=1)
     return label_df, label_idx_dict
@@ -625,7 +627,7 @@ def ground_truth_by_model(
         path = model_specific_embedding_path(paths.main_embeds_path, model)
 
         label_df, label_idx_dict = load_labels_and_build_dict(
-            paths, label_file, label_column=label_column, **kwargs
+            paths, label_file, main_label_column=label_column, **kwargs
         )
 
         files = list(path.rglob("*.npy"))
@@ -635,6 +637,7 @@ def ground_truth_by_model(
         segment_s = metadata["segment_length (samples)"] / metadata["sample_rate (Hz)"]
 
         label_columns = [col for col in label_df.columns if "label:" in col]
+        ground_truth_dict = {}
         for label_col in label_columns:
             labels = label_col.split("label:")[-1]
             ground_truth = collect_ground_truth_labels_by_file(
@@ -644,16 +647,16 @@ def ground_truth_by_model(
                 segment_s,
                 metadata,
                 label_df,
-                label_idx_dict,
+                label_idx_dict[label_col],
                 single_label=single_label,
                 label_column=labels,
                 **kwargs,
             )
 
-            ground_truth_dict = {
+            ground_truth_dict.update({
                 f"label:{labels}": ground_truth,
-                f"label_dict:{labels}": label_idx_dict,
-            }
+                f"label_dict:{labels}": label_idx_dict[label_col],
+            })
         np.save(paths.labels_path.joinpath("ground_truth.npy"), ground_truth_dict)
     else:
         ground_truth_dict = np.load(

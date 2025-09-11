@@ -21,7 +21,8 @@ class ModelBaseClass:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        if self.run_pretrained_classifier:
+        if (self.run_pretrained_classifier 
+            and hasattr(self, 'classifier_predictions')):
             self.bool_classifier = True
         else:
             self.bool_classifier = False

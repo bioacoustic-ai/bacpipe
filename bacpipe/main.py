@@ -494,7 +494,7 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                         embed.save_classifier_outputs(ld, file)
 
             # Finalize
-            if embed.model.bool_classifier:
+            if embed.model.bool_classifier and not embed.dim_reduction_model:
                 embed.cumulative_annotations.to_csv(
                     embed.paths.class_path / "default_classifier_annotations.csv",
                     index=False,

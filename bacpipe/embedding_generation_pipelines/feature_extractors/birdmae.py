@@ -20,7 +20,6 @@ class Model(ModelBaseClass):
             dtype="auto",
         )
         self.model.to(self.device)
-        self.audio_processor.to(self.device)
         self.model.eval()
 
     def preprocess(self, audio):

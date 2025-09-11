@@ -1,6 +1,7 @@
 # Welcome to **bacpipe** (**B**io**A**coustic **C**ollection **Pipe**line)
 
 ![](src/bacpipe_logo.png)
+image by Nicole Allison
 
 **bacpipe** makes using deep learning models for bioacoustics easy!
 Using **bacpipe** you can generate embeddings, classification predictions and clusters. All you need is your audio data and to customize the settings.
@@ -376,7 +377,7 @@ Where `audiofilename` is the name of the audio file, `start` and `end` are the s
 
 `species` is a placeholder here and can be replaced with any label description. So if you have labelled call types, change it to `label:call_type`. But it's important that there are no spaces and that it contains `label:`. By doing this you will be able to visualize your data based on all of these label columns.
 
-The labels can then be used to perform clustering and classification evaluation. This can be done only in regard to one label, so specify the main label column in the `label_column` variable in [settings.yaml](bacpipe/settings.yaml). This defaults to `species`. Only labels that exceed the `min_label_occurances` value will be used. This is to make sure you have enough data to train linear classifiers and do meaningful evaluations. If you have enough labeled data, feel free to increase this. 
+The labels can then be used to perform clustering and classification evaluation. This can be done only in regard to one label, so specify the main label column in the `label_column` variable in [settings.yaml](bacpipe/settings.yaml). This defaults to `species`. Only labels that exceed the `min_label_occurrences` value will be used. This is to make sure you have enough data to train linear classifiers and do meaningful evaluations. If you have enough labeled data, feel free to increase this. 
 
 See the file [annotations.csv](bacpipe/tests/test_data/annotations.csv) for an example of how the annotations file should look like.
 

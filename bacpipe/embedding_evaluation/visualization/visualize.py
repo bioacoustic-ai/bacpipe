@@ -131,7 +131,10 @@ class EmbedAndLabelLoader:
             return_labels = self.labels[model_name]
             return_embeds = self.embeds[model_name]
 
-        return_splits = data_split_by_labels(return_embeds, return_labels[label_by])
+        if label_by in return_labels:
+            return_splits = data_split_by_labels(return_embeds, return_labels[label_by])
+        else:
+            return [], [], {}
         return (
             return_labels[label_by],
             return_embeds,
@@ -190,6 +193,9 @@ def plot_embeddings(
     labels, embeds, split_data = loader.get_data(model_name, label_by, **kwargs)
 
     fig, axes, return_axes = init_embed_figure(fig, axes, **kwargs)
+    
+    if len(labels) == 0 and len(embeds) == 0:
+        return fig
 
     if label_by == 'audio_file_name':
         new_labels = [Path(l).stem+Path(l).suffix for l in labels]
@@ -279,10 +285,11 @@ def get_labels_for_plot(model_name=None, **kwargs):
 
 def set_colorbar_or_legend(fig, axes, points, c_label_dict, label_by, **kwargs):
     if len(c_label_dict.keys()) > 20:
-        if (
-            isinstance(list(c_label_dict.keys())[0], int)
-            or len(list(c_label_dict.keys())[0]) < 12
-        ):
+        if isinstance(list(c_label_dict.keys())[0], int):
+            fontsize = 9
+        elif isinstance(list(c_label_dict.keys())[0], np.int32):
+            fontsize = 9
+        elif len(list(c_label_dict.keys())[0]) < 12:
             fontsize = 9
         else:
             fontsize = 6

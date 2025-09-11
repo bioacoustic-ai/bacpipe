@@ -9,7 +9,8 @@
 
 # PATHS:
 # define paths for your audio data
-audio_dir :       "bacpipe/tests/test_data"
+### IMPORTANT! WINODWS USERS DON'T USE QUOTATIONS HERE
+audio_dir :       bacpipe/tests/test_data
 
 #####################    PROCESS SETTINGS    ##############################
 
