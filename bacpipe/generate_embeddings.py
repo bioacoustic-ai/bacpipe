@@ -56,8 +56,7 @@ class Loader:
             self.embed_suffix = ".json"
         else:
             self.embed_suffix = ".npy"
-        import numpy as np
-        np.array()
+        
         start = time.time()
         self.check_embeds_already_exist()
         logger.debug(
