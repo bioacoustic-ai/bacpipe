@@ -4,8 +4,6 @@ import yaml
 import importlib.resources as pkg_resources
 from pathlib import Path
 
-sys.path.insert(0, ".")
-
 import bacpipe
 from bacpipe.main import get_embeddings, embeds_array_without_noise
 from bacpipe.generate_embeddings import Loader, Embedder
