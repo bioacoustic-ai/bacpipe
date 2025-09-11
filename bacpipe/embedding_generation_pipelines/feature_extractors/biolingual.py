@@ -16,11 +16,13 @@ class Model(ModelBaseClass):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
 
         self.preprocessor = ClapProcessor.from_pretrained(
-            "davidrrobinson/BioLingual", device_map={"", self.device}
+            "davidrrobinson/BioLingual",
         )
         self.model = ClapModel.from_pretrained(
-            "davidrrobinson/BioLingual", device_map={"", self.device}
+            "davidrrobinson/BioLingual",
         )
+        
+        self.model.to(self.device)
 
     def preprocess(self, audio):
         audio_input = []

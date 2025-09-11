@@ -43,9 +43,9 @@ class Model(Model):
                 cls_vals = self.classifier_predictions(results)
                 class_preds.append(cls_vals)
             embeds.append(results.embeddings.squeeze())
-        class_preds = np.array(class_preds).squeeze()
 
         if return_class_results:
+            class_preds = np.array(class_preds).squeeze()
             return np.array(embeds), class_preds
         else:
             return np.array(embeds)

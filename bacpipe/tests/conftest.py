@@ -1,6 +1,8 @@
 from pathlib import Path
-import pytest
-import bacpipe
+from bacpipe import supported_models, models_needing_checkpoint, settings
+
+# cache so we only compute once
+_filtered_models = None
 
 
 def pytest_addoption(parser):
@@ -13,25 +15,31 @@ def pytest_addoption(parser):
 
 
 def pytest_generate_tests(metafunc):
-    if "model" in metafunc.fixturenames:
+    global _filtered_models
+
+    if "model" not in metafunc.fixturenames:
+        return
+
+    if _filtered_models is None:
         option = metafunc.config.getoption("models")
 
         if option:
-            # User-specified models
+            # user-specified models
             models = option.split(",")
         else:
-            # Discover all models
-            models = [
-                mod.stem
-                for mod in Path(
-                    bacpipe.PACKAGE_MAIN
-                    / "embedding_generation_pipelines/feature_extractors"
-                ).glob("*.py")
+            models = list(supported_models)
+            not_available = [
+                m for m in models_needing_checkpoint
+                if not (Path(settings.model_base_path) / m).exists()
             ]
+            for m in not_available:
+                if m in models:
+                    models.remove(m)
 
-        if not models:
-            models = ["birdnet"]  # fallback if nothing found
+            if not models:
+                models = ["birdnet"]  # fallback if nothing left
 
+        _filtered_models = models
 
-        print(">>> Models selected for tests:", models)
-        metafunc.parametrize("model", models)
+    print(">>> Models selected for tests:", _filtered_models)
+    metafunc.parametrize("model", _filtered_models)
