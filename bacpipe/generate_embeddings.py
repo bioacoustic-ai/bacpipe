@@ -718,4 +718,3 @@ def save_embeddings_dict_with_timestamps(
             embed_dict[file.stem] = embeds[acc_shape : acc_shape + shape[0]]
             acc_shape += shape[0]
         np.save(file_dest.replace(".json", f"{embeds.shape[-1]}.npy"), embed_dict)
-Loader()
