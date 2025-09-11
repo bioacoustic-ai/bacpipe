@@ -18,12 +18,13 @@ def ensure_std_models(model_base_path, repo_id="vinikay/bacpipe_models"):
     repo_id : str, optional
         Hugging Face Hub repo ID, by default "vinikay/bacpipe_models"
     """
-    Path(model_base_path).parent.mkdir(exist_ok=True, parents=True)
+    model_base_path = Path(model_base_path)
+    model_base_path.parent.mkdir(exist_ok=True, parents=True)
 
     if model_base_path.exists():
         return model_base_path.parent / "model_checkpoints"
 
-    logger.INFO(
+    print(
         "This seems to be the first call. Hi there! "
         "Downloading model checkpoints from Hugging Face Hub for "
         "BirdNet. Because let's face it, everyone needs to at least have BirdNet."

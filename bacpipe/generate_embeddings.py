@@ -22,6 +22,28 @@ class Loader:
         testing=False,
         **kwargs,
     ):
+        """
+                Run the embedding generation pipeline, check if embeddings for this
+        dataset have already been processed, if so load them, if not generate them. 
+        During this process collect metadata and return a dictionary of model-
+        specific loader objects that can be used to access the embeddings 
+        and view metadata. 
+
+        Parameters
+        ----------
+        audio_dir : string or pathlib.Path
+            path to audio data
+        check_if_combination_exists : bool, optional
+            If false new embeddings are created and the checking is skipped, by default True
+        model_name : string, optional
+            Name of the model that should be used, by default None
+        dim_reduction_model : bool, optional
+            Either false if primary embeddings are created or the name of
+            the dimensionaliry reduction model if dim reduction should be 
+            performed, by default False
+        testing : bool, optional
+            Testing yes or no?, by default False
+        """
         self.model_name = model_name
         self.audio_dir = Path(audio_dir)
         self.dim_reduction_model = dim_reduction_model
@@ -34,7 +56,8 @@ class Loader:
             self.embed_suffix = ".json"
         else:
             self.embed_suffix = ".npy"
-
+        import numpy as np
+        np.array()
         start = time.time()
         self.check_embeds_already_exist()
         logger.debug(
@@ -185,6 +208,10 @@ class Loader:
         ]
 
     def _get_audio_files(self):
+        if self.audio_dir == 'bacpipe/tests/test_data':
+            import importlib.resources as pkg_resources
+            with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
+                audio_dir = Path(audio_dir)
         files_list = []
         [
             [files_list.append(ll) for ll in self.audio_dir.rglob(f"*{string}")]
@@ -691,3 +718,4 @@ def save_embeddings_dict_with_timestamps(
             embed_dict[file.stem] = embeds[acc_shape : acc_shape + shape[0]]
             acc_shape += shape[0]
         np.save(file_dest.replace(".json", f"{embeds.shape[-1]}.npy"), embed_dict)
+Loader()

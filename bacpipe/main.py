@@ -155,6 +155,36 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **
     in the directory specified by the audio_dir parameter. The
     function returns a dictionary containing the loader objects
     for each model, by which metadata and paths are stored.
+    
+        
+    code example:
+    ```
+    loader = bacpipe.model_specific_embedding_creation(
+    **vars(bacpipe.config), **vars(bacpipe.settings)
+    )
+
+    # this call will initiate the embedding generation process, it will check if embeddings
+    # already exist for the combination of each model and the dataset and if so it will
+    # be ready to load them. The loader keys will be the model name and the values will
+    # be the loader objects for each model. Each object contains all the information
+    # on the generated embeddings. To name access them:
+    loader['birdnet'].embedding_dict() 
+    # this will give you a dictionary with the keys corresponding to embedding files
+    # and the values corresponding to the embeddings as numpy arrays
+
+    loader['birdnet'].metadata_dict
+    # This will give you a dictionary overview of:
+    # - where the audio data came from,
+    # - where the embeddings were saved
+    # - all the audio files, 
+    # - the embedding size of the model, 
+    # - the audio file lengths,
+    # - the number of embeddings for each audio files
+    # - the sample rate
+    # - the number of samples per window
+    # - and the total length of the processed dataset in seconds
+    # Thic dictionary is also saved as a yaml file in the directory of the embeddings
+    ```
 
     Parameters
     ----------
