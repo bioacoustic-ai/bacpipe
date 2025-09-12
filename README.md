@@ -23,6 +23,7 @@ bacpipe.play()
 ```
 A more detailed description of the API can be found under [API](#api)
 
+There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) available on youtube to install and run bacpipe.
 
 ## 📚 Table of Contents
 
@@ -143,12 +144,17 @@ import bacpipe
 
 bacpipe.play()
 
+##################################################################
 # to modify configurations and settings, you can simply access them
 # as attributes
 
 # to see available settings and configs run the above commands
 bacpipe.config
 bacpipe.settings
+# you can also check the bacpipe/config.yaml and bacpipe/settings.yaml
+# files here in the repository to see all the available settings and
+# read their respective description
+
 
 # to modify the audio data path for example, do
 bacpipe.config.audio_dir = '/path/to/your/audio/dir'
@@ -162,20 +168,33 @@ bacpipe.models_needing_checkpoint
 bacpipe.settings.model_base_path = '/path/to/model_checkpoints'
 # On first execution the birdnet checkpoint is downloaded and the
 # model_checkpoints folder is created from the current working directory
+# After you are finished with all the customizations you can again just 
+bacpipe.play() 
+# which will then run with your settings.
 
-# If you just want to run models and get embeddings and don't want 
-# the dashboard and all of that, define an embedder object and pass it
-# the model name, and the settings you modified
-# To ensure birdnet is downloaded, run the following (this is done by default
-# if you run bacpipe.play(), but without that, you need to call this explicitly)
-bacpipe.ensure_std_models(bacpipe.settings.model_base_path)
+# You can also run 
+bacpipe.play(save_logs=True)
+# That way bacpipe will generate log files of the outputs and also save your
+# config and settings files, which can be helpful in retrospect to remember
+# all the settings you chose for a run. 
 
-em = bacpipe.Embedder('birdnet', **vars(bacpipe.settings)) 
+
+##################################################################
+# If you just want to run models and get embeddings returned without saving them
+# and don't want the dashboard and all of that, define an embedder object 
+# and pass it the model name, and the settings you modified.
+
+em = bacpipe.Embedder('perch_bird', **vars(bacpipe.settings)) 
 # the vars part is important!
 
 audio_file = '/path/to/all/the/audio/file'
 embeddings = em.get_embeddings_from_model(audio_file)
+# To ensure birdnet is downloaded, run the following (this is done by default
+# if you run bacpipe.play(), but without that, you need to call this explicitly)
+bacpipe.ensure_std_models(bacpipe.settings.model_base_path)
 
+
+##################################################################
 # if the model has a built in classifier, like birdnet
 # you can make sure the class predictions are also saved 
 # by setting 
@@ -184,7 +203,9 @@ bacpipe.settings.run_pretrained_classifier = True
 # the class predictions using
 em.model.classifier_outputs
 
-# If you want to produce embeddings for various models, bacpipe will always store
+
+##################################################################
+# If you want to produce embeddings for multiple models, bacpipe will always store
 # them to keep your memory from overfilling. Still you can use the package to easily
 # access the embeddings and all the metadata
 loader = bacpipe.model_specific_embedding_creation(
