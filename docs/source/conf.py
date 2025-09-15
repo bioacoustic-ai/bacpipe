@@ -58,11 +58,14 @@ html_logo = "_static/bacpipe_logo.png"      # optional logo
 html_favicon = "_static/bacpipe_favicon_white.png"  # optional favicon
 
 def run_apidoc(_):
-    import os
-    import sys
     from sphinx.ext.apidoc import main
-    sys.path.append(os.path.abspath("../.."))
-    main(["-o", "docs/source/api", "bacpipe", "--force"])
+
+    here = os.path.abspath(os.path.dirname(__file__))  # docs/source/
+    root = os.path.abspath(os.path.join(here, "../.."))  # repo root
+    api_out = os.path.join(here, "api")  # docs/source/api
+    src_dir = os.path.join(root, "bacpipe")  # your package
+
+    main(["-o", api_out, src_dir, "--force"])
 
 def setup(app):
     app.connect("builder-inited", run_apidoc)
