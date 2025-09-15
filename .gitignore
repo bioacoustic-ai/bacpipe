@@ -20,6 +20,10 @@ results/test_data/dim_reduced_embeddings/*
 !results/test_data/dim_reduced_embeddings/README.md
 
 
+# Sphinx build
+docs/build/
+docs/source/api/bacpipe.*
+
 # ignore test result files
 bacpipe/tests/results_files/*
 

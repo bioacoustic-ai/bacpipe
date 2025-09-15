@@ -130,7 +130,7 @@ distance_configs:
 # fixed path, embeddings will be stored here, advised not to change
 # because this is also where bacpipe will look for existing embeddings
 ### IMPORTANT! WINODWS USERS DON'T USE QUOTATIONS HERE
-main_results_dir :      bacpipe_results
+main_results_dir :      /home/siriussound/Code/bacpipe/results
 embed_parent_dir :      embeddings
 dim_reduc_parent_dir :  dim_reduced_embeddings
 evaluations_dir :       evaluations

@@ -72,7 +72,11 @@ from bacpipe.tests.test_embedding_creation import embedding_dimensions, needs_ch
 from bacpipe.generate_embeddings import Embedder
 
 supported_models = list(embedding_dimensions.keys())
+"""list[str]: Supported embedding models available in bacpipe."""
+
 models_needing_checkpoint = needs_checkpoint
+"""list[str]: Models that require a checkpoint to be downloaded before use."""
+
 
 
 from bacpipe.main import (

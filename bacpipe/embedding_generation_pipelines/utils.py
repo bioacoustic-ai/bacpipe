@@ -17,6 +17,52 @@ class ModelBaseClass:
     def __init__(self, sr, segment_length, device, 
                  model_base_path, global_batch_size, 
                  padding, **kwargs):
+        """
+        This base class defines key methods and attributes for all feature
+        extractors to ensure that we can use the same processing pipeline
+        to generate embeddings. The idea is to 
+        
+        
+        1. initialize the model with prepare_inference, thereby loading 
+        the model and loading it onto the selected device.
+        
+        2. load and resample audio to the sample rate required by the model
+        
+        3. window the audio into segments corresponding to the required
+        input segment length.
+        
+        4. Calculating spectrograms (if the model architecture is accessible)
+        to batch preprocess the audio and potentially be able to in 
+        retrospect build the spectrograms to investigate
+        
+        5. Initialize a torch dataloader object based on the model specific
+        audio loading characteristics to speed up the inference process
+        and looping through the segments
+        
+        6. Perform batch inference
+        
+        
+        If 'cuda' has been selected as device, a threading approach is used
+        to load data in parallel while performing inference. The return value 
+        are the embeddings.
+
+        Parameters
+        ----------
+        sr : int
+            sample rate
+        segment_length : int
+            segment length in samples
+        device : str
+            'cpu' or 'cuda'
+        model_base_path : pathlib.Path
+            path to moin model checkpoint dir
+        global_batch_size : int
+            global batch size that is then used in comjunction with the 
+            segment length to calculate a model-specific batch size that
+            results in approximately equal batches for different models
+        padding : str
+            how to pad audio segments that are shorter than the segment length
+        """
         
         for key, value in kwargs.items():
             setattr(self, key, value)
