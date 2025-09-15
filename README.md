@@ -38,6 +38,12 @@ There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) availab
   - [Dimensionality reduction](#dimensionality-reduction)
   - [Dashboard](#dashboard)
   - [Evaluation](#evaluation)
+  - [Models with classifiers](#models-with-classifiers)
+  - [Generated Files](#generated-files)
+    - [Embedding Folders](#embedding-folders)
+    - [Dimensionality reduced embedding folders](#dimensionality-reduced-embedding-folders)
+    - [Evaluation folders](#evaluation-folders)
+    - [Example result files structure](#example-result-files-structure)
 - [Available models](#available-models)
 - [Contribute](#contribute)
 - [Known issues](#known-issues)
@@ -416,6 +422,117 @@ Models that already contain classification heads, are the following:
 - google_whale
 
 With all of these models, you only need to set `run_pretrained_classifier` to True and then the model will save the classification outputs in the `classification/original_classifier_outputs` folder. Only predictions exceeding the `classifier_threshold` value will be saved. A csv file in the shape of the annotations.csv file is also saved corresponding to the class predictions. The dashboard will also contain an extra `label_by` option `default_classifier`.
+
+## Generated Files
+
+When processing `bacpipe` generates a number of files. It will firstly create the `main_results_dir` specified in [settings.yaml](bacpipe/settings.yaml) and within that it will create a folder named like the dataset selected in `audio_dir` in [config.yaml](bacpipe/config.yaml). Within this directory, bacpipe will create 3 directories: `embed_parent_dir`, `dim_reduc_parent_dir` and `evaluations_dir`. 
+
+The `embed_parent_dir` will contain the model-specific folders with the timestamps when they were processed. The `dim_reduc_parent_dir` contains the model-specific and dimensionality reduction-specific folder again with a timestamp when they were processed. And the `evaluations_dir` contains folders for each model that has been processed. 
+
+### Embedding folders
+
+By default the naming conventions for the embedding directories is:
+
+`_year-month-day_hour-minute___modelname_datasetname`
+
+The `metadata.yaml` file that will be created in each of the embedding folders has the following structure:
+
+Inside this directory you will find:
+- `metadata.yml`, which contains metadata in the shape of a dictionary with the following keys:
+    - audio_dir: _data_directory_
+    - embed_dir: _path_to_embedding_files_
+    - embedding_size: _dimension_of_embeddings_
+    - files: _dictionary_with_lists_containing_per_file_information_
+        - audio_files: _name_of_audio_files_
+        - file_lengths (s): _file_length_in_seconds_
+    - model_name: _name_of_model_
+    - sample_rate (Hz): _sample_rate_
+    - segment_length (samples): _length_of_input_segment_in_samples_
+    - total_dataset_length (s): _total_length_of_dataset_in_seconds_
+- either the embeddings files (ending on `.npy`) or directories corresponding to subdirectories in the dataset folder
+
+
+It is important that the name of this directory remains unchanged, so that it can be found automatically. 
+
+
+### Dimensionality reduced embedding folders
+
+By default the naming conventions for the embedding directories is:
+
+`_year-month-day_hour-minute___DimReductionModelName-DatasetName-ModelName`
+
+Inside this directory you will find:
+- `metadata.yml`, which contains metadata in the shape of a dictionary with the following keys (all of the metadata from the embeddings is also repeated):
+    - files: _dictionary_with_lists_containing_per_file_information_
+        - embedding_dimensions: _tuple_of_number_of_embeddings_by_embedding_size_
+        - embedding_files: _name_of_embedding_files_
+        - nr_embeds_per_file: _number_of_embeddings_per_file_
+    - nr_embeds_total: _total_number_of_embeddings_
+- one `.json` file containing the reduced embeddings of the entire dataset
+- a plot, visiualizing the reduced embeddings in 2d
+
+It is important that the name of this directory remains unchanged, so that it can be found automatically. 
+
+### Evaluation folders
+
+Within the `evaluations_dir` folder, you will find the following folders: `classification`, `clustering`, `distances`, `labels` and `plots`. These folders will be filled with results if the corresponding evaluation tasks are selected. `distanctes` is currently not supported and therefore only a place-holder. `label` will contain a `.npy` file containing the auto-generated labels from the metadata and if available ground_truth.
+
+### Pretrained classifier annotations
+
+If the model has a pretrained classifier and `run_pretrained_classifier` is `True`, `bacpipe` will create a `original_classifier_output` folder and a `default_classifier_annotations.csv` file, corresponding to annotations from the pretrained classifier. The folder will contain `.json` files for each audio file with the species and in which time bin they occurred with what certainty. The `default_classifier_annotations.csv` file contains annotations in the same style as the [annotations.csv](bacpipe/tests/test_data/annotations.csv) file.
+
+
+### Example result files structure
+
+Generated from running with the test_data (timestamps will change) with only directories shown.
+
+This is the source audio data structure:
+```.
+└── audio
+    ├── FewShot
+    └── UrbanSoundscape
+```
+
+This is the resulting folder structure:
+
+```
+.
+├── dim_reduced_embeddings
+│   ├── 2025-09-09_03-08___umap-test_data-birdnet
+│   └── 2025-09-09_03-09___umap-test_data-perch_bird
+├── embeddings
+│   ├── 2025-09-09_03-08___birdnet-test_data
+│   │   └── audio
+│   │       ├── FewShot
+│   │       └── UrbanSoundscape
+│   └── 2025-09-09_03-08___perch_bird-test_data
+│       └── audio
+│           ├── FewShot
+│           └── UrbanSoundscape
+└── evaluations
+    ├── birdnet
+    │   ├── classification
+    │   │   └── original_classifier_outputs
+    │   │       └── audio
+    │   │           ├── FewShot
+    │   │           └── UrbanSoundscape
+    │   ├── clustering
+    │   ├── distances
+    │   ├── labels
+    │   └── plots
+    ├── overview
+    └── perch_bird
+        ├── classification
+        │   └── original_classifier_outputs
+        │       └── audio
+        │           ├── FewShot
+        │           └── UrbanSoundscape
+        ├── clustering
+        ├── distances
+        ├── labels
+        └── plots
+```
+
 
 # Available models
 
