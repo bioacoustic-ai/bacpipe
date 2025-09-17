@@ -1,5 +1,7 @@
 # Welcome to **bacpipe** (**B**io**A**coustic **C**ollection **Pipe**line)
 
+[![Documentation Status](https://readthedocs.org/projects/bacpipe/badge/?version=latest)](https://bacpipe.readthedocs.io/en/latest/?badge=latest)
+
 ![](src/bacpipe_logo.png)
 image by Nicole Allison
 
@@ -21,7 +23,7 @@ import bacpipe
 
 bacpipe.play()
 ```
-A more detailed description of the API can be found under [API](#api)
+A more detailed description of the API can be found under [API](#api). Full documentation can be found at [https://bacpipe.readthedocs.io](https://bacpipe.readthedocs.io).
 
 There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) available on youtube to install and run bacpipe.
 
@@ -604,10 +606,10 @@ AudioMAE from the facebook research group is a vision transformer pretrained on 
 ### AudioProtoPNet
 - spectrogram input
 - supervised learning, trained using asymmetric loss
-- ConvNext architecture
+- ConvNext architecture as feature extractor
 - trained on the xeno-canto large section of BirdSet
 
-This CNN is trained in two phases. The main contribution of this model is its interpretability. It learned prototypes during its second training phase which can be used during inference time to visualize sections of the spectrogram that were most important for classification. It also reaches competitive performance on bird classification tasks. The (include) classifier can distinguish 9736 classes. 
+This CNN is trained in two phases. The main contribution of this model is its interpretability. It learned prototypes during its second training phase which can be used during inference time to visualize sections of the spectrogram that were most important for classification. It also reaches competitive performance on bird classification tasks. The (included) prototype-based classifier can distinguish 9736 classes. 
 
 ### AvesEcho_PaSST
 - transformer
@@ -826,6 +828,16 @@ Given the large number of different models, there are already a lot of requireme
 There should always be a baseline minimal use case, where embeddings are created from different feature extractors and everything else is an add-on.
 
 # Known issues
+
+`bacpipe` is being updated regularly. To make sure you're always up to date with the latest fixes run `git pull` regularly.
+If you have local changes (like changes in the `config` or `settings` files) you don't want to lose run the following:
+```bash
+git stash
+git pull
+git stash apply
+```
+That way it will stash your changes, update `bacpipe` for you and then apply your changes again, so you can continue where you left off. 
+
 
 Given that this repository compiles a large number of very different deep learning models with different requirements, some issues have been noted. 
 
