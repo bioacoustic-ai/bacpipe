@@ -136,10 +136,11 @@ def play(config=config, settings=settings, save_logs=False):
     if save_logs:
         import datetime
         import json
-
-        Path(settings.main_results_dir).mkdir(parents=True, exist_ok=True)
+        
+        log_dir = Path(settings.main_results_dir) / Path(config.audio_dir).stem / f"logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        log_file = Path(settings.main_results_dir) / f"bacpipe_{timestamp}.log"
+        log_file = log_dir / f"bacpipe_{timestamp}.log"
 
         f_format = logging.Formatter(
             "%(asctime)s :: %(name)s :: %(levelname)s :: %(message)s"
@@ -151,16 +152,28 @@ def play(config=config, settings=settings, save_logs=False):
         logger.addHandler(f_handler)
 
         # Save current config + settings snapshot
+        settings_dict, config_dict = {}, {}
+        for k, v in vars(settings).items():
+            if isinstance(v, Path):
+                settings_dict[k] = v.as_posix()
+            else:
+                settings_dict[k] = v
+        for k, v in vars(config).items():
+            if isinstance(v, Path):
+                config_dict[k] = v.as_posix()
+            else:
+                config_dict[k] = v
+        
         with open(
-            Path(settings.main_results_dir) / f"config_{timestamp}.json", "w"
+            log_dir / f"config_{timestamp}.json", "w"
         ) as f:
-            json.dump(vars(config), f, indent=2)
+            json.dump(config_dict, f, indent=2)
         with open(
-            Path(settings.main_results_dir) / f"settings_{timestamp}.json", "w"
+            log_dir / f"settings_{timestamp}.json", "w"
         ) as f:
-            json.dump(vars(settings), f, indent=2)
+            json.dump(settings_dict, f, indent=2)
 
-        logger.info("Saved config, settings, and logs to %s", settings.main_results_dir)
+        logger.info("Saved config, settings, and logs to %s", log_dir)
 
     config.models = get_model_names(**vars(config), **vars(settings))
 

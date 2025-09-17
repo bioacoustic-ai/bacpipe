@@ -350,7 +350,7 @@ def visualize_using_dashboard(models, **kwargs):
     try:
         dashboard.build_layout()
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Error building dashboard layout: {e}\n \n "
             "Are you sure all the evaluations have been performed? "
             "If not, rerun the pipeline with `overwrite=True`.\n \n "

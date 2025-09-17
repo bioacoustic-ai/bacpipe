@@ -103,7 +103,7 @@ def compute_clusterings(
         for def_name, def_labels in default_labels.items():
             if "no_noise" in cl_name:
                 def_labels = np.array(def_labels)[labels != -1]
-            metrics[f"AMI"][f"{cl_name}-{def_name}"] = AMI(def_labels, cl_labels)
+            metrics[f"AMI"][f"{cl_name}-{def_name}"] = AMI(def_labels, cl_labels) # TODO eval for perch when default classifier was used
             metrics[f"ARI"][f"{cl_name}-{def_name}"] = ARI(def_labels, cl_labels)
 
     return metrics, clusterings

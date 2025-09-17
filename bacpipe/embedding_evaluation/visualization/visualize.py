@@ -1046,6 +1046,12 @@ def plot_overview_metrics(
         metrics = {k: v["overall"] for k, v in metrics.items()}
 
     fig, ax = plt.subplots(1, 1, figsize=(12, 6))
+    if len(model_list) == 1 and model_list[0] not in metrics:
+        raise AttributeError(
+            "It seems like you have selected a single model in a folder where previously "
+            "multiple models were computed. Try selecting at least two models, that way "
+            "this error should be fixed."
+        )
     num_metrics = len(metrics[model_list[0]])
     bar_width = 1 / (num_metrics + 1)
 

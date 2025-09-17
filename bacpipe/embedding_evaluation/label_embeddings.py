@@ -20,11 +20,13 @@ class DefaultLabels:
         self.model = model
         self.default_label_keys = default_label_keys
         self.paths = paths
+        
         if (self.paths.class_path / "original_classifier_outputs").exists():
             if not "default_classifier" in self.default_label_keys:
                 self.default_label_keys += ["default_classifier"]
         elif "default_classifier" in self.default_label_keys:
             self.default_label_keys.remove("default_classifier")
+        
         embed_path = model_specific_embedding_path(paths.main_embeds_path, model)
         self.metadata = yaml.safe_load(open(embed_path.joinpath("metadata.yml"), "r"))
         self.nr_embeds_per_file = self.metadata["files"]["nr_embeds_per_file"]
@@ -39,9 +41,10 @@ class DefaultLabels:
         for default_label in self.default_label_keys:
             getattr(self, default_label)()
 
-            self.default_label_dict.update(
-                {default_label: getattr(self, f"{default_label}_per_embedding")}
-            )
+            if hasattr(self, f"{default_label}_per_embedding"):
+                self.default_label_dict.update(
+                    {default_label: getattr(self, f"{default_label}_per_embedding")}
+                )
 
     @staticmethod
     def get_dt_filename(file):
@@ -169,7 +172,7 @@ class DefaultLabels:
     def default_classifier(self):
         path = self.paths.class_path / "default_classifier_annotations.csv"
         if not path.exists():
-            self.default_classifier_per_embedding = []
+            self.default_label_keys.remove("default_classifier")
         else:
             df = pd.read_csv(path)
             self.default_classifier_per_embedding = df[

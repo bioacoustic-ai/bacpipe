@@ -95,17 +95,17 @@ class ModelBaseClass:
             try:
                 self.model = self.model.to(self.device)
             except Exception as e:
-                print(e)
+                logger.error(e)
                 pass
         except AttributeError:
-            logger.debug("Skipping model.eval() because model is from tensorflow.")
+            logger.error("Skipping model.eval() because model is from tensorflow.")
             pass
 
     def load_and_resample(self, path):
         try:
             audio, sr = ta.load(path, normalize=True)
         except Exception as e:
-            logger.debug(
+            logger.exception(
                 f"Error loading audio with torchaudio. "
                 f"Skipping {path}."
                 f"Error: {e}"
