@@ -90,6 +90,8 @@ class ModelBaseClass:
             self.batch_size = int(100_000 * self.global_batch_size / segment_length)
 
     def prepare_inference(self):
+        if 'umap' in self.__module__:
+            return
         try:
             self.model.eval()
             try:
