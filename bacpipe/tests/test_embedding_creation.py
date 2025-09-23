@@ -43,12 +43,14 @@ embedding_dimensions = {
     "biolingual": 512,
     "birdnet": 1024,
     "birdmae": 1280,
+    "convnext_birdset": 1024,
     "hbdet": 2048,
     "insect66": 1280,
     "insect459": 1280,
     "mix2": 960,
     "naturebeats": 768,
     "perch_bird": 1280,
+    "perch_v2": 1536,
     "protoclr": 384,
     "rcl_fs_bsed": 2048,
     "surfperch": 1280,
@@ -69,8 +71,7 @@ needs_checkpoint = [
     "mix2",
     "naturebeats",
     "protoclr",
-    "rcl_fs_bsed",
-    "vggish",
+    "rcl_fs_bsed"
 ]
 
 embeddings = {}

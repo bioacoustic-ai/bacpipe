@@ -20,7 +20,7 @@ class Model(ModelBaseClass):
         )
         self.model.to(self.device)
         self.model.eval()
-        self.preproc_batch_size = 511
+        self.preproc_batch_size = 5114
 
     def preprocess(self, audio):
         batched_windows = torch.Tensor([])
@@ -31,7 +31,7 @@ class Model(ModelBaseClass):
                      audio[i:i+self.preproc_batch_size]
                      ).unsqueeze(1)]
                 )
-        return batched_windows.to(self.device)
+        return batched_windows.squeeze(1).to(self.device)
 
     @torch.inference_mode()
     def __call__(self, input):

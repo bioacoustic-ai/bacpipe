@@ -8,7 +8,7 @@ SAMPLE_RATE = 16_000
 LENGTH_IN_SAMPLES = int(5 * SAMPLE_RATE)
 
 
-BEATS_PRETRAINED_PATH_FT = "naturebeats/BEATs_iter1_finetuned_on_AS2M_cpt1.pt"
+BEATS_PRETRAINED_PATH_FT = "beats/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt1.pt"
 
 
 class BeatsModel:

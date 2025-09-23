@@ -11,7 +11,7 @@ from ..utils import ModelBaseClass
 SAMPLE_RATE = 16_000
 LENGTH_IN_SAMPLES = int(5 * SAMPLE_RATE)
 
-BEATS_PRETRAINED_PATH_SSL = "naturebeats/BEATs_iter3_plus_AS2M.pt"
+BEATS_PRETRAINED_PATH_SSL = "beats/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt1.pt"
 BEATS_PRETRAINED_PATH_NATURELM = "naturebeats/naturebeats.pt"
 
 
