@@ -23,7 +23,9 @@ class Model(ModelBaseClass):
         if not hasattr(self, 'class_label_key'):
             self.class_label_key = "labels"
         
-        if not model_choice in ["multispecies_whale"]:
+        if model_choice in ['vggish']:
+            return
+        elif not model_choice in ["multispecies_whale"]:
             self.class_list = mod.class_list[self.class_label_key].classes
             self.ebird2name = pd.read_csv(
                 self.model_utils_base_path /
@@ -42,6 +44,7 @@ class Model(ModelBaseClass):
             ]
         else:
             self.class_list = mod.class_list
+            
         if model_choice.startswith('perch_v2'):
             self.class_label_key = 'label'
 

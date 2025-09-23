@@ -43,7 +43,8 @@ SURFPERCH_SLUG = 'google/surfperch/tensorFlow2/1'
 HUMPBACK_SLUG = 'google/humpback-whale/tensorFlow2/humpback-whale'
 MULTISPECIES_WHALE_SLUG = 'google/multispecies-whale/tensorFlow2/default'
 YAMNET_SLUG = 'google/yamnet'
-VGGISH_SLUG = 'google/vggish'
+# VGGISH_SLUG = 'google/vggish'
+VGGISH_SLUG = 'https://www.kaggle.com/models/google/vggish/TensorFlow2/vggish/1'
 
 
 def normalize_slug(model_slug: str, model_version: int | None = None) -> str:
