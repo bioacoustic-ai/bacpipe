@@ -60,6 +60,7 @@ class ConvNextPreProcess:
     def __init__(self, sample_rate, device):
         
         # Initialize the transformations
+        device='cpu'
 
         self.spectrogram_converter = torchaudio.transforms.Spectrogram(
             n_fft=1024, hop_length=320, power=2.0
@@ -80,7 +81,7 @@ class ConvNextPreProcess:
 
         """
         # convert waveform to spectrogram
-        spectrogram = self.spectrogram_converter(audio)
+        spectrogram = self.spectrogram_converter(audio.cpu())
         spectrogram = spectrogram.to(torch.float32)
         melspec = self.mel_converter(spectrogram)
         dbscale = self.powerToDB(melspec)

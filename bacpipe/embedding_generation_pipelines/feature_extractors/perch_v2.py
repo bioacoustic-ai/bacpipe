@@ -15,7 +15,7 @@ class Model(ModelBaseClass):
     ):
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
         
-        if self.device == 'cuda':
+        if self.device == 'cuda' and model_choice.startswith('perch_v2'):
             model_choice = 'perch_v2'
         mod = load_model_by_name(model_choice)
 
