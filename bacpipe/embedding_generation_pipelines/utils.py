@@ -144,7 +144,7 @@ class ModelBaseClass:
         starts = np.array(file_annots.start, dtype=np.float32)*self.sr
         ends = np.array(file_annots.end, dtype=np.float32)*self.sr
 
-        audio = audio.squeeze()
+        audio = audio.cpu().squeeze()
         for idx, (s, e) in enumerate(zip(starts, ends)):
             s, e = int(s), int(e)
             if e > len(audio):
