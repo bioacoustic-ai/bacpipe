@@ -411,7 +411,7 @@ class Embedder:
             self.model_name = dim_reduction_model
         else:
             self.model_name = model_name
-        self._init_model(**kwargs)
+        self._init_model(dim_reduction_model=dim_reduction_model, **kwargs)
 
     def _init_model(self, **kwargs):
         """

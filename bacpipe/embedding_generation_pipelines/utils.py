@@ -1,10 +1,10 @@
+import os
 import logging
 from pathlib import Path
 import importlib.resources as pkg_resources
 from tqdm import tqdm
 
 import bacpipe
-        
 import librosa as lb
 import numpy as np
 import torchaudio as ta
@@ -16,7 +16,8 @@ logger = logging.getLogger("bacpipe")
 class ModelBaseClass:
     def __init__(self, sr, segment_length, device, 
                  model_base_path, global_batch_size, 
-                 padding, **kwargs):
+                 padding, dim_reduction_model=False,
+                 **kwargs):
         """
         This base class defines key methods and attributes for all feature
         extractors to ensure that we can use the same processing pipeline
@@ -74,13 +75,16 @@ class ModelBaseClass:
             self.bool_classifier = False
             
         self.device = device
-        if self.device == 'cuda':
+        if self.device == 'cuda' and not dim_reduction_model:
+            
             if not check_if_cudnn_tensorflow_compatible():
-                import os
                 # Force TensorFlow to ignore all GPUs
                 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
                 
                 self.device = 'cpu'
+        else:
+            if "CUDA_VISIBLE_DEVICES" in os.environ:
+                os.environ.pop("CUDA_VISIBLE_DEVICES")
                 
         self.model_base_path = Path(model_base_path)
         with pkg_resources.path(bacpipe, "model_specific_utils") as utils_path:
