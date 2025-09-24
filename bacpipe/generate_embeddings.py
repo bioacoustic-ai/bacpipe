@@ -446,7 +446,10 @@ class Embedder:
             audio frames preprocessed with model specific preprocessing
         """
         audio = self.model.load_and_resample(sample)
-        frames = self.model.window_audio(audio)
+        if False:
+            frames = self.model.window_audio(audio)
+        else:
+            frames = self.model.only_load_annotated_segments(sample, audio)
         preprocessed_frames = self.model.preprocess(frames)
         self.file_length[sample.stem] = len(audio[0]) / self.model.sr
         self.preprocessed_shape = tuple(preprocessed_frames.shape)

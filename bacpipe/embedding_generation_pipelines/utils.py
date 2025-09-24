@@ -133,6 +133,39 @@ class ModelBaseClass:
         re_audio = ta.functional.resample(audio, sr, self.sr)
         return re_audio.to(self.device)
 
+    def only_load_annotated_segments(self, file_path, audio):
+        import pandas as pd
+        annots = pd.read_csv(Path(self.audio_dir) / 'annotations.csv')
+        # filter current file
+        file_annots = annots[annots.audiofilename==file_path.relative_to(self.audio_dir)]
+        if len(file_annots) == 0:
+            file_annots = annots[annots.audiofilename==file_path.stem+file_path.suffix]
+        
+        starts = np.array(file_annots.start, dtype=np.float32)*self.sr
+        ends = np.array(file_annots.end, dtype=np.float32)*self.sr
+
+        audio = audio.squeeze()
+        for idx, (s, e) in enumerate(zip(starts, ends)):
+            s, e = int(s), int(e)
+            if e > len(audio):
+                logger.warning(
+                    f"Annotation with start {s} and end {e} is outside of "
+                    f"range of {file_path}. Skipping annotation."
+                )
+                continue
+            segments = lb.util.fix_length(
+                audio[s:e+1],
+                size=self.segment_length,
+                mode=self.padding
+                )
+            if idx == 0:
+                cumulative_segments = segments
+            else:
+                cumulative_segments = np.vstack([cumulative_segments, segments])
+        cumulative_segments = torch.Tensor(cumulative_segments)
+        cumulative_segments = cumulative_segments.to(self.device)
+        return cumulative_segments
+
     def window_audio(self, audio):
         num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
         if isinstance(audio, torch.Tensor):
