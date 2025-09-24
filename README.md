@@ -320,15 +320,45 @@ For `poetry`:
 `poetry lock`
 `poetry install`
 
-Alternatively: 
-
-`uv sync`
-
 If for some reasons you would prefer requirements, use the these for windows:
 
 `uv pip install -r requirements_windows.txt` 
 
 If you do not have admin rights and encounter a `permission denied` error when using `pip install`, use `python -m pip install ...` instead.
+
+### Install gpu support for tensorflow
+
+Because of the requirements of `torch==2.6` the cuda versions have to be installed corresponding to what pytorch supports. However, I have tested that you are able to install different cuda dependencies to also support tensorflow gpus once the environment is set up. Once you have installed the requirements. Install the following dependencies (also included in `requirements_tf_gpu.txt`)
+
+```python
+nvidia-cublas-cu12==12.5.2.13
+nvidia-cuda-cccl-cu12==12.5.39.post1
+nvidia-cuda-cupti-cu12==12.5.39
+nvidia-cuda-cuxxfilt-cu12==12.5.39
+nvidia-cuda-nvcc-cu12==12.5.40
+nvidia-cuda-nvrtc-cu12==12.5.40
+nvidia-cuda-opencl-cu12==12.5.39
+nvidia-cuda-profiler-api-cu12==12.5.39
+nvidia-cuda-runtime-cu12==12.5.39
+nvidia-cuda-sanitizer-api-cu12==12.5.39
+nvidia-cudnn-cu12==9.3.0.75
+nvidia-cufft-cu12==11.2.3.18
+nvidia-curand-cu12==10.3.6.39
+nvidia-cusolver-cu12==11.6.2.40
+nvidia-cusparse-cu12==12.4.1.24
+nvidia-cusparselt-cu12==0.6.2
+nvidia-nccl-cu12==2.21.5
+nvidia-npp-cu12==12.3.0.116
+nvidia-nvfatbin-cu12==12.5.39
+nvidia-nvjitlink-cu12==12.5.40
+nvidia-nvjpeg-cu12==12.3.2.38
+nvidia-nvml-dev-cu12==12.5.39
+nvidia-nvtx-cu12==12.5.39
+```
+
+Or simply run `uv pip install -r requirements_tf_gpu.txt`
+
+
 
 ### OPTIONAL: Add other model checkpoints that are not included by default.
 

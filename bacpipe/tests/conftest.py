@@ -12,7 +12,12 @@ def pytest_addoption(parser):
         default=None,
         help="Comma-separated list of models to test (default: all available models)",
     )
-
+    parser.addoption(
+        "--device",
+        action="store",
+        default="cpu",
+        help="Device to run the tests on (e.g., 'cpu', 'cuda')",
+    )
 
 def pytest_generate_tests(metafunc):
     global _filtered_models
@@ -43,3 +48,7 @@ def pytest_generate_tests(metafunc):
 
     print(">>> Models selected for tests:", _filtered_models)
     metafunc.parametrize("model", _filtered_models)
+
+    if "device" in metafunc.fixturenames:
+        device_option = metafunc.config.getoption("device")
+        metafunc.parametrize("device", [device_option])

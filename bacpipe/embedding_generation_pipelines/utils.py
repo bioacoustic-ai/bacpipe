@@ -74,6 +74,14 @@ class ModelBaseClass:
             self.bool_classifier = False
             
         self.device = device
+        if self.device == 'cuda':
+            if not check_if_cudnn_tensorflow_compatible():
+                import os
+                # Force TensorFlow to ignore all GPUs
+                os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+                
+                self.device = 'cpu'
+                
         self.model_base_path = Path(model_base_path)
         with pkg_resources.path(bacpipe, "model_specific_utils") as utils_path:
             self.model_utils_base_path = Path(utils_path)
@@ -209,3 +217,17 @@ class ModelBaseClass:
         }
 
         return cls_results
+
+
+def check_if_cudnn_tensorflow_compatible():
+    import torch
+    version = (torch.backends.cudnn.version() % 1000) // 100
+    logger.info(
+        "cuDNN version does not match the required 9.3 for tensorflow. "
+        "Device is therefore set to cpu for the tensorflow models."
+        )
+    if version < 3:
+        return False
+    else:
+        return True
+    

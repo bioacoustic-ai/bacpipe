@@ -501,7 +501,12 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                 )
             ld.write_metadata_file()
             ld.update_files()
-
+        
+            # clear GPU
+            del embed
+            import tensorflow as tf
+            tf.keras.backend.clear_session()
+            
         return ld
     except KeyboardInterrupt:
         if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:

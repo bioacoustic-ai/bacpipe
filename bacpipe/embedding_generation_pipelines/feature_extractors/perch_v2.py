@@ -16,7 +16,8 @@ class Model(ModelBaseClass):
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
         
         if self.device == 'cuda' and model_choice.startswith('perch_v2'):
-            model_choice = 'perch_v2'
+            if len(tf.config.list_physical_devices("GPU")) > 0:
+                model_choice = 'perch_v2'
         mod = load_model_by_name(model_choice)
 
         self.model = mod.embed
@@ -53,7 +54,11 @@ class Model(ModelBaseClass):
         return tf.convert_to_tensor(audio, dtype=tf.float32)
 
     def __call__(self, input, return_class_results=False):
+        # try:
         results = self.model(input)
+        # except:
+        #     with tf.device('/cpu'):
+        #         results = self.model(input)
         embeddings = results.embeddings
         if return_class_results:
             cls_vals = self.classifier_predictions(results.logits[self.class_label_key])

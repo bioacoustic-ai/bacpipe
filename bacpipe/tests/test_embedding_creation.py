@@ -100,7 +100,8 @@ def loader_fn():
 # -------------------------------------------------------------------------
 # Tests
 # -------------------------------------------------------------------------
-def test_embedding_generation(model):
+def test_embedding_generation(model, device):
+    settings['device'] = device
     embeddings[model] = get_embeddings(
         model_name=model,
         check_if_primary_combination_exists=False,
