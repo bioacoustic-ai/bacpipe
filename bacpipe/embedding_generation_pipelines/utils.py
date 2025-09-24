@@ -82,6 +82,8 @@ class ModelBaseClass:
                 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
                 
                 self.device = 'cpu'
+        elif self.device == 'cpu':
+            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         else:
             if "CUDA_VISIBLE_DEVICES" in os.environ:
                 os.environ.pop("CUDA_VISIBLE_DEVICES")

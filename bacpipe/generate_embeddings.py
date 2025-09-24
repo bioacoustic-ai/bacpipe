@@ -446,10 +446,10 @@ class Embedder:
             audio frames preprocessed with model specific preprocessing
         """
         audio = self.model.load_and_resample(sample)
-        if False:
-            frames = self.model.window_audio(audio)
-        else:
+        if self.model.only_embed_annotations:
             frames = self.model.only_load_annotated_segments(sample, audio)
+        else:
+            frames = self.model.window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
         self.file_length[sample.stem] = len(audio[0]) / self.model.sr
         self.preprocessed_shape = tuple(preprocessed_frames.shape)
@@ -653,6 +653,9 @@ class Embedder:
         if self.model.classifier_outputs.shape[0] != len(self.model.classes):
             self.model.classifier_outputs = self.model.classifier_outputs.swapaxes(0, 1)
 
+        if self.model.only_embed_annotations: #annotation file exists
+            np.save(file_dest.replace('.json', '.npy'), self.model.classifier_outputs)
+        
         cls_results = self.make_classification_dict(
             self.model.classifier_outputs, self.model.classes, self.classifier_threshold
         )
