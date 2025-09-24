@@ -21,6 +21,13 @@ class Model(ModelBaseClass):
         mod = load_model_by_name(model_choice)
 
         self.model = mod.embed
+        if model_choice == 'perch_v2':
+            test_model_sample = tf.convert_to_tensor(np.zeros([1, LENGTH_IN_SAMPLES]))
+            try:
+                self.model(test_model_sample)
+            except:
+                mod = load_model_by_name('perch_v2_cpu')
+                
         if not hasattr(self, 'class_label_key'):
             self.class_label_key = "labels"
         
