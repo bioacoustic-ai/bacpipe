@@ -632,7 +632,7 @@ class Embedder:
                     probabilities[cls_idx[cls_idx == k], tmp_idx[cls_idx == k]]
                 ).tolist(),
             }
-            for k in cls_idx
+            for k in np.unique(cls_idx)
         }
 
         cls_results["head"] = {
