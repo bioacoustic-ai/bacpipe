@@ -10,6 +10,13 @@ device: 'cpu'
 # this is also where bacpipe will look for existing checkpoints
 model_base_path: bacpipe/model_checkpoints
 
+# If you have an annotations.csv file in the format specified in the 
+# ReadMe file, you can choose to only create embeddings for the segments
+# corresponding to the annotations. For model's that require input segments
+# longer than an annotation, the audio will be padded according to the 
+# padding specified below (see `padding`).
+only_embed_annotations: False
+
 # batch size for embedding generation, modify if you have memory issues
 # or if you want to speed up the process and have enough memory available
 global_batch_size: 16
@@ -23,12 +30,14 @@ audio_suffixes: ['.wav', '.WAV', '.aif', '.mp3', '.MP3', '.flac', '.ogg']
 # Set to False if you want to keep embeddings even if the process is interrupted.
 rm_embedding_on_keyboard_interrupt: True
 
-# When audio get's imported and windowed, the last frame might
-# end up not being long enough to fit a full context window, as a 
-# result the frame get's padded. Specify how it should get padded.
+# Specify the padding strategy for the models. This will be used
+# both if only annotated segments are embedded or if audio get's 
+# imported and windowed and the last frame might end up not being 
+# long enough to fit a full context window, as a result the frame 
+# get's padded. Specify how it should get padded.
 # Choose values from the np.pad function documentation
 # (https://numpy.org/devdocs/reference/generated/numpy.pad.html).
-padding: 'wrap'
+padding: 'minimum'
 
 # To increase performance when running inference on a GPU, bacpipe will use threads
 # to load audio data in one thread and compute embeddings in another. That way audio 
@@ -71,8 +80,8 @@ label_column: 'species'
 # it will be used, to provide another option to colorcode embeddings
 # and visualize differences between embeddings. 
 run_pretrained_classifier: True
-classifier_threshold: 0.3
-only_embed_annotations: True
+classifier_threshold: 0.5
+
 
 class_configs:
   config_1:

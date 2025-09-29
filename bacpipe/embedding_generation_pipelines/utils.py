@@ -261,11 +261,11 @@ class ModelBaseClass:
 def check_if_cudnn_tensorflow_compatible():
     import torch
     version = (torch.backends.cudnn.version() % 1000) // 100
-    logger.info(
-        "cuDNN version does not match the required 9.3 for tensorflow. "
-        "Device is therefore set to cpu for the tensorflow models."
-        )
     if version < 3:
+        logger.info(
+            "cuDNN version does not match the required 9.3 for tensorflow. "
+            "Device is therefore set to cpu for the tensorflow models."
+            )
         return False
     else:
         return True

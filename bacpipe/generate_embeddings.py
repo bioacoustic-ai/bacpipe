@@ -624,6 +624,12 @@ class Embedder:
             probabilities = probabilities.swapaxes(0, 1)
 
         cls_idx, tmp_idx = np.where(probabilities > threshold)
+        
+        # TODO do something like np.unique(cls_idx, return_counts=True) and then
+        # use the counts to clac the avg_prediction * number of occurrences to
+        # extract the 200 most important classes for a sound file and return them
+        # or maybe the like square of pred - thresh * count. something like that
+        # but yeah limit it so this doesn't take more than a second
 
         cls_results = {
             classes[k]: {
