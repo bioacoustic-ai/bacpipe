@@ -55,7 +55,16 @@ class Model(ModelBaseClass):
         return tf.convert_to_tensor(audio, dtype=tf.float32)
 
     def __call__(self, input, return_class_results=False):
-        results = self.model(input)
+        try:
+            results = self.model(input)
+        except Exception as e:
+            print(
+                "You are on a operating system that does not currently support this model. "
+                "Perch V2 is currently only supported on linux or other machines supporting "
+                "XLA deserialization. ",
+                e                
+            )
+            raise e
         embeddings = results.embeddings
         if return_class_results:
             cls_vals = self.classifier_predictions(results.logits[self.class_label_key])
