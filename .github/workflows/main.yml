@@ -1,0 +1,17 @@
+name: Full CI
+
+on: [push, pull_request]
+
+jobs:
+  cpu-tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: uv pip install -r pyproject.toml
+      - run: pytest bacpipe/tests/test_embedding_generation.py
