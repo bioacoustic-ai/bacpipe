@@ -1,0 +1,21 @@
+# Core scientific stack
+numpy==1.26.4
+scipy==1.13.1
+pandas==2.2.3
+scikit-learn==1.7.1
+
+# PyTorch CPU wheels only
+torch==2.6+cpu
+torchvision==0.21.0+cpu
+torchaudio==2.6+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# JAX CPU
+jax==0.4.33
+jaxlib==0.4.33
+
+# Hugging Face ecosystem
+transformers==4.56.0
+
+# Testing
+pytest==8.4.2
