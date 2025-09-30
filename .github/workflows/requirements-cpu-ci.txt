@@ -5,9 +5,9 @@ pandas==2.2.3
 scikit-learn==1.7.1
 
 # PyTorch CPU wheels only
-torch==2.6+cpu
-torchvision==0.21.0+cpu
-torchaudio==2.6+cpu
+torch==2.6
+torchvision==0.21.0
+torchaudio==2.6
 
 # JAX CPU
 jax==0.4.33
