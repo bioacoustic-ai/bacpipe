@@ -14,5 +14,5 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install uv
-      - run: uv pip install -r pyproject.toml
+      - run: uv pip install --system -r pyproject.toml
       - run: pytest bacpipe/tests/test_embedding_generation.py
