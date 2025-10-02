@@ -1,17 +1,17 @@
 matplotlib==3.10.6
 #numpy==1.26
-panel==1.8.1
+#panel==1.8.1
 pytest==8.4.2
 scikit-learn==1.7.1
 scipy==1.13.1
 seaborn==0.13.2
-tensorflow==2.20.0
+#tensorflow==2.20.0
 
 torch==2.6.0+cpu
 torchaudio==2.6.0+cpu
 torchvision==0.21.0+cpu
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-transformers==4.56.0
+#transformers==4.56.0
 
 umap-learn==0.5.9.post2
