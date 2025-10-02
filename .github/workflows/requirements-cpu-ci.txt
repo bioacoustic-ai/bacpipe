@@ -1,13 +1,14 @@
 # Core scientific stack
-numpy==1.26.4
+#numpy==1.26.4
 scipy==1.13.1
 pandas==2.2.3
 scikit-learn==1.7.1
 
 # PyTorch CPU wheels only
-torch==2.6
-torchvision==0.21.0
-torchaudio==2.6
+torch==2.6+cpu
+torchvision==0.21.0+cpu
+torchaudio==2.6+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
 
 # JAX CPU
 jax==0.4.33
