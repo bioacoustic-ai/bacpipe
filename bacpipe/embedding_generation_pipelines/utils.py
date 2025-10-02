@@ -13,9 +13,7 @@ import tensorflow
 
 logger = logging.getLogger("bacpipe")
 
-class ModelBaseClass:
-    tf_models = ['perch_v2', 'perch_bird', 'google_whale', 'hbdet', 'birdnet', 'surfperch', 'vggish']
-    
+class ModelBaseClass:    
     def __init__(self, sr, segment_length, device, 
                  model_base_path, global_batch_size, 
                  model_name, padding, 
@@ -81,7 +79,7 @@ class ModelBaseClass:
         if (
             self.device == 'cuda' 
             and not dim_reduction_model 
-            and model_name in ModelBaseClass.tf_models
+            and model_name in bacpipe.TF_MODELS
             ):
             if not check_if_cudnn_tensorflow_compatible():
                 # Force TensorFlow to ignore all GPUs
@@ -140,7 +138,7 @@ class ModelBaseClass:
             logger.debug(f"Audio file {path} is empty. " f"Skipping {path}.")
             raise ValueError(f"Audio file {path} is empty.")
         re_audio = ta.functional.resample(audio, sr, self.sr)
-        return re_audio.to(self.device)
+        return re_audio
 
     def only_load_annotated_segments(self, file_path, audio):
         import pandas as pd

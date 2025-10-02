@@ -6,6 +6,16 @@ from types import SimpleNamespace
 import importlib.resources as pkg_resources
 from huggingface_hub import hf_hub_download
 
+TF_MODELS = [
+    'birdnet', 
+    'perch_v2', 
+    'perch_bird', 
+    'google_whale', 
+    'surfperch', 
+    'vggish'
+    'hbdet', 
+]
+
 def ensure_std_models(model_base_path, repo_id="vinikay/bacpipe_models"):
     """
     Ensure that the model checkpoints for birdnetv2.4 and perchv1 are

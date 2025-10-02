@@ -8,6 +8,7 @@ import torch
 import logging
 import importlib
 import json
+import os
 
 logger = logging.getLogger("bacpipe")
 
@@ -194,9 +195,6 @@ class Loader:
     def _get_audio_paths(self):
         self.files = self._get_audio_files()
         self.files.sort()
-        if False:
-            self._get_annotation_files()
-
         self.embed_dir = Path(self.embed_parent_dir).joinpath(self.get_timestamp_dir())
 
     def _get_annotation_files(self):
@@ -425,7 +423,7 @@ class Embedder:
             module = importlib.import_module(
                 f"bacpipe.embedding_generation_pipelines.feature_extractors.{self.model_name}"
             )
-        self.model = module.Model(**kwargs)
+        self.model = module.Model(model_name=self.model_name, **kwargs)
         self.model.prepare_inference()
 
     def prepare_audio(self, sample):
@@ -446,6 +444,7 @@ class Embedder:
             audio frames preprocessed with model specific preprocessing
         """
         audio = self.model.load_and_resample(sample)
+        audio = audio.to(self.model.device)
         if self.model.only_embed_annotations:
             frames = self.model.only_load_annotated_segments(sample, audio)
         else:
@@ -453,6 +452,9 @@ class Embedder:
         preprocessed_frames = self.model.preprocess(frames)
         self.file_length[sample.stem] = len(audio[0]) / self.model.sr
         self.preprocessed_shape = tuple(preprocessed_frames.shape)
+        if self.model.device == 'cuda':
+            del audio, frames
+            torch.cuda.empty_cache()
         return preprocessed_frames
 
     def get_embeddings_for_audio(self, sample):
@@ -519,6 +521,17 @@ class Embedder:
                 try:
                     preprocessed = self.prepare_audio(file)
                     task_queue.put((idx, file, preprocessed))
+                                    
+                except torch.cuda.OutOfMemoryError:
+                    logger.error(
+                        "\nCuda device is out of memory. Your Vram doesn't seem to be "
+                        "large enough for this process. Try setting the variable "
+                        "`avoid_pipelined_gpu_inference` to `True`. That way data "
+                        "will be processed in series instead of parallel which will "
+                        "reduce memory requirements. If that also fails use `cpu` "
+                        "instead of `cuda`."
+                    )
+                    os._exit(1) 
                 except Exception as e:
                     task_queue.put((idx, file, e))
             task_queue.put(None)  # sentinel = done
@@ -631,6 +644,12 @@ class Embedder:
         # or maybe the like square of pred - thresh * count. something like that
         # but yeah limit it so this doesn't take more than a second
 
+        cls, cls_cnts = np.unique(cls_idx, return_counts=True)
+        
+        cls_dict = {k: v for k, v in zip(cls, cls_cnts)}
+        cls_dict = dict(sorted(cls_dict.items(), key=lambda x: x[1], reverse=True))
+        top_50_cls = {k: v for i, (k, v) in enumerate(cls_dict.items()) if i < 50}
+                
         cls_results = {
             classes[k]: {
                 "time_bins_exceeding_threshold": tmp_idx[cls_idx == k].tolist(),
@@ -638,7 +657,7 @@ class Embedder:
                     probabilities[cls_idx[cls_idx == k], tmp_idx[cls_idx == k]]
                 ).tolist(),
             }
-            for k in np.unique(cls_idx)
+            for k in top_50_cls.keys()
         }
 
         cls_results["head"] = {
