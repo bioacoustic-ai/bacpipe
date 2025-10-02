@@ -85,8 +85,8 @@ tokenizers==0.22.1
 torch==2.6.0+cpu
 torchaudio==2.6.0+cpu
 torchvision==0.21.0+cpu
-tornado==6.5.2
 --extra-index-url https://download.pytorch.org/whl/cpu
+tornado==6.5.2
 tqdm==4.67.1
 transformers==4.56.0
 typing-extensions==4.12.2
