@@ -13,7 +13,7 @@ class Model(ModelBaseClass):
     def __init__(self, **kwargs):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         self.model = tf.keras.models.load_model(
-            self.model_base_path / "birdnet/birdnetv2.4_keras3.keras", compile=False
+            self.model_base_path / "birdnet/birdnetv2.4.keras", compile=False
         )
         
         loaded_preprocessor = tf.saved_model.load(

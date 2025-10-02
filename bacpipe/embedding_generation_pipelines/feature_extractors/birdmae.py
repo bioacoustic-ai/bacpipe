@@ -20,7 +20,7 @@ class Model(ModelBaseClass):
         )
         self.model.to(self.device)
         self.model.eval()
-        self.preproc_batch_size = 5114
+        self.preproc_batch_size = 511
 
     def preprocess(self, audio):
         batched_windows = torch.Tensor([])

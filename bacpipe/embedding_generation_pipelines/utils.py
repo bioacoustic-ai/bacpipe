@@ -14,9 +14,12 @@ import tensorflow
 logger = logging.getLogger("bacpipe")
 
 class ModelBaseClass:
+    tf_models = ['perch_v2', 'perch_bird', 'google_whale', 'hbdet', 'birdnet', 'surfperch', 'vggish']
+    
     def __init__(self, sr, segment_length, device, 
                  model_base_path, global_batch_size, 
-                 padding, dim_reduction_model=False,
+                 model_name, padding, 
+                 dim_reduction_model=False,
                  **kwargs):
         """
         This base class defines key methods and attributes for all feature
@@ -75,8 +78,11 @@ class ModelBaseClass:
             self.bool_classifier = False
             
         self.device = device
-        if self.device == 'cuda' and not dim_reduction_model:
-            
+        if (
+            self.device == 'cuda' 
+            and not dim_reduction_model 
+            and model_name in ModelBaseClass.tf_models
+            ):
             if not check_if_cudnn_tensorflow_compatible():
                 # Force TensorFlow to ignore all GPUs
                 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -88,6 +94,8 @@ class ModelBaseClass:
             if "CUDA_VISIBLE_DEVICES" in os.environ:
                 os.environ.pop("CUDA_VISIBLE_DEVICES")
                 
+        logger.info(f"Using {device=}")
+                
         self.model_base_path = Path(model_base_path)
         with pkg_resources.path(bacpipe, "model_specific_utils") as utils_path:
             self.model_utils_base_path = Path(utils_path)
@@ -96,8 +104,7 @@ class ModelBaseClass:
         self.padding = padding
         
         self.classifier_outputs = torch.tensor([])
-        self.model_base_path = self.model_base_path
-        self.classification_threshold = 0.1
+        
         self.sr = sr
         self.segment_length = segment_length
         if segment_length:
@@ -241,21 +248,6 @@ class ModelBaseClass:
             import tensorflow as tf
             return_embeds = tf.concat(embeds, axis=0).numpy().squeeze()
             return return_embeds
-
-    def filter_classifier_predictions(self, cls_vals):
-        if not isinstance(self.classes, np.ndarray):
-            self.classes = np.array(self.classes)
-
-        bool_exceeding_threshold = np.where(cls_vals > self.classification_threshold)[1]
-        classes_exceeding_thresh = np.unique(self.classes[bool_exceeding_threshold])
-
-        cls_results = {
-            k: cls_vals[:, idx]
-            for idx, k in enumerate(self.classes)
-            if k in classes_exceeding_thresh
-        }
-
-        return cls_results
 
 
 def check_if_cudnn_tensorflow_compatible():
