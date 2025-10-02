@@ -51,6 +51,7 @@ def ensure_std_models(model_base_path, repo_id="vinikay/bacpipe_models"):
     return model_base_path.parent / "model_checkpoints"
 
 
+
 # --------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------
@@ -164,13 +165,13 @@ def play(config=config, settings=settings, save_logs=False):
         # Save current config + settings snapshot
         settings_dict, config_dict = {}, {}
         for k, v in vars(settings).items():
-            if isinstance(v, Path):
-                settings_dict[k] = v.as_posix()
+            if '/' in str(v) or '\\' in str(v):
+                settings_dict[k] = Path(v).as_posix()
             else:
                 settings_dict[k] = v
         for k, v in vars(config).items():
-            if isinstance(v, Path):
-                config_dict[k] = v.as_posix()
+            if '/' in str(v) or '\\' in str(v):
+                config_dict[k] = Path(v).as_posix()
             else:
                 config_dict[k] = v
         
@@ -201,3 +202,5 @@ def play(config=config, settings=settings, save_logs=False):
 
     if dashboard:
         visualize_using_dashboard(**vars(config), **vars(settings))
+
+
