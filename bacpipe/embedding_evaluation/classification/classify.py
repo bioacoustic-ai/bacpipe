@@ -165,6 +165,8 @@ def classify(paths, dataset_csv_path, embeds, config="linear", **kwargs):
             json.dump(label2index, f, indent=1)
 
     elif config == "knn":
+        if len(df[df.predefined_set =='test']) < kwargs['n_neighbors']:
+            kwargs['n_neighbors'] = len(df[df.predefined_set =='test']) - 1
         clfier = KNN(**kwargs)
         clfier = train_knn_classifier(clfier, train_gen, **kwargs)
 

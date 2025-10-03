@@ -631,63 +631,95 @@ class Embedder:
                 embeds = np.expand_dims(embeds, axis=0)
             np.save(file_dest, embeds)
 
+
+    @staticmethod
+    def filter_top_k_classifications(probabilities, class_names,
+                                     class_indices, class_time_bins, 
+                                     k=50):
+        """
+        Generate a dictionary with the top k classes. By limiting the class number to 
+        k, it prevents from this step taking too long but has the benefit of generating
+        a dicitonary which can be saved as a .json file to quickly get a overview of 
+        species that are well represented within an audio file. 
+
+        Parameters
+        ----------
+        probabilities : np.array
+            Probabilities for each class
+        class_names : list
+            class names
+        class_indices : np.array
+            class indices exceeding the threshold
+        class_time_bins : np.array
+            time bin indices exceeding the threshold
+        k : int, optional
+            number of classes to save in the dict. keep this below 100
+            otherwise the operation will start slowing the process down
+            a lot, by default 50
+
+        Returns
+        -------
+        dict
+            dictionary of top k classes with time bin indices exceeding threshold
+        """
+        classes, class_counts = np.unique(class_indices, 
+                                          return_counts=True)
+        
+        cls_dict = {k: v for k, v in zip(classes, class_counts)}
+        cls_dict = dict(sorted(cls_dict.items(), key=lambda x: x[1], 
+                               reverse=True))
+        top_k_cls = {k: v for i, (k, v) 
+                     in enumerate(cls_dict.items()) 
+                     if i < k}
+                
+        cls_results = {
+            class_names[cls]: {
+                "time_bins_exceeding_threshold": class_time_bins[
+                    class_indices == cls
+                    ].tolist(),
+                "classifier_predictions": np.array(
+                    probabilities[class_indices[class_indices == cls], 
+                                  class_time_bins[class_indices == cls]]
+                ).tolist(),
+            }
+            for cls in top_k_cls.keys()
+        }
+        return cls_results
+
     @staticmethod
     def make_classification_dict(probabilities, classes, threshold):
         if probabilities.shape[0] != len(classes):
             probabilities = probabilities.swapaxes(0, 1)
 
         cls_idx, tmp_idx = np.where(probabilities > threshold)
-        
-        # TODO do something like np.unique(cls_idx, return_counts=True) and then
-        # use the counts to clac the avg_prediction * number of occurrences to
-        # extract the 200 most important classes for a sound file and return them
-        # or maybe the like square of pred - thresh * count. something like that
-        # but yeah limit it so this doesn't take more than a second
 
-        cls, cls_cnts = np.unique(cls_idx, return_counts=True)
-        
-        cls_dict = {k: v for k, v in zip(cls, cls_cnts)}
-        cls_dict = dict(sorted(cls_dict.items(), key=lambda x: x[1], reverse=True))
-        top_50_cls = {k: v for i, (k, v) in enumerate(cls_dict.items()) if i < 50}
-                
-        cls_results = {
-            classes[k]: {
-                "time_bins_exceeding_threshold": tmp_idx[cls_idx == k].tolist(),
-                "classifier_predictions": np.array(
-                    probabilities[cls_idx[cls_idx == k], tmp_idx[cls_idx == k]]
-                ).tolist(),
-            }
-            for k in top_50_cls.keys()
-        }
+        cls_results = Embedder.filter_top_k_classifications(probabilities, 
+                                                            classes,
+                                                            cls_idx, 
+                                                            tmp_idx)
 
         cls_results["head"] = {
             "Time bins in this file": probabilities.shape[0],
             "Threshold for classifier predictions": threshold,
         }
         return cls_results
+    
+    def fill_dataframe_with_classiefier_results(self, fileloader_obj, file):
+        """
+        Append or create a dataframe and fill it with the results from the 
+        classifier to later be saved as a csv file.
 
-    def save_classifier_outputs(self, fileloader_obj, file):
-        relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
-        results_path = self.paths.class_path.joinpath(
-            "original_classifier_outputs"
-        ).joinpath(relative_parent_path)
-        results_path.mkdir(exist_ok=True, parents=True)
-        file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
-        file_dest = str(file_dest) + ".json"
-
-        if self.model.classifier_outputs.shape[0] != len(self.model.classes):
-            self.model.classifier_outputs = self.model.classifier_outputs.swapaxes(0, 1)
-
-        if self.model.only_embed_annotations: #annotation file exists
-            np.save(file_dest.replace('.json', '.npy'), self.model.classifier_outputs)
-        
-        cls_results = self.make_classification_dict(
-            self.model.classifier_outputs, self.model.classes, self.classifier_threshold
-        )
-
+        Parameters
+        ----------
+        fileloader_obj : bacpipe.Loader object
+            All paths and metadata of embeddings creation run
+        file : pathlike
+            audio file path
+        """
         classifier_annotations = pd.DataFrame()
-
+        
         tmp_bins = self.model.classifier_outputs.shape[-1]
+        
         classifier_annotations["start"] = np.arange(tmp_bins) * (
             self.model.segment_length / self.model.sr
         )
@@ -707,6 +739,27 @@ class Embedder:
             self.cumulative_annotations = pd.concat(
                 [self.cumulative_annotations, classifier_annotations], ignore_index=True
             )
+
+    def save_classifier_outputs(self, fileloader_obj, file):
+        relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
+        results_path = self.paths.class_path.joinpath(
+            "original_classifier_outputs"
+        ).joinpath(relative_parent_path)
+        results_path.mkdir(exist_ok=True, parents=True)
+        file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
+        file_dest = str(file_dest) + ".json"
+
+        if self.model.classifier_outputs.shape[0] != len(self.model.classes):
+            self.model.classifier_outputs = self.model.classifier_outputs.swapaxes(0, 1)
+
+        if self.model.only_embed_annotations: #annotation file exists
+            np.save(file_dest.replace('.json', '.npy'), self.model.classifier_outputs)
+        
+        self.fill_dataframe_with_classiefier_results(fileloader_obj, file)
+        
+        cls_results = self.make_classification_dict(
+            self.model.classifier_outputs, self.model.classes, self.classifier_threshold
+        )
 
         with open(file_dest, "w") as f:
             json.dump(cls_results, f, indent=2)
