@@ -13,6 +13,7 @@
 import torch
 import torch.nn as nn
 from tqdm import tqdm
+import pathlib
 
 from timm.models.layers import trunc_normal_
 from timm.models.layers import to_2tuple
@@ -26,6 +27,7 @@ BATCH_SIZE = 8  # important to lower this if run on laptop cpu
 
 SAMPLE_RATE = 16000
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
+
 
 
 class PatchEmbed_new(nn.Module):
@@ -115,10 +117,21 @@ class Model(ModelBaseClass):
         self.model.pos_embed = nn.Parameter(
             torch.zeros(1, num_patches + 1, self.emb_dim), requires_grad=False
         )  # fixed sin-cos embedding
+        
+        # Save original PosixPath
+        original_posix_path = pathlib.PosixPath
 
-        checkpoint = torch.load(
-            self.model_path, map_location=self.device, weights_only=False
-        )
+        # patch PosixPath to return str or WindowsPath
+        pathlib.PosixPath = pathlib.WindowsPath 
+
+        try:
+            checkpoint = torch.load(
+                self.model_path, map_location=self.device, weights_only=False
+            )
+        finally:
+            # Restore original PosixPath to avoid side effects
+            pathlib.PosixPath = original_posix_path
+        
         checkpoint_model = checkpoint["model"]
         # load pre-trained model
         self.model.load_state_dict(checkpoint_model)

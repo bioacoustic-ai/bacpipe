@@ -15,6 +15,9 @@ class Model(ModelBaseClass):
     ):
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
         
+        if model_choice == 'vggish':
+            self.bool_classifier = False
+        
         if self.device == 'cuda' and model_choice.startswith('perch_v2'):
             if len(tf.config.list_physical_devices("GPU")) > 0:
                 model_choice = 'perch_v2'
