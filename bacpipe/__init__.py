@@ -12,7 +12,7 @@ TF_MODELS = [
     'perch_bird', 
     'google_whale', 
     'surfperch', 
-    'vggish'
+    'vggish',
     'hbdet', 
 ]
 
