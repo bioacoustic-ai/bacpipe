@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import importlib.resources as pkg_resources
 from huggingface_hub import hf_hub_download
 
-def ensure_std_models(model_base_path, repo_id="vinikay/bacpipe_models"):
+def ensure_std_models(model_base_path, repo_id="vskode/bacpipe_models"):
     """
     Ensure that the model checkpoints for birdnetv2.4 and perchv1 are
     available locally. Downloads from Hugging Face Hub if missing.
