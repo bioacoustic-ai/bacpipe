@@ -118,19 +118,26 @@ class Model(ModelBaseClass):
             torch.zeros(1, num_patches + 1, self.emb_dim), requires_grad=False
         )  # fixed sin-cos embedding
         
-        # Save original PosixPath
-        original_posix_path = pathlib.PosixPath
 
-        # patch PosixPath to return str or WindowsPath
-        pathlib.PosixPath = pathlib.WindowsPath 
 
-        try:
-            checkpoint = torch.load(
-                self.model_path, map_location=self.device, weights_only=False
-            )
-        finally:
-            # Restore original PosixPath to avoid side effects
-            pathlib.PosixPath = original_posix_path
+        if isinstance(self.model_path, pathlib.WindowsPath):
+            try:
+                # Save original PosixPath
+                original_posix_path = pathlib.PosixPath
+                
+                # patch PosixPath to return str or WindowsPath
+                pathlib.PosixPath = pathlib.WindowsPath 
+                
+                checkpoint = torch.load(
+                    self.model_path, map_location=self.device, weights_only=False
+                )
+            finally:
+                # Restore original PosixPath to avoid side effects
+                pathlib.PosixPath = original_posix_path
+        else:
+                checkpoint = torch.load(
+                    self.model_path, map_location=self.device, weights_only=False
+                )
         
         checkpoint_model = checkpoint["model"]
         # load pre-trained model
