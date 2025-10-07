@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 from pathlib import Path
@@ -30,6 +31,8 @@ from bacpipe.embedding_evaluation.distance_evalutation.distances import (
 )
 
 from bacpipe.embedding_evaluation.visualization.dashboard import DashBoard
+
+from bacpipe import TF_MODELS
 
 logger = logging.getLogger("bacpipe")
 
@@ -449,6 +452,8 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
         )
     else:
         raise ValueError("model_name not provided in kwargs.")
+    if kwargs['model_name'] in TF_MODELS:
+        import tensorflow as tf
     try:
         start = time.time()
         ld = ge.Loader(**kwargs)
@@ -482,6 +487,14 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                 ):
                     try:
                         embeddings = embed.get_embeddings_from_model(file)
+                    except tf.errors.ResourceExhaustedError:
+                                                   
+                        logger.error(
+                            "\nGPU device is out of memory. Your Vram doesn't seem to be "
+                            "large enough for this process. This could be down to the "
+                            "size of the audio files. Use `cpu` instead of `cuda`."
+                        )
+                        os._exit(1) 
                     except Exception as e:
                         logger.warning(
                             f"Error generating embeddings, skipping file. \n"
@@ -501,7 +514,12 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                 )
             ld.write_metadata_file()
             ld.update_files()
-
+        
+            # clear GPU
+            del embed
+            import tensorflow as tf
+            tf.keras.backend.clear_session()
+            
         return ld
     except KeyboardInterrupt:
         if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:

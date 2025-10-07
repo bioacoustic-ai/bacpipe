@@ -11,7 +11,7 @@ from ..utils import ModelBaseClass
 SAMPLE_RATE = 16_000
 LENGTH_IN_SAMPLES = int(5 * SAMPLE_RATE)
 
-BEATS_PRETRAINED_PATH_SSL = "naturebeats/BEATs_iter3_plus_AS2M.pt"
+BEATS_PRETRAINED_PATH_FT = "beats/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt1.pt"
 BEATS_PRETRAINED_PATH_NATURELM = "naturebeats/naturebeats.pt"
 
 
@@ -20,7 +20,7 @@ class Model(ModelBaseClass):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
 
         self.beats = BeatsModel(
-            checkpoint_path=self.model_base_path / BEATS_PRETRAINED_PATH_SSL
+            checkpoint_path=self.model_base_path / BEATS_PRETRAINED_PATH_FT
         )
         beats_ckpt_naturelm = torch.load(
             self.model_base_path / BEATS_PRETRAINED_PATH_NATURELM,

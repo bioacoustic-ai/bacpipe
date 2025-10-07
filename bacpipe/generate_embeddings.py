@@ -8,6 +8,7 @@ import torch
 import logging
 import importlib
 import json
+import os
 
 logger = logging.getLogger("bacpipe")
 
@@ -194,9 +195,6 @@ class Loader:
     def _get_audio_paths(self):
         self.files = self._get_audio_files()
         self.files.sort()
-        if False:
-            self._get_annotation_files()
-
         self.embed_dir = Path(self.embed_parent_dir).joinpath(self.get_timestamp_dir())
 
     def _get_annotation_files(self):
@@ -411,7 +409,7 @@ class Embedder:
             self.model_name = dim_reduction_model
         else:
             self.model_name = model_name
-        self._init_model(**kwargs)
+        self._init_model(dim_reduction_model=dim_reduction_model, **kwargs)
 
     def _init_model(self, **kwargs):
         """
@@ -425,7 +423,7 @@ class Embedder:
             module = importlib.import_module(
                 f"bacpipe.embedding_generation_pipelines.feature_extractors.{self.model_name}"
             )
-        self.model = module.Model(**kwargs)
+        self.model = module.Model(model_name=self.model_name, **kwargs)
         self.model.prepare_inference()
 
     def prepare_audio(self, sample):
@@ -446,10 +444,17 @@ class Embedder:
             audio frames preprocessed with model specific preprocessing
         """
         audio = self.model.load_and_resample(sample)
-        frames = self.model.window_audio(audio)
+        audio = audio.to(self.model.device)
+        if self.model.only_embed_annotations:
+            frames = self.model.only_load_annotated_segments(sample, audio)
+        else:
+            frames = self.model.window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
         self.file_length[sample.stem] = len(audio[0]) / self.model.sr
         self.preprocessed_shape = tuple(preprocessed_frames.shape)
+        if self.model.device == 'cuda':
+            del audio, frames
+            torch.cuda.empty_cache()
         return preprocessed_frames
 
     def get_embeddings_for_audio(self, sample):
@@ -516,6 +521,17 @@ class Embedder:
                 try:
                     preprocessed = self.prepare_audio(file)
                     task_queue.put((idx, file, preprocessed))
+                                    
+                except torch.cuda.OutOfMemoryError:
+                    logger.error(
+                        "\nCuda device is out of memory. Your Vram doesn't seem to be "
+                        "large enough for this process. Try setting the variable "
+                        "`avoid_pipelined_gpu_inference` to `True`. That way data "
+                        "will be processed in series instead of parallel which will "
+                        "reduce memory requirements. If that also fails use `cpu` "
+                        "instead of `cuda`."
+                    )
+                    os._exit(1) 
                 except Exception as e:
                     task_queue.put((idx, file, e))
             task_queue.put(None)  # sentinel = done
@@ -583,6 +599,12 @@ class Embedder:
         else:
             if not isinstance(sample, Path):
                 sample = Path(sample)
+                if not sample.suffix in self.model.audio_suffixes:
+                    raise AssertionError(
+                        "The provided path does not lead to a supported audio file with the ending"
+                        f" {self.model.audio_suffixes}. Please check again that you provided the correct"
+                        " path."
+                    )
             sample = self.prepare_audio(sample)
             embeds = self.get_embeddings_for_audio(sample)
 
@@ -615,6 +637,61 @@ class Embedder:
                 embeds = np.expand_dims(embeds, axis=0)
             np.save(file_dest, embeds)
 
+
+    @staticmethod
+    def filter_top_k_classifications(probabilities, class_names,
+                                     class_indices, class_time_bins, 
+                                     k=50):
+        """
+        Generate a dictionary with the top k classes. By limiting the class number to 
+        k, it prevents from this step taking too long but has the benefit of generating
+        a dicitonary which can be saved as a .json file to quickly get a overview of 
+        species that are well represented within an audio file. 
+
+        Parameters
+        ----------
+        probabilities : np.array
+            Probabilities for each class
+        class_names : list
+            class names
+        class_indices : np.array
+            class indices exceeding the threshold
+        class_time_bins : np.array
+            time bin indices exceeding the threshold
+        k : int, optional
+            number of classes to save in the dict. keep this below 100
+            otherwise the operation will start slowing the process down
+            a lot, by default 50
+
+        Returns
+        -------
+        dict
+            dictionary of top k classes with time bin indices exceeding threshold
+        """
+        classes, class_counts = np.unique(class_indices, 
+                                          return_counts=True)
+        
+        cls_dict = {k: v for k, v in zip(classes, class_counts)}
+        cls_dict = dict(sorted(cls_dict.items(), key=lambda x: x[1], 
+                               reverse=True))
+        top_k_cls = {k: v for i, (k, v) 
+                     in enumerate(cls_dict.items()) 
+                     if i < k}
+                
+        cls_results = {
+            class_names[cls]: {
+                "time_bins_exceeding_threshold": class_time_bins[
+                    class_indices == cls
+                    ].tolist(),
+                "classifier_predictions": np.array(
+                    probabilities[class_indices[class_indices == cls], 
+                                  class_time_bins[class_indices == cls]]
+                ).tolist(),
+            }
+            for cls in top_k_cls.keys()
+        }
+        return cls_results
+
     @staticmethod
     def make_classification_dict(probabilities, classes, threshold):
         if probabilities.shape[0] != len(classes):
@@ -622,41 +699,33 @@ class Embedder:
 
         cls_idx, tmp_idx = np.where(probabilities > threshold)
 
-        cls_results = {
-            classes[k]: {
-                "time_bins_exceeding_threshold": tmp_idx[cls_idx == k].tolist(),
-                "classifier_predictions": np.array(
-                    probabilities[cls_idx[cls_idx == k], tmp_idx[cls_idx == k]]
-                ).tolist(),
-            }
-            for k in cls_idx
-        }
+        cls_results = Embedder.filter_top_k_classifications(probabilities, 
+                                                            classes,
+                                                            cls_idx, 
+                                                            tmp_idx)
 
         cls_results["head"] = {
             "Time bins in this file": probabilities.shape[0],
             "Threshold for classifier predictions": threshold,
         }
         return cls_results
+    
+    def fill_dataframe_with_classiefier_results(self, fileloader_obj, file):
+        """
+        Append or create a dataframe and fill it with the results from the 
+        classifier to later be saved as a csv file.
 
-    def save_classifier_outputs(self, fileloader_obj, file):
-        relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
-        results_path = self.paths.class_path.joinpath(
-            "original_classifier_outputs"
-        ).joinpath(relative_parent_path)
-        results_path.mkdir(exist_ok=True, parents=True)
-        file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
-        file_dest = str(file_dest) + ".json"
-
-        if self.model.classifier_outputs.shape[0] != len(self.model.classes):
-            self.model.classifier_outputs = self.model.classifier_outputs.swapaxes(0, 1)
-
-        cls_results = self.make_classification_dict(
-            self.model.classifier_outputs, self.model.classes, self.classifier_threshold
-        )
-
+        Parameters
+        ----------
+        fileloader_obj : bacpipe.Loader object
+            All paths and metadata of embeddings creation run
+        file : pathlike
+            audio file path
+        """
         classifier_annotations = pd.DataFrame()
-
+        
         tmp_bins = self.model.classifier_outputs.shape[-1]
+        
         classifier_annotations["start"] = np.arange(tmp_bins) * (
             self.model.segment_length / self.model.sr
         )
@@ -676,6 +745,27 @@ class Embedder:
             self.cumulative_annotations = pd.concat(
                 [self.cumulative_annotations, classifier_annotations], ignore_index=True
             )
+
+    def save_classifier_outputs(self, fileloader_obj, file):
+        relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
+        results_path = self.paths.class_path.joinpath(
+            "original_classifier_outputs"
+        ).joinpath(relative_parent_path)
+        results_path.mkdir(exist_ok=True, parents=True)
+        file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
+        file_dest = str(file_dest) + ".json"
+
+        if self.model.classifier_outputs.shape[0] != len(self.model.classes):
+            self.model.classifier_outputs = self.model.classifier_outputs.swapaxes(0, 1)
+
+        if self.model.only_embed_annotations: #annotation file exists
+            np.save(file_dest.replace('.json', '.npy'), self.model.classifier_outputs)
+        
+        self.fill_dataframe_with_classiefier_results(fileloader_obj, file)
+        
+        cls_results = self.make_classification_dict(
+            self.model.classifier_outputs, self.model.classes, self.classifier_threshold
+        )
 
         with open(file_dest, "w") as f:
             json.dump(cls_results, f, indent=2)

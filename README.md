@@ -31,21 +31,31 @@ There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) availab
 
 - [How it works](#how-it-works)
 - [API](#api)
+    - [Use bacpipe immediately on the integrated test data](#use-bacpipe-immediately-on-the-integrated-test-data)
+    - [Modify configurations and settings as attributs](#modify-configurations-and-settings-as-attributs)
+    - [Modify audio source path, models, device](#modify-audio-source-path-models-device)
+    - [Use bacpipe in an existing pipeline](#use-bacpipe-in-an-existing-pipeline)
+    - [Produce embeddings for multiple models in your own pipeline](#produce-embeddings-for-multiple-models-in-your-own-pipeline)
 - [Dashboard visualization](#dashboard-visualization)
 - [Installation](#installation)
+    - [Install prerequisites](#install-prerequisites)
+    - [Clone the git repository](#clone-the-git-repository)
+    - [Install the dependencies once the prerequisites are satisfied](#install-the-dependencies-once-the-prerequisites-are-satisfied)
+    - [Model checkpoints are downloaded automatically](#model-checkpoints-are-downloaded-automatically)
+    - [Test the installation was successful](#test-the-installation-was-successful)
 - [Usage](#usage)
-  - [Configurations and settings](#configurations-and-settings)
-  - [Running the pipeline](#running-the-pipeline)
-  - [Model selection](#model-selection)
-  - [Dimensionality reduction](#dimensionality-reduction)
-  - [Dashboard](#dashboard)
-  - [Evaluation](#evaluation)
-  - [Models with classifiers](#models-with-classifiers)
-  - [Generated Files](#generated-files)
-    - [Embedding Folders](#embedding-folders)
-    - [Dimensionality reduced embedding folders](#dimensionality-reduced-embedding-folders)
-    - [Evaluation folders](#evaluation-folders)
-    - [Example result files structure](#example-result-files-structure)
+    - [Configurations and settings](#configurations-and-settings)
+    - [Running the pipeline](#running-the-pipeline)
+    - [Model selection](#model-selection)
+    - [Dimensionality reduction](#dimensionality-reduction)
+    - [Dashboard](#dashboard)
+    - [Evaluation](#evaluation)
+    - [Models with classifiers](#models-with-classifiers)
+    - [Generated Files](#generated-files)
+        - [Embedding Folders](#embedding-folders)
+        - [Dimensionality reduced embedding folders](#dimensionality-reduced-embedding-folders)
+        - [Evaluation folders](#evaluation-folders)
+        - [Example result files structure](#example-result-files-structure)
 - [Available models](#available-models)
 - [Contribute](#contribute)
 - [Known issues](#known-issues)
@@ -83,12 +93,14 @@ available_models : [
     "biolingual"
     "birdnet"
     "birdmae"
+    "convnext_birdset"
     "hbdet"
     "insect66"
     "insect459"
     "mix2"
     "naturebeats"
     "perch_bird"
+    "pervh_v2"
     "protoclr"
     "rcl_fs_bsed"
     "surfperch"
@@ -143,6 +155,8 @@ If this file exists, the evaluation script will automatically use the annotation
 
 `pip install bacpipe`
 
+## Use bacpipe immediately on the integrated test data
+
 ```python
 import bacpipe
 
@@ -151,75 +165,70 @@ import bacpipe
 # a set of audio test data using the models birdnet and perch
 
 bacpipe.play()
+```
 
-##################################################################
-# to modify configurations and settings, you can simply access them
-# as attributes
+## Modify configurations and settings as attributs
+To modify configurations and settings, you can simply access them as attributes. To see available settings and configs run the following commands
 
-# to see available settings and configs run the above commands
+```python
 bacpipe.config
 bacpipe.settings
 # you can also check the bacpipe/config.yaml and bacpipe/settings.yaml
 # files here in the repository to see all the available settings and
 # read their respective description
+```
 
-
+## Modify audio source path, models, device
+If you're on a Windows machine, make sure to add a `r` before the path like `r'path\to\audio'` otherwise the path will likely cause problems due to the backslashes. 
+```python
 # to modify the audio data path for example, do
 bacpipe.config.audio_dir = '/path/to/your/audio/dir'
 
 # to modify the models you want to run, do
 bacpipe.config.models = ['birdnet', 'birdmae', 'naturebeats']
-# keep in mind some models require checkpoints, to find out which ones, run
-bacpipe.models_needing_checkpoint
-# links to checkpoints are to be found in this readme file, 
-# location of the checkpoints is specified under 
-bacpipe.settings.model_base_path = '/path/to/model_checkpoints'
-# On first execution the birdnet checkpoint is downloaded and the
-# model_checkpoints folder is created from the current working directory
-# After you are finished with all the customizations you can again just 
-bacpipe.play() 
-# which will then run with your settings.
+# if you do not have the checkpoint yet, it will be automatically 
+# downloaded and stored locally
 
-# You can also run 
+bacpipe.settings.device = 'cuda' 
+# bacpipe uses multithreading which speeds up model inference if 
+# run on a machine supporting cuda
+
+# then run with your settings.
+# By default the save logs is True
 bacpipe.play(save_logs=True)
 # That way bacpipe will generate log files of the outputs and also save your
 # config and settings files, which can be helpful in retrospect to remember
 # all the settings you chose for a run. 
 
+```
 
-##################################################################
-# If you just want to run models and get embeddings returned without saving them
-# and don't want the dashboard and all of that, define an embedder object 
-# and pass it the model name, and the settings you modified.
+## Use bacpipe in an existing pipeline
+If you just want to run models and get embeddings returned without saving them and don't want the dashboard and all of that, define an embedder object and pass it the model name and the settings you modified.
 
+```python
 em = bacpipe.Embedder('perch_bird', **vars(bacpipe.settings)) 
 # the vars part is important!
 
 audio_file = '/path/to/all/the/audio/file'
 embeddings = em.get_embeddings_from_model(audio_file)
-# To ensure birdnet is downloaded, run the following (this is done by default
-# if you run bacpipe.play(), but without that, you need to call this explicitly)
-bacpipe.ensure_std_models(bacpipe.settings.model_base_path)
 
+# if the model has a built in classifier, like birdnet, the classification
+# score are also saved. You can check if there is a classifier included by 
+# checking 
+em.model.bool_classifier
 
-##################################################################
-# if the model has a built in classifier, like birdnet
-# you can make sure the class predictions are also saved 
-# by setting 
-bacpipe.settings.run_pretrained_classifier = True
-# the generating of embeddings above will then let you access 
+# After the generating of embeddings above, you will then be able to access 
 # the class predictions using
 em.model.classifier_outputs
+```
 
+## Produce embeddings for multiple models in your own pipeline
+If you want to produce embeddings for multiple models, bacpipe will always store them to keep your memory from overfilling. Still you can use the package to easily access the embeddings and all the metadata
 
-##################################################################
-# If you want to produce embeddings for multiple models, bacpipe will always store
-# them to keep your memory from overfilling. Still you can use the package to easily
-# access the embeddings and all the metadata
+```python
 loader = bacpipe.model_specific_embedding_creation(
   **vars(bacpipe.config), **vars(bacpipe.settings)
   )
-
 # this call will initiate the embedding generation process, it will check if embeddings
 # already exist for the combination of each model and the dataset and if so it will
 # be ready to load them. The loader keys will be the model name and the values will
@@ -278,7 +287,44 @@ __Try it out__ and (__please__) feel free to give feedback and ask questions (or
 ---
 # Installation
 
-### Install `uv` (recommended) or `poetry`
+## Install prerequisites
+<details>
+<summary> Install python 3.11, uv and git <b>(click to expand)</b> </summary> 
+
+### Install Python 3.11 and git on your local computer
+
+For **Windows**:
+- Download python 3.11: https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe
+- Download Git: https://github.com/git-for-windows/git/releases/download/v2.51.0.windows.1/Git-2.51.0-64-bit.exe
+
+For **Linux**
+- `sudo add-apt-repository ppa:deadsnakes/ppa`
+- `sudo apt install python3.11`
+- `sudo apt install git`
+
+For **Mac**
+- (install homebrew: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" `
+- install git: `brew install git`
+
+
+### Create a virtual environment for this project
+
+Virtual environments are very important. They ensure that specific libraries that are needed for one project don't get in the way of libraries you need for another project.
+
+Create your virtual environment (all systems):
+- `uv venv --python 3.11 env_acodet`
+
+For **Windows**, Activate your environment:
+- `source env_acodet/Scripts/activate`
+
+For **Linux**/**Mac**, Activate your environment:
+- `source env_acodet/bin/activate`
+
+Install the project dependencies (all systems):
+- `uv pip install -r pyproject.toml`
+
+
+## Install `uv` (recommended) or `poetry`
 
 It is recommended to use python 3.11 for this repository, as some of the models require it. 
 
@@ -286,7 +332,7 @@ For speed and stability it is recommended to use `uv`. To install `uv` use the f
 
 `pip install uv` 
 
-(for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m pip install uv`)
+(for windows use `$HOME/AppData/Local/Programs/Python/Python311/python.exe -m pip install uv`)
 
 If you prefer to use `poetry`, you can install it using: 
 
@@ -296,7 +342,7 @@ If you prefer to use `poetry`, you can install it using:
 
 `python3.11 -m uv venv .env_bacpipe`
 
-(for windows use `/c/Users/$USERNAME/AppData/Local/Programs/Python/Python311/python.exe -m uv venv .env_bacpipe`)
+(for windows use `$HOME/AppData/Local/Programs/Python/Python311/python.exe -m uv venv .env_bacpipe`)
 
 (alternatively for `poetry` use `poetry env use 3.11`)
 
@@ -304,12 +350,26 @@ activate the environment
 
 `source .env_bacpipe/bin/activate` (for windows use `source .env_bacpipe\Scripts\activate`)
 
-### Clone the repository
-`git clone https://github.com/bioacoustic-ai/bacpipe.git`
+</details>
 
-cd into the bacpipe directory (`cd bacpipe`)
 
-### Install the dependencies once the prerequisites are satisfied.
+## Clone the git repository
+
+For **Windows**:
+- move to a folder of your choice (choose wisely - something like `Documents` is always a good starting point), then right click and `Open Git Bash here`
+- install **uv**: `"$HOME/AppData/Local/Programs/Python/Python311/python" -m pip install uv`
+
+For **Linux** / **MAC**:
+- open a terminal (console) in the folder of your choice
+- install **uv**: `/usr/bin/python/Python311/python -m pip install uv`
+- (if Mac users get an error locate python with `which python3` and use that path instead followed by `-m pip install uv`)
+
+For all systems:
+
+- run `git clone https://github.com/bioacoustic-ai/bacpipe`
+
+
+## Install the dependencies once the prerequisites are satisfied.
 
 `uv pip install -r pyproject.toml`
 
@@ -318,21 +378,46 @@ cd into the bacpipe directory (`cd bacpipe`)
 For `poetry`:
 
 `poetry lock`
+
 `poetry install`
-
-Alternatively: 
-
-`uv sync`
-
-If for some reasons you would prefer requirements, use the these for windows:
-
-`uv pip install -r requirements_windows.txt` 
 
 If you do not have admin rights and encounter a `permission denied` error when using `pip install`, use `python -m pip install ...` instead.
 
-### OPTIONAL: Add other model checkpoints that are not included by default.
 
-Download the ones that are available from [here](https://github.com/bioacoustic-ai/bacpipe/tree/main/bacpipe/pipelines) and create directories corresponding to the pipeline-names and place the checkpoints within them. 
+### Install gpu support for tensorflow
+
+Because of the requirements of `torch==2.6` the cuda versions have to be installed corresponding to what pytorch supports. However, I have tested that you are able to install different cuda dependencies to also support tensorflow gpus once the environment is set up. Once you have installed the requirements. Install the following dependencies using 
+`uv pip install -r requirements_tf_gpu.txt`.
+
+```python
+nvidia-cublas-cu12==12.5.2.13
+nvidia-cuda-cccl-cu12==12.5.39.post1
+nvidia-cuda-cupti-cu12==12.5.39
+nvidia-cuda-cuxxfilt-cu12==12.5.39
+nvidia-cuda-nvcc-cu12==12.5.40
+nvidia-cuda-nvrtc-cu12==12.5.40
+nvidia-cuda-opencl-cu12==12.5.39
+nvidia-cuda-profiler-api-cu12==12.5.39
+nvidia-cuda-runtime-cu12==12.5.39
+nvidia-cuda-sanitizer-api-cu12==12.5.39
+nvidia-cudnn-cu12==9.3.0.75
+nvidia-cufft-cu12==11.2.3.18
+nvidia-curand-cu12==10.3.6.39
+nvidia-cusolver-cu12==11.6.2.40
+nvidia-cusparse-cu12==12.4.1.24
+nvidia-cusparselt-cu12==0.6.2
+nvidia-nccl-cu12==2.21.5
+nvidia-npp-cu12==12.3.0.116
+nvidia-nvfatbin-cu12==12.5.39
+nvidia-nvjitlink-cu12==12.5.40
+nvidia-nvjpeg-cu12==12.3.2.38
+nvidia-nvml-dev-cu12==12.5.39
+nvidia-nvtx-cu12==12.5.39
+```
+
+## Model checkpoints are downloaded automatically. 
+
+Model checkpoints will be downloaded automatically. Once you run `bacpipe.play()`, it will automatically download models that were included but are not yet available locally. Models are downloaded from [this huggingface repo](https://huggingface.co/datasets/vskode/bacpipe_models/tree/main).
 
 ## Test the installation was successful
 
@@ -404,6 +489,8 @@ audiofilename,start,end,label:species
 
 Where `audiofilename` is the name of the audio file, `start` and `end` are the start and end times of the annotation in seconds, and `label` is the label of the annotation.
 
+Using the settings attribute `only_embed_annotations`, you can also decide to only generate embedding corresponding to your annotations. In that case bacpipe will take each annotation and create embeddings for each selected model from only those segments. If segments are shorter than the model input length, the segments will be padded. If they are longer, they will produce several embeddings.
+
 `species` is a placeholder here and can be replaced with any label description. So if you have labelled call types, change it to `label:call_type`. But it's important that there are no spaces and that it contains `label:`. By doing this you will be able to visualize your data based on all of these label columns.
 
 The labels can then be used to perform clustering and classification evaluation. This can be done only in regard to one label, so specify the main label column in the `label_column` variable in [settings.yaml](bacpipe/settings.yaml). This defaults to `species`. Only labels that exceed the `min_label_occurrences` value will be used. This is to make sure you have enough data to train linear classifiers and do meaningful evaluations. If you have enough labeled data, feel free to increase this. 
@@ -417,10 +504,12 @@ If you selected classification, a linear classifier will be trained and saved in
 ## Models with classifiers
 
 Models that already contain classification heads, are the following:
-- AudioProtoPNet
+- Perch_v2
 - BirdNET
 - Perch_bird
 - SurfPerch
+- AudioProtoPNet
+- ConvNeXT_birdset
 - google_whale
 
 With all of these models, you only need to set `run_pretrained_classifier` to True and then the model will save the classification outputs in the `classification/original_classifier_outputs` folder. Only predictions exceeding the `classifier_threshold` value will be saved. A csv file in the shape of the annotations.csv file is also saved corresponding to the class predictions. The dashboard will also contain an extra `label_by` option `default_classifier`.
@@ -553,6 +642,7 @@ Models currently include:
 |   BirdAVES_ESpecies    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 1024 |
 |   BirdMAE    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   32 kHz|   10 s| 1280 |
 |   BirdNET     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s| 1024 |
+|   ConveNeXT_BirdSet   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |   32 kHz|   5 s| 1024 |
 |   Google_Whale       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   24 kHz|   5 s| 1280 |
 |   HumpbackNET |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s| 2048|
 |   Insect66NET |   [paper](https://doi.org/10.1371/journal.pcbi.1011541)   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   44.1 kHz|   5.5 s| 1280 |
@@ -560,6 +650,7 @@ Models currently include:
 |   Mix2        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   16 kHz|   3 s| 960 |
 |   NatureBEATs        |   [paper](https://arxiv.org/abs/2411.07186)   |   [code](https://github.com/earthspecies/NatureLM-audio)    |   16 kHz|   10 s| 768 |
 |   Perch_Bird       |   [paper](https://www.nature.com/articles/s41598-023-49989-z.epdf)   |   [code](https://github.com/google-research/perch)    |   32 kHz|   5 s| 1280 |
+|   Perch_V2       |   [paper](https://arxiv.org/abs/2508.04665)   |   [code](https://github.com/google-research/perch_hoplite)    |   32 kHz|   5 s| 1536 |
 |   ProtoCLR     |   [paper](https://arxiv.org/pdf/2409.08589)   |   [code](https://github.com/ilyassmoummad/ProtoCLR)    |   16 kHz|   6 s| 384 |
 |   RCL_FS_BSED     |   [paper](https://arxiv.org/abs/2309.08971)   |   [code](https://github.com/ilyassmoummad/RCL_FS_BSED)    |   22.05 kHz|   0.2 s| 2048 |
 |   SurfPerch       |   [paper](https://arxiv.org/abs/2404.16436)   |   [code](https://www.kaggle.com/models/google/surfperch)    |   32 kHz|   5 s| 1280 |
@@ -580,6 +671,7 @@ Models currently include:
 |   [BirdAVES_ESpecies](#birdaves_especies)    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   ssl|   trafo | HuBERT | [weights](https://storage.googleapis.com/esp-public-files/birdaves/birdaves-biox-large.torchaudio.pt)|
 |   [BirdMAE](#birdmae)    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   ssl | trafo | ViT | included |
 |   [BirdNET](#birdnet)     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   sup l|   CNN | EffNetB0 | [weights](https://github.com/kahst/BirdNET-Analyzer/tree/main/birdnet_analyzer/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model)|
+|   [ConvNeXT_BirdSet](#convnext_birdset)   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |  sup l |   CNN | ConvNext | included|
 |   [Google_Whale](#google_whale)       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   sup l|   CNN| EffNetb0 | included|
 |   [HumpbackNET](#humpbacknet) |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   sup l |   CNN | ResNet50| [weights](https://github.com/vskode/acodet/blob/main/acodet/src/models/Humpback_20221130.zip)|
 |   [Insect66NET](#insect66net) |   paper   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   sup l|   CNN | EffNetv2s | [weights](https://gitlab.com/arise-biodiversity/DSI/algorithms/cricket-cicada-detector-capgemini/-/blob/main/src/model_traced.pt?ref_type=heads)|
@@ -587,6 +679,7 @@ Models currently include:
 |   [Mix2](#mix2)        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   sup l|   CNN| MobNetv3 | release pending|
 |   [NatureBEATs](#naturebeats)        |   [paper](https://arxiv.org/abs/2411.07186)   |   [code](https://github.com/earthspecies/NatureLM-audio)    | ssl | trafo | BEATs | [weights](https://drive.google.com/file/d/12BrWRbxJsuwZHOkzX8HEpGgSMy5VnwCp/view?usp=sharing) |
 |   [Perch_Bird](#perch_bird)       |   [paper](https://www.nature.com/articles/s41598-023-49989-z.epdf)   |   [code](https://github.com/google-research/perch)    |   sup l|   CNN| EffNetb0 | included |
+|   [Perch_V2](#perch_v2)       |   [paper](https://arxiv.org/abs/2508.04665)   |   [code](https://github.com/google-research/perch_hoplite)    |   sup l |   CNN | EfficientNetB3 | included |
 |   [ProtoCLR](#protoclr)     |   [paper](https://arxiv.org/pdf/2409.08589)   |   [code](https://github.com/ilyassmoummad/ProtoCLR)    |   sup cl|   trafo| CvT-13 | [weights](https://huggingface.co/ilyassmoummad/ProtoCLR)|
 |   [RCL_FS_BSED](#rcl_fs_bsed)     |   [paper](https://arxiv.org/abs/2309.08971)   |   [code](https://github.com/ilyassmoummad/RCL_FS_BSED)    |   sup cl|   CNN| ResNet9 | [weights](https://zenodo.org/records/11353694)|
 |   [SurfPerch](#surfperch)       |   [paper](https://arxiv.org/abs/2404.16436)   |   [code](https://www.kaggle.com/models/google/surfperch)    |   sup l|   CNN| EffNetb0 | included |
@@ -663,6 +756,15 @@ BirdMAE is a masked autoencoder inspired by meta's AudioMAE, however the model w
 
 BirdNET (v2.4) is based on a EfficientNET(b0) architecture. The model is trained on a large amount of bird vocalizations from the xeno-canto database alongside other bird song databses. 
 
+### ConvNeXT_BirdSet
+- CNN
+- supervised learning
+- trained on BirdSet
+
+The ConvNeXT_birdset model is a ConvNeXT CNN trained on the BirdSet dataset (which consists of large portions of the xeno-canto database and uses a varierty of multilabel soundscape recordings for evaluation.)
+
+
+
 ### Google_Whale
 - CNN
 - supervised training model
@@ -728,6 +830,13 @@ ProtoCLR stands for Prototypical Contrastive Learning for robust representation 
 - trained on bird song data
 
 Perch_Bird is a EFficientNet B1 model trained on the entire Xeno-canto database.
+
+### Perch_V2
+- CNN
+- supervised learning
+- trained on birds, amphibians, insects and mammals (xeno-canto, iNaturalis, Tierstimmenarchiv)
+
+Perch V2 or Perch 2.0 is the updated version of the Perch model from bioacousticians at Google. The model is a EfficientNetB3, trained on a very large database of various species. The classifier is able to distinguish 14795 different species. 
 
 ### SurfPerch
 - CNN
@@ -828,6 +937,8 @@ Given the large number of different models, there are already a lot of requireme
 There should always be a baseline minimal use case, where embeddings are created from different feature extractors and everything else is an add-on.
 
 # Known issues
+
+Perch_v2 is only supported on linux machines. see [this issue](https://github.com/google-research/perch-hoplite/issues/56#issuecomment-3372589067).
 
 `bacpipe` is being updated regularly. To make sure you're always up to date with the latest fixes run `git pull` regularly.
 If you have local changes (like changes in the `config` or `settings` files) you don't want to lose run the following:

@@ -1,37 +1,27 @@
 import torch
-from transformers import (
-    AutoFeatureExtractor,
-    AutoModel,
-    AutoModelForSequenceClassification,
-)
+from transformers import AutoModelForImageClassification
 import pandas as pd
 
 
 SAMPLE_RATE = 32_000
 LENGTH_IN_SAMPLES = 160_000
 
+from bacpipe.model_specific_utils.convnext_birdset.preprocess import ConvNextPreProcess
 from ..utils import ModelBaseClass
 
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
-        model = AutoModelForSequenceClassification.from_pretrained(
-            "DBD-research-group/AudioProtoPNet-5-BirdSet-XCL",
+        model = AutoModelForImageClassification.from_pretrained(
+            "DBD-research-group/ConvNeXT-Base-BirdSet-XCL",
             trust_remote_code=True,
         )
-
-        # optional: patch missing attribute if other code expects it
-        if not hasattr(model, "incorrect_class_connection"):
-            model.incorrect_class_connection = None
-
-        self.preprocessor = AutoFeatureExtractor.from_pretrained(
-            "DBD-research-group/AudioProtoPNet-5-BirdSet-XCL",
-            trust_remote_code=True,
-        )
+        preproc = ConvNextPreProcess(SAMPLE_RATE, device=self.device)
+        self.preprocessor = preproc.preprocess
         
-        self.model = model.model.backbone.to(self.device)
-        self.classifier = model.head.to(self.device)
+        self.model = model.convnext.to(self.device)
+        self.classifier = model.classifier.to(self.device)
         
         self.model.eval()
 
@@ -57,9 +47,14 @@ class Model(ModelBaseClass):
             return self.model(x).pooler_output
         else:
             embeds = self.model(x)
-            class_preds = self.classifier_predictions(embeds.last_hidden_state)
+            class_preds = self.classifier_predictions(embeds.pooler_output)
             return embeds.pooler_output, class_preds
 
     def classifier_predictions(self, embeddings):
-        logits, _ = self.classifier(embeddings)
-        return torch.sigmoid(logits).detach()
+        for i, batch in enumerate(embeddings):
+            logits = self.classifier(batch)
+            if i == 0:
+                cumulated_logits = logits
+            else:
+                cumulated_logits = torch.vstack([cumulated_logits, logits])
+        return torch.sigmoid(cumulated_logits).detach()

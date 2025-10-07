@@ -1102,7 +1102,11 @@ def plot_overview_metrics(
     )
     if return_fig:
         return fig
-    file = f"overview_metrics_{task_name}_" + "-".join(metrics.keys()) + ".png"
+    file = (
+        f"overview_metrics_{task_name}_" 
+        + "-".join([m[:2] for m in metrics.keys()]) 
+        + ".png"
+        )
     plot_path.mkdir(exist_ok=True, parents=True)
     fig.savefig(
         plot_path.joinpath(file),
@@ -1173,7 +1177,9 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
 
     fig.subplots_adjust(right=0.65, bottom=0.3)
     file_name = (
-        f"comparison_{task_name.replace(' ', '_')}_" + "-".join(model_list) + ".png"
+        f"comparison_{task_name.replace(' ', '_')}_" 
+        + "-".join([m[:2] for m in model_list]) 
+        + ".png"
     )
     plot_path.mkdir(exist_ok=True, parents=True)
     fig.savefig(

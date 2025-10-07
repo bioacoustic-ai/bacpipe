@@ -5,6 +5,7 @@ import importlib.resources as pkg_resources
 from pathlib import Path
 
 import bacpipe
+from bacpipe import EMBEDDING_DIMENSIONS
 from bacpipe.main import get_embeddings, embeds_array_without_noise
 from bacpipe.generate_embeddings import Loader, Embedder
 from bacpipe.embedding_evaluation.label_embeddings import (
@@ -33,45 +34,7 @@ kwargs = {**config, **settings}
 # -------------------------------------------------------------------------
 # Globals
 # -------------------------------------------------------------------------
-embedding_dimensions = {
-    "audiomae": 768,
-    "audioprotopnet": 1024,
-    "avesecho_passt": 768,
-    "aves_especies": 768,
-    "beats": 768,
-    "birdaves_especies": 1024,
-    "biolingual": 512,
-    "birdnet": 1024,
-    "birdmae": 1280,
-    "hbdet": 2048,
-    "insect66": 1280,
-    "insect459": 1280,
-    "mix2": 960,
-    "naturebeats": 768,
-    "perch_bird": 1280,
-    "protoclr": 384,
-    "rcl_fs_bsed": 2048,
-    "surfperch": 1280,
-    "google_whale": 1280,
-    "vggish": 128,
-}
 
-needs_checkpoint = [
-    "audiomae",
-    "avesecho_passt",
-    "aves_especies",
-    "beats",
-    "birdaves_especies",
-    "birdnet",
-    "hbdet",
-    "insect66",
-    "insect459",
-    "mix2",
-    "naturebeats",
-    "protoclr",
-    "rcl_fs_bsed",
-    "vggish",
-]
 
 embeddings = {}
 with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
@@ -99,7 +62,8 @@ def loader_fn():
 # -------------------------------------------------------------------------
 # Tests
 # -------------------------------------------------------------------------
-def test_embedding_generation(model):
+def test_embedding_generation(model, device):
+    settings['device'] = device
     embeddings[model] = get_embeddings(
         model_name=model,
         check_if_primary_combination_exists=False,
@@ -111,7 +75,7 @@ def test_embedding_generation(model):
 
 def test_embedding_dimensions(model):
     assert (
-        embeddings[model].metadata_dict["embedding_size"] == embedding_dimensions[model]
+        embeddings[model].metadata_dict["embedding_size"] == EMBEDDING_DIMENSIONS[model]
     ), f"Embedding dimension mismatch for {model}"
 
 
