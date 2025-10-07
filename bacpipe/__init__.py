@@ -8,7 +8,7 @@ import tarfile
 
 TF_MODELS = [
     'birdnet', 
-    'perch_v2', 
+    'perch_v2',
     'perch_bird', 
     'google_whale', 
     'surfperch', 
@@ -59,13 +59,15 @@ NEEDS_CHECKPOINT = [
 
 def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_models"):
     """
-    Ensure that the model checkpoints for birdnetv2.4 and perchv1 are
+    Ensure that the model checkpoints for the selected models are
     available locally. Downloads from Hugging Face Hub if missing.
 
     Parameters
     ----------
     model_base_path : Path
         Local base directory where the checkpoints should be stored.
+    model_names : list
+        list of models to run
     repo_id : str, optional
         Hugging Face Hub repo ID, by default "vinikay/bacpipe_models"
     """
