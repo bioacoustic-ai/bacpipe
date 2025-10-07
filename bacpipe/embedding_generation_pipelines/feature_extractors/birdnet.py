@@ -1,6 +1,7 @@
 import tensorflow as tf
 import keras
 import pandas as pd
+import numpy as np
 
 SAMPLE_RATE = 48000
 LENGTH_IN_SAMPLES = 144000
@@ -43,7 +44,17 @@ class Model(ModelBaseClass):
 
     def preprocess(self, audio):
         audio = audio.cpu()
-        return self.preprocessor(tf.convert_to_tensor(audio, dtype=tf.float32))
+        for idx in range(0, audio.shape[0], 511):
+            if idx == 0:
+                processed = self.preprocessor(tf.convert_to_tensor(audio[:511], 
+                                                                   dtype=tf.float32)).numpy()
+            else:
+                processed = np.vstack([
+                    processed,
+                    self.preprocessor(tf.convert_to_tensor(audio[idx:idx+511], 
+                                                        dtype=tf.float32)).numpy()
+                    ])
+        return tf.convert_to_tensor(processed, dtype=tf.float32)
 
     def __call__(self, input, return_class_results=False):
         if not return_class_results:

@@ -83,12 +83,14 @@ available_models : [
     "biolingual"
     "birdnet"
     "birdmae"
+    "convnext_birdset"
     "hbdet"
     "insect66"
     "insect459"
     "mix2"
     "naturebeats"
     "perch_bird"
+    "pervh_v2"
     "protoclr"
     "rcl_fs_bsed"
     "surfperch"
@@ -143,6 +145,8 @@ If this file exists, the evaluation script will automatically use the annotation
 
 `pip install bacpipe`
 
+## Use bacpipe immediately on the integrated test data
+
 ```python
 import bacpipe
 
@@ -151,75 +155,70 @@ import bacpipe
 # a set of audio test data using the models birdnet and perch
 
 bacpipe.play()
+```
 
-##################################################################
-# to modify configurations and settings, you can simply access them
-# as attributes
+## Modify configurations and settings as attributs
+To modify configurations and settings, you can simply access them as attributes. To see available settings and configs run the following commands
 
-# to see available settings and configs run the above commands
+```python
 bacpipe.config
 bacpipe.settings
 # you can also check the bacpipe/config.yaml and bacpipe/settings.yaml
 # files here in the repository to see all the available settings and
 # read their respective description
+```
 
-
+## Modify audio source path, models, device ...
+If you're on a Windows machine, make sure to add a `r` before the path like `r'path\to\audio'` otherwise the path will likely cause problems due to the backslashes. 
+```python
 # to modify the audio data path for example, do
 bacpipe.config.audio_dir = '/path/to/your/audio/dir'
 
 # to modify the models you want to run, do
 bacpipe.config.models = ['birdnet', 'birdmae', 'naturebeats']
-# keep in mind some models require checkpoints, to find out which ones, run
-bacpipe.models_needing_checkpoint
-# links to checkpoints are to be found in this readme file, 
-# location of the checkpoints is specified under 
-bacpipe.settings.model_base_path = '/path/to/model_checkpoints'
-# On first execution the birdnet checkpoint is downloaded and the
-# model_checkpoints folder is created from the current working directory
-# After you are finished with all the customizations you can again just 
-bacpipe.play() 
-# which will then run with your settings.
+# if you do not have the checkpoint yet, it will be automatically 
+# downloaded and stored locally
 
-# You can also run 
+bacpipe.settings.device = 'cuda' 
+# bacpipe uses multithreading which speeds up model inference if 
+# run on a machine supporting cuda
+
+# then run with your settings.
+# By default the save logs is True
 bacpipe.play(save_logs=True)
 # That way bacpipe will generate log files of the outputs and also save your
 # config and settings files, which can be helpful in retrospect to remember
 # all the settings you chose for a run. 
 
+```
 
-##################################################################
-# If you just want to run models and get embeddings returned without saving them
-# and don't want the dashboard and all of that, define an embedder object 
-# and pass it the model name, and the settings you modified.
+## Use bacpipe in an existing pipeline
+If you just want to run models and get embeddings returned without saving them and don't want the dashboard and all of that, define an embedder object and pass it the model name and the settings you modified.
 
+```python
 em = bacpipe.Embedder('perch_bird', **vars(bacpipe.settings)) 
 # the vars part is important!
 
 audio_file = '/path/to/all/the/audio/file'
 embeddings = em.get_embeddings_from_model(audio_file)
-# To ensure birdnet is downloaded, run the following (this is done by default
-# if you run bacpipe.play(), but without that, you need to call this explicitly)
-bacpipe.ensure_std_models(bacpipe.settings.model_base_path)
 
+# if the model has a built in classifier, like birdnet, the classification
+# score are also saved. You can check if there is a classifier included by 
+# checking 
+em.model.bool_classifier
 
-##################################################################
-# if the model has a built in classifier, like birdnet
-# you can make sure the class predictions are also saved 
-# by setting 
-bacpipe.settings.run_pretrained_classifier = True
-# the generating of embeddings above will then let you access 
+# After the generating of embeddings above, you will then be able to access 
 # the class predictions using
 em.model.classifier_outputs
+```
 
+## Produce embeddings for multiple models in your own pipeline
+If you want to produce embeddings for multiple models, bacpipe will always store them to keep your memory from overfilling. Still you can use the package to easily access the embeddings and all the metadata
 
-##################################################################
-# If you want to produce embeddings for multiple models, bacpipe will always store
-# them to keep your memory from overfilling. Still you can use the package to easily
-# access the embeddings and all the metadata
+```python
 loader = bacpipe.model_specific_embedding_creation(
   **vars(bacpipe.config), **vars(bacpipe.settings)
   )
-
 # this call will initiate the embedding generation process, it will check if embeddings
 # already exist for the combination of each model and the dataset and if so it will
 # be ready to load them. The loader keys will be the model name and the values will

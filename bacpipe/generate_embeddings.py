@@ -599,6 +599,12 @@ class Embedder:
         else:
             if not isinstance(sample, Path):
                 sample = Path(sample)
+                if not sample.suffix in self.model.audio_suffixes:
+                    raise AssertionError(
+                        "The provided path does not lead to a supported audio file with the ending"
+                        f" {self.model.audio_suffixes}. Please check again that you provided the correct"
+                        " path."
+                    )
             sample = self.prepare_audio(sample)
             embeds = self.get_embeddings_for_audio(sample)
 
