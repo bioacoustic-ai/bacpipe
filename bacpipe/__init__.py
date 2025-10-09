@@ -86,18 +86,25 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
                 logger.info(f"{model_name} checkpoint exists.\n")    
                 continue
             else:   
+                if model_name == 'birdnet':
+                    import tensorflow as tf
+                    if tf.__version__ == '2.15.1':
+                        hf_url = f"{model_name}/{model_name}_tf215.tar.xz"
+                else:
+                    hf_url = f"{model_name}/{model_name}.tar.xz"
+                    
                 logger.info(
                     f"{model_name} checkpoint does not exists. "
                     "Downloading the model from "
-                    f"https://huggingface.co/datasets/{repo_id}/blob/main/{model_name}/{model_name}.tar.xz\n"
+                    f"https://huggingface.co/datasets/{repo_id}/blob/main/{hf_url}\n"
                     )    
                 hf_hub_download(
                     repo_id=repo_id,
-                    filename=f"{model_name}/{model_name}.tar.xz",
+                    filename=hf_url,
                     local_dir=model_base_path,
                     repo_type="dataset",
                 )
-                tar = tarfile.open(model_base_path / f"{model_name}/{model_name}.tar.xz")
+                tar = tarfile.open(model_base_path / hf_url)
                 tar.extractall(path=model_base_path)
                 tar.close()
 

@@ -2,6 +2,8 @@ from bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.model_configs impor
 import tensorflow as tf
 import numpy as np
 import pandas as pd
+import logging
+logger = logging.getLogger("bacpipe")
 
 from ..utils import ModelBaseClass
 
@@ -61,13 +63,14 @@ class Model(ModelBaseClass):
         try:
             results = self.model(input)
         except Exception as e:
-            print(
+            logger.exception(
                 "You are on a operating system that does not currently support this model. "
                 "Perch V2 is currently only supported on linux or other machines supporting "
                 "XLA deserialization. ",
                 e                
             )
-            raise e
+            import sys
+            sys.exit(0)
         embeddings = results.embeddings
         if return_class_results:
             cls_vals = self.classifier_predictions(results.logits[self.class_label_key])
