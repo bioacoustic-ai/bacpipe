@@ -90,6 +90,8 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
                     import tensorflow as tf
                     if tf.__version__ == '2.15.1':
                         hf_url = f"{model_name}/{model_name}_tf215.tar.xz"
+                    else:
+                        hf_url = f"{model_name}/{model_name}.tar.xz"
                 else:
                     hf_url = f"{model_name}/{model_name}.tar.xz"
                     
