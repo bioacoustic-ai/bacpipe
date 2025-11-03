@@ -278,7 +278,10 @@ def get_labels_for_plot(model_name=None, **kwargs):
                     labels[name] = values
                 else:
                     labels[name] = np.array(["noise"] * len(bool_noise), dtype=object)
-                    labels[name][~bool_noise] = [inv[v] for v in values]
+                    if len(values) == len(labels[name]):
+                        labels[name][~bool_noise] = [inv[v] for v in values[~bool_noise]]
+                    else:
+                        labels[name][~bool_noise] = [inv[v] for v in values]
 
     return labels, bool_noise
 

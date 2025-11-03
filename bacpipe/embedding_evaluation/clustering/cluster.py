@@ -128,8 +128,8 @@ def get_clustering_models(clust_params):
         if name == "kmeans":
             cluster_configs[name] = KMeans(**params)
 
-        if False:  # TODO name == "hdbscan":
-            from hdbscan import hdbscan
+        if name == "hdbscan":
+            import hdbscan
 
             cluster_configs[name] = hdbscan.HDBSCAN(**params, core_dist_n_jobs=-1)
     return cluster_configs

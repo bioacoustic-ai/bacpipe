@@ -625,8 +625,12 @@ class Embedder:
                         f" {self.model.audio_suffixes}. Please check again that you provided the correct"
                         " path."
                     )
-            sample = self.prepare_audio(sample)
-            embeds = self.get_embeddings_for_audio(sample)
+            if 'Aug' in self.model_name:
+                embeds = self.model(sample)
+                self.file_length[sample.stem] = self.model.file_length
+            else:
+                sample = self.prepare_audio(sample)
+                embeds = self.get_embeddings_for_audio(sample)
 
         logger.debug(f"{self.model_name} embeddings have shape: {embeds.shape}")
         logger.info(f"{self.model_name} inference took {time.time()-start:.2f}s.")
