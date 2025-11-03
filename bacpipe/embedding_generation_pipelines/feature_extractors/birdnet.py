@@ -49,6 +49,9 @@ class Model(ModelBaseClass):
 
     def preprocess(self, audio):
         audio = audio.cpu()
+        if audio.shape[1] > LENGTH_IN_SAMPLES:
+            audio = audio[:, :LENGTH_IN_SAMPLES]
+            print('Cutting Audio! Because length of frames is loo large!')
         for idx in range(0, audio.shape[0], 511):
             if idx == 0:
                 processed = self.preprocessor(tf.convert_to_tensor(audio[:511], 

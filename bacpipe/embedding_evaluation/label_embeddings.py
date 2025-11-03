@@ -29,8 +29,16 @@ class DefaultLabels:
         
         embed_path = model_specific_embedding_path(paths.main_embeds_path, model)
         self.metadata = yaml.safe_load(open(embed_path.joinpath("metadata.yml"), "r"))
-        self.nr_embeds_per_file = self.metadata["files"]["nr_embeds_per_file"]
-        self.nr_embeds_total = self.metadata["nr_embeds_total"]
+        if 'unknown_sounds' in self.metadata['audio_dir']:
+            import h5py
+            
+            self.starts = h5py.File(self.metadata['audio_dir'] + '.h5', 'r')['starts']
+
+            self.nr_embeds_per_file = self.metadata['files']['nr_embeds_per_file']
+            self.nr_embeds_total = self.metadata['nr_embeds_total']
+        else:
+            self.nr_embeds_per_file = self.metadata["files"]["nr_embeds_per_file"]
+            self.nr_embeds_total = self.metadata["nr_embeds_total"]
         if not sum(self.nr_embeds_per_file) == self.nr_embeds_total:
             raise ValueError(
                 "The number of embeddings per file does not match the total number of embeddings."
@@ -111,11 +119,19 @@ class DefaultLabels:
         self.time_of_day_per_embedding = []
         for file_idx, (file, time_of_day) in enumerate(time_of_day_per_file.items()):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
-                timestamp = (
-                    (time_of_day + index_of_embedding * segment_s_dt)
-                    .time()
-                    .replace(microsecond=0)
-                )
+                if 'unknown_sounds' in self.metadata['audio_dir']:
+                    cumulative_idx = sum(self.nr_embeds_per_file[:file_idx])
+                    timestamp = (
+                        (time_of_day + dt.timedelta(seconds=self.starts[cumulative_idx + index_of_embedding]))
+                        .time()
+                        .replace(microsecond=0)
+                    )
+                else:
+                    timestamp = (
+                        (time_of_day + index_of_embedding * segment_s_dt)
+                        .time()
+                        .replace(microsecond=0)
+                    )
                 self.time_of_day_per_embedding.append(timestamp.strftime("%H-%M-%S"))
 
     def day_of_year(self):
@@ -148,9 +164,17 @@ class DefaultLabels:
             self.timestamp_per_file.items()
         ):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
-                timestamp = (
-                    datetime_per_file + index_of_embedding * segment_s_dt
-                ).replace(microsecond=0)
+                if 'unknown_sounds' in self.metadata['audio_dir']:
+                    cumulative_idx = sum(self.nr_embeds_per_file[:file_idx])
+                    timestamp = (
+                        (datetime_per_file + dt.timedelta(seconds=self.starts[cumulative_idx + index_of_embedding]))
+                        .time()
+                        .replace(microsecond=0)
+                    )
+                else:
+                    timestamp = (
+                        datetime_per_file + index_of_embedding * segment_s_dt
+                    ).replace(microsecond=0)
                 self.continuous_timestamp_per_embedding.append(
                     timestamp.strftime("%Y-%m-%d_%H:%M:%S")
                 )
@@ -429,22 +453,64 @@ def load_labels_and_build_dict(
     testing=False,
     **kwargs,
 ):
-    try:
-        label_df = pd.read_csv(Path(audio_dir).joinpath(label_file))
-    except FileNotFoundError as e:
-        logger.warning(
-            f"No annotations file found in {audio_dir}, trying in "
-            f"{str(paths.dataset_path.resolve())}."
-        )
+    if 'unknown_sounds' in audio_dir:
+        import yaml
+        path = kwargs['model_specific_embed_path']
+        with open(path / 'metadata.yml', 'r') as f:
+            metadata = yaml.safe_load(f)
+            
+        unique_filenames = metadata['files']['audio_files']
+        counts = metadata['files']['nr_embeds_per_file']
+        metadata_filenames = []
+        [metadata_filenames.extend(np.repeat(a, i)) for a, i in zip(unique_filenames, counts)]
+        
+        import h5py
+        raw_labels = h5py.File(audio_dir + '.h5', 'r')['labels']
+        
+        labels = [l.decode('utf8') for l in raw_labels]
+        # labels = [l for l in labels if not l in ['within_file', 'diff_file']]
+        
+        raw_filenames = h5py.File(audio_dir + '.h5', 'r')['filenames']
+        h5_filenames = [l.decode('utf8') for l in raw_filenames]
+        
+        if not all(np.array(h5_filenames) == np.array(metadata_filenames)):
+            raise AssertionError('filename order does not match')
+        # sorted_indices = np.argsort(filenames)
+        # filenames = np.array(filenames)[sorted_indices]
+        # labels = np.array(labels)[sorted_indices]
+        
+        
+        # starts = h5py.File(audio_dir + '.h5', 'r')['starts'][:]
+        # ends = h5py.File(audio_dir + '.h5', 'r')['ends'][:]
+        # _, indices, counts = np.unique(filenames, return_counts=True, return_index=True)
+        # ordered_counts = counts[np.argsort(indices)]
+        
+        starts = []
+        [starts.extend(np.arange(a) * 3) for a in counts]        
+        ends = (np.array(starts) + 3).tolist()
+        label_df = pd.DataFrame({
+            'audiofilename': metadata_filenames,
+            'label:species': labels,
+            'start': starts,
+            'end': ends
+            })
+    else:
         try:
-            label_df = pd.read_csv(paths.dataset_path.joinpath(label_file))
-        except:
+            label_df = pd.read_csv(Path(audio_dir).joinpath(label_file))
+        except FileNotFoundError as e:
             logger.warning(
-                "No annotations file found, not able to create ground_truth.npy file. "
-                "bacpipe should still work, but you will not be able to label by ground truth. "
-                "You also will not be able to evaluate using classification."
+                f"No annotations file found in {audio_dir}, trying in "
+                f"{str(paths.dataset_path.resolve())}."
             )
-            raise FileNotFoundError("No annotations file found.")
+            try:
+                label_df = pd.read_csv(paths.dataset_path.joinpath(label_file))
+            except:
+                logger.warning(
+                    "No annotations file found, not able to create ground_truth.npy file. "
+                    "bacpipe should still work, but you will not be able to label by ground truth. "
+                    "You also will not be able to evaluate using classification."
+                )
+                raise FileNotFoundError("No annotations file found.")
     if bool_filter_labels and not testing:
         filtered_labels = [
             lab
@@ -464,11 +530,17 @@ def load_labels_and_build_dict(
         else:
             label_df = label_df[label_df[f"label:{main_label_column}"].isin(filtered_labels)]
     label_idx_dict = {}
+    full_df = label_df
+    label_df = label_df[~label_df['label:species'].isin(['diff_file', 'within_file'])]
     for label_column in [l for l in label_df.columns if 'label:' in l]:
         label_idx_dict[label_column] = {
             label: idx
             for idx, label in enumerate(label_df[label_column].unique())
         }
+    label_idx_dict['label:species'].update({
+        'within_file': -3,
+        'diff_file': -4
+    })
     with open(paths.labels_path.joinpath("label_idx_dict.json"), "w") as f:
         json.dump(label_idx_dict, f, indent=1)
     return label_df, label_idx_dict
@@ -488,9 +560,11 @@ def fit_labels_to_embedding_timestamps(
     if single_label:
         single_label_arr = [True] * len(embed_timestamps)
 
-    for _, row in df.iterrows():
+    for idx, (_, row) in enumerate(df.iterrows()):
         em_start = np.argmin(np.abs(embed_timestamps - row.start))
         em_end = np.argmin(np.abs(embed_timestamps - row.end))
+        if em_start == em_end and idx == len(df) -1:
+            em_end += 1
         if single_label:
             if (
                 not all(file_labels[em_start:em_end] == -1)
@@ -592,13 +666,13 @@ def collect_ground_truth_labels_by_file(
         desc=f"Loading {model} embeddings and split by labels",
         leave=False,
     ):
-        assert (
-            Path(metadata["files"]["audio_files"][ind]).stem
-            == file.stem.split(f"_{model}")[0]
-        ), (
-            f"File names do not match for {file} and "
-            f"{metadata['files']['audio_files'][ind]}"
-        )
+        # assert (
+        #     Path(metadata["files"]["audio_files"][ind]).stem
+        #     == file.stem.split(f"_{model}")[0]
+        # ), (
+        #     f"File names do not match for {file} and "
+        #     f"{metadata['files']['audio_files'][ind]}"
+        # )
 
         num_embeds = metadata["files"]["nr_embeds_per_file"][ind]
         ground_truth = build_ground_truth_labels_by_file(
@@ -628,16 +702,20 @@ def ground_truth_by_model(
     if overwrite or not paths.labels_path.joinpath("ground_truth.npy").exists():
 
         path = model_specific_embedding_path(paths.main_embeds_path, model)
-
+        kwargs['model_specific_embed_path'] = path
         label_df, label_idx_dict = load_labels_and_build_dict(
             paths, label_file, main_label_column=label_column, **kwargs
         )
 
-        files = list(path.rglob("*.npy"))
-        files.sort()
-
         metadata = yaml.safe_load(open(path.joinpath("metadata.yml"), "r"))
         segment_s = metadata["segment_length (samples)"] / metadata["sample_rate (Hz)"]
+        
+        if 'unknown_sounds' in kwargs['audio_dir']:
+            files = metadata['files']['audio_files']
+        else:
+            files = list(path.rglob("*.npy"))
+            files.sort()
+
 
         label_columns = [col for col in label_df.columns if "label:" in col]
         ground_truth_dict = {}

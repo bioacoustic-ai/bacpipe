@@ -123,21 +123,32 @@ class ModelBaseClass:
             pass
 
     def load_and_resample(self, path):
-        try:
-            audio, sr = ta.load(path, normalize=True)
-        except Exception as e:
-            logger.exception(
-                f"Error loading audio with torchaudio. "
-                f"Skipping {path}."
-                f"Error: {e}"
-            )
-            raise e
-        if audio.shape[0] > 1:
-            audio = audio.mean(axis=0).unsqueeze(0)
-        if len(audio[0]) == 0:
-            logger.debug(f"Audio file {path} is empty. " f"Skipping {path}.")
-            raise ValueError(f"Audio file {path} is empty.")
-        re_audio = ta.functional.resample(audio, sr, self.sr)
+        if 'unknown_sounds' in path.stem:
+            import h5py
+            file = self.audio_dir + '.h5'
+            audio = h5py.File(file, 'r')['audio'][:]
+            sr = h5py.File(file, 'r')['sample_rates'][0]
+            audio = torch.Tensor(audio)
+            # audio = [f.decode('utf8') for f in h5py.File(self.audio_dir, 'r')['filenames'][:]]
+            re_audio = torch.zeros([audio.shape[0], int(self.sr*(len(audio[0])/sr))])
+            for idx, win in tqdm(enumerate(audio), desc='resampling audio windows to model sr', total=len(audio)):
+                re_audio[idx] = ta.functional.resample(win, sr, self.sr)
+        else:
+            try:
+                audio, sr = ta.load(path, normalize=True)
+            except Exception as e:
+                logger.exception(
+                    f"Error loading audio with torchaudio. "
+                    f"Skipping {path}."
+                    f"Error: {e}"
+                )
+                raise e
+            if audio.shape[0] > 1:
+                audio = audio.mean(axis=0).unsqueeze(0)
+            if len(audio[0]) == 0:
+                logger.debug(f"Audio file {path} is empty. " f"Skipping {path}.")
+                raise ValueError(f"Audio file {path} is empty.")
+            re_audio = ta.functional.resample(audio, sr, self.sr)
         return re_audio
 
     def only_load_annotated_segments(self, file_path, audio):
@@ -174,20 +185,25 @@ class ModelBaseClass:
         return cumulative_segments
 
     def window_audio(self, audio):
-        num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
-        if isinstance(audio, torch.Tensor):
-            audio = audio.cpu()
-        padded_audio = lb.util.fix_length(
-            audio,
-            size=int(num_frames * self.segment_length),
-            mode=self.padding,
-        )
-        logger.debug(f"{self.padding} was used on an audio segment.")
-        frames = padded_audio.reshape([num_frames, self.segment_length])
-        if not isinstance(frames, torch.Tensor):
-            frames = torch.tensor(frames)
-        frames = frames.to(self.device)
-        return frames
+        if len(audio.shape) > 1:
+            frames = audio
+            frames = frames.to(self.device)
+            return frames
+        else:
+            num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
+            if isinstance(audio, torch.Tensor):
+                audio = audio.cpu()
+            padded_audio = lb.util.fix_length(
+                audio,
+                size=int(num_frames * self.segment_length),
+                mode=self.padding,
+            )
+            logger.debug(f"{self.padding} was used on an audio segment.")
+            frames = padded_audio.reshape([num_frames, self.segment_length])
+            if not isinstance(frames, torch.Tensor):
+                frames = torch.tensor(frames)
+            frames = frames.to(self.device)
+            return frames
 
     def init_dataloader(self, audio):
         if "tensorflow" in str(type(audio)):

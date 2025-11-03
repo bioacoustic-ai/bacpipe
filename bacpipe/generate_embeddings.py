@@ -209,6 +209,8 @@ class Loader:
             import importlib.resources as pkg_resources
             with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
                 audio_dir = Path(audio_dir)
+        if 'unknown_sounds' in self.audio_dir.stem:
+            return [self.audio_dir]
         files_list = []
         [
             [files_list.append(ll) for ll in self.audio_dir.rglob(f"*{string}")]
@@ -341,11 +343,29 @@ class Loader:
             self.metadata_dict["sample_rate (Hz)"] = embed.model.sr
             self.metadata_dict["embedding_size"] = embeddings.shape[-1]
         rel_file_path = Path(file).relative_to(self.audio_dir)
-        self.metadata_dict["files"]["audio_files"].append(str(rel_file_path))
-        self.metadata_dict["files"]["file_lengths (s)"].append(
-            embed.file_length[file.stem]
-        )
-        self.metadata_dict["files"]["nr_embeds_per_file"].append(embeddings.shape[0])
+        if 'unknown_sounds' in embed.model.audio_dir:
+            import h5py
+            audio_files = h5py.File(embed.model.audio_dir + '.h5', 'r')['filenames'][:]
+            audio_files = [f.decode('utf8') for f in audio_files]
+            unique_audio_files, idx, unique_audio_file_counts = np.unique(
+                audio_files, return_index=True, return_counts=True
+                )
+            sorted_unique_audio_files = np.array(unique_audio_files)[np.argsort(idx)]
+            sorted_unique_audio_file_counts = np.array(unique_audio_file_counts)[np.argsort(idx)]
+            if not all(sorted_unique_audio_files == np.array(audio_files)[np.sort(idx)]):
+                raise AssertionError('File order does not match')
+            
+            self.metadata_dict["files"]["audio_files"] = sorted_unique_audio_files.tolist()
+            self.metadata_dict["files"]["nr_embeds_per_file"] = sorted_unique_audio_file_counts.tolist()
+            self.metadata_dict["files"]["file_lengths (s)"] = np.array(
+                embed.file_length[file.stem] * (sorted_unique_audio_file_counts+1)
+            ).tolist()
+        else:
+            self.metadata_dict["files"]["audio_files"].append(str(rel_file_path))
+            self.metadata_dict["files"]["file_lengths (s)"].append(
+                embed.file_length[file.stem]
+            )
+            self.metadata_dict["files"]["nr_embeds_per_file"].append(embeddings.shape[0])
 
     def write_metadata_file(self):
         self.metadata_dict["nr_embeds_total"] = sum(
