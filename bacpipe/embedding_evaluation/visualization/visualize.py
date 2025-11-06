@@ -277,11 +277,12 @@ def get_labels_for_plot(model_name=None, **kwargs):
                 if "kmeans" in name:
                     labels[name] = values
                 else:
-                    labels[name] = np.array(["noise"] * len(bool_noise), dtype=object)
-                    if len(values) == len(labels[name]):
-                        labels[name][~bool_noise] = [inv[v] for v in values[~bool_noise]]
-                    else:
-                        labels[name][~bool_noise] = [inv[v] for v in values]
+                    labels[name] = values
+                    # labels[name] = np.array(["noise"] * len(bool_noise), dtype=object)
+                    # if len(values) == len(labels[name]):
+                    #     labels[name][~bool_noise] = [inv[v] for v in values[~bool_noise]]
+                    # else:
+                    #     labels[name][~bool_noise] = [inv[v] for v in values]
 
     return labels, bool_noise
 
@@ -291,6 +292,8 @@ def set_colorbar_or_legend(fig, axes, points, c_label_dict, label_by, **kwargs):
         if isinstance(list(c_label_dict.keys())[0], int):
             fontsize = 9
         elif isinstance(list(c_label_dict.keys())[0], np.int32):
+            fontsize = 9
+        elif isinstance(list(c_label_dict.keys())[0], np.int64):
             fontsize = 9
         elif len(list(c_label_dict.keys())[0]) < 12:
             fontsize = 9
@@ -347,7 +350,10 @@ def plot_embedding_points(
     if len(c_label_dict.keys()) > 20:
         import matplotlib.cm as cm
 
-        cmap = cm.viridis  # or 'plasma', 'inferno', 'magma', etc.
+        if '-' in labels[0] and len(labels[0]) == 8:
+            cmap = cm.twilight  # or 'plasma', 'inferno', 'magma', etc.
+        else:
+            cmap = cm.viridis  # or 'plasma', 'inferno', 'magma', etc.
         # if remove_noise:
         #     bool_labels = np.array(labels) != "noise"
         #     labels = np.array(labels)[bool_labels]
@@ -364,6 +370,7 @@ def plot_embedding_points(
             label=labels,
             s=1,
             cmap=cmap,
+            alpha=0.25
         )
     else:
         cmap = plt.cm.tab20
@@ -377,6 +384,7 @@ def plot_embedding_points(
                 label=label,
                 s=1,
                 color=colors[idx],
+                alpha=0.25
             )
     return points
 

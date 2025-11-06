@@ -67,7 +67,7 @@ class DashBoard:
             self.label_by += labels
 
         if len(list(le.get_paths(model_names[0]).clust_path.glob("*.npy"))) > 0:
-            self.label_by += ["kmeans"]
+            self.label_by += ["kmeans", "hdbscan"]
 
         self.evaluation_task = evaluation_task
         self.dim_reduction_model = dim_reduction_model

@@ -73,7 +73,7 @@ def train_linear_classifier(
             embeddings, y = embeddings.to(device), y.to(device)
 
             # Forward pass through linear classifier
-            outputs = linear_classifier(embeddings)
+            outputs = linear_classifier(embeddings.float())
 
             # Compute loss
             loss = criterion(outputs, y)
@@ -136,7 +136,7 @@ def inference(classifier, test_dataloader, device="cuda:0", config="linear", **k
     for embeddings, y in test_dataloader:
         embeddings, y = embeddings.to(device), y.to(device)
 
-        outputs = classifier(embeddings)
+        outputs = classifier(embeddings.float())
         if config == "linear":
             # Use softmax to get probabilities
             probs = F.softmax(outputs, dim=1).detach().cpu().numpy()

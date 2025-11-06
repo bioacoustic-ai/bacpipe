@@ -256,7 +256,9 @@ def play(config=config, settings=settings, save_logs=False):
     ):
 
         loader_dict = model_specific_embedding_creation(
-            **vars(config), **vars(settings)
+                # check_if_primary_combination_exists=False,
+                # check_if_secondary_combination_exists=False,
+                **vars(config), **vars(settings)
         )
 
         model_specific_evaluation(loader_dict, **vars(config), **vars(settings))
