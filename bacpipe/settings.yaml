@@ -59,7 +59,7 @@ min_label_occurrences: 50
 
 # If you want to visualize the embeddings by ground truth with no minimum
 # number of occurances, set this to False.
-bool_filter_labels: True
+bool_filter_labels: False
 
 # kinds of default labels that are created for the embeddings
 default_label_keys: [
@@ -118,8 +118,8 @@ clust_configs:
     bool: False
     name: "hdbscan"
     params:
-      min_cluster_size: 10
-      min_samples: 5
+      min_cluster_size: 5
+      min_samples: 8
       metric: "euclidean"
     
 
@@ -140,7 +140,9 @@ distance_configs:
 # fixed path, embeddings will be stored here, advised not to change
 # because this is also where bacpipe will look for existing embeddings
 ### IMPORTANT! WINODWS USERS DON'T USE QUOTATIONS HERE
-main_results_dir :      bacpipe_results
+main_results_dir :      /home/siriussound/Code/bacpipe/bacpipe_results
+# main_results_dir :      /mnt/swap/Work/Embeddings
+# main_results_dir :      bacpipe_results
 embed_parent_dir :      embeddings
 dim_reduc_parent_dir :  dim_reduced_embeddings
 evaluations_dir :       evaluations

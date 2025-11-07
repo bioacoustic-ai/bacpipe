@@ -10,7 +10,7 @@
 # PATHS:
 # define paths for your audio data
 ### IMPORTANT! WINODWS USERS DON'T USE QUOTATIONS HERE
-audio_dir :       bacpipe/tests/test_data
+audio_dir :       /mnt/swap/Work/Data/Amphibians/AnuranSet/AnuranSet
 
 #####################    PROCESS SETTINGS    ##############################
 
@@ -28,8 +28,11 @@ dashboard: True
 
 # embedding model name
 models: [
+      "birdnetAugPeriodTS",
+      "birdnetAugLinClf",
+      "birdnetAugTS",
       "birdnet",
-      "perch_bird",
+      # "perch_bird",
   ]
 
   # if already_computed is True, the embeddings will be loaded from the
@@ -54,8 +57,8 @@ dim_reduction_model: "umap"
 #########################################################################
 
 evaluation_task: [
-  # "clustering",
-  # "classification"
+  "clustering",
+  "classification"
 ]
 
 
