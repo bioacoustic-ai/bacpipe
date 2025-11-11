@@ -254,6 +254,25 @@ class DashBoard:
         )
 
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
+    
+    def apply_clfier_page(self, widget_idx):
+        sidebar = self.make_sidebar(widget_idx, model=True)
+        
+        # input box where i can input the path to the linear classifier
+        
+        # after that show me the classes that this linear classifier will classify
+        
+        # input section to give a threshold for classification
+        
+        # button to click run
+        
+        # progbar
+        
+        # by default create all annotations as one big annotations file
+        
+        # add button to save as raven annotations
+        
+        # heatmap for 20 top species
 
     def make_sidebar(self, widget_idx, model=True):
         widgets = [pn.pane.Markdown("## Settings")]
@@ -313,6 +332,7 @@ class DashBoard:
         model0_page = self.single_model_page(0)
         model1_page = self.single_model_page(1)
         model_all_page = self.all_models_page(1)
+        apply_classifier_page = self.apply_clfier_page(1)
 
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
@@ -337,15 +357,17 @@ class DashBoard:
                 ),
             ),
             ("All models", model_all_page),
+            ("Apply Classifer", apply_classifier_page)
         )
         
-        self.add_styling(model1_page, model_all_page)
+        self.add_styling(model1_page, model_all_page, apply_classifier_page)
         
-    def add_styling(self, model1_page, model_all_page):
+    def add_styling(self, *pages):
         with pkg_resources.path(bacpipe.imgs, 'bacpipe_unlabelled.png') as p:
             logo_path = str(p)
 
-        for sidebar in [model1_page.objects[0], model_all_page.objects[0]]:
+        for page in [pages]:
+            sidebar = page.objects[0]
             # Add logo to the sidebar
             sidebar.append(
                 pn.pane.PNG(logo_path, sizing_mode="scale_width")
