@@ -30,6 +30,8 @@ bacpipe/tests/results_files/*
 # track all Readme files, including the ones in subdirectories
 !**/README.md
 
+*model_checkpoints*
+
 exploration/*
 !exploration/explore_embeds.py
 !exploration/explore_dashboard.py
