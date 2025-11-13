@@ -1,6 +1,7 @@
 import panel as pn
 import matplotlib
 import sys
+import json
 import seaborn as sns
 import numpy as np
 import importlib.resources as pkg_resources
@@ -258,21 +259,62 @@ class DashBoard:
     def apply_clfier_page(self, widget_idx):
         sidebar = self.make_sidebar(widget_idx, model=True)
         
-        # input box where i can input the path to the linear classifier
+        with open(self.path_func(self.models[0]).class_path / 'label2index.json', 'r') as f:
+            classes = json.load(f)
+        classes = list(classes.keys())
+        from src.btn_icon import icon_str
         
-        # after that show me the classes that this linear classifier will classify
+        btn_run = pn.widgets.Button(
+            name='Apply linear classifier', 
+            icon=icon_str, 
+            width=100, 
+            height=30
+            )
         
-        # input section to give a threshold for classification
+        progress_bar = pn.indicators.Progress(
+            value=0,
+            max=100,
+            bar_color='primary',
+        )
+
+        def update_indicator(event):
+            # Increase progress by 10 until max=100
+            new_value = min(progress_bar.value + 10, 100)
+            progress_bar.value = new_value
+
+        # connect button click to update function
+        btn_run.on_click(update_indicator)
         
-        # button to click run
+        main_content = pn.Column(
+            # input box where i can input the path to the linear classifier
+            pn.widgets.TextInput(
+                name='Path to Linear Classifier', 
+                placeholder=(
+                    self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
+                    ).as_posix(),
+                max_length=200
+                ),
+            
+            # after that show me the classes that this linear classifier will classify
+            pn.widgets.StaticText(name='Classes', value=classes),
+            
+            # input section to give a threshold for classification
+            pn.widgets.TextInput(name='Threshold for classification', placeholder='0.5'),
+            
+            # button to click run
+            btn_run,
+            
+            # progbar
+            progress_bar,
+            
+            # heatmap for 20 top species
+            
+            # by default create all annotations as one big annotations file
+            
+            # add button to save as raven annotations
+        )
+        return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
         
-        # progbar
-        
-        # by default create all annotations as one big annotations file
-        
-        # add button to save as raven annotations
-        
-        # heatmap for 20 top species
 
     def make_sidebar(self, widget_idx, model=True):
         widgets = [pn.pane.Markdown("## Settings")]
@@ -366,7 +408,7 @@ class DashBoard:
         with pkg_resources.path(bacpipe.imgs, 'bacpipe_unlabelled.png') as p:
             logo_path = str(p)
 
-        for page in [pages]:
+        for page in pages:
             sidebar = page.objects[0]
             # Add logo to the sidebar
             sidebar.append(
