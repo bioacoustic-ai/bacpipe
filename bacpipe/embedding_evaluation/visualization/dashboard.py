@@ -4,8 +4,13 @@ import sys
 import json
 import seaborn as sns
 import numpy as np
+
+import torch.nn.functional as F
+import torch
+
 import importlib.resources as pkg_resources
 import bacpipe.imgs
+from pathlib import Path
 from .visualize import (
     plot_embeddings,
     plot_comparison,
@@ -16,6 +21,7 @@ from .visualize import (
     EmbedAndLabelLoader,
 )
 import bacpipe.embedding_evaluation.label_embeddings as le
+from bacpipe.embedding_evaluation.classification.train_classifier import LinearClassifier
 
 sns.set_theme(style="whitegrid")
 
@@ -256,14 +262,94 @@ class DashBoard:
 
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
     
+    def collect_all_embeddings(self, model):
+        import bacpipe.generate_embeddings as ge
+        dataset_path = self.path_func(model).dataset_path
+        audio_dir = dataset_path.stem
+        parent_dir = dataset_path.parent
+        ld = ge.Loader(audio_dir=audio_dir, 
+                       model_name=model, 
+                       main_results_dir=parent_dir, 
+                       **self.kwargs)
+        
+        for idx, file in enumerate(ld.files):
+            if idx == 0:
+                embeds = np.load(file)
+            else:
+                embeds = np.vstack([embeds, np.load(file)])
+        return torch.Tensor(embeds)
+    
+    def run_classifier(self, embeds, linear_clfier):
+        probs = []
+        for idx, batch in enumerate(embeds):
+            logits = linear_clfier(batch)
+            probs.append(F.softmax(logits, dim=0).detach().cpu().numpy())
+            self.progress_bar.value = int((idx+1)/len(embeds)*100)
+        return np.array(probs)
+            
+    
+    def classify_embeddings(self, model, path, threshold, event):
+        if path == '':
+            path = (
+                self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
+                ).as_posix()
+        
+        embeds = self.collect_all_embeddings(model)
+        
+        with open(Path(path).parent / 'label2index.json', 'r') as f:
+            label2index = json.load(f)
+        clfier_weights = torch.load(path)
+        clfier = LinearClassifier(clfier_weights['clfier.weight'].shape[-1], len(label2index))
+        clfier.load_state_dict(clfier_weights)
+        clfier.to(self.kwargs['device'])
+        
+        probs = self.run_classifier(embeds, clfier)
+        return probs, label2index
+        
+    def get_timestamps(self, eval_dir, model, label_key):
+        from datetime import datetime 
+        default_labels = np.load(
+            # self.ld.evaluations_dir 
+            # / self.ld.metadata_dict['model_name']
+            eval_dir
+            / model
+            / 'labels/default_labels.npy',
+            allow_pickle=True
+            ).item()
+        labels = default_labels[label_key]
+        if label_key == 'time_of_day':
+            labels_ts = [datetime.strptime(ts ,'%H-%M-%S').timestamp() for ts in labels]
+        if label_key == 'continuous_timestamp':
+            labels_ts = [datetime.strptime(ts ,'%Y-%m-%d %H-%M-%S').timestamp() for ts in labels]
+        return labels_ts
+        
+        
+    def get_classes(self, path):
+        if path == '':
+            path = (
+                self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
+                ).as_posix()
+        with open(Path(path).parent / 'label2index.json', 'r') as f:
+            classes = json.load(f)
+        return list(classes.keys())
+            
     def apply_clfier_page(self, widget_idx):
         sidebar = self.make_sidebar(widget_idx, model=True)
         
-        with open(self.path_func(self.models[0]).class_path / 'label2index.json', 'r') as f:
-            classes = json.load(f)
-        classes = list(classes.keys())
-        from src.btn_icon import icon_str
+        clfier_path = pn.widgets.TextInput(
+            name='Path to Linear Classifier', 
+            placeholder=(
+                self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
+                ).as_posix(),
+            max_length=200
+            )
         
+        clfier_thresh = pn.widgets.TextInput(
+            name='Threshold for classification', 
+            placeholder='0.5'
+            )
+        
+        from src.btn_icon import icon_str
         btn_run = pn.widgets.Button(
             name='Apply linear classifier', 
             icon=icon_str, 
@@ -271,43 +357,36 @@ class DashBoard:
             height=30
             )
         
-        progress_bar = pn.indicators.Progress(
+        self.progress_bar = pn.indicators.Progress(
             value=0,
             max=100,
             bar_color='primary',
         )
-
-        def update_indicator(event):
-            # Increase progress by 10 until max=100
-            new_value = min(progress_bar.value + 10, 100)
-            progress_bar.value = new_value
-
-        # connect button click to update function
-        btn_run.on_click(update_indicator)
+        upd_ind = pn.bind(self.classify_embeddings, self.model_select[widget_idx], clfier_path, clfier_thresh)
         
+        # connect button click to update function
+        prediction_tuple = btn_run.on_click(upd_ind)
+                
         main_content = pn.Column(
             # input box where i can input the path to the linear classifier
-            pn.widgets.TextInput(
-                name='Path to Linear Classifier', 
-                placeholder=(
-                    self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
-                    ).as_posix(),
-                max_length=200
-                ),
+            clfier_path,
             
             # after that show me the classes that this linear classifier will classify
-            pn.widgets.StaticText(name='Classes', value=classes),
+            pn.widgets.StaticText(name='Classes', value=pn.bind(self.get_classes, clfier_path)),
             
             # input section to give a threshold for classification
-            pn.widgets.TextInput(name='Threshold for classification', placeholder='0.5'),
+            clfier_thresh,
             
             # button to click run
             btn_run,
             
             # progbar
-            progress_bar,
+            self.progress_bar,
             
             # heatmap for 20 top species
+            pn.bind(self.plot_heatmap, prediction_tuple, self.model_select[widget_idx]),
+                    # if len(prediction_tuple) == 2
+                    # else None
             
             # by default create all annotations as one big annotations file
             
@@ -315,6 +394,13 @@ class DashBoard:
         )
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
         
+    def plot_heatmap(self, prediction_tuple, model):
+        # probabilities, class_dict = prediction_tuple
+        # timestamps = self.get_timestamps(self.path_func(model).eval_path, model, 'continuous_timestamp')
+        import matplotlib.pyplot as plt
+        fig = plt.figure()
+        sns.heatmap([[1, 2], [2, 1]])      
+        return fig      
 
     def make_sidebar(self, widget_idx, model=True):
         widgets = [pn.pane.Markdown("## Settings")]
