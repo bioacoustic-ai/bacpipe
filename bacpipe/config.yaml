@@ -10,7 +10,7 @@
 # PATHS:
 # define paths for your audio data
 ### IMPORTANT! WINODWS USERS DON'T USE QUOTATIONS HERE
-audio_dir :       /mnt/swap/Work/Data/Amphibians/AnuranSet/AnuranSet
+audio_dir :       unknown_sounds_2_within_file_2_diff_file_5s
 
 #####################    PROCESS SETTINGS    ##############################
 

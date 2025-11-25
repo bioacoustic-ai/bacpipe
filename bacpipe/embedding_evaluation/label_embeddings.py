@@ -84,10 +84,18 @@ class DefaultLabels:
                     file_date = dt.datetime.strptime(datetime, "%y%m%d%H%M%S")
                 elif len(datetime) == 14:
                     file_date = dt.datetime.strptime(datetime, "%Y%m%d%H%M%S")
+            except ValueError:
+                # incorrect second in filename
+                if int(datetime[-2]) >= 6:
+                    datetime = datetime[:-2] + '5' + datetime[-1:]
+                # incorrect minute in filename
+                elif int(datetime[-4]) >= 6:
+                    datetime = datetime[:-4] + '5' + datetime[-3:]
             except:
                 i = 1
                 while len(datetime) > 12:
                     datetime = datetime[:-i]
+
         return file_date
 
     def get_datetimes(self):
