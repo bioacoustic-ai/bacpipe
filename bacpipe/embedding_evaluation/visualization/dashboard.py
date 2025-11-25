@@ -90,6 +90,8 @@ class DashBoard:
         self.noise_select = dict()
         self.class_select = dict()
         self.embed_plot = dict()
+        
+        self.heatmap_plot = dict()
         self.kwargs = kwargs
 
     def init_plot(self, p_type, plot_func, widget_idx, **kwargs):
@@ -285,6 +287,7 @@ class DashBoard:
             logits = linear_clfier(batch)
             probs.append(F.softmax(logits, dim=0).detach().cpu().numpy())
             self.progress_bar.value = int((idx+1)/len(embeds)*100)
+        self.classifier_complete = True
         return np.array(probs)
             
     
@@ -304,6 +307,8 @@ class DashBoard:
         clfier.to(self.kwargs['device'])
         
         probs = self.run_classifier(embeds, clfier)
+        # self.class_figure
+        self.class_tuples = probs, label2index
         return probs, label2index
         
     def get_timestamps(self, eval_dir, model, label_key):
@@ -362,10 +367,7 @@ class DashBoard:
             max=100,
             bar_color='primary',
         )
-        upd_ind = pn.bind(self.classify_embeddings, self.model_select[widget_idx], clfier_path, clfier_thresh)
-        
-        # connect button click to update function
-        prediction_tuple = btn_run.on_click(upd_ind)
+        self.trigger_classification = pn.bind(self.classify_embeddings, self.model_select[widget_idx], clfier_path, clfier_thresh)
                 
         main_content = pn.Column(
             # input box where i can input the path to the linear classifier
@@ -380,13 +382,19 @@ class DashBoard:
             # button to click run
             btn_run,
             
+            # static_progress if self.classifier_complete else None,
+            
             # progbar
             self.progress_bar,
             
             # heatmap for 20 top species
-            pn.bind(self.plot_heatmap, prediction_tuple, self.model_select[widget_idx]),
-                    # if len(prediction_tuple) == 2
-                    # else None
+            # (pn.bind(self.plot_heatmap, self.class_tuples, self.model_select[widget_idx])
+            #         if not self.class_tuples is None
+            #         else None),
+            (
+                self.plot_widget(self.plot_heatmap, model=self.model_select[widget_idx], progress=btn_run)
+            ),
+            
             
             # by default create all annotations as one big annotations file
             
@@ -394,11 +402,18 @@ class DashBoard:
         )
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
         
-    def plot_heatmap(self, prediction_tuple, model):
-        # probabilities, class_dict = prediction_tuple
+    def plot_heatmap(self, model, progress):
         # timestamps = self.get_timestamps(self.path_func(model).eval_path, model, 'continuous_timestamp')
+        if progress == False:
+            return None
+        
+        probabilities, class_dict = self.trigger_classification(progress)
+        
         import matplotlib.pyplot as plt
         fig = plt.figure()
+        # if not prediction_tuple is None:
+        #     print(prediction_tuple)
+        print('figure update')
         sns.heatmap([[1, 2], [2, 1]])      
         return fig      
 
