@@ -88,6 +88,8 @@ class DashBoard:
         self.model_select = dict()
         self.label_select = dict()
         self.noise_select = dict()
+        self.species_select = dict()
+        self.accumulate_select = dict()
         self.class_select = dict()
         self.embed_plot = dict()
         
@@ -281,14 +283,17 @@ class DashBoard:
                 embeds = np.vstack([embeds, np.load(file)])
         return torch.Tensor(embeds)
     
-    def run_classifier(self, embeds, linear_clfier):
+    def run_classifier(self, embeds, linear_clfier, threshold):
         probs = []
         for idx, batch in enumerate(embeds):
             logits = linear_clfier(batch)
-            probs.append(F.softmax(logits, dim=0).detach().cpu().numpy())
+            probabilities = F.softmax(logits, dim=0).detach().cpu().numpy()
+            binary_classification = np.zeros(probabilities.shape, dtype=np.int8)
+            binary_classification[probabilities > threshold] = 1
+            probs.append(binary_classification.tolist())
             self.progress_bar.value = int((idx+1)/len(embeds)*100)
         self.classifier_complete = True
-        return np.array(probs)
+        return np.array(probs, dtype=np.int8)
             
     
     def classify_embeddings(self, model, path, threshold, event):
@@ -296,6 +301,10 @@ class DashBoard:
             path = (
                 self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
                 ).as_posix()
+        if threshold == '':
+            threshold = 0.5
+        else:
+            threshold = float(threshold)
         
         embeds = self.collect_all_embeddings(model)
         
@@ -306,7 +315,7 @@ class DashBoard:
         clfier.load_state_dict(clfier_weights)
         clfier.to(self.kwargs['device'])
         
-        probs = self.run_classifier(embeds, clfier)
+        probs = self.run_classifier(embeds, clfier, threshold)
         # self.class_figure
         self.class_tuples = probs, label2index
         return probs, label2index
@@ -392,7 +401,12 @@ class DashBoard:
             #         if not self.class_tuples is None
             #         else None),
             (
-                self.plot_widget(self.plot_heatmap, model=self.model_select[widget_idx], progress=btn_run)
+                # self.plot_widget(self.plot_heatmap, 
+                #                  model=self.model_select[widget_idx], 
+                #                  progress=btn_run)
+                pn.bind(self.prepare_heatmap,
+                        model=self.model_select[widget_idx], 
+                        progress=btn_run)
             ),
             
             
@@ -402,20 +416,76 @@ class DashBoard:
         )
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
         
-    def plot_heatmap(self, model, progress):
+    def prepare_heatmap(self, model, progress):
+        
         # timestamps = self.get_timestamps(self.path_func(model).eval_path, model, 'continuous_timestamp')
         if progress == False:
             return None
         
-        probabilities, class_dict = self.trigger_classification(progress)
+        binary_presence, class_dict = self.trigger_classification(progress)
+        timestamps = self.get_timestamps_per_embedding(model)
+        
+        species_select = self.init_widget(0, w_type='species', name='Select species', options=list(class_dict.keys()))
+        accumulate_select = self.init_widget(0, w_type='accumulate', name='Select what to aggregate by', options=['day', 'week', 'month'])
+        
+        accumulated_presence = pn.bind(self.accumulate_data, 
+                                       binary_presence, 
+                                       timestamps, 
+                                       class_dict,
+                                       species=species_select,
+                                       accumulate_by=accumulate_select)
+        
+        return self.plot_widget(self.plot_heatmap, 
+                         accumulated_presence=accumulated_presence, 
+                         accumulate_by=accumulate_select, 
+                         species=species_select)
+        
+        
+    def plot_heatmap(self, accumulated_presence, accumulate_by, species):
         
         import matplotlib.pyplot as plt
         fig = plt.figure()
         # if not prediction_tuple is None:
         #     print(prediction_tuple)
         print('figure update')
-        sns.heatmap([[1, 2], [2, 1]])      
+        sns.heatmap(accumulated_presence)      
+        # sns.heatmap([[1, 2], [2, 1]])      
         return fig      
+    
+    def accumulate_data(self, presence, timestamps, class_dict, species, accumulate_by='day'):
+        species_idx = class_dict[species]
+        dates = np.array([getattr(ts, 'date')() for ts in timestamps])
+        hours = np.array([getattr(ts, 'hour') for ts in timestamps])
+        accumulated = np.zeros([24, len(np.unique(dates))], dtype=np.int8)
+        species_presence = presence[:, species_idx]
+        for date_idx, date in enumerate(np.unique(dates)):
+            daily_presence_idx = np.where(dates==date)[0]
+            for hour in range(24):
+                hourly_presence_idx = np.where(hours[daily_presence_idx]==hour)[0]
+                accumulated[hour, date_idx] = sum(species_presence[daily_presence_idx[hourly_presence_idx]])
+        return accumulated
+            
+        
+
+    def get_timestamps_per_embedding(self, model):
+        from bacpipe.embedding_evaluation.label_embeddings import DefaultLabels as DL
+        import datetime as dt
+        
+        embed_dict = self.vis_loader.embeds[model]
+        ts_within_audio_files = [dt.timedelta(seconds=ts) for ts in embed_dict['timestamp']]
+        ts_files = [DL.get_dt_filename(f) for f in embed_dict['metadata']['audio_files']]
+        ts_files_same_length_as_embeds = []
+        [
+            ts_files_same_length_as_embeds.extend([ts_file] * embed_len) 
+            for ts_file, embed_len in zip(ts_files, embed_dict['metadata']['nr_embeds_per_file'])
+        ]
+        
+        ts_per_embedding = [
+            ts_file+ts_within_audio_file
+            for ts_file, ts_within_audio_file in 
+            zip(ts_files_same_length_as_embeds, ts_within_audio_files)
+            ]
+        return ts_per_embedding
 
     def make_sidebar(self, widget_idx, model=True):
         widgets = [pn.pane.Markdown("## Settings")]
