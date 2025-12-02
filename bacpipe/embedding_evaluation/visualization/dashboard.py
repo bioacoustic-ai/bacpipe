@@ -1,16 +1,12 @@
 import panel as pn
 import matplotlib
 import sys
-import json
 import seaborn as sns
 import numpy as np
 
-import torch.nn.functional as F
-import torch
 
 import importlib.resources as pkg_resources
 import bacpipe.imgs
-from pathlib import Path
 from .visualize import (
     plot_embeddings,
     plot_comparison,
@@ -29,9 +25,9 @@ matplotlib.use("agg")
 
 # Enable Panel
 pn.extension()
+from .dashboard_utils import DashBoardHelper
 
-
-class DashBoard:
+class DashBoard(DashBoardHelper):
     def __init__(
         self,
         model_names,
@@ -88,6 +84,7 @@ class DashBoard:
         self.model_select = dict()
         self.label_select = dict()
         self.noise_select = dict()
+        self.clfier_select = dict()
         self.species_select = dict()
         self.accumulate_select = dict()
         self.class_select = dict()
@@ -95,27 +92,6 @@ class DashBoard:
         
         self.heatmap_plot = dict()
         self.kwargs = kwargs
-
-    def init_plot(self, p_type, plot_func, widget_idx, **kwargs):
-        getattr(self, f"{p_type}_plot")[widget_idx] = pn.panel(
-            self.plot_widget(plot_func, widget_idx=widget_idx, **kwargs), tight=False
-        )
-        return getattr(self, f"{p_type}_plot")[widget_idx]
-
-    def plot_widget(self, plot_func, **kwargs):
-        if kwargs.get("return_fig", False):
-            return pn.bind(plot_func, **kwargs)
-        else:
-            return self.add_save_button(plot_func, **kwargs)
-
-    def widget(self, name, options, attr="Select", width=120, **kwargs):
-        return getattr(pn.widgets, attr)(
-            name=name, options=options, width=self.widget_width, **kwargs
-        )
-
-    def init_widget(self, idx, w_type, **kwargs):
-        getattr(self, f"{w_type}_select")[idx] = self.widget(**kwargs)
-        return getattr(self, f"{w_type}_select")[idx]
 
     def single_model_page(self, widget_idx):
         sidebar = self.make_sidebar(widget_idx, model=True)
@@ -266,228 +242,87 @@ class DashBoard:
 
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
     
-    def collect_all_embeddings(self, model):
-        import bacpipe.generate_embeddings as ge
-        dataset_path = self.path_func(model).dataset_path
-        audio_dir = dataset_path.stem
-        parent_dir = dataset_path.parent
-        ld = ge.Loader(audio_dir=audio_dir, 
-                       model_name=model, 
-                       main_results_dir=parent_dir, 
-                       **self.kwargs)
-        
-        for idx, file in enumerate(ld.files):
-            if idx == 0:
-                embeds = np.load(file)
-            else:
-                embeds = np.vstack([embeds, np.load(file)])
-        return torch.Tensor(embeds)
-    
-    def run_classifier(self, embeds, linear_clfier, threshold):
-        probs = []
-        for idx, batch in enumerate(embeds):
-            logits = linear_clfier(batch)
-            probabilities = F.softmax(logits, dim=0).detach().cpu().numpy()
-            binary_classification = np.zeros(probabilities.shape, dtype=np.int8)
-            binary_classification[probabilities > threshold] = 1
-            probs.append(binary_classification.tolist())
-            self.progress_bar.value = int((idx+1)/len(embeds)*100)
-        self.classifier_complete = True
-        return np.array(probs, dtype=np.int8)
-            
-    
-    def classify_embeddings(self, model, path, threshold, event):
-        if path == '':
-            path = (
-                self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
-                ).as_posix()
-        if threshold == '':
-            threshold = 0.5
-        else:
-            threshold = float(threshold)
-        
-        embeds = self.collect_all_embeddings(model)
-        
-        with open(Path(path).parent / 'label2index.json', 'r') as f:
-            label2index = json.load(f)
-        clfier_weights = torch.load(path)
-        clfier = LinearClassifier(clfier_weights['clfier.weight'].shape[-1], len(label2index))
-        clfier.load_state_dict(clfier_weights)
-        clfier.to(self.kwargs['device'])
-        
-        probs = self.run_classifier(embeds, clfier, threshold)
-        # self.class_figure
-        self.class_tuples = probs, label2index
-        return probs, label2index
-        
-    def get_timestamps(self, eval_dir, model, label_key):
-        from datetime import datetime 
-        default_labels = np.load(
-            # self.ld.evaluations_dir 
-            # / self.ld.metadata_dict['model_name']
-            eval_dir
-            / model
-            / 'labels/default_labels.npy',
-            allow_pickle=True
-            ).item()
-        labels = default_labels[label_key]
-        if label_key == 'time_of_day':
-            labels_ts = [datetime.strptime(ts ,'%H-%M-%S').timestamp() for ts in labels]
-        if label_key == 'continuous_timestamp':
-            labels_ts = [datetime.strptime(ts ,'%Y-%m-%d %H-%M-%S').timestamp() for ts in labels]
-        return labels_ts
-        
-        
-    def get_classes(self, path):
-        if path == '':
-            path = (
-                self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
-                ).as_posix()
-        with open(Path(path).parent / 'label2index.json', 'r') as f:
-            classes = json.load(f)
-        return list(classes.keys())
-            
     def apply_clfier_page(self, widget_idx):
-        sidebar = self.make_sidebar(widget_idx, model=True)
+        self.class_options = []
+        sidebar = self.make_sidebar(widget_idx, model=True, classifier_page=True)
+        self.class_tuples = []
         
+        # input box where i can input the path to the linear classifier
         clfier_path = pn.widgets.TextInput(
-            name='Path to Linear Classifier', 
-            placeholder=(
-                self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
-                ).as_posix(),
-            max_length=200
-            )
+                name='Path to Linear Classifier', 
+                placeholder=(
+                    self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
+                    ).as_posix(),
+                width=800,
+                max_length=800
+                )
         
         clfier_thresh = pn.widgets.TextInput(
             name='Threshold for classification', 
-            placeholder='0.5'
+            placeholder='0.5',
+            width=80,
             )
         
         from src.btn_icon import icon_str
-        btn_run = pn.widgets.Button(
+        btn_run_clfier = pn.widgets.Button(
             name='Apply linear classifier', 
             icon=icon_str, 
             width=100, 
-            height=30
+            height=30,
             )
+        
         
         self.progress_bar = pn.indicators.Progress(
             value=0,
             max=100,
             bar_color='primary',
+            width=800
         )
+        
         self.trigger_classification = pn.bind(self.classify_embeddings, self.model_select[widget_idx], clfier_path, clfier_thresh)
                 
+            
         main_content = pn.Column(
-            # input box where i can input the path to the linear classifier
-            clfier_path,
-            
-            # after that show me the classes that this linear classifier will classify
-            pn.widgets.StaticText(name='Classes', value=pn.bind(self.get_classes, clfier_path)),
-            
-            # input section to give a threshold for classification
-            clfier_thresh,
-            
-            # button to click run
-            btn_run,
-            
-            # static_progress if self.classifier_complete else None,
-            
-            # progbar
-            self.progress_bar,
-            
-            # heatmap for 20 top species
-            # (pn.bind(self.plot_heatmap, self.class_tuples, self.model_select[widget_idx])
-            #         if not self.class_tuples is None
-            #         else None),
-            (
-                # self.plot_widget(self.plot_heatmap, 
-                #                  model=self.model_select[widget_idx], 
-                #                  progress=btn_run)
-                pn.bind(self.prepare_heatmap,
-                        model=self.model_select[widget_idx], 
-                        progress=btn_run)
-            ),
-            
-            
-            # by default create all annotations as one big annotations file
-            
-            # add button to save as raven annotations
-        )
+            pn.pane.Markdown("## All Models Dashboard"),
+            pn.Accordion(
+                (
+                    "Linear classifier settings",
+                    pn.Column(
+                        clfier_path,
+                
+                        # after that show me the classes that this 
+                        # linear classifier will classify
+                        pn.widgets.StaticText(
+                            name='Classes', 
+                            value=pn.bind(self.get_classes, clfier_path)
+                            ),
+                
+                        # input section to give a threshold for classification
+                        clfier_thresh,
+                    
+                        # button to click run
+                        btn_run_clfier,
+                                    
+                        # progbar
+                        self.progress_bar,
+                    )
+                ),
+                (
+                    "Classification heatmap",
+                    # heatmap for 20 top species
+                    pn.bind(self.prepare_heatmap,
+                            model=self.model_select[widget_idx], 
+                            progress=btn_run_clfier)
+                ),
+                active=[0, 1, 2],
+                # by default create all annotations as one big annotations file
+                # # add button to save as raven annotations
+                ),
+            )
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
         
-    def prepare_heatmap(self, model, progress):
-        
-        # timestamps = self.get_timestamps(self.path_func(model).eval_path, model, 'continuous_timestamp')
-        if progress == False:
-            return None
-        
-        binary_presence, class_dict = self.trigger_classification(progress)
-        timestamps = self.get_timestamps_per_embedding(model)
-        
-        species_select = self.init_widget(0, w_type='species', name='Select species', options=list(class_dict.keys()))
-        accumulate_select = self.init_widget(0, w_type='accumulate', name='Select what to aggregate by', options=['day', 'week', 'month'])
-        
-        accumulated_presence = pn.bind(self.accumulate_data, 
-                                       binary_presence, 
-                                       timestamps, 
-                                       class_dict,
-                                       species=species_select,
-                                       accumulate_by=accumulate_select)
-        
-        return self.plot_widget(self.plot_heatmap, 
-                         accumulated_presence=accumulated_presence, 
-                         accumulate_by=accumulate_select, 
-                         species=species_select)
-        
-        
-    def plot_heatmap(self, accumulated_presence, accumulate_by, species):
-        
-        import matplotlib.pyplot as plt
-        fig = plt.figure()
-        # if not prediction_tuple is None:
-        #     print(prediction_tuple)
-        print('figure update')
-        sns.heatmap(accumulated_presence)      
-        # sns.heatmap([[1, 2], [2, 1]])      
-        return fig      
-    
-    def accumulate_data(self, presence, timestamps, class_dict, species, accumulate_by='day'):
-        species_idx = class_dict[species]
-        dates = np.array([getattr(ts, 'date')() for ts in timestamps])
-        hours = np.array([getattr(ts, 'hour') for ts in timestamps])
-        accumulated = np.zeros([24, len(np.unique(dates))], dtype=np.int8)
-        species_presence = presence[:, species_idx]
-        for date_idx, date in enumerate(np.unique(dates)):
-            daily_presence_idx = np.where(dates==date)[0]
-            for hour in range(24):
-                hourly_presence_idx = np.where(hours[daily_presence_idx]==hour)[0]
-                accumulated[hour, date_idx] = sum(species_presence[daily_presence_idx[hourly_presence_idx]])
-        return accumulated
-            
-        
 
-    def get_timestamps_per_embedding(self, model):
-        from bacpipe.embedding_evaluation.label_embeddings import DefaultLabels as DL
-        import datetime as dt
-        
-        embed_dict = self.vis_loader.embeds[model]
-        ts_within_audio_files = [dt.timedelta(seconds=ts) for ts in embed_dict['timestamp']]
-        ts_files = [DL.get_dt_filename(f) for f in embed_dict['metadata']['audio_files']]
-        ts_files_same_length_as_embeds = []
-        [
-            ts_files_same_length_as_embeds.extend([ts_file] * embed_len) 
-            for ts_file, embed_len in zip(ts_files, embed_dict['metadata']['nr_embeds_per_file'])
-        ]
-        
-        ts_per_embedding = [
-            ts_file+ts_within_audio_file
-            for ts_file, ts_within_audio_file in 
-            zip(ts_files_same_length_as_embeds, ts_within_audio_files)
-            ]
-        return ts_per_embedding
-
-    def make_sidebar(self, widget_idx, model=True):
+    def make_sidebar(self, widget_idx, model=True, classifier_page=False):
         widgets = [pn.pane.Markdown("## Settings")]
 
         if model:
@@ -495,40 +330,67 @@ class DashBoard:
                 self.init_widget(widget_idx, "model", name="Model", options=self.models)
             )
 
-        widgets.extend(
-            [
-                self.init_widget(
-                    widget_idx, "label", name="Label by", options=self.label_by
-                ),
-                (
-                    pn.widgets.StaticText(name="", value="Remove noise?")
-                    if not self.ground_truth is None
-                    else None
-                ),
-                (
+        if not classifier_page:
+            widgets.extend(
+                [
+                    self.init_widget(
+                        widget_idx, "label", name="Label by", options=self.label_by
+                    ),
+                    (
+                        pn.widgets.StaticText(name="", value="Remove noise?")
+                        if not self.ground_truth is None
+                        else None
+                    ),
+                    (
+                        self.init_widget(
+                            widget_idx,
+                            "noise",
+                            name="Remove Noise",
+                            options=[True, False],
+                            attr="RadioBoxGroup",
+                            value=False,
+                        )
+                        if not self.ground_truth is None
+                        else None
+                    ),
+                    (
+                        self.init_widget(
+                            widget_idx,
+                            "class",
+                            name="Classification Type",
+                            options=["knn", "linear"],
+                        )
+                        if "classification" in self.evaluation_task
+                        else None
+                    ),
+                ]
+            )
+        else:
+            widgets.extend(
+                [
                     self.init_widget(
                         widget_idx,
-                        "noise",
-                        name="Remove Noise",
-                        options=[True, False],
+                        w_type="clfier",
+                        name="Integrated or linear classifier",
+                        options=['Integrated', 'Linear'],
                         attr="RadioBoxGroup",
-                        value=False,
-                    )
-                    if not self.ground_truth is None
-                    else None
-                ),
-                (
+                        value='Integrated',
+                        ),
                     self.init_widget(
-                        widget_idx,
-                        "class",
-                        name="Classification Type",
-                        options=["knn", "linear"],
-                    )
-                    if "classification" in self.evaluation_task
-                    else None
-                ),
-            ]
-        )
+                        widget_idx, 
+                        w_type='species', 
+                        name='Select species', 
+                        options=self.class_options
+                        ),
+                    self.init_widget(
+                        widget_idx, 
+                        w_type='accumulate', 
+                        name='Select what to aggregate by', 
+                        options=['day', 'week', 'month']
+                        ),
+        
+                ]
+            )
 
         return pn.Column(*widgets, width=200, margin=(10, 10))
 
@@ -545,7 +407,7 @@ class DashBoard:
         model0_page = self.single_model_page(0)
         model1_page = self.single_model_page(1)
         model_all_page = self.all_models_page(1)
-        apply_classifier_page = self.apply_clfier_page(1)
+        apply_classifier_page = self.apply_clfier_page(0)
 
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
