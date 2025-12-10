@@ -53,6 +53,8 @@ class Loader:
         self.initialize_path_structure(testing=testing, **kwargs)
 
         self.check_if_combination_exists = check_if_combination_exists
+        self.continue_failed_run = False
+
         if self.dim_reduction_model:
             self.embed_suffix = ".json"
         else:
@@ -70,7 +72,10 @@ class Loader:
             self._get_audio_paths()
             self._init_metadata_dict()
 
-        if not self.combination_already_exists:
+        if not self.continue_failed_run:
+            self._get_metadata_from_created_embeddings()
+            self._update_audio_file_list()
+        elif not self.combination_already_exists:
             self.embed_dir.mkdir(exist_ok=True, parents=True)
         else:
             logger.debug(
@@ -127,10 +132,17 @@ class Loader:
                         continue
                     except OSError:
                         logger.info(
-                            f"Directory {d} is not empty. ",
-                            "Please remove it manually.",
+                            f"\nThe directory {d} is not empty. "
+                            "It seems like a previous run failed, "
+                            "bacpipe is comparing what files were already "
+                            "created and will then continue where it left off."
+                            "If you interrupted the run on purpose and want to "
+                            "start from the beginning, please cancel using "
+                            "Ctrl + C and then remove "
+                            f"the folder {d} manually."
                         )
-                        continue
+                        self.continue_failed_run = True
+                        return d
                 with open(d.joinpath("metadata.yml"), "r") as f:
                     mdata = yaml.load(f, Loader=yaml.CLoader)
                     if not self.model_name == mdata["model_name"]:
@@ -157,7 +169,7 @@ class Loader:
                         self._get_metadata_dict(d)
                         self.combination_already_exists = True
                         logger.info(
-                            f"Error: {e}. "
+                            f"\nError: {e}. "
                             "Will proceed without veryfying if the number of embeddings "
                             "is the same as the number of audio files."
                         )
@@ -176,7 +188,7 @@ class Loader:
                         )
                         break
                     elif (
-                        np.round(num_files / num_audio_files, 1) == 1
+                        np.round(num_files / num_audio_files, 1) == 1 # allow 5 % deviation
                         and num_files > 100
                     ):
                         self.combination_already_exists = True
@@ -600,11 +612,13 @@ class Embedder:
             if not isinstance(sample, Path):
                 sample = Path(sample)
                 if not sample.suffix in self.model.audio_suffixes:
-                    raise AssertionError(
-                        "The provided path does not lead to a supported audio file with the ending"
+                    error = (
+                        "\nThe provided path does not lead to a supported audio file with the ending"
                         f" {self.model.audio_suffixes}. Please check again that you provided the correct"
                         " path."
                     )
+                    logger.exception(error)
+                    raise AssertionError(error)
             sample = self.prepare_audio(sample)
             embeds = self.get_embeddings_for_audio(sample)
 

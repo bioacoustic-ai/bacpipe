@@ -673,12 +673,14 @@ def plot_classification_results(
     if not metrics:
         class_path = paths.class_path / f"class_results_{task_name}.json"
         if not class_path.exists():
-            raise AssertionError(
-                f"The classification file {class_path} does not exist. Perhaps it was not "
+            error = (
+                f"\nThe classification file {class_path} does not exist. Perhaps it was not "
                 "created yet. To avoid getting this error, make sure you have not "
                 " included 'classificaion' in the 'evaluation_tasks'. If you want to compute "
                 "classification, make sure to set `overwrite=True`."
             )
+            logger.exception(error)
+            raise AssertionError(error)
 
         with open(paths.class_path / f"class_results_{task_name}.json", "r") as f:
             metrics = json.load(f)
@@ -938,10 +940,12 @@ def plot_clusterings(
 
     clust_path = path_func(model_name).clust_path / "clust_results.json"
     if not clust_path.exists():
-        raise AssertionError(
-            f"The clustering file {clust_path} does not exist. Perhaps it was not "
+        error = (
+            f"\nThe clustering file {clust_path} does not exist. Perhaps it was not "
             "created yet. To avoid getting this error set `overwrite=True`."
         )
+        logger.exception(error)
+        raise AssertionError(error)
 
     with open(clust_path, "r") as f:
         metrics = json.load(f)
@@ -1047,11 +1051,13 @@ def plot_overview_metrics(
 
     fig, ax = plt.subplots(1, 1, figsize=(12, 6))
     if len(model_list) == 1 and model_list[0] not in metrics:
-        raise AttributeError(
-            "It seems like you have selected a single model in a folder where previously "
+        error = (
+            "\nIt seems like you have selected a single model in a folder where previously "
             "multiple models were computed. Try selecting at least two models, that way "
             "this error should be fixed."
         )
+        logger.exception(error)
+        raise AttributeError(error)
     num_metrics = len(metrics[model_list[0]])
     bar_width = 1 / (num_metrics + 1)
 

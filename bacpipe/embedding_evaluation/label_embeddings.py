@@ -32,9 +32,11 @@ class DefaultLabels:
         self.nr_embeds_per_file = self.metadata["files"]["nr_embeds_per_file"]
         self.nr_embeds_total = self.metadata["nr_embeds_total"]
         if not sum(self.nr_embeds_per_file) == self.nr_embeds_total:
-            raise ValueError(
-                "The number of embeddings per file does not match the total number of embeddings."
-            )
+            error = (
+                "\nThe number of embeddings per file does not match "
+                "the total number of embeddings.")
+            logger.exception(error)
+            raise ValueError(error)
 
     def generate(self):
         self.default_label_dict = {}
@@ -307,10 +309,12 @@ def model_specific_embedding_path(path, model, dim_reduction_model=None, **kwarg
         ]
     embed_paths_for_this_model.sort()
     if len(embed_paths_for_this_model) == 0:
-        raise ValueError(
-            f"No embeddings found for model {model} in {path}. "
+        error = (
+            f"\nNo embeddings found for model {model} in {path}. "
             "Please check the directory path."
         )
+        logger.exception(error)
+        raise ValueError(error)
     elif len(embed_paths_for_this_model) > 1:
         logger.info(
             f"Multiple embeddings found for model {model} in {path}. "
@@ -670,10 +674,12 @@ def ground_truth_by_model(
 
 def generate_annotations_for_classification_task(paths, label_column, **kwargs):
     if not paths.labels_path.joinpath("ground_truth.npy").exists():
-        raise ValueError(
-            "The ground truth label file ground_truth.npy does not exist. "
-            "Please create it first."
+        error = (
+            "\nThe ground truth label file ground_truth.npy does not exist. "
+            "Please create it first by rerunning with `overwrite=True`."
         )
+        logger.exception(error)
+        raise ValueError(error)
     ground_truth = np.load(
         paths.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
     ).item()
