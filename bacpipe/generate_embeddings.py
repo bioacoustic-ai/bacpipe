@@ -72,9 +72,8 @@ class Loader:
             self._get_audio_paths()
             self._init_metadata_dict()
 
-        if not self.continue_failed_run:
+        if self.continue_failed_run:
             self._get_metadata_from_created_embeddings()
-            self._update_audio_file_list()
         elif not self.combination_already_exists:
             self.embed_dir.mkdir(exist_ok=True, parents=True)
         else:
@@ -122,6 +121,40 @@ class Loader:
             existing_embed_dirs.sort()
             self._find_existing_embed_dir(existing_embed_dirs)
 
+    def _get_metadata_from_created_embeddings(self):
+        module = importlib.import_module(
+                f"bacpipe.embedding_generation_pipelines.feature_extractors.{self.model_name}"
+            )
+        already_processed_files = list(Path(self.embed_dir).rglob('*.npy'))
+        already_processed_files.sort()
+        relative_audio_stems = np.array([str(f.relative_to(self.audio_dir)).split('.')[0] for f in self.files])
+        audio_files = np.array(self.files)
+        audio_suffixes = np.array([f.suffix for f in self.files])
+        for file in already_processed_files:
+            with open(file, 'rb') as f:
+                corresponding_audio_file_bool = (
+                    relative_audio_stems==str(
+                        file.relative_to(self.embed_dir)
+                        ).replace(f'_{self.model_name}.npy', '')
+                )
+                embed = np.load(f)
+                self.metadata_dict['files']['audio_files'].append(
+                    relative_audio_stems[corresponding_audio_file_bool][0]
+                    + audio_suffixes[corresponding_audio_file_bool][0]
+                )
+                self.metadata_dict['files']['nr_embeds_per_file'].append(
+                    embed.shape[0]
+                )
+                self.metadata_dict['files']['file_lengths (s)'].append(
+                    embed.shape[0] * (module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE)
+                )
+                self._update_audio_file_list(audio_files, corresponding_audio_file_bool)        
+        
+    def _update_audio_file_list(self, audio_files, corresponding_audio_file_bool):
+        self.files.remove(
+            audio_files[corresponding_audio_file_bool][0]
+        )
+
     def _find_existing_embed_dir(self, existing_embed_dirs):
         for d in existing_embed_dirs[::-1]:
 
@@ -142,6 +175,7 @@ class Loader:
                             f"the folder {d} manually."
                         )
                         self.continue_failed_run = True
+                        self.embed_dir = d
                         return d
                 with open(d.joinpath("metadata.yml"), "r") as f:
                     mdata = yaml.load(f, Loader=yaml.CLoader)
@@ -207,7 +241,8 @@ class Loader:
     def _get_audio_paths(self):
         self.files = self._get_audio_files()
         self.files.sort()
-        self.embed_dir = Path(self.embed_parent_dir).joinpath(self.get_timestamp_dir())
+        if not self.continue_failed_run:
+            self.embed_dir = Path(self.embed_parent_dir).joinpath(self.get_timestamp_dir())
 
     def _get_annotation_files(self):
         all_annotation_files = list(self.audio_dir.rglob("*.csv"))
@@ -723,6 +758,13 @@ class Embedder:
             "Threshold for classifier predictions": threshold,
         }
         return cls_results
+    
+    def run_clfier_for_previous_embeddings(self, fileloader_obj):
+        existing_embeddings = list(Path(fileloader_obj.embed_dir).rglob('*.npy'))
+        for file in existing_embeddings:
+            with open(file, 'rb') as f:
+                embed = np.load(f)
+                
     
     def fill_dataframe_with_classiefier_results(self, fileloader_obj, file):
         """
