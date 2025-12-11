@@ -676,7 +676,7 @@ def plot_classification_results(
             error = (
                 f"\nThe classification file {class_path} does not exist. Perhaps it was not "
                 "created yet. To avoid getting this error, make sure you have not "
-                " included 'classificaion' in the 'evaluation_tasks'. If you want to compute "
+                " included 'classification' in the 'evaluation_tasks'. If you want to compute "
                 "classification, make sure to set `overwrite=True`."
             )
             logger.exception(error)

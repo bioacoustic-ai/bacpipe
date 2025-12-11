@@ -56,7 +56,7 @@ def train_linear_classifier(
     Returns
     -------
     object
-        trained linear classificaion object
+        trained linear classification object
     """
     device = torch.device(device)
     linear_classifier = linear_classifier.to(device)
