@@ -177,10 +177,17 @@ class DefaultLabels:
             self.default_label_keys.remove("default_classifier")
         else:
             df = pd.read_csv(path)
+            if not len(self.parent_directory_per_embedding) == len(df):
+                df = self.fill_remaining_labels(df)
             self.default_classifier_per_embedding = df[
                 "label:default_classifier"
             ].values.tolist()
 
+    def fill_remaining_labels(self, df):
+        for idx, (file, nr_embeds) in enumerate(zip(self.metadata['files']['audio_files'], self.metadata['files']['nr_embeds_per_file'])):
+            df_part = df[df.audiofilename == file]
+            # ensure all other indices are filled with another label
+            
 
 def make_set_paths_func(
     audio_dir,

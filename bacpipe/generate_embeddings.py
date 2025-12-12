@@ -172,7 +172,7 @@ class Loader:
                             "If you interrupted the run on purpose and want to "
                             "start from the beginning, please cancel using "
                             "Ctrl + C and then remove "
-                            f"the folder {d} manually."
+                            f"the folder {d} manually.\n"
                         )
                         self.continue_failed_run = True
                         self.embed_dir = d
@@ -754,7 +754,7 @@ class Embedder:
                                                             tmp_idx)
 
         cls_results["head"] = {
-            "Time bins in this file": probabilities.shape[0],
+            "Time bins in this file": probabilities.shape[-1],
             "Threshold for classifier predictions": threshold,
         }
         return cls_results
@@ -780,9 +780,18 @@ class Embedder:
         """
         classifier_annotations = pd.DataFrame()
         
-        tmp_bins = self.model.classifier_outputs.shape[-1]
+        maxes = torch.max(self.model.classifier_outputs, dim=0)
+        outputs_exceeding_thresh = self.model.classifier_outputs[:,
+            maxes.values > self.classifier_threshold
+        ]
         
-        classifier_annotations["start"] = np.arange(tmp_bins) * (
+        active_time_bins = np.arange(
+            self.model.classifier_outputs.shape[-1]
+            )[maxes.values > self.classifier_threshold]
+        
+        classifier_annotations['idx'] = active_time_bins
+        
+        classifier_annotations["start"] = active_time_bins * (
             self.model.segment_length / self.model.sr
         )
         classifier_annotations["end"] = classifier_annotations["start"] + (
@@ -793,15 +802,98 @@ class Embedder:
         )
         classifier_annotations["label:default_classifier"] = np.array(
             self.model.classes
-        )[torch.argmax(self.model.classifier_outputs, dim=0)].tolist()
+        )[maxes.indices[maxes.values > self.classifier_threshold]].tolist()
 
         if not hasattr(self, "cumulative_annotations"):
-            self.cumulative_annotations = classifier_annotations
+            if fileloader_obj.continue_failed_run:
+                self.load_existing_clfier_outputs(fileloader_obj, 
+                                                  classifier_annotations)
+            else:
+                self.cumulative_annotations = classifier_annotations
         else:
             self.cumulative_annotations = pd.concat(
                 [self.cumulative_annotations, classifier_annotations], ignore_index=True
             )
 
+    def load_existing_clfier_outputs(self, fileloader_obj, clfier_annotations):
+        clfier_dir = Path(
+            fileloader_obj.paths.class_path / 'original_classifier_outputs'
+            )
+        existing_clfier_outputs = list(clfier_dir.rglob('*.json'))
+        existing_clfier_outputs.sort()
+        
+        seg_len = self.model.segment_length / self.model.sr
+        
+        relative_audio = np.array(
+            # we omit the last item assuming that it's just been processed
+            # and corresponds to the clfier_annotations contents
+            [
+                f.split('.')
+                for f in 
+                fileloader_obj.metadata_dict['files']['audio_files'][:-1]
+                ]
+            )
+        relative_audio_stems = relative_audio[:, 0]
+        relative_audio_suffixes = relative_audio[:, 1]
+        
+        
+        df_dict = {
+            'idx': [],
+            'start': [],
+            'end': [],
+            'audiofilename': [],
+            'label:default_classifier': []
+            }
+        for file in existing_clfier_outputs:
+            corresponding_audio_file_bool = (
+                relative_audio_stems==str(
+                    file.relative_to(clfier_dir)
+                    ).replace(f'_{fileloader_obj.model_name}.json', '')
+            )
+            with open(file, 'r') as f:
+                outputs = json.load(f)
+            outputs.pop('head')
+            if len(outputs) == 0:
+                continue
+            all_active_time_bins = []
+            clfier_preds = []
+            species = []
+            for k, v in outputs.items():
+                all_active_time_bins.append(v['time_bins_exceeding_threshold'])
+                clfier_preds.append(v['classifier_predictions'])
+                species.append(k)
+                
+            width = max(max(a) for a in all_active_time_bins) + 1 
+            clfier_preds_np = np.zeros([len(clfier_preds), width])
+            for i, (j,pred) in enumerate(zip(all_active_time_bins, clfier_preds)):
+                clfier_preds_np[i][j] = pred
+            
+            active_time_bins = np.where(np.max(clfier_preds_np, axis=0))[0]
+            active_species = np.array(species)[np.argmax(clfier_preds_np, axis=0)[active_time_bins]].tolist()
+            
+            df_dict['idx'].extend(active_time_bins)
+            
+            df_dict['start'].extend(
+                (active_time_bins * seg_len).tolist()
+            )
+            df_dict['end'].extend(
+                ((active_time_bins * seg_len) + seg_len).tolist()
+            )
+            df_dict['audiofilename'].extend(
+                [
+                    relative_audio_stems[corresponding_audio_file_bool][0] 
+                    + '.' 
+                    +relative_audio_suffixes[corresponding_audio_file_bool][0]
+                    ] * len(active_species)
+            )
+            df_dict['label:default_classifier'].extend(active_species)
+        self.cumulative_annotations = pd.DataFrame(df_dict)
+        self.cumulative_annotations = pd.concat(
+                [self.cumulative_annotations, clfier_annotations], 
+                ignore_index=True
+            )
+        
+        
     def save_classifier_outputs(self, fileloader_obj, file):
         relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
         results_path = self.paths.class_path.joinpath(
