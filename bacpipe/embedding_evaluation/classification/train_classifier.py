@@ -4,6 +4,10 @@ import torch.nn.functional as F
 
 from sklearn.neighbors import KNeighborsClassifier
 
+import logging
+
+logger = logging.getLogger("bacpipe")
+
 
 class LinearClassifier(nn.Module):
     def __init__(self, in_dim, out_dim):
@@ -52,7 +56,7 @@ def train_linear_classifier(
     Returns
     -------
     object
-        trained linear classificaion object
+        trained linear classification object
     """
     device = torch.device(device)
     linear_classifier = linear_classifier.to(device)
@@ -178,7 +182,9 @@ class KNN(nn.Module):
     def forward(self, x):
         """Predict using KNN (only after it's trained)"""
         if not self.is_trained:
-            raise ValueError("KNN model is not trained. Call `fit()` first.")
+            error = ("\nKNN model is not trained. Call `fit()` first.")
+            logger.exception(error)
+            raise ValueError(error)
 
         x_np = x.cpu().detach().numpy()
         preds = self.knn.predict(x_np)  # Predict labels
