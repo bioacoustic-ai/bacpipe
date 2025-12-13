@@ -184,10 +184,24 @@ class DefaultLabels:
             ].values.tolist()
 
     def fill_remaining_labels(self, df):
-        for idx, (file, nr_embeds) in enumerate(zip(self.metadata['files']['audio_files'], self.metadata['files']['nr_embeds_per_file'])):
+        seg_len = self.metadata['segment_length (samples)'] / self.metadata['sample_rate (Hz)']
+        df_new = {
+            'start': [],
+            'end': [],
+            'audiofilename': [],
+            'label:default_classifier': []
+        }
+        for file, nr_embeds in zip(self.metadata['files']['audio_files'], self.metadata['files']['nr_embeds_per_file']):
             df_part = df[df.audiofilename == file]
-            # ensure all other indices are filled with another label
+            all_time_bins = (np.arange(nr_embeds) * seg_len).tolist()
+            [all_time_bins.remove(l) for l in df_part.start]
+            df_new['start'].extend(all_time_bins)
+            df_new['end'].extend((np.array(all_time_bins) + seg_len).tolist())
+            df_new['audiofilename'].extend([file] * len(all_time_bins))
+            df_new['label:default_classifier'].extend(['below_thresh'] * len(all_time_bins))
             
+        df = pd.concat([df, pd.DataFrame(df_new)], ignore_index=True)
+        return df.sort_values(['audiofilename', 'start'])
 
 def make_set_paths_func(
     audio_dir,

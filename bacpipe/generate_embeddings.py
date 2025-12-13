@@ -789,8 +789,6 @@ class Embedder:
             self.model.classifier_outputs.shape[-1]
             )[maxes.values > self.classifier_threshold]
         
-        classifier_annotations['idx'] = active_time_bins
-        
         classifier_annotations["start"] = active_time_bins * (
             self.model.segment_length / self.model.sr
         )
@@ -838,7 +836,6 @@ class Embedder:
         
         
         df_dict = {
-            'idx': [],
             'start': [],
             'end': [],
             'audiofilename': [],
@@ -869,9 +866,9 @@ class Embedder:
                 clfier_preds_np[i][j] = pred
             
             active_time_bins = np.where(np.max(clfier_preds_np, axis=0))[0]
-            active_species = np.array(species)[np.argmax(clfier_preds_np, axis=0)[active_time_bins]].tolist()
-            
-            df_dict['idx'].extend(active_time_bins)
+            active_species = np.array(species)[
+                np.argmax(clfier_preds_np, axis=0)[active_time_bins]
+                ].tolist()
             
             df_dict['start'].extend(
                 (active_time_bins * seg_len).tolist()
