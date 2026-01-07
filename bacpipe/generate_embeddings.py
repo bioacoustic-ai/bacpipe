@@ -705,7 +705,7 @@ class Embedder:
                                                             tmp_idx)
 
         cls_results["head"] = {
-            "Time bins in this file": probabilities.shape[0],
+            "Time bins in this file": probabilities.shape[1],
             "Threshold for classifier predictions": threshold,
         }
         return cls_results
