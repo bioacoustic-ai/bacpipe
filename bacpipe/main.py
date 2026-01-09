@@ -213,6 +213,8 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **
             audio_dir=audio_dir,
             **kwargs,
         )
+        if loader_dict[model_name] is None:
+            loader_dict.pop(model_name)
     return loader_dict
 
 
@@ -382,6 +384,7 @@ def get_embeddings(
     check_if_secondary_combination_exists=True,
     overwrite=False,
     testing=False,
+    return_umap=False,
     **kwargs,
 ):
     global get_paths
@@ -396,6 +399,8 @@ def get_embeddings(
         testing=testing,
         **kwargs,
     )
+    if loader_embeddings is None:
+        return
 
     if not dim_reduction_model == "None":
 
@@ -411,6 +416,8 @@ def get_embeddings(
             testing=testing,
             **kwargs,
         )
+        if return_umap:
+            return loader_dim_reduced
         if (
             not overwrite
             and (paths.plot_path.joinpath("embeddings.png").exists())
@@ -441,7 +448,7 @@ def get_embeddings(
     return loader_embeddings
 
 
-def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
+def generate_embeddings(avoid_pipelined_gpu_inference=False, already_computed=False, **kwargs):
     if "dim_reduction_model" in kwargs:
         print(
             f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"
@@ -459,6 +466,8 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
         ld = ge.Loader(**kwargs)
         logger.debug(f"Loading the data took {time.time()-start:.2f}s.")
         if not ld.combination_already_exists:
+            if already_computed:
+                return 
             embed = ge.Embedder(**kwargs)
 
             if ld.dim_reduction_model:
