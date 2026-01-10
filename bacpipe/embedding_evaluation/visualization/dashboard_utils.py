@@ -55,28 +55,34 @@ class DashBoardHelper:
                 embeds = np.vstack([embeds, np.load(file)])
         return torch.Tensor(embeds)
     
-    def run_classifier(self, embeds, linear_clfier):
+    def run_classifier(self, embeds, linear_clfier, threshold):
         probs = []
+        embeds = embeds.to(self.kwargs['device'])
         for idx, batch in enumerate(embeds):
             logits = linear_clfier(batch)
             probabilities = F.softmax(logits, dim=0).detach().cpu().numpy()
             binary_classification = np.zeros(probabilities.shape, dtype=np.int8)
-            binary_classification[probabilities > self.class_threshold] = 1
+            binary_classification[probabilities > threshold] = 1
             probs.append(binary_classification.tolist())
             self.progress_bar.value = int((idx+1)/len(embeds)*100)
         self.classifier_complete = True
         return np.array(probs, dtype=np.int8)
             
+    @staticmethod
+    def verify_threshold(threshold):
+        if threshold == '':
+            threshold = 0.5
+        else:
+            threshold = float(threshold)
+        return threshold
+        
     
     def classify_embeddings(self, model, path, threshold, event):
         if path == '':
             path = (
                 self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
                 ).as_posix()
-        if threshold == '':
-            self.class_threshold = 0.5
-        else:
-            self.class_threshold = float(threshold)
+        threshold = self.verify_threshold(threshold)
         
         embeds = self.collect_all_embeddings(model)
         
@@ -89,7 +95,7 @@ class DashBoardHelper:
         clfier.load_state_dict(clfier_weights)
         clfier.to(self.kwargs['device'])
         
-        probs = self.run_classifier(embeds, clfier)
+        probs = self.run_classifier(embeds, clfier, threshold)
         # self.class_figure
         self.class_tuples = probs, label2index
         return probs, label2index
@@ -121,49 +127,115 @@ class DashBoardHelper:
             classes = json.load(f)
         return list(classes.keys())
             
+    def load_classification(self, model, thresh):
+        integrated_clfier_path = (
+            self.path_func(model)
+            .class_path.joinpath('original_classifier_outputs')
+        )
+        if not integrated_clfier_path.exists():
+            return None, None
+        else:
+            files = list(integrated_clfier_path.rglob('*json'))
+            
+        cl_dict = {}
+        total_length = 0
+        k2idx = {}
+        for file in files:
+            with open(file, 'r') as f:
+                d = json.load(f)
+                current_time_bins = d['head']['Time bins in this file']
+                d.pop('head')
+                
+                for k, v in d.items():
+                    cl_dict[k] = np.zeros([total_length + current_time_bins])    
+                    if not k2idx:
+                        k2idx[k] = 0
+                    if not k in k2idx:
+                        k2idx[k] = max(k2idx.values()) + 1
+                        
+                    cl_dict[k][np.array(v['time_bins_exceeding_threshold']) + total_length] = v['classifier_predictions']
+                    # file_specific_classification[v['time_bins_exceeding_threshold'], k2idx[k]] = v['classifier_predictions']
+                for species in [
+                    k for k, v in cl_dict.items() 
+                    if len(v) < total_length + current_time_bins
+                    ]:
+                    cl_dict[species] = np.hstack([cl_dict[species], np.zeros([current_time_bins])])
+                
+                total_length += current_time_bins
+        
+        self.species_select[0].options = list(k2idx.keys())
+        probs_array = np.array(list(cl_dict.values()))
+        # binary_classification = probs_array[probs_array > thresh]
+        
+        binary_classification = np.zeros(probs_array.shape, dtype=np.int8)
+        binary_classification[probs_array > thresh] = 1
+        return binary_classification.T, k2idx
 
         
-    def prepare_heatmap(self, model, progress, widget_idx=0):
+    def prepare_heatmap(self, threshold, model, clfier_type, progress, widget_idx=0):
         
         # timestamps = self.get_timestamps(self.path_func(model).eval_path, model, 'continuous_timestamp')
         if progress == False:
             return None
+        threshold = self.verify_threshold(threshold)
         
-        binary_presence, class_dict = self.trigger_classification(progress)
+        if clfier_type == 'Linear':
+            self.loading_test_placeholder.value = 'Loading embeddings'
+            binary_presence, class_dict = self.trigger_classification(progress)
+        elif clfier_type == 'Integrated':
+            binary_presence, class_dict = self.load_classification(model, threshold)
+        
+        if binary_presence is None:
+            return pn.widgets.StaticText(
+                name="Error",
+                value="It seems like the classifier hasn't been run yet. Please rerun bacpipe with the setting "
+                "`run default classifier` set to `True`."
+                )
+            
         timestamps = self.get_timestamps_per_embedding(model)
         
-        
         accumulated_presence = pn.bind(self.accumulate_data, 
-                                       binary_presence, 
-                                       timestamps, 
-                                       class_dict,
-                                       species=self.species_select[widget_idx],
-                                       accumulate_by=self.accumulate_select[widget_idx])
+                                    binary_presence, 
+                                    timestamps, 
+                                    class_dict,
+                                    species=self.species_select[widget_idx],
+                                    accumulate_by=self.accumulate_select[widget_idx])
+            
         
         return self.plot_widget(self.plot_heatmap, 
                          accumulated_presence=accumulated_presence, 
                          timestamps=timestamps,
                          accumulate_by=self.accumulate_select[widget_idx], 
-                         species=self.species_select[widget_idx])
+                         species=self.species_select[widget_idx],
+                         threshold=threshold)
         
         
-    def plot_heatmap(self, accumulated_presence, timestamps, accumulate_by, species):
+    def plot_heatmap(self, accumulated_presence, timestamps, accumulate_by, species, threshold):
         
         import matplotlib.pyplot as plt
         fig = plt.figure(figsize=[10, 8])
         fig.suptitle(
-            f'Presence heatmap for {species} with threshold of {self.class_threshold}'
+            f'Presence heatmap for {species} with threshold of {threshold}',
+            fontsize=10
             )
-        sns.heatmap(accumulated_presence, 
+        ax = sns.heatmap(accumulated_presence, 
                     vmin=0,
+                    vmax=1,
                     cmap='viridis')
-        locs, labels = plt.xticks()
+        locs, xticklabels = plt.xticks()
         if accumulate_by == 'day':
             labels = np.unique([ts.date() for ts in timestamps])
-        plt.xticks(locs, labels, rotation=45)
+            selected_labels = labels[[int(i.get_text()) for i in xticklabels]]
+        plt.xticks(locs, selected_labels, rotation=45)
         
         locs, labels = plt.yticks()
         plt.yticks(locs, labels, rotation=0)
+        
+        # plt.clabel('Binary presence each hour')
+        
+        fig.set_size_inches(6, 5)
+        fig.set_dpi(300)
+        fig.tight_layout()
         return fig      
     
     def accumulate_data(self, presence, timestamps, class_dict, species, accumulate_by='day'):

@@ -279,14 +279,23 @@ class DashBoard(DashBoardHelper):
             width=800
         )
         
-        self.trigger_classification = pn.bind(self.classify_embeddings, self.model_select[widget_idx], clfier_path, clfier_thresh)
-                
+        self.trigger_classification = pn.bind(
+            self.classify_embeddings, 
+            self.model_select[widget_idx], 
+            clfier_path, 
+            clfier_thresh
+            )
+        
+        self.loading_test_placeholder = pn.widgets.StaticText(
+            name='Preparing classification', 
+            value=''
+            )
             
         main_content = pn.Column(
             pn.pane.Markdown("## All Models Dashboard"),
             pn.Accordion(
                 (
-                    "Linear classifier settings",
+                    "Classification settings",
                     pn.Column(
                         clfier_path,
                 
@@ -302,6 +311,10 @@ class DashBoard(DashBoardHelper):
                     
                         # button to click run
                         btn_run_clfier,
+                        
+                        # placeholder textbox to show that something 
+                        # is happening while waiting on embeddings to load
+                        self.loading_test_placeholder,
                                     
                         # progbar
                         self.progress_bar,
@@ -311,13 +324,16 @@ class DashBoard(DashBoardHelper):
                     "Classification heatmap",
                     # heatmap for 20 top species
                     pn.bind(self.prepare_heatmap,
+                            clfier_thresh,
                             model=self.model_select[widget_idx], 
+                            clfier_type=self.clfier_select[widget_idx],
                             progress=btn_run_clfier)
                 ),
                 active=[0, 1, 2],
                 # by default create all annotations as one big annotations file
                 # # add button to save as raven annotations
                 ),
+                width=900
             )
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
         

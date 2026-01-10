@@ -5,6 +5,8 @@ from pathlib import Path
 import importlib.resources as pkg_resources
 import bacpipe.imgs
 
+from bacpipe.generate_embeddings import Embedder
+
 import numpy as np
 from tqdm import tqdm
 
@@ -215,6 +217,58 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **
         )
     return loader_dict
 
+def run_default_clfier_and_save_results(loader, embed):
+    import torch
+    all_embeds = loader.embedding_dict()
+    for f_name, embeddings in tqdm(
+        all_embeds.items(),
+        desc='Running pretrained classifier',
+        total=len(all_embeds)
+        ):
+        cls_vals = embed.model.classifier_predictions(embeddings)
+        if not isinstance(embeddings, np.ndarray):
+            embed.model.classifier_outputs = torch.cat(
+                [embed.model.classifier_outputs, cls_vals.clone().detach()]
+            )
+        else:
+            embed.model.classifier_outputs = torch.cat(
+                [embed.model.classifier_outputs, torch.Tensor(cls_vals)]
+            )
+        embed.save_classifier_outputs(loader, loader.audio_dir / f_name)
+    del embed
+    import tensorflow as tf
+    tf.keras.backend.clear_session()
+    
+def check_if_default_clfier_should_be_run(
+    loader_dict, model_name, **kwargs
+):
+    if (
+        not loader_dict[model_name].paths.class_path.joinpath(
+            "original_classifier_outputs"
+            ).exists()
+        and loader_dict[model_name].run_pretrained_classifier
+    ):
+        dim_reduction_model = kwargs.pop('dim_reduction_model')
+        if model_name in ['perch_v2', 'perch_bird', 'vggish', 'surfperch', 'google_whale']:
+            logger.warning(
+                f"The google family of models (which {model_name} is part of) "
+                "calculate embeddings and classifications at once, making it "
+                "impossible to only run the classifier, like with any other model. "
+                "Please remove the embeddings corresponding to this model and then "
+                "rerun bacpipe with the setting `run_default_classifier` set to True. "
+                "That way classification results will be saved immediately."
+            )
+            return
+        embed = Embedder(
+            model_name, 
+            paths=loader_dict['birdnet'].paths, 
+            **kwargs
+            )
+        if hasattr(embed.model, 'classifier_predictions'):
+            run_default_clfier_and_save_results(
+                loader_dict[model_name], embed
+                )
+        kwargs['dim_reduction_model'] = dim_reduction_model
 
 def model_specific_evaluation(
     loader_dict, evaluation_task, class_configs, distance_configs, models, **kwargs
@@ -246,7 +300,11 @@ def model_specific_evaluation(
         embedding models
     """
     for model_name in models:
-        if not evaluation_task in ["None", []]:
+        check_if_default_clfier_should_be_run(
+            loader_dict, model_name, **kwargs
+            )
+                
+        if not evaluation_task in ["None", [], False]:
             embeds = loader_dict[model_name].embedding_dict()
             paths = get_paths(model_name)
             try:

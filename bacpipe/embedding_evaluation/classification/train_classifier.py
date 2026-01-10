@@ -4,6 +4,10 @@ import torch.nn.functional as F
 
 from sklearn.neighbors import KNeighborsClassifier
 
+import logging
+
+logger = logging.getLogger("bacpipe")
+
 
 class LinearClassifier(nn.Module):
     def __init__(self, in_dim, out_dim):
@@ -55,7 +59,18 @@ def train_linear_classifier(
         trained linear classificaion object
     """
     device = torch.device(device)
-    linear_classifier = linear_classifier.to(device)
+    try:
+        linear_classifier = linear_classifier.to(device)
+    except RuntimeError:
+        logger.error('Traceback', exc_info=True)
+        logger.info(
+            "This problem is likely cause by tensorflow being a pain in the ****. "
+            "The best fix for this is to simply restart bacpipe with the same settings, "
+            "that way the GPU should be available for pytorch. Alternatively select "
+            "`cpu` for device in the settings.yaml file."
+        )
+        import sys
+        sys.exit(0)
 
     # Define optimizer and loss function
     optimizer = torch.optim.Adam(linear_classifier.parameters(), lr=learning_rate)
