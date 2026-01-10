@@ -78,7 +78,11 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
         "Checking if the selected models require a checkpoint, and if so, "
         "if the checkpoint already exists.\n"
     )
-    
+    remove_from_list = []
+    if 'naturebeats' in model_names and not 'beats' in model_names:
+        model_names.append('beats')
+        remove_from_list = ['beats']
+        
     for model_name in model_names:
         if model_name in NEEDS_CHECKPOINT:
             if ((model_base_path / model_name).exists()
@@ -109,7 +113,8 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
                 tar = tarfile.open(model_base_path / hf_url)
                 tar.extractall(path=model_base_path)
                 tar.close()
-
+                
+    [model_names.remove(l) for l in remove_from_list]
     return model_base_path.parent / "model_checkpoints"
 
 
