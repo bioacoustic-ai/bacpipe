@@ -53,6 +53,8 @@ class DashBoardHelper:
                 embeds = np.load(file)
             else:
                 embeds = np.vstack([embeds, np.load(file)])
+                
+            self.progress_bar.value = int((idx+1)/len(ld.files)*100)
         return torch.Tensor(embeds)
     
     def run_classifier(self, embeds, linear_clfier, threshold):
@@ -86,9 +88,10 @@ class DashBoardHelper:
         
         embeds = self.collect_all_embeddings(model)
         
+        self.loading_test_placeholder.value = 'Running classifier'
+        
         with open(Path(path).parent / 'label2index.json', 'r') as f:
             label2index = json.load(f)
-        self.species_select[0].options = list(label2index.keys())
             
         clfier_weights = torch.load(path)
         clfier = LinearClassifier(clfier_weights['clfier.weight'].shape[-1], len(label2index))
@@ -96,9 +99,24 @@ class DashBoardHelper:
         clfier.to(self.kwargs['device'])
         
         probs = self.run_classifier(embeds, clfier, threshold)
+        
+        label2index = self.reorder_by_most_occurrance(probs, label2index)
+        
+        self.species_select[0].options = list(label2index.keys())
         # self.class_figure
         self.class_tuples = probs, label2index
         return probs, label2index
+    
+    @staticmethod
+    def reorder_by_most_occurrance(probs, label2index):
+        sums = [sum(probs[:,a]) for a in range(probs.shape[1])]
+        
+        sorted_l2i = dict(sorted(
+            label2index.items(), 
+            key=lambda x: sums[x[1]],
+            reverse=True
+            ))
+        return sorted_l2i
         
     def get_timestamps(self, eval_dir, model, label_key):
         from datetime import datetime 
