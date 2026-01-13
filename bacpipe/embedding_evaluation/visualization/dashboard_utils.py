@@ -93,7 +93,7 @@ class DashBoardHelper:
         with open(Path(path).parent / 'label2index.json', 'r') as f:
             label2index = json.load(f)
             
-        clfier_weights = torch.load(path)
+        clfier_weights = torch.load(path, map_location=self.kwargs['device'])
         clfier = LinearClassifier(clfier_weights['clfier.weight'].shape[-1], len(label2index))
         clfier.load_state_dict(clfier_weights)
         clfier.to(self.kwargs['device'])
