@@ -345,7 +345,9 @@ class Loader:
         self.metadata_dict["files"]["file_lengths (s)"].append(
             embed.file_length[file.stem]
         )
-        self.metadata_dict["files"]["nr_embeds_per_file"].append(embeddings.shape[0])
+        self.metadata_dict["files"]["nr_embeds_per_file"].append(
+            1 if len(embeddings.shape) == 1 else embeddings.shape[0]
+            )
 
     def write_metadata_file(self):
         self.metadata_dict["nr_embeds_total"] = sum(
