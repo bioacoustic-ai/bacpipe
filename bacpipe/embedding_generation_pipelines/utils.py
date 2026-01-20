@@ -127,7 +127,7 @@ class ModelBaseClass:
             audio, sr = ta.load(path, normalize=True)
         except Exception as e:
             logger.exception(
-                f"Error loading audio with torchaudio. "
+                f"\nError loading audio with torchaudio. "
                 f"Skipping {path}."
                 f"Error: {e}"
             )
@@ -135,8 +135,9 @@ class ModelBaseClass:
         if audio.shape[0] > 1:
             audio = audio.mean(axis=0).unsqueeze(0)
         if len(audio[0]) == 0:
-            logger.debug(f"Audio file {path} is empty. " f"Skipping {path}.")
-            raise ValueError(f"Audio file {path} is empty.")
+            error = f"Audio file {path} is empty. " f"Skipping {path}."
+            logger.exception(error)
+            raise ValueError(error)
         re_audio = ta.functional.resample(audio, sr, self.sr)
         return re_audio
 

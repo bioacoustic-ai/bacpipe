@@ -53,6 +53,8 @@ class Loader:
         self.initialize_path_structure(testing=testing, **kwargs)
 
         self.check_if_combination_exists = check_if_combination_exists
+        self.continue_failed_run = False
+
         if self.dim_reduction_model:
             self.embed_suffix = ".json"
         else:
@@ -70,7 +72,9 @@ class Loader:
             self._get_audio_paths()
             self._init_metadata_dict()
 
-        if not self.combination_already_exists:
+        if self.continue_failed_run:
+            self._get_metadata_from_created_embeddings()
+        elif not self.combination_already_exists:
             self.embed_dir.mkdir(exist_ok=True, parents=True)
         else:
             logger.debug(
@@ -117,6 +121,40 @@ class Loader:
             existing_embed_dirs.sort()
             self._find_existing_embed_dir(existing_embed_dirs)
 
+    def _get_metadata_from_created_embeddings(self):
+        module = importlib.import_module(
+                f"bacpipe.embedding_generation_pipelines.feature_extractors.{self.model_name}"
+            )
+        already_processed_files = list(Path(self.embed_dir).rglob('*.npy'))
+        already_processed_files.sort()
+        relative_audio_stems = np.array([str(f.relative_to(self.audio_dir)).split('.')[0] for f in self.files])
+        audio_files = np.array(self.files)
+        audio_suffixes = np.array([f.suffix for f in self.files])
+        for file in already_processed_files:
+            with open(file, 'rb') as f:
+                corresponding_audio_file_bool = (
+                    relative_audio_stems==str(
+                        file.relative_to(self.embed_dir)
+                        ).replace(f'_{self.model_name}.npy', '')
+                )
+                embed = np.load(f)
+                self.metadata_dict['files']['audio_files'].append(
+                    relative_audio_stems[corresponding_audio_file_bool][0]
+                    + audio_suffixes[corresponding_audio_file_bool][0]
+                )
+                self.metadata_dict['files']['nr_embeds_per_file'].append(
+                    embed.shape[0]
+                )
+                self.metadata_dict['files']['file_lengths (s)'].append(
+                    embed.shape[0] * (module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE)
+                )
+                self._update_audio_file_list(audio_files, corresponding_audio_file_bool)        
+        
+    def _update_audio_file_list(self, audio_files, corresponding_audio_file_bool):
+        self.files.remove(
+            audio_files[corresponding_audio_file_bool][0]
+        )
+
     def _find_existing_embed_dir(self, existing_embed_dirs):
         for d in existing_embed_dirs[::-1]:
 
@@ -127,10 +165,18 @@ class Loader:
                         continue
                     except OSError:
                         logger.info(
-                            f"Directory {d} is not empty. ",
-                            "Please remove it manually.",
+                            f"\nThe directory {d} is not empty. "
+                            "It seems like a previous run failed, "
+                            "bacpipe is comparing what files were already "
+                            "created and will then continue where it left off."
+                            "If you interrupted the run on purpose and want to "
+                            "start from the beginning, please cancel using "
+                            "Ctrl + C and then remove "
+                            f"the folder {d} manually."
                         )
-                        continue
+                        self.continue_failed_run = True
+                        self.embed_dir = d
+                        return d
                 with open(d.joinpath("metadata.yml"), "r") as f:
                     mdata = yaml.load(f, Loader=yaml.CLoader)
                     if not self.model_name == mdata["model_name"]:
@@ -157,7 +203,7 @@ class Loader:
                         self._get_metadata_dict(d)
                         self.combination_already_exists = True
                         logger.info(
-                            f"Error: {e}. "
+                            f"\nError: {e}. "
                             "Will proceed without veryfying if the number of embeddings "
                             "is the same as the number of audio files."
                         )
@@ -176,7 +222,7 @@ class Loader:
                         )
                         break
                     elif (
-                        np.round(num_files / num_audio_files, 1) == 1
+                        np.round(num_files / num_audio_files, 1) == 1 # allow 5 % deviation
                         and num_files > 100
                     ):
                         self.combination_already_exists = True
@@ -195,7 +241,8 @@ class Loader:
     def _get_audio_paths(self):
         self.files = self._get_audio_files()
         self.files.sort()
-        self.embed_dir = Path(self.embed_parent_dir).joinpath(self.get_timestamp_dir())
+        if not self.continue_failed_run:
+            self.embed_dir = Path(self.embed_parent_dir).joinpath(self.get_timestamp_dir())
 
     def _get_annotation_files(self):
         all_annotation_files = list(self.audio_dir.rglob("*.csv"))
@@ -602,11 +649,13 @@ class Embedder:
             if not isinstance(sample, Path):
                 sample = Path(sample)
                 if not sample.suffix in self.model.audio_suffixes:
-                    raise AssertionError(
-                        "The provided path does not lead to a supported audio file with the ending"
+                    error = (
+                        "\nThe provided path does not lead to a supported audio file with the ending"
                         f" {self.model.audio_suffixes}. Please check again that you provided the correct"
                         " path."
                     )
+                    logger.exception(error)
+                    raise AssertionError(error)
             sample = self.prepare_audio(sample)
             embeds = self.get_embeddings_for_audio(sample)
 
@@ -711,6 +760,13 @@ class Embedder:
             "Threshold for classifier predictions": threshold,
         }
         return cls_results
+    
+    def run_clfier_for_previous_embeddings(self, fileloader_obj):
+        existing_embeddings = list(Path(fileloader_obj.embed_dir).rglob('*.npy'))
+        for file in existing_embeddings:
+            with open(file, 'rb') as f:
+                embed = np.load(f)
+                
     
     def fill_dataframe_with_classiefier_results(self, fileloader_obj, file):
         """
