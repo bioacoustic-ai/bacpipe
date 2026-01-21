@@ -20,6 +20,8 @@ from sklearn.metrics import homogeneity_score as HS
 
 from tqdm import tqdm
 
+from bacpipe.embedding_evaluation.label_embeddings import DefaultLabels as Labels
+
 config.overwrite = False
 config.audio_dir = 'unknown_sounds_2_within_file_1_diff_file_3s'
 config.already_computed = True
@@ -165,11 +167,14 @@ eval_name = 'species_vs_infile_noise'
 def plotly_mutual_information(model, clust_name, species, eval_name):
         current_labels = [l if l == species else 'noise' for l in labels[label_dict_bool[eval_name][species]]]
 
-        label_colors = {i: rgb2hex(c) for i, c in enumerate(plt.colormaps['tab20'].colors)}
+        # label_colors = {i: rgb2hex(c) for i, c in enumerate(plt.colormaps['tab20'].colors)}
+        label_colors = {i: rgb2hex(c) for i, c in enumerate(plt.colormaps['tab10'].colors)}
+        label_colors[11] = label_colors[3]
 
         fig = make_subplots(
-        rows=2, cols=2,
-        subplot_titles=(model, f'{clust_name=} {eval_name=} {species=} score={clust_results[model][clust_name][eval_name][species]}.4f'),
+        rows=2, cols=1,
+        subplot_titles=(model, 
+                        f'{clust_name=} {eval_name=} {species=} score={clust_results[model][clust_name][eval_name][species]}:.4f'),
         horizontal_spacing=0.1,
         vertical_spacing=0.12
         )
@@ -204,7 +209,7 @@ def plotly_mutual_information(model, clust_name, species, eval_name):
                                 opacity=0.5,
                                 legendgroup=label,  # Group for shared legend
                                 showlegend=False
-                        ), row=1, col=2)
+                        ), row=2, col=1)
                         
                 fig.add_trace(go.Scatter(
                         x=umaps[model][b_array, 0][mask_mask],
@@ -225,11 +230,15 @@ def plotly_mutual_information(model, clust_name, species, eval_name):
                 ), row=1, col=1)
                 
 
-        fig.update_layout(height=1200, width=1600, hovermode='closest')
+        fig.update_layout(height=1200, width=800, hovermode='closest')
         fig.write_html('test.html')
-        fig.show()
+        # fig.show()
+        return fig
 
-plotly_mutual_information(model, clust_name, species, eval_name)
+fig = plotly_mutual_information(model, clust_name, species, eval_name)
+from interactive_plot import interactive_plot
+file_dts = [Labels.get_dt_filename(f) for f in filename]
+interactive_plot(fig, title='Test')
         
 def plotly_compare_models():
         unique_labels = np.unique(labels)
@@ -269,3 +278,5 @@ def plotly_compare_models():
         fig.update_layout(height=1200, width=1600, hovermode='closest')
         fig.write_html('test.html')
         fig.show()
+        
+        
