@@ -196,7 +196,7 @@ def make_set_paths_func(
         """
         Generate model specific paths for the results of the embedding evaluation.
         This includes paths for the embeddings, labels, clustering, classification,
-        distances, and plots. The paths are created based on the audio directory,
+        and plots. The paths are created based on the audio directory,
         and model name.
 
         Parameters
@@ -223,7 +223,6 @@ def make_set_paths_func(
             "labels_path": task_path.joinpath("labels"),
             "clust_path": task_path.joinpath("clustering"),
             "class_path": task_path.joinpath("classification"),
-            "distances_path": task_path.joinpath("distances"),
             "plot_path": task_path.joinpath("plots"),
         }
 
@@ -233,7 +232,6 @@ def make_set_paths_func(
         paths.labels_path.mkdir(exist_ok=True, parents=True)
         paths.clust_path.mkdir(exist_ok=True)
         paths.class_path.mkdir(exist_ok=True)
-        paths.distances_path.mkdir(exist_ok=True)
         paths.plot_path.mkdir(exist_ok=True)
         return paths
 

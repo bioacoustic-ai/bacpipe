@@ -28,9 +28,6 @@ from bacpipe.embedding_evaluation.classification.classify import classification_
 
 from bacpipe.embedding_evaluation.clustering.cluster import clustering
 
-from bacpipe.embedding_evaluation.distance_evalutation.distances import (
-    calc_distances,
-)
 
 from bacpipe.embedding_evaluation.visualization.dashboard import DashBoard
 
@@ -108,7 +105,7 @@ def evaluation_with_settings_already_exists(
     """
     Check if the evaluation with the specified settings already exists.
     The function checks if the embeddings, dimensionality reduction,
-    classification, clustering, and distance evaluation results
+    classification and clustering evaluation results
     already exist in the specified directory. If any of these
     results do not exist, the function returns False. Otherwise,
     it returns True.
@@ -255,7 +252,7 @@ def check_if_default_clfier_should_be_run(
                 "calculate embeddings and classifications at once, making it "
                 "impossible to only run the classifier, like with any other model. "
                 "Please remove the embeddings corresponding to this model and then "
-                "rerun bacpipe with the setting `run_default_classifier` set to True. "
+                "rerun bacpipe with the setting `run_pretrained_classifier` set to True. "
                 "That way classification results will be saved immediately."
             )
             return
@@ -271,14 +268,14 @@ def check_if_default_clfier_should_be_run(
         kwargs['dim_reduction_model'] = dim_reduction_model
 
 def model_specific_evaluation(
-    loader_dict, evaluation_task, class_configs, distance_configs, models, **kwargs
+    loader_dict, evaluation_task, class_configs, models, **kwargs
 ):
     """
     Perform evaluation of the embeddings using the specified
     evaluation task. The evaluation task can be either
-    classification, clustering, or pairwise distances.
+    classification or clustering.
     The evaluation is performed using the functions from
-    the classification, clustering, and distance modules.
+    the classification and clustering modules.
     The results of the evaluation are saved in the directory
     specified by the audio_dir parameter. The function
     returns a dictionary containing the paths for the
@@ -294,8 +291,6 @@ def model_specific_evaluation(
         dictionary containing the configuration for the
         classification tasks. The configurations are specified
         in the bacpipe/settings.yaml file.
-    distance_configs : dict
-        dictionary to specify which distance calculations to perform
     models : list
         embedding models
     """
@@ -347,10 +342,6 @@ def model_specific_evaluation(
             embeds_array = np.concatenate(list(embeds.values()))
             clustering(paths, embeds_array, ground_truth, **kwargs)
 
-        if "pairwise_distances" in evaluation_task:
-            for dist_config in distance_configs.values():
-                if dist_config["bool"]:
-                    calc_distances(paths, embeds, **dist_config)
 
 
 def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwargs):

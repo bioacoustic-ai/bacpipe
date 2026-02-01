@@ -39,9 +39,9 @@ kwargs = {**config, **settings}
 embeddings = {}
 with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
     audio_dir = Path(audio_dir)
-config["audio_dir"] = audio_dir
+kwargs["audio_dir"] = audio_dir
 get_paths = make_set_paths_func(**kwargs)
-
+print(audio_dir)
 
 # -------------------------------------------------------------------------
 # Helper functions

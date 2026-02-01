@@ -566,7 +566,7 @@ It is important that the name of this directory remains unchanged, so that it ca
 
 ### Evaluation folders
 
-Within the `evaluations_dir` folder, you will find the following folders: `classification`, `clustering`, `distances`, `labels` and `plots`. These folders will be filled with results if the corresponding evaluation tasks are selected. `distanctes` is currently not supported and therefore only a place-holder. `label` will contain a `.npy` file containing the auto-generated labels from the metadata and if available ground_truth.
+Within the `evaluations_dir` folder, you will find the following folders: `classification`, `clustering`, `labels` and `plots`. These folders will be filled with results if the corresponding evaluation tasks are selected. `distanctes` is currently not supported and therefore only a place-holder. `label` will contain a `.npy` file containing the auto-generated labels from the metadata and if available ground_truth.
 
 ### Pretrained classifier annotations
 
@@ -608,7 +608,6 @@ This is the resulting folder structure:
     │   │           ├── FewShot
     │   │           └── UrbanSoundscape
     │   ├── clustering
-    │   ├── distances
     │   ├── labels
     │   └── plots
     ├── overview
@@ -619,7 +618,6 @@ This is the resulting folder structure:
         │           ├── FewShot
         │           └── UrbanSoundscape
         ├── clustering
-        ├── distances
         ├── labels
         └── plots
 ```
