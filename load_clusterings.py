@@ -23,7 +23,8 @@ from tqdm import tqdm
 from bacpipe.embedding_evaluation.label_embeddings import DefaultLabels as Labels
 
 config.overwrite = False
-config.audio_dir = 'unknown_sounds_2_within_file_1_diff_file_3s'
+config.audio_dir = 'data/unknown_sounds_2_within_1_diff_3s_minimum'
+settings.run_pretrained_classifier = False
 config.already_computed = True
 # config.models = ['birdnet']
 config.dim_reduction_model='None'
@@ -52,13 +53,16 @@ for model in loader_dict.keys():
         umap = list(umap_loader_dict[model].embedding_dict().values())[0].item()
         umaps[model] = np.array([np.array([x, y]) for x, y in zip(umap['x'], umap['y'])])
 
-file_name = 'unknown_sounds_2_within_file_1_diff_file_3s.h5'
+file_name = config.audio_dir + '.h5'
+# file_name = 'data/unknown_sounds_2_within_1_diff_3s_minimum.h5'
 data_file = h5py.File(file_name)
 
 labels = data_file['labels'][:].astype(str)
-dataset = data_file['datasets'][:].astype(str)
-filename = data_file['filenames'][:].astype(str)
-start = data_file['starts'][:].astype(str)
+datasets = data_file['datasets'][:].astype(str)
+filenames = data_file['filenames'][:].astype(str)
+starts = data_file['starts'][:].astype(str)
+ends = data_file['ends'][:].astype(str)
+length_of_annotations = data_file['length_of_annotations'][:].astype(str)
 
 if False:
         label_dict_bool = {}
@@ -157,9 +161,9 @@ else:
                 
 print(clust_results)
 
-model = 'naturebeats'
+model = 'birdnet'
 clust_name = 'hdb'
-species = 'Dendropsophus cruzi'
+species = 'Black-bellied Plover'
 eval_name = 'species_vs_infile_noise'
 # Convert string labels to numeric codes for coloring
 
@@ -168,8 +172,8 @@ def plotly_mutual_information(model, clust_name, species, eval_name):
         current_labels = [l if l == species else 'noise' for l in labels[label_dict_bool[eval_name][species]]]
 
         # label_colors = {i: rgb2hex(c) for i, c in enumerate(plt.colormaps['tab20'].colors)}
-        label_colors = {i: rgb2hex(c) for i, c in enumerate(plt.colormaps['tab10'].colors)}
-        label_colors[11] = label_colors[3]
+        label_colors = {i: rgb2hex(c) for i, c in enumerate(plt.colormaps['tab20'].colors)}
+        # label_colors[11] = label_colors[3]
 
         fig = make_subplots(
         rows=2, cols=1,
@@ -184,6 +188,8 @@ def plotly_mutual_information(model, clust_name, species, eval_name):
                 '<br>dataset: %{{customdata[0]}}'
                 '<br>filename: %{{customdata[1]}}'
                 '<br>start: %{{customdata[2]}}'
+                '<br>end: %{{customdata[5]}}'
+                '<br>idx: %{{customdata[4]}}'
                 '<extra></extra>'
                 )
 
@@ -200,10 +206,12 @@ def plotly_mutual_information(model, clust_name, species, eval_name):
                                 name=label,
                                 marker=dict(size=8, color=label_colors[len(np.unique(current_labels))+clust_label]),
                                 customdata=np.column_stack((
-                                        dataset[b_array][mask_mask][clust_mask], 
-                                        filename[b_array][mask_mask][clust_mask], 
-                                        start[b_array][mask_mask][clust_mask],
+                                        datasets[b_array][mask_mask][clust_mask], 
+                                        filenames[b_array][mask_mask][clust_mask], 
+                                        starts[b_array][mask_mask][clust_mask],
                                         clust_dict[model][clust_name][b_array][mask_mask][clust_mask],
+                                        np.arange(len(starts))[b_array][mask_mask][clust_mask],
+                                        ends[b_array][mask_mask][clust_mask]
                                         )),
                                 hovertemplate=hover.format(label),
                                 opacity=0.5,
@@ -218,10 +226,12 @@ def plotly_mutual_information(model, clust_name, species, eval_name):
                         name=label,
                         marker=dict(size=8, color=label_colors[l_idx]),
                         customdata=np.column_stack((
-                                dataset[b_array][mask_mask], 
-                                filename[b_array][mask_mask], 
-                                start[b_array][mask_mask],
-                                [False] * len(start[b_array][mask_mask])
+                                datasets[b_array][mask_mask], 
+                                filenames[b_array][mask_mask], 
+                                starts[b_array][mask_mask],
+                                [False] * len(starts[b_array][mask_mask]),
+                                np.arange(len(starts))[b_array][mask_mask],
+                                ends[b_array][mask_mask]
                                 )),
                         hovertemplate=hover.format(label),
                         opacity=0.5,
@@ -237,7 +247,7 @@ def plotly_mutual_information(model, clust_name, species, eval_name):
 
 fig = plotly_mutual_information(model, clust_name, species, eval_name)
 from interactive_plot import interactive_plot
-file_dts = [Labels.get_dt_filename(f) for f in filename]
+file_dts = [Labels.get_dt_filename(f) for f in filenames]
 interactive_plot(fig, title='Test')
         
 def plotly_compare_models():
@@ -264,7 +274,7 @@ def plotly_compare_models():
                                 mode='markers',
                                 name=label,
                                 marker=dict(size=8, color=label_colors[label]),
-                                customdata=np.column_stack((dataset[mask], filename[mask], start[mask])),
+                                customdata=np.column_stack((datasets[mask], filenames[mask], starts[mask])),
                                 hovertemplate=f'<b>{label}</b><br>dataset: %{{customdata[0]}}<br>filename: %{{customdata[1]}}<br>start: %{{customdata[2]}}<extra></extra>',
                                 legendgroup=label,  # Group for shared legend
                                 showlegend=showlegend

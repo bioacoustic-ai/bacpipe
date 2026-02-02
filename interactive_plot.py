@@ -8,6 +8,7 @@ import numpy as np
 SAMPLE_RATE = 48_000
 EXAMPLE_WINDOW_SECONDS = 3.
 SPEC_WIN_LEN = 1024
+PAD_FUNC = 'minimum'
 
 import librosa as lb
 import sounddevice as sd
@@ -128,16 +129,20 @@ def interactive_plot(fig, title='Testing'):
             return px.imshow(dummy_image()), "file: ..."
         
         # Extract data from click
-        point_data = clickData['points'][0].get('customdata', [None]*4)
-        dataset, filename, t_in_file, cluster = point_data
+        point_data = clickData['points'][0].get('customdata', [None]*6)
+        dataset, filename, start_s, cluster, idx, end_s = point_data
         
-        audio, sr, file_stem = load_audio(t_in_file, filename, dataset)
+        audio, sr, file_stem = load_audio(start_s, end_s, filename, dataset)
+        # import h5py
+        # file_name = 'unknown_sounds_2_within_file_1_diff_file_3s.h5'
+        # data_file = h5py.File(file_name)
+        # audio = data_file['audio'][int(idx)]
         spec_fig = create_specs(audio)
         
         # Update title info
         heading = html.P([
             f"file: {file_stem}", html.Br(),
-            f"time in file: {t_in_file}"
+            f"time in file: {start_s}"
         ])
 
         # Handle Audio logic
@@ -166,14 +171,21 @@ def play_audio(audio, sr):
     sd.play(fade_audio(audio), sr)
     
     
-def load_audio(t_s, filename, dataset):
+def load_audio(start, end, filename, dataset):
     path = list(Path(SRCS[dataset]).rglob(filename))[0]
     
     audio, sr = lb.load(path, 
-                        offset=float(t_s), 
-                        sr=SAMPLE_RATE, 
-                        duration = EXAMPLE_WINDOW_SECONDS)
-    return audio, sr, path.stem
+                        offset=float(start), 
+                        # sr=SAMPLE_RATE, 
+                        # duration = EXAMPLE_WINDOW_SECONDS)
+                        duration = float(end)-float(start))
+    
+    audio_padded = lb.util.fix_length(
+                audio,
+                size=int(EXAMPLE_WINDOW_SECONDS * sr),
+                mode=PAD_FUNC,
+            )
+    return audio_padded, sr, path.stem
  
 def set_axis_lims_dep_sr(S_dB):
     if PREPROC['downsample']:
