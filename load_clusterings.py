@@ -23,10 +23,10 @@ from tqdm import tqdm
 from bacpipe.embedding_evaluation.label_embeddings import DefaultLabels as Labels
 
 config.overwrite = False
-config.audio_dir = 'data/unknown_sounds_2_within_1_diff_3s_minimum'
+config.audio_dir = 'data/unknown_sounds_2_within_1_diff_3s_pad_constant'
 settings.run_pretrained_classifier = False
-config.already_computed = True
-# config.models = ['birdnet']
+# config.already_computed = True
+config.models = ['birdnet']
 config.dim_reduction_model='None'
 
 loader_dict = model_specific_embedding_creation(
@@ -64,6 +64,9 @@ starts = data_file['starts'][:].astype(str)
 ends = data_file['ends'][:].astype(str)
 length_of_annotations = data_file['length_of_annotations'][:].astype(str)
 
+main_results_path = Path('data') / Path(config.audio_dir).stem
+main_results_path.mkdir(exist_ok=True, parents=True)
+
 if False:
         label_dict_bool = {}
         for eval_name in ['species_vs_species', 'species_vs_infile_noise', 'species_vs_other_noise', 'species_vs_all']:
@@ -86,7 +89,7 @@ if False:
                                 this_species_filenames = np.unique([
                                         f 
                                         for idx, f 
-                                        in enumerate(filename) 
+                                        in enumerate(filenames) 
                                         if labels[idx] == species
                                         ])
                                 within_files = [
@@ -94,7 +97,7 @@ if False:
                                         if fn in this_species_filenames 
                                         and labels[idx] == 'within_file' 
                                         else False 
-                                        for idx, fn in enumerate(filename)
+                                        for idx, fn in enumerate(filenames)
                                         ]
                                 labels_bool = [a or b for a,b in zip (labels_bool, within_files)]
                         elif eval_name == 'species_vs_other_noise':
@@ -142,21 +145,21 @@ if False:
                                         ground_truth = [1 if l == species else 0 for l in labels[b_array]]
                                         clustering = clust[b_array]
                                         clust_results[model_name][clust_name][eval_name].update({
-                                                        species: HS(clustering, ground_truth)
+                                                        species: AMI(clustering, ground_truth)
                                         })
                                 clust_results[model_name][clust_name][eval_name].update({
                                         'avg': np.mean(list(clust_results[model_name][clust_name][eval_name].values()))
                                 })        
-        with open('label_dict_bool.npy', 'wb') as f:
+        with open(main_results_path / 'label_dict_bool.npy', 'wb') as f:
                 np.save(f, label_dict_bool, allow_pickle=True)
-        with open('clust_results.npy', 'wb') as f:
+        with open(main_results_path / 'clust_results.npy', 'wb') as f:
                 np.save(f, clust_results, allow_pickle=True)
-        with open('clust_dict.npy', 'wb') as f:
+        with open(main_results_path / 'clust_dict.npy', 'wb') as f:
                 np.save(f, clust_dict, allow_pickle=True)
 else:
-        clust_results = np.load('clust_results.npy', allow_pickle=True).item()
-        clust_dict = np.load('clust_dict.npy', allow_pickle=True).item()
-        label_dict_bool = np.load('label_dict_bool.npy', allow_pickle=True).item()
+        clust_results = np.load(main_results_path / 'clust_results.npy', allow_pickle=True).item()
+        clust_dict = np.load(main_results_path / 'clust_dict.npy', allow_pickle=True).item()
+        label_dict_bool = np.load(main_results_path / 'label_dict_bool.npy', allow_pickle=True).item()
         
                 
 print(clust_results)
@@ -166,89 +169,41 @@ clust_name = 'hdb'
 species = 'Black-bellied Plover'
 eval_name = 'species_vs_infile_noise'
 # Convert string labels to numeric codes for coloring
+print(clust_results[model][clust_name][eval_name][species])
+print(clust_results[model]['kmeans'][eval_name][species])
 
+clust_name_list = list(clust_results[model].keys())
+eval_name_list = list(clust_results[model]['kmeans'].keys())
+species_list = list(clust_results[model][clust_name][eval_name].keys())
+species_list.remove('avg')
 
-def plotly_mutual_information(model, clust_name, species, eval_name):
-        current_labels = [l if l == species else 'noise' for l in labels[label_dict_bool[eval_name][species]]]
+dropdown_vars = {
+        'def_clust': clust_name,
+        'def_eval': eval_name,
+        'def_species': species,
+        'clust_opts': clust_name_list,
+        'species_opts': species_list,
+        'eval_opts': eval_name_list,
+}
 
-        # label_colors = {i: rgb2hex(c) for i, c in enumerate(plt.colormaps['tab20'].colors)}
-        label_colors = {i: rgb2hex(c) for i, c in enumerate(plt.colormaps['tab20'].colors)}
-        # label_colors[11] = label_colors[3]
-
-        fig = make_subplots(
-        rows=2, cols=1,
-        subplot_titles=(model, 
-                        f'{clust_name=} {eval_name=} {species=} score={clust_results[model][clust_name][eval_name][species]}:.4f'),
-        horizontal_spacing=0.1,
-        vertical_spacing=0.12
-        )
-        hover = (
-                '<b>{}</b>'
-                '<br>cluster: %{{customdata[3]}}'
-                '<br>dataset: %{{customdata[0]}}'
-                '<br>filename: %{{customdata[1]}}'
-                '<br>start: %{{customdata[2]}}'
-                '<br>end: %{{customdata[5]}}'
-                '<br>idx: %{{customdata[4]}}'
-                '<extra></extra>'
-                )
-
-        for l_idx, label in enumerate(np.unique(current_labels)):
-                b_array = label_dict_bool[eval_name][species]
-                mask_mask = np.array(current_labels) == label
-                
-                for clust_label in np.unique(clust_dict[model][clust_name][b_array][mask_mask]):
-                        clust_mask = clust_dict[model][clust_name][b_array][mask_mask] == clust_label
-                        fig.add_trace(go.Scatter(
-                                x=umaps[model][b_array, 0][mask_mask][clust_mask],
-                                y=umaps[model][b_array, 1][mask_mask][clust_mask],
-                                mode='markers',
-                                name=label,
-                                marker=dict(size=8, color=label_colors[len(np.unique(current_labels))+clust_label]),
-                                customdata=np.column_stack((
-                                        datasets[b_array][mask_mask][clust_mask], 
-                                        filenames[b_array][mask_mask][clust_mask], 
-                                        starts[b_array][mask_mask][clust_mask],
-                                        clust_dict[model][clust_name][b_array][mask_mask][clust_mask],
-                                        np.arange(len(starts))[b_array][mask_mask][clust_mask],
-                                        ends[b_array][mask_mask][clust_mask]
-                                        )),
-                                hovertemplate=hover.format(label),
-                                opacity=0.5,
-                                legendgroup=label,  # Group for shared legend
-                                showlegend=False
-                        ), row=2, col=1)
-                        
-                fig.add_trace(go.Scatter(
-                        x=umaps[model][b_array, 0][mask_mask],
-                        y=umaps[model][b_array, 1][mask_mask],
-                        mode='markers',
-                        name=label,
-                        marker=dict(size=8, color=label_colors[l_idx]),
-                        customdata=np.column_stack((
-                                datasets[b_array][mask_mask], 
-                                filenames[b_array][mask_mask], 
-                                starts[b_array][mask_mask],
-                                [False] * len(starts[b_array][mask_mask]),
-                                np.arange(len(starts))[b_array][mask_mask],
-                                ends[b_array][mask_mask]
-                                )),
-                        hovertemplate=hover.format(label),
-                        opacity=0.5,
-                        legendgroup=label,  # Group for shared legend
-                        showlegend=True
-                ), row=1, col=1)
-                
-
-        fig.update_layout(height=1200, width=800, hovermode='closest')
-        fig.write_html('test.html')
-        # fig.show()
-        return fig
-
-fig = plotly_mutual_information(model, clust_name, species, eval_name)
-from interactive_plot import interactive_plot
+from interactive_plot import InteractivePlot
 file_dts = [Labels.get_dt_filename(f) for f in filenames]
-interactive_plot(fig, title='Test')
+
+padding_func = main_results_path.stem.split('_')[-1]
+plot_obj = InteractivePlot(
+        data_file,
+        clust_results,
+        label_dict_bool,
+        clust_dict,
+        umaps,
+        src_path = '/media/siriussound/Extreme SSD/Recordings',
+        sample_rate = 48_000,
+        example_window_seconds = 3.,
+        pad_func = padding_func
+        )
+
+# fig = plotly_mutual_information(model, clust_name, species, eval_name)
+plot_obj.interactive_plot('birdnet', title=f'cluster_evaluation {padding_func}', port=8050, **dropdown_vars)
         
 def plotly_compare_models():
         unique_labels = np.unique(labels)
