@@ -149,11 +149,13 @@ def play(config=config, settings=settings, bool_save_logs=False):
             audio_dir = Path(audio_dir)
 
         if not audio_dir.exists():
-            raise FileNotFoundError(
-                f"Audio directory {config.audio_dir} does not exist. Please check the path. "
+            error = (
+                f"\nAudio directory {config.audio_dir} does not exist. Please check the path. "
                 "It should be in the format 'C:\\path\\to\\audio' on Windows or "
                 "'/path/to/audio' on Linux/Mac. Use single quotes '!"
             )
+            logger.exception(error)
+            raise FileNotFoundError(error)
         else:
             config.audio_dir = audio_dir
 

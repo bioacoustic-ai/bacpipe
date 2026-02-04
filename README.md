@@ -100,7 +100,7 @@ available_models : [
     "mix2"
     "naturebeats"
     "perch_bird"
-    "pervh_v2"
+    "perch_v2"
     "protoclr"
     "rcl_fs_bsed"
     "surfperch"

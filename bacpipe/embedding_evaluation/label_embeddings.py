@@ -32,9 +32,11 @@ class DefaultLabels:
         self.nr_embeds_per_file = self.metadata["files"]["nr_embeds_per_file"]
         self.nr_embeds_total = self.metadata["nr_embeds_total"]
         if not sum(self.nr_embeds_per_file) == self.nr_embeds_total:
-            raise ValueError(
-                "The number of embeddings per file does not match the total number of embeddings."
-            )
+            error = (
+                "\nThe number of embeddings per file does not match "
+                "the total number of embeddings.")
+            logger.exception(error)
+            raise ValueError(error)
 
     def generate(self):
         self.default_label_dict = {}
@@ -139,10 +141,31 @@ class DefaultLabels:
             self.default_label_keys.remove("default_classifier")
         else:
             df = pd.read_csv(path)
+            if not len(self.parent_directory_per_embedding) == len(df):
+                df = self.fill_remaining_labels(df)
             self.default_classifier_per_embedding = df[
                 "label:default_classifier"
             ].values.tolist()
 
+    def fill_remaining_labels(self, df):
+        seg_len = self.metadata['segment_length (samples)'] / self.metadata['sample_rate (Hz)']
+        df_new = {
+            'start': [],
+            'end': [],
+            'audiofilename': [],
+            'label:default_classifier': []
+        }
+        for file, nr_embeds in zip(self.metadata['files']['audio_files'], self.metadata['files']['nr_embeds_per_file']):
+            df_part = df[df.audiofilename == file]
+            all_time_bins = (np.arange(nr_embeds) * seg_len).tolist()
+            [all_time_bins.remove(l) for l in df_part.start]
+            df_new['start'].extend(all_time_bins)
+            df_new['end'].extend((np.array(all_time_bins) + seg_len).tolist())
+            df_new['audiofilename'].extend([file] * len(all_time_bins))
+            df_new['label:default_classifier'].extend(['below_thresh'] * len(all_time_bins))
+            
+        df = pd.concat([df, pd.DataFrame(df_new)], ignore_index=True)
+        return df.sort_values(['audiofilename', 'start'])
 
 def make_set_paths_func(
     audio_dir,
@@ -350,10 +373,12 @@ def model_specific_embedding_path(path, model, dim_reduction_model=None, **kwarg
         ]
     embed_paths_for_this_model.sort()
     if len(embed_paths_for_this_model) == 0:
-        raise ValueError(
-            f"No embeddings found for model {model} in {path}. "
+        error = (
+            f"\nNo embeddings found for model {model} in {path}. "
             "Please check the directory path."
         )
+        logger.exception(error)
+        raise ValueError(error)
     elif len(embed_paths_for_this_model) > 1:
         logger.info(
             f"Multiple embeddings found for model {model} in {path}. "
@@ -713,10 +738,12 @@ def ground_truth_by_model(
 
 def generate_annotations_for_classification_task(paths, label_column, **kwargs):
     if not paths.labels_path.joinpath("ground_truth.npy").exists():
-        raise ValueError(
-            "The ground truth label file ground_truth.npy does not exist. "
-            "Please create it first."
+        error = (
+            "\nThe ground truth label file ground_truth.npy does not exist. "
+            "Please create it first by rerunning with `overwrite=True`."
         )
+        logger.exception(error)
+        raise ValueError(error)
     ground_truth = np.load(
         paths.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
     ).item()

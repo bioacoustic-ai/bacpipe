@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 import importlib.resources as pkg_resources
 import bacpipe.imgs
+import soundfile
 
 from bacpipe.generate_embeddings import Embedder
 
@@ -82,13 +83,15 @@ def get_model_names(
             if d.is_dir()
         ]
         if not model_names:
-            raise ValueError(
-                "No embedding models found in the specified directory. "
+            error = (
+                "\nNo embedding models found in the specified directory. "
                 "You have selected the option to use already computed embeddings, "
                 "but no embeddings were found. Please check the directory path."
                 " If you want to compute new embeddings, please set the "
                 "'already_computed' option to False in the config.yaml file."
             )
+            logger.exception(error)
+            raise ValueError(error)
         else:
             return np.unique(model_names).tolist()
     else:
@@ -323,12 +326,14 @@ def model_specific_evaluation(
             for class_config in class_configs.values():
                 if class_config["bool"]:
                     if not len(class_embeds) > 0:
-                        raise AssertionError(
-                            "No embeddings were found for classification task. "
+                        error = (
+                            "\nNo embeddings were found for classification task. "
                             "Are you sure there are annotations for the data and the annotations.csv file "
                             "has been correctly linked? If you didn't intent do do classification, "
                             "simply remove it from the evaluation tasks list in the config.yaml file."
                         )
+                        logger.exception(error)
+                        raise AssertionError(error)
                     classification_pipeline(
                         paths, class_embeds, **class_config, **kwargs
                     )
@@ -403,7 +408,7 @@ def visualize_using_dashboard(models, **kwargs):
         dashboard.build_layout()
     except Exception as e:
         logger.exception(
-            f"Error building dashboard layout: {e}\n \n "
+            f"\nError building dashboard layout: {e}\n \n "
             "Are you sure all the evaluations have been performed? "
             "If not, rerun the pipeline with `overwrite=True`.\n \n "
         )
@@ -446,7 +451,7 @@ def get_embeddings(
         **kwargs,
     )
 
-    if not dim_reduction_model == "None":
+    if not dim_reduction_model in ["None", False]:
 
         assert len(loader_embeddings.files) > 1, (
             "Too few files to perform dimensionality reduction. "
@@ -500,7 +505,9 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
             f"\n\n\n###### Generating embeddings using {kwargs['model_name'].upper()} ######\n"
         )
     else:
-        raise ValueError("model_name not provided in kwargs.")
+        error = "\nmodel_name not provided in kwargs."
+        logger.exception(error)
+        raise ValueError(error)
     if kwargs['model_name'] in TF_MODELS:
         import tensorflow as tf
     try:
@@ -535,18 +542,25 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                     tqdm(ld.files, desc="processing files", position=1, leave=False)
                 ):
                     try:
-                        embeddings = embed.get_embeddings_from_model(file)
-                    except tf.errors.ResourceExhaustedError:
-                                                   
-                        logger.error(
-                            "\nGPU device is out of memory. Your Vram doesn't seem to be "
-                            "large enough for this process. This could be down to the "
-                            "size of the audio files. Use `cpu` instead of `cuda`."
-                        )
-                        os._exit(1) 
+                        try:
+                            embeddings = embed.get_embeddings_from_model(file)
+                        except soundfile.LibsndfileError as e:
+                            logger.warning(
+                                f"\n Error loading audio, skipping file. \n"
+                                f"Error: {e}"
+                            )
+                            continue
+                        except tf.errors.ResourceExhaustedError:
+                                                    
+                            logger.error(
+                                "\nGPU device is out of memory. Your Vram doesn't seem to be "
+                                "large enough for this process. This could be down to the "
+                                "size of the audio files. Use `cpu` instead of `cuda`."
+                            )
+                            os._exit(1) 
                     except Exception as e:
                         logger.warning(
-                            f"Error generating embeddings, skipping file. \n"
+                            f"\n Error generating embeddings, skipping file. \n"
                             f"Error: {e}"
                         )
                         continue

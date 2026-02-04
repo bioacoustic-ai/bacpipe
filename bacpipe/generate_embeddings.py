@@ -53,6 +53,8 @@ class Loader:
         self.initialize_path_structure(testing=testing, **kwargs)
 
         self.check_if_combination_exists = check_if_combination_exists
+        self.continue_failed_run = False
+
         if self.dim_reduction_model:
             self.embed_suffix = ".json"
         else:
@@ -70,7 +72,9 @@ class Loader:
             self._get_audio_paths()
             self._init_metadata_dict()
 
-        if not self.combination_already_exists:
+        if self.continue_failed_run:
+            self._get_metadata_from_created_embeddings()
+        elif not self.combination_already_exists:
             self.embed_dir.mkdir(exist_ok=True, parents=True)
         else:
             logger.debug(
@@ -117,6 +121,40 @@ class Loader:
             existing_embed_dirs.sort()
             self._find_existing_embed_dir(existing_embed_dirs)
 
+    def _get_metadata_from_created_embeddings(self):
+        module = importlib.import_module(
+                f"bacpipe.embedding_generation_pipelines.feature_extractors.{self.model_name}"
+            )
+        already_processed_files = list(Path(self.embed_dir).rglob('*.npy'))
+        already_processed_files.sort()
+        relative_audio_stems = np.array([str(f.relative_to(self.audio_dir)).split('.')[0] for f in self.files])
+        audio_files = np.array(self.files)
+        audio_suffixes = np.array([f.suffix for f in self.files])
+        for file in already_processed_files:
+            with open(file, 'rb') as f:
+                corresponding_audio_file_bool = (
+                    relative_audio_stems==str(
+                        file.relative_to(self.embed_dir)
+                        ).replace(f'_{self.model_name}.npy', '')
+                )
+                embed = np.load(f)
+                self.metadata_dict['files']['audio_files'].append(
+                    relative_audio_stems[corresponding_audio_file_bool][0]
+                    + audio_suffixes[corresponding_audio_file_bool][0]
+                )
+                self.metadata_dict['files']['nr_embeds_per_file'].append(
+                    embed.shape[0]
+                )
+                self.metadata_dict['files']['file_lengths (s)'].append(
+                    embed.shape[0] * (module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE)
+                )
+                self._update_audio_file_list(audio_files, corresponding_audio_file_bool)        
+        
+    def _update_audio_file_list(self, audio_files, corresponding_audio_file_bool):
+        self.files.remove(
+            audio_files[corresponding_audio_file_bool][0]
+        )
+
     def _find_existing_embed_dir(self, existing_embed_dirs):
         for d in existing_embed_dirs[::-1]:
 
@@ -127,10 +165,18 @@ class Loader:
                         continue
                     except OSError:
                         logger.info(
-                            f"Directory {d} is not empty. ",
-                            "Please remove it manually.",
+                            f"\nThe directory {d} is not empty. "
+                            "It seems like a previous run failed, "
+                            "bacpipe is comparing what files were already "
+                            "created and will then continue where it left off."
+                            "If you interrupted the run on purpose and want to "
+                            "start from the beginning, please cancel using "
+                            "Ctrl + C and then remove "
+                            f"the folder {d} manually.\n"
                         )
-                        continue
+                        self.continue_failed_run = True
+                        self.embed_dir = d
+                        return d
                 with open(d.joinpath("metadata.yml"), "r") as f:
                     mdata = yaml.load(f, Loader=yaml.CLoader)
                     if not self.model_name == mdata["model_name"]:
@@ -157,7 +203,7 @@ class Loader:
                         self._get_metadata_dict(d)
                         self.combination_already_exists = True
                         logger.info(
-                            f"Error: {e}. "
+                            f"\nError: {e}. "
                             "Will proceed without veryfying if the number of embeddings "
                             "is the same as the number of audio files."
                         )
@@ -176,7 +222,7 @@ class Loader:
                         )
                         break
                     elif (
-                        np.round(num_files / num_audio_files, 1) == 1
+                        np.round(num_files / num_audio_files, 1) == 1 # allow 5 % deviation
                         and num_files > 100
                     ):
                         self.combination_already_exists = True
@@ -195,7 +241,8 @@ class Loader:
     def _get_audio_paths(self):
         self.files = self._get_audio_files()
         self.files.sort()
-        self.embed_dir = Path(self.embed_parent_dir).joinpath(self.get_timestamp_dir())
+        if not self.continue_failed_run:
+            self.embed_dir = Path(self.embed_parent_dir).joinpath(self.get_timestamp_dir())
 
     def _get_annotation_files(self):
         all_annotation_files = list(self.audio_dir.rglob("*.csv"))
@@ -600,11 +647,13 @@ class Embedder:
             if not isinstance(sample, Path):
                 sample = Path(sample)
                 if not sample.suffix in self.model.audio_suffixes:
-                    raise AssertionError(
-                        "The provided path does not lead to a supported audio file with the ending"
+                    error = (
+                        "\nThe provided path does not lead to a supported audio file with the ending"
                         f" {self.model.audio_suffixes}. Please check again that you provided the correct"
                         " path."
                     )
+                    logger.exception(error)
+                    raise AssertionError(error)
             sample = self.prepare_audio(sample)
             embeds = self.get_embeddings_for_audio(sample)
 
@@ -705,10 +754,17 @@ class Embedder:
                                                             tmp_idx)
 
         cls_results["head"] = {
-            "Time bins in this file": probabilities.shape[1],
+            "Time bins in this file": probabilities.shape[-1],
             "Threshold for classifier predictions": threshold,
         }
         return cls_results
+    
+    def run_clfier_for_previous_embeddings(self, fileloader_obj):
+        existing_embeddings = list(Path(fileloader_obj.embed_dir).rglob('*.npy'))
+        for file in existing_embeddings:
+            with open(file, 'rb') as f:
+                embed = np.load(f)
+                
     
     def fill_dataframe_with_classiefier_results(self, fileloader_obj, file):
         """
@@ -724,9 +780,16 @@ class Embedder:
         """
         classifier_annotations = pd.DataFrame()
         
-        tmp_bins = self.model.classifier_outputs.shape[-1]
+        maxes = torch.max(self.model.classifier_outputs, dim=0)
+        outputs_exceeding_thresh = self.model.classifier_outputs[:,
+            maxes.values > self.classifier_threshold
+        ]
         
-        classifier_annotations["start"] = np.arange(tmp_bins) * (
+        active_time_bins = np.arange(
+            self.model.classifier_outputs.shape[-1]
+            )[maxes.values > self.classifier_threshold]
+        
+        classifier_annotations["start"] = active_time_bins * (
             self.model.segment_length / self.model.sr
         )
         classifier_annotations["end"] = classifier_annotations["start"] + (
@@ -737,15 +800,97 @@ class Embedder:
         )
         classifier_annotations["label:default_classifier"] = np.array(
             self.model.classes
-        )[torch.argmax(self.model.classifier_outputs, dim=0)].tolist()
+        )[maxes.indices[maxes.values > self.classifier_threshold]].tolist()
 
         if not hasattr(self, "cumulative_annotations"):
-            self.cumulative_annotations = classifier_annotations
+            if fileloader_obj.continue_failed_run:
+                self.load_existing_clfier_outputs(fileloader_obj, 
+                                                  classifier_annotations)
+            else:
+                self.cumulative_annotations = classifier_annotations
         else:
             self.cumulative_annotations = pd.concat(
                 [self.cumulative_annotations, classifier_annotations], ignore_index=True
             )
 
+    def load_existing_clfier_outputs(self, fileloader_obj, clfier_annotations):
+        clfier_dir = Path(
+            fileloader_obj.paths.class_path / 'original_classifier_outputs'
+            )
+        existing_clfier_outputs = list(clfier_dir.rglob('*.json'))
+        existing_clfier_outputs.sort()
+        
+        seg_len = self.model.segment_length / self.model.sr
+        
+        relative_audio = np.array(
+            # we omit the last item assuming that it's just been processed
+            # and corresponds to the clfier_annotations contents
+            [
+                f.split('.')
+                for f in 
+                fileloader_obj.metadata_dict['files']['audio_files'][:-1]
+                ]
+            )
+        relative_audio_stems = relative_audio[:, 0]
+        relative_audio_suffixes = relative_audio[:, 1]
+        
+        
+        df_dict = {
+            'start': [],
+            'end': [],
+            'audiofilename': [],
+            'label:default_classifier': []
+            }
+        for file in existing_clfier_outputs:
+            corresponding_audio_file_bool = (
+                relative_audio_stems==str(
+                    file.relative_to(clfier_dir)
+                    ).replace(f'_{fileloader_obj.model_name}.json', '')
+            )
+            with open(file, 'r') as f:
+                outputs = json.load(f)
+            outputs.pop('head')
+            if len(outputs) == 0:
+                continue
+            all_active_time_bins = []
+            clfier_preds = []
+            species = []
+            for k, v in outputs.items():
+                all_active_time_bins.append(v['time_bins_exceeding_threshold'])
+                clfier_preds.append(v['classifier_predictions'])
+                species.append(k)
+                
+            width = max(max(a) for a in all_active_time_bins) + 1 
+            clfier_preds_np = np.zeros([len(clfier_preds), width])
+            for i, (j,pred) in enumerate(zip(all_active_time_bins, clfier_preds)):
+                clfier_preds_np[i][j] = pred
+            
+            active_time_bins = np.where(np.max(clfier_preds_np, axis=0))[0]
+            active_species = np.array(species)[
+                np.argmax(clfier_preds_np, axis=0)[active_time_bins]
+                ].tolist()
+            
+            df_dict['start'].extend(
+                (active_time_bins * seg_len).tolist()
+            )
+            df_dict['end'].extend(
+                ((active_time_bins * seg_len) + seg_len).tolist()
+            )
+            df_dict['audiofilename'].extend(
+                [
+                    relative_audio_stems[corresponding_audio_file_bool][0] 
+                    + '.' 
+                    +relative_audio_suffixes[corresponding_audio_file_bool][0]
+                    ] * len(active_species)
+            )
+            df_dict['label:default_classifier'].extend(active_species)
+        self.cumulative_annotations = pd.DataFrame(df_dict)
+        self.cumulative_annotations = pd.concat(
+                [self.cumulative_annotations, clfier_annotations], 
+                ignore_index=True
+            )
+        
+        
     def save_classifier_outputs(self, fileloader_obj, file):
         relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
         results_path = self.paths.class_path.joinpath(
