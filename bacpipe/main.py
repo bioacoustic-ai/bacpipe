@@ -9,6 +9,9 @@ import logging
 import importlib
 import json
 import os
+import queue
+import threading
+from tqdm import tqdm
 
 logger = logging.getLogger("bacpipe")
 
@@ -123,7 +126,7 @@ class Loader:
 
     def _get_metadata_from_created_embeddings(self):
         module = importlib.import_module(
-                f"bacpipe.embedding_generation_pipelines.feature_extractors.{self.model_name}"
+                f"bacpipe.model_pipelines.feature_extractors.{self.model_name}"
             )
         already_processed_files = list(Path(self.embed_dir).rglob('*.npy'))
         already_processed_files.sort()
@@ -411,11 +414,6 @@ class Loader:
             self.files = list(self.embed_dir.rglob("*.npy"))
 
 
-import queue
-import threading
-from tqdm import tqdm
-
-
 class Embedder:
     def __init__(
         self,
@@ -464,11 +462,11 @@ class Embedder:
         """
         if self.dim_reduction_model:
             module = importlib.import_module(
-                f"bacpipe.embedding_generation_pipelines.dimensionality_reduction.{self.model_name}"
+                f"bacpipe.model_pipelines.dimensionality_reduction.{self.model_name}"
             )
         else:
             module = importlib.import_module(
-                f"bacpipe.embedding_generation_pipelines.feature_extractors.{self.model_name}"
+                f"bacpipe.model_pipelines.feature_extractors.{self.model_name}"
             )
         self.model = module.Model(model_name=self.model_name, **kwargs)
         self.model.prepare_inference()
@@ -916,6 +914,10 @@ class Embedder:
             json.dump(cls_results, f, indent=2)
         self.model.classifier_outputs = torch.tensor([])
 
+
+class Classifier:
+    def __init__(self):
+        pass
 
 def save_embeddings_dict_with_timestamps(
     file_dest, embeds, input_len, loader_obj, f_idx
