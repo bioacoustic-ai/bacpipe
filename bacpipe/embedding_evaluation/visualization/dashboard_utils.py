@@ -100,11 +100,6 @@ class DashBoardHelper:
         
         probs = self.run_classifier(embeds, clfier, threshold)
         
-        label2index = self.reorder_by_most_occurrance(probs, label2index)
-        
-        self.species_select[0].options = list(label2index.keys())
-        # self.class_figure
-        self.class_tuples = probs, label2index
         return probs, label2index
     
     @staticmethod
@@ -181,13 +176,12 @@ class DashBoardHelper:
                 
                 total_length += current_time_bins
         
-        self.species_select[0].options = list(k2idx.keys())
-        probs_array = np.array(list(cl_dict.values()))
+        probs_array = np.array(list(cl_dict.values())).T
         # binary_classification = probs_array[probs_array > thresh]
-        
         binary_classification = np.zeros(probs_array.shape, dtype=np.int8)
         binary_classification[probs_array > thresh] = 1
-        return binary_classification.T, k2idx
+        
+        return binary_classification, k2idx
 
         
     def prepare_heatmap(self, threshold, model, clfier_type, progress, widget_idx=0):
@@ -203,14 +197,23 @@ class DashBoardHelper:
         elif clfier_type == 'Integrated':
             binary_presence, class_dict = self.load_classification(model, threshold)
         
+        
         if binary_presence is None:
             return pn.widgets.StaticText(
                 name="Error",
                 value="It seems like the classifier hasn't been run yet. Please rerun bacpipe with the setting "
                 "`run default classifier` set to `True`."
                 )
-            
+        
         timestamps = self.get_timestamps_per_embedding(model)
+        
+        class_dict['overall'] = len(class_dict)
+        binary_presence = np.concatenate([binary_presence.T, 
+                                     [np.sum(binary_presence, axis=1).astype(np.int8)]]).T
+        
+        
+        class_dict = self.reorder_by_most_occurrance(binary_presence, class_dict)
+        self.species_select[0].options = list(class_dict.keys())
         
         accumulated_presence = pn.bind(self.accumulate_data, 
                                     binary_presence, 
@@ -231,23 +234,27 @@ class DashBoardHelper:
     def plot_heatmap(self, accumulated_presence, timestamps, accumulate_by, species, threshold):
         
         import matplotlib.pyplot as plt
-        fig = plt.figure(figsize=[10, 8])
+        fig = plt.figure(figsize=[11, 8])
         fig.suptitle(
             f'Presence heatmap for {species} with threshold of {threshold}',
             fontsize=10
             )
-        ax = sns.heatmap(accumulated_presence, 
+        ax = sns.heatmap(accumulated_presence.T, 
                     vmin=0,
-                    vmax=1,
+                    # vmax=1,
                     cmap='viridis')
-        locs, xticklabels = plt.xticks()
+        locs, yticklabels = plt.yticks()
         if accumulate_by == 'day':
             labels = np.unique([ts.date() for ts in timestamps])
-            selected_labels = labels[[int(i.get_text()) for i in xticklabels]]
-        plt.xticks(locs, selected_labels, rotation=45)
+            selected_labels = labels[[int(i.get_text()) for i in yticklabels]]
+        elif accumulate_by == 'month':
+            labels = np.unique([ts.date() for ts in timestamps])
+            selected_labels = labels[[int(i.get_text()) for i in yticklabels]]
+        plt.yticks(locs, selected_labels)
         
-        locs, labels = plt.yticks()
-        plt.yticks(locs, labels, rotation=0)
+        locs, labels = plt.xticks()
+        x_idxs = [0, 6, 12, 18, 23]
+        plt.xticks(locs[x_idxs], np.array(labels)[x_idxs])
         
         # plt.clabel('Binary presence each hour')
         
@@ -258,26 +265,47 @@ class DashBoardHelper:
     
     def accumulate_data(self, presence, timestamps, class_dict, species, accumulate_by='day'):
         species_idx = class_dict[species]
+        species_presence = presence[:, species_idx]
+        
         dates = np.array([getattr(ts, 'date')() for ts in timestamps])
         hours = np.array([getattr(ts, 'hour') for ts in timestamps])
-        accumulated = np.zeros([24, len(np.unique(dates))], dtype=np.int8)
-        species_presence = presence[:, species_idx]
-        for date_idx, date in enumerate(np.unique(dates)):
-            daily_presence_idx = np.where(dates==date)[0]
-            for hour in range(24):
-                hourly_presence_idx = np.where(hours[daily_presence_idx]==hour)[0]
-                accumulated[hour, date_idx] = sum(species_presence[daily_presence_idx[hourly_presence_idx]])
+        if accumulate_by == 'day':
+            accumulated = self.transform_presence_into_hour_heatmap(
+                            species_presence, hours, accumulator=dates
+                        )
+        elif accumulate_by == 'week':
+            accumulated = np.zeros([24, len(np.unique(dates))], dtype=np.int8)
+        elif accumulate_by == 'month':
+            months = np.array([(getattr(ts, 'year'), getattr(ts, 'month')) for ts in timestamps])
+            accumulated = self.transform_presence_into_hour_heatmap(
+                species_presence, hours, accumulator=months
+            )
         return accumulated
             
+    @staticmethod
+    def transform_presence_into_hour_heatmap(
+        species_presence, hours, accumulator
+        ):
+        accumulated = np.zeros([24, len(np.unique(accumulator))], dtype=np.int8)
+        for acc_idx, item in enumerate(np.unique(accumulator)):
+            month_presence_idx = np.where(accumulator==item)[0]
+            for hour in range(24):
+                hourly_presence_idx = np.where(
+                    hours[month_presence_idx]==hour
+                    )[0]
+                accumulated[hour, acc_idx] = sum(
+                    species_presence[month_presence_idx[hourly_presence_idx]]
+                    )
+        return accumulated
         
 
     def get_timestamps_per_embedding(self, model):
-        from bacpipe.embedding_evaluation.label_embeddings import DefaultLabels as DL
+        from bacpipe.embedding_evaluation.label_embeddings import get_dt_filename
         import datetime as dt
         
         embed_dict = self.vis_loader.embeds[model]
         ts_within_audio_files = [dt.timedelta(seconds=ts) for ts in embed_dict['timestamp']]
-        ts_files = [DL.get_dt_filename(f) for f in embed_dict['metadata']['audio_files']]
+        ts_files = [get_dt_filename(f) for f in embed_dict['metadata']['audio_files']]
         ts_files_same_length_as_embeds = []
         [
             ts_files_same_length_as_embeds.extend([ts_file] * embed_len) 

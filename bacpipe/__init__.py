@@ -57,6 +57,131 @@ NEEDS_CHECKPOINT = [
     "rcl_fs_bsed"
 ]
 
+
+# --------------------------------------------------------------------
+### EXPOSE API ENDPOINTS ### 
+# --------------------------------------------------------------------
+from bacpipe.generate_embeddings import Embedder, Loader
+
+from bacpipe.main import (
+    get_model_names,
+    evaluation_with_settings_already_exists,
+    model_specific_embedding_creation,
+    model_specific_evaluation,
+    cross_model_evaluation,
+    visualize_using_dashboard,
+)
+
+from bacpipe.embedding_evaluation.label_embeddings import (
+    DefaultLabels, 
+    get_default_labels,
+    get_ground_truth, 
+    get_dt_filename
+    )
+
+
+
+
+# --------------------------------------------------------------------
+# Logging
+# --------------------------------------------------------------------
+logger = logging.getLogger("bacpipe")
+if not logger.handlers:
+    c_handler = logging.StreamHandler()
+    c_handler.setLevel(logging.INFO)
+    c_handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(c_handler)
+logger.setLevel(logging.INFO)
+
+
+# --------------------------------------------------------------------
+# Load config & settings
+# --------------------------------------------------------------------
+with pkg_resources.open_text(__package__, "config.yaml") as f:
+    _config_dict = yaml.load(f, Loader=yaml.CLoader)
+
+with pkg_resources.open_text(__package__, "settings.yaml") as f:
+    _settings_dict = yaml.load(f, Loader=yaml.CLoader)
+
+# Expose as mutable namespaces
+config = SimpleNamespace(**_config_dict)
+settings = SimpleNamespace(**_settings_dict)
+
+
+supported_models = list(EMBEDDING_DIMENSIONS.keys())
+"""list[str]: Supported embedding models available in bacpipe."""
+
+models_needing_checkpoint = NEEDS_CHECKPOINT
+"""list[str]: Models that require a checkpoint to be downloaded before use."""
+
+
+def play(config=config, settings=settings, bool_save_logs=False):
+    """
+    Play the bacpipe! The pipeline will run using the models specified in
+    bacpipe.config.models and generate results in the directory
+    bacpipe.settings.results_dir. For more details see the ReadMe file on the
+    repository page https://github.com/bioacoustic-ai/bacpipe.
+
+    Parameters
+    ----------
+    config : dict, optional
+        configurations for pipeline execution, by default config
+    settings : dict, optional
+        settings for pipeline execution, by default settings
+    bool_save_logs : bool, optional
+        Save logs, config and settings file. This is important if you get a bug,
+        sharing this will be very helpful to find the source of
+        the problem, by default False
+
+
+    Raises
+    ------
+    FileNotFoundError
+        If no audio files are found we can't compute any embeddings. So make
+        sure the path is correct :)
+    """
+    settings.model_base_path = ensure_models_exist(Path(settings.model_base_path),
+                                                   model_names=config.models)
+    overwrite, dashboard = config.overwrite, config.dashboard
+
+    if config.audio_dir == 'bacpipe/tests/test_data':
+        with pkg_resources.path(__package__ + ".tests.test_data", "") as audio_dir:
+            audio_dir = Path(audio_dir)
+
+        if not audio_dir.exists():
+            raise FileNotFoundError(
+                f"Audio directory {config.audio_dir} does not exist. Please check the path. "
+                "It should be in the format 'C:\\path\\to\\audio' on Windows or "
+                "'/path/to/audio' on Linux/Mac. Use single quotes '!"
+            )
+        else:
+            config.audio_dir = audio_dir
+
+        # ----------------------------------------------------------------
+    # Setup logging to file if requested
+    # ----------------------------------------------------------------
+    if bool_save_logs:
+        save_logs()
+
+    config.models = get_model_names(**vars(config), **vars(settings))
+
+    if overwrite or not evaluation_with_settings_already_exists(
+        **vars(config), **vars(settings)
+    ):
+
+        loader_dict = model_specific_embedding_creation(
+            **vars(config), **vars(settings)
+        )
+
+        model_specific_evaluation(loader_dict, **vars(config), **vars(settings))
+
+        cross_model_evaluation(**vars(config), **vars(settings))
+
+    if dashboard:
+        visualize_using_dashboard(**vars(config), **vars(settings))
+
+
+
 def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_models"):
     """
     Ensure that the model checkpoints for the selected models are
@@ -118,157 +243,44 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
     return model_base_path.parent / "model_checkpoints"
 
 
+def save_logs():
+    import datetime
+    import json
+    
+    log_dir = Path(settings.main_results_dir) / Path(config.audio_dir).stem / f"logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_file = log_dir / f"bacpipe_{timestamp}.log"
 
-# --------------------------------------------------------------------
-# Logging
-# --------------------------------------------------------------------
-logger = logging.getLogger("bacpipe")
-if not logger.handlers:
-    c_handler = logging.StreamHandler()
-    c_handler.setLevel(logging.INFO)
-    c_handler.setFormatter(logging.Formatter("%(message)s"))
-    logger.addHandler(c_handler)
-logger.setLevel(logging.INFO)
+    f_format = logging.Formatter(
+        "%(asctime)s :: %(name)s :: %(levelname)s :: %(message)s"
+    )
+    f_handler = logging.FileHandler(log_file, mode="w", encoding="utf-8")
+    f_handler.setLevel(logging.INFO)
+    f_handler.setFormatter(f_format)
+    f_handler.flush = lambda: f_handler.stream.flush()  # optional, for clarity
+    logger.addHandler(f_handler)
 
-# --------------------------------------------------------------------
-# Expose core API functions
-# --------------------------------------------------------------------
-from bacpipe.generate_embeddings import Embedder
-
-# --------------------------------------------------------------------
-# Load config & settings
-# --------------------------------------------------------------------
-with pkg_resources.open_text(__package__, "config.yaml") as f:
-    _config_dict = yaml.load(f, Loader=yaml.CLoader)
-
-with pkg_resources.open_text(__package__, "settings.yaml") as f:
-    _settings_dict = yaml.load(f, Loader=yaml.CLoader)
-
-# Expose as mutable namespaces
-config = SimpleNamespace(**_config_dict)
-settings = SimpleNamespace(**_settings_dict)
-
-
-supported_models = list(EMBEDDING_DIMENSIONS.keys())
-"""list[str]: Supported embedding models available in bacpipe."""
-
-models_needing_checkpoint = NEEDS_CHECKPOINT
-"""list[str]: Models that require a checkpoint to be downloaded before use."""
-
-
-
-from bacpipe.main import (
-    get_model_names,
-    evaluation_with_settings_already_exists,
-    model_specific_embedding_creation,
-    model_specific_evaluation,
-    cross_model_evaluation,
-    visualize_using_dashboard,
-)
-
-
-def play(config=config, settings=settings, save_logs=False):
-    """
-    Play the bacpipe! The pipeline will run using the models specified in
-    bacpipe.config.models and generate results in the directory
-    bacpipe.settings.results_dir. For more details see the ReadMe file on the
-    repository page https://github.com/bioacoustic-ai/bacpipe.
-
-    Parameters
-    ----------
-    config : dict, optional
-        configurations for pipeline execution, by default config
-    settings : dict, optional
-        settings for pipeline execution, by default settings
-    save_logs : bool, optional
-        Save logs, config and settings file. This is important if you get a bug,
-        sharing this will be very helpful to find the source of
-        the problem, by default False
-
-
-    Raises
-    ------
-    FileNotFoundError
-        If no audio files are found we can't compute any embeddings. So make
-        sure the path is correct :)
-    """
-    settings.model_base_path = ensure_models_exist(Path(settings.model_base_path),
-                                                   model_names=config.models)
-    overwrite, dashboard = config.overwrite, config.dashboard
-
-    if config.audio_dir == 'bacpipe/tests/test_data':
-        with pkg_resources.path(__package__ + ".tests.test_data", "") as audio_dir:
-            audio_dir = Path(audio_dir)
-
-        if not audio_dir.exists():
-            raise FileNotFoundError(
-                f"Audio directory {config.audio_dir} does not exist. Please check the path. "
-                "It should be in the format 'C:\\path\\to\\audio' on Windows or "
-                "'/path/to/audio' on Linux/Mac. Use single quotes '!"
-            )
+    # Save current config + settings snapshot
+    settings_dict, config_dict = {}, {}
+    for k, v in vars(settings).items():
+        if '/' in str(v) or '\\' in str(v):
+            settings_dict[k] = Path(v).as_posix()
         else:
-            config.audio_dir = audio_dir
+            settings_dict[k] = v
+    for k, v in vars(config).items():
+        if '/' in str(v) or '\\' in str(v):
+            config_dict[k] = Path(v).as_posix()
+        else:
+            config_dict[k] = v
+    
+    with open(
+        log_dir / f"config_{timestamp}.json", "w"
+    ) as f:
+        json.dump(config_dict, f, indent=2)
+    with open(
+        log_dir / f"settings_{timestamp}.json", "w"
+    ) as f:
+        json.dump(settings_dict, f, indent=2)
 
-        # ----------------------------------------------------------------
-    # Setup logging to file if requested
-    # ----------------------------------------------------------------
-    if save_logs:
-        import datetime
-        import json
-        
-        log_dir = Path(settings.main_results_dir) / Path(config.audio_dir).stem / f"logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        log_file = log_dir / f"bacpipe_{timestamp}.log"
-
-        f_format = logging.Formatter(
-            "%(asctime)s :: %(name)s :: %(levelname)s :: %(message)s"
-        )
-        f_handler = logging.FileHandler(log_file, mode="w", encoding="utf-8")
-        f_handler.setLevel(logging.INFO)
-        f_handler.setFormatter(f_format)
-        f_handler.flush = lambda: f_handler.stream.flush()  # optional, for clarity
-        logger.addHandler(f_handler)
-
-        # Save current config + settings snapshot
-        settings_dict, config_dict = {}, {}
-        for k, v in vars(settings).items():
-            if '/' in str(v) or '\\' in str(v):
-                settings_dict[k] = Path(v).as_posix()
-            else:
-                settings_dict[k] = v
-        for k, v in vars(config).items():
-            if '/' in str(v) or '\\' in str(v):
-                config_dict[k] = Path(v).as_posix()
-            else:
-                config_dict[k] = v
-        
-        with open(
-            log_dir / f"config_{timestamp}.json", "w"
-        ) as f:
-            json.dump(config_dict, f, indent=2)
-        with open(
-            log_dir / f"settings_{timestamp}.json", "w"
-        ) as f:
-            json.dump(settings_dict, f, indent=2)
-
-        logger.info("Saved config, settings, and logs to %s", log_dir)
-
-    config.models = get_model_names(**vars(config), **vars(settings))
-
-    if overwrite or not evaluation_with_settings_already_exists(
-        **vars(config), **vars(settings)
-    ):
-
-        loader_dict = model_specific_embedding_creation(
-            **vars(config), **vars(settings)
-        )
-
-        model_specific_evaluation(loader_dict, **vars(config), **vars(settings))
-
-        cross_model_evaluation(**vars(config), **vars(settings))
-
-    if dashboard:
-        visualize_using_dashboard(**vars(config), **vars(settings))
-
-
+    logger.info("Saved config, settings, and logs to %s", log_dir)

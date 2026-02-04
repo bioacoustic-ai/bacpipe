@@ -264,7 +264,7 @@ class DashBoard(DashBoardHelper):
             )
         
         from src.btn_icon import icon_str
-        btn_run_clfier = pn.widgets.Button(
+        self.btn_run_clfier = pn.widgets.Button(
             name='Apply linear classifier', 
             icon=icon_str, 
             width=100, 
@@ -310,7 +310,7 @@ class DashBoard(DashBoardHelper):
                         clfier_thresh,
                     
                         # button to click run
-                        btn_run_clfier,
+                        self.btn_run_clfier,
                         
                         # placeholder textbox to show that something 
                         # is happening while waiting on embeddings to load
@@ -327,7 +327,7 @@ class DashBoard(DashBoardHelper):
                             clfier_thresh,
                             model=self.model_select[widget_idx], 
                             clfier_type=self.clfier_select[widget_idx],
-                            progress=btn_run_clfier)
+                            progress=self.btn_run_clfier)
                 ),
                 active=[0, 1, 2],
                 # by default create all annotations as one big annotations file
