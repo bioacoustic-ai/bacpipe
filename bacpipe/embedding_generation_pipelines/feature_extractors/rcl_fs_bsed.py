@@ -1,7 +1,7 @@
 import torch
 from torchaudio import transforms as T
 from bacpipe.model_specific_utils.rcl_fs_bsed.resnet import ResNet
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 SAMPLE_RATE = 22050
 LENGTH_IN_SAMPLES = int(0.2 * SAMPLE_RATE)

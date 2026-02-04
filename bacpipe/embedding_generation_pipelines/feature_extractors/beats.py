@@ -1,7 +1,7 @@
 import torch
 
 from bacpipe.model_specific_utils.naturebeats.BEATs import BEATs, BEATsConfig
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 
 SAMPLE_RATE = 16_000

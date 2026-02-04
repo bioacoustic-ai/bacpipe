@@ -10,7 +10,7 @@ import pandas as pd
 SAMPLE_RATE = 32_000
 LENGTH_IN_SAMPLES = 160_000
 
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 
 class Model(ModelBaseClass):

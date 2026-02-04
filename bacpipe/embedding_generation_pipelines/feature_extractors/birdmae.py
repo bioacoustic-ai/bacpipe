@@ -1,6 +1,6 @@
 import torch
 from transformers import AutoFeatureExtractor, AutoModel
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 SAMPLE_RATE = 32_000
 LENGTH_IN_SAMPLES = 160_000

@@ -1,595 +1,954 @@
-import os
-import time
-import logging
-from pathlib import Path
-import importlib.resources as pkg_resources
-import bacpipe.imgs
-import soundfile
-
-from bacpipe.generate_embeddings import Embedder
-
+import librosa as lb
 import numpy as np
-from tqdm import tqdm
-
-import bacpipe.generate_embeddings as ge
-
-from bacpipe.embedding_evaluation.visualization.visualize import (
-    plot_comparison,
-    plot_embeddings,
-    visualise_results_across_models,
-    EmbedAndLabelLoader,
-)
-from bacpipe.embedding_evaluation.label_embeddings import (
-    make_set_paths_func,
-    generate_annotations_for_classification_task,
-    ground_truth_by_model,
-)
-
-from bacpipe.embedding_evaluation.classification.classify import classification_pipeline
-
-from bacpipe.embedding_evaluation.clustering.cluster import clustering
-
-
-from bacpipe.embedding_evaluation.visualization.dashboard import DashBoard
-
-from bacpipe import TF_MODELS
+import pandas as pd
+from pathlib import Path
+import yaml
+import time
+import torch
+import logging
+import importlib
+import json
+import os
 
 logger = logging.getLogger("bacpipe")
 
 
-def get_model_names(
-    models,
-    audio_dir,
-    main_results_dir,
-    embed_parent_dir,
-    already_computed=False,
-    **kwargs,
-):
-    """
-    Get the names of the models used for embedding. This is either done
-    by using already computed embeddings or by using the selected models
-    from the config file. If already computed embeddings are used, the
-    model names are extracted from the directory structure.
-
-    Parameters
-    ----------
-    models : list
-        list of embedding models
-    audio_dir : string
-        full path to audio files
-    main_results_dir : string
-        top level directory for the results of the embedding evaluation
-    embed_parent_dir : string
-        parent directory for the embeddings
-    already_computed : bool, Default is False
-        ignore model list and use only models whos embeddings already have
-        been computed and are saved in the results dir
-
-    Raises
-    ------
-    ValueError
-        If already computed embeddings are used, but no embeddings
-        are found in the specified directory.
-    """
-    if already_computed:
-
-        dataset_name = Path(audio_dir).stem
-        main_results_path = (
-            Path(main_results_dir).joinpath(dataset_name).joinpath(embed_parent_dir)
-        )
-        model_names = [
-            d.stem.split("___")[-1].split("-")[0]
-            for d in list(main_results_path.glob("*"))
-            if d.is_dir()
-        ]
-        if not model_names:
-            error = (
-                "\nNo embedding models found in the specified directory. "
-                "You have selected the option to use already computed embeddings, "
-                "but no embeddings were found. Please check the directory path."
-                " If you want to compute new embeddings, please set the "
-                "'already_computed' option to False in the config.yaml file."
-            )
-            logger.exception(error)
-            raise ValueError(error)
-        else:
-            return np.unique(model_names).tolist()
-    else:
-        return models
-
-
-def evaluation_with_settings_already_exists(
-    audio_dir,
-    dim_reduction_model,
-    models,
-    testing=False,
-    **kwargs,
-):
-    """
-    Check if the evaluation with the specified settings already exists.
-    The function checks if the embeddings, dimensionality reduction,
-    classification and clustering evaluation results
-    already exist in the specified directory. If any of these
-    results do not exist, the function returns False. Otherwise,
-    it returns True.
-
-    Parameters
-    ----------
-    audio_dir : string
-        full path to audio files
-    dim_reduction_model : string
-        name of the dimensionality reduction model to be used
-    models : list
-        embedding models
-
-    Returns
-    -------
-    bool
-        True if the evaluation with the specified settings
-    """
-    if testing:
-        return False
-    for model_name in models:
-        paths = make_set_paths_func(audio_dir, **kwargs)(model_name)
-        bool_paths = (
-            paths.main_embeds_path.exists()
-            and paths.dim_reduc_parent_dir.exists()
-            and paths.class_path.exists()
-            and paths.clust_path.exists()
-        )
-        if not bool_paths:
-            return False
-        else:
-            bool_dim_reducs = [
-                True
-                for d in paths.dim_reduc_parent_dir.rglob(
-                    f"*{dim_reduction_model}*{model_name}*"
-                )
-            ]
-            bool_dim_reducs = len(bool_dim_reducs) > 0 and all(bool_dim_reducs)
-        if not bool_dim_reducs:
-            return False
-    return True
-
-
-def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **kwargs):
-    """
-    Generate embeddings for each model in the list of model names.
-    The embeddings are generated using the generate_embeddings function
-    from the generate_embeddings module. The embeddings are saved
-    in the directory specified by the audio_dir parameter. The
-    function returns a dictionary containing the loader objects
-    for each model, by which metadata and paths are stored.
-    
-        
-    code example:
-    ```
-    loader = bacpipe.model_specific_embedding_creation(
-    **vars(bacpipe.config), **vars(bacpipe.settings)
-    )
-
-    # this call will initiate the embedding generation process, it will check if embeddings
-    # already exist for the combination of each model and the dataset and if so it will
-    # be ready to load them. The loader keys will be the model name and the values will
-    # be the loader objects for each model. Each object contains all the information
-    # on the generated embeddings. To name access them:
-    loader['birdnet'].embedding_dict() 
-    # this will give you a dictionary with the keys corresponding to embedding files
-    # and the values corresponding to the embeddings as numpy arrays
-
-    loader['birdnet'].metadata_dict
-    # This will give you a dictionary overview of:
-    # - where the audio data came from,
-    # - where the embeddings were saved
-    # - all the audio files, 
-    # - the embedding size of the model, 
-    # - the audio file lengths,
-    # - the number of embeddings for each audio files
-    # - the sample rate
-    # - the number of samples per window
-    # - and the total length of the processed dataset in seconds
-    # Thic dictionary is also saved as a yaml file in the directory of the embeddings
-    ```
-
-    Parameters
-    ----------
-    audio_dir : string
-        full path to audio files
-    dim_reduction_model : string
-        name of the dimensionality reduction model to be used
-        for the embeddings. If "None" is selected, no
-        dimensionality reduction is performed.
-    models : list
-        embedding models
-
-    Returns
-    -------
-    loader_dict : dict
-        dictionary containing the loader objects for each model
-    """
-    loader_dict = {}
-    for model_name in models:
-        loader_dict[model_name] = get_embeddings(
-            model_name=model_name,
-            dim_reduction_model=dim_reduction_model,
-            audio_dir=audio_dir,
-            **kwargs,
-        )
-    return loader_dict
-
-def run_default_clfier_and_save_results(loader, embed):
-    import torch
-    all_embeds = loader.embedding_dict()
-    for f_name, embeddings in tqdm(
-        all_embeds.items(),
-        desc='Running pretrained classifier',
-        total=len(all_embeds)
-        ):
-        cls_vals = embed.model.classifier_predictions(embeddings)
-        if not isinstance(embeddings, np.ndarray):
-            embed.model.classifier_outputs = torch.cat(
-                [embed.model.classifier_outputs, cls_vals.clone().detach()]
-            )
-        else:
-            embed.model.classifier_outputs = torch.cat(
-                [embed.model.classifier_outputs, torch.Tensor(cls_vals)]
-            )
-        embed.save_classifier_outputs(loader, loader.audio_dir / f_name)
-    del embed
-    import tensorflow as tf
-    tf.keras.backend.clear_session()
-    
-def check_if_default_clfier_should_be_run(
-    loader_dict, model_name, **kwargs
-):
-    if (
-        not loader_dict[model_name].paths.class_path.joinpath(
-            "original_classifier_outputs"
-            ).exists()
-        and loader_dict[model_name].run_pretrained_classifier
-    ):
-        dim_reduction_model = kwargs.pop('dim_reduction_model')
-        if model_name in ['perch_v2', 'perch_bird', 'vggish', 'surfperch', 'google_whale']:
-            logger.warning(
-                f"The google family of models (which {model_name} is part of) "
-                "calculate embeddings and classifications at once, making it "
-                "impossible to only run the classifier, like with any other model. "
-                "Please remove the embeddings corresponding to this model and then "
-                "rerun bacpipe with the setting `run_pretrained_classifier` set to True. "
-                "That way classification results will be saved immediately."
-            )
-            return
-        embed = Embedder(
-            model_name, 
-            paths=loader_dict['birdnet'].paths, 
-            **kwargs
-            )
-        if hasattr(embed.model, 'classifier_predictions'):
-            run_default_clfier_and_save_results(
-                loader_dict[model_name], embed
-                )
-        kwargs['dim_reduction_model'] = dim_reduction_model
-
-def model_specific_evaluation(
-    loader_dict, evaluation_task, class_configs, models, **kwargs
-):
-    """
-    Perform evaluation of the embeddings using the specified
-    evaluation task. The evaluation task can be either
-    classification or clustering.
-    The evaluation is performed using the functions from
-    the classification and clustering modules.
-    The results of the evaluation are saved in the directory
-    specified by the audio_dir parameter. The function
-    returns a dictionary containing the paths for the
-    results of the evaluation.
-
-    Parameters
-    ----------
-    loader_dict : dict
-        dictionary containing the loader objects for each model
-    evaluation_task : string
-        name of the evaluation task to be performed.
-    class_configs : dict
-        dictionary containing the configuration for the
-        classification tasks. The configurations are specified
-        in the bacpipe/settings.yaml file.
-    models : list
-        embedding models
-    """
-    for model_name in models:
-        check_if_default_clfier_should_be_run(
-            loader_dict, model_name, **kwargs
-            )
-                
-        if not evaluation_task in ["None", [], False]:
-            embeds = loader_dict[model_name].embedding_dict()
-            paths = get_paths(model_name)
-            try:
-                ground_truth = ground_truth_by_model(paths, model_name, **kwargs)
-            except FileNotFoundError as e:
-                ground_truth = None
-
-        if "classification" in evaluation_task and not ground_truth is None:
-            print(
-                "\nTraining classifier to evaluate " f"{model_name.upper()} embeddings"
-            )
-
-            assert len(embeds) > 1, (
-                "Too few files to evaluate embeddings with classifier. "
-                "Are you sure you have selected the right data?"
-            )
-
-            generate_annotations_for_classification_task(paths, **kwargs)
-
-            class_embeds = embeds_array_without_noise(embeds, ground_truth, **kwargs)
-            for class_config in class_configs.values():
-                if class_config["bool"]:
-                    if not len(class_embeds) > 0:
-                        error = (
-                            "\nNo embeddings were found for classification task. "
-                            "Are you sure there are annotations for the data and the annotations.csv file "
-                            "has been correctly linked? If you didn't intent do do classification, "
-                            "simply remove it from the evaluation tasks list in the config.yaml file."
-                        )
-                        logger.exception(error)
-                        raise AssertionError(error)
-                    classification_pipeline(
-                        paths, class_embeds, **class_config, **kwargs
-                    )
-
-        if "clustering" in evaluation_task:
-            print(
-                "\nGenerating clusterings to evaluate "
-                f"{model_name.upper()} embeddings"
-            )
-
-            embeds_array = np.concatenate(list(embeds.values()))
-            clustering(paths, embeds_array, ground_truth, **kwargs)
-
-
-
-def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwargs):
-    """
-    Generate plots to compare models by the specified tasks.
-
-    Parameters
-    ----------
-    dim_reduction_model : str
-        name of dimensionality reduction model
-    evaluation_task : list
-        tasks to evaluate models by
-    models : list
-        embedding models
-    """
-    if len(models) > 1:
-        plot_path = get_paths(models[0]).plot_path.parent.parent.joinpath("overview")
-        plot_path.mkdir(exist_ok=True, parents=True)
-        if not len(evaluation_task) == 0:
-            for task in evaluation_task:
-                visualise_results_across_models(plot_path, task, models)
-        if not dim_reduction_model == "None":
-            kwargs.pop("dashboard")
-            plot_comparison(
-                plot_path,
-                models,
-                dim_reduction_model,
-                label_by="time_of_day",
-                dashboard=False,
-                **kwargs,
-            )
-
-
-def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
-    return np.concatenate(list(embeds.values()))[
-        ground_truth[f"label:{label_column}"] > -1
-    ]
-
-
-def visualize_using_dashboard(models, **kwargs):
-    """
-    Create and serve the dashboard for visualization.
-
-    Parameters
-    ----------
-    models : list
-        embedding models
-    kwargs : dict
-        Dictionary with parameters for dashboard creation
-    """
-    from bacpipe.embedding_evaluation.visualization.dashboard import DashBoard
-    import panel as pn
-
-    # Configure dashboard
-    dashboard = DashBoard(models, **kwargs)
-
-    # Build the dashboard layout
-    try:
-        dashboard.build_layout()
-    except Exception as e:
-        logger.exception(
-            f"\nError building dashboard layout: {e}\n \n "
-            "Are you sure all the evaluations have been performed? "
-            "If not, rerun the pipeline with `overwrite=True`.\n \n "
-        )
-        raise e
-
-    with pkg_resources.path(bacpipe.imgs, 'bacpipe_favicon_white.png') as p:
-        favicon_path = str(p)
-
-    template = pn.template.BootstrapTemplate(
-        site="bacpipe dashboard",
-        title="Explore embeddings of audio data",
-        favicon=str(favicon_path),  # must be a path ending in .ico, .png, etc.
-        main=[dashboard.app],
-    )
-    
-
-    template.show(port=5006, address="localhost")
-
-
-def get_embeddings(
-    model_name,
-    audio_dir,
-    dim_reduction_model="None",
-    check_if_primary_combination_exists=True,
-    check_if_secondary_combination_exists=True,
-    overwrite=False,
-    testing=False,
-    **kwargs,
-):
-    global get_paths
-    get_paths = make_set_paths_func(audio_dir, testing=testing, **kwargs)
-    paths = get_paths(model_name)
-
-    loader_embeddings = generate_embeddings(
-        model_name=model_name,
-        audio_dir=audio_dir,
-        check_if_combination_exists=check_if_primary_combination_exists,
-        paths=paths,
-        testing=testing,
+class Loader:
+    def __init__(
+        self,
+        audio_dir,
+        check_if_combination_exists=True,
+        model_name=None,
+        dim_reduction_model=False,
+        testing=False,
         **kwargs,
-    )
+    ):
+        """
+                Run the embedding generation pipeline, check if embeddings for this
+        dataset have already been processed, if so load them, if not generate them. 
+        During this process collect metadata and return a dictionary of model-
+        specific loader objects that can be used to access the embeddings 
+        and view metadata. 
 
-    if not dim_reduction_model in ["None", False]:
+        Parameters
+        ----------
+        audio_dir : string or pathlib.Path
+            path to audio data
+        check_if_combination_exists : bool, optional
+            If false new embeddings are created and the checking is skipped, by default True
+        model_name : string, optional
+            Name of the model that should be used, by default None
+        dim_reduction_model : bool, optional
+            Either false if primary embeddings are created or the name of
+            the dimensionaliry reduction model if dim reduction should be 
+            performed, by default False
+        testing : bool, optional
+            Testing yes or no?, by default False
+        """
+        self.model_name = model_name
+        self.audio_dir = Path(audio_dir)
+        self.dim_reduction_model = dim_reduction_model
+        self.testing = testing
 
-        assert len(loader_embeddings.files) > 1, (
-            "Too few files to perform dimensionality reduction. "
-            + "Are you sure you have selected the right data?"
+        self.initialize_path_structure(testing=testing, **kwargs)
+
+        self.check_if_combination_exists = check_if_combination_exists
+        self.continue_failed_run = False
+
+        if self.dim_reduction_model:
+            self.embed_suffix = ".json"
+        else:
+            self.embed_suffix = ".npy"
+        
+        start = time.time()
+        self.check_embeds_already_exist()
+        logger.debug(
+            f"Checking if embeddings already exist took {time.time()-start:.2f}s."
         )
-        loader_dim_reduced = generate_embeddings(
-            model_name=model_name,
-            dim_reduction_model=dim_reduction_model,
-            audio_dir=audio_dir,
-            check_if_combination_exists=check_if_secondary_combination_exists,
-            testing=testing,
-            **kwargs,
-        )
-        if (
-            not overwrite
-            and (paths.plot_path.joinpath("embeddings.png").exists())
-            or testing
-        ):
+
+        if self.combination_already_exists or self.dim_reduction_model:
+            self.get_embeddings()
+        else:
+            self._get_audio_paths()
+            self._init_metadata_dict()
+
+        if self.continue_failed_run:
+            self._get_metadata_from_created_embeddings()
+        elif not self.combination_already_exists:
+            self.embed_dir.mkdir(exist_ok=True, parents=True)
+        else:
             logger.debug(
-                f"Embedding visualization already exist in {loader_dim_reduced.embed_dir}"
-                " Skipping visualization generation."
+                "Combination of {} and {} already "
+                "exists -> using saved embeddings in {}".format(
+                    self.model_name, Path(self.audio_dir).stem, str(self.embed_dir)
+                )
+            )
+
+    def initialize_path_structure(self, testing=False, **kwargs):
+        if testing:
+            kwargs["main_results_dir"] = "bacpipe/tests/results_files"
+
+        for key, val in kwargs.items():
+            if key == "main_results_dir":
+                continue
+            if key in ["embed_parent_dir", "dim_reduc_parent_dir", "evaluations_dir"]:
+                val = (
+                    Path(kwargs["main_results_dir"])
+                    .joinpath(self.audio_dir.stem)
+                    .joinpath(val)
+                )
+                val.mkdir(exist_ok=True, parents=True)
+            setattr(self, key, val)
+
+    def check_embeds_already_exist(self):
+        self.combination_already_exists = False
+        self.dim_reduc_embed_dir = False
+
+        if self.check_if_combination_exists:
+            if self.dim_reduction_model:
+                existing_embed_dirs = Path(self.dim_reduc_parent_dir).iterdir()
+            else:
+                existing_embed_dirs = Path(self.embed_parent_dir).iterdir()
+            if self.testing:
+                return
+            existing_embed_dirs = list(existing_embed_dirs)
+            if isinstance(self.check_if_combination_exists, str):
+                existing_embed_dirs = [
+                    existing_embed_dirs[0].parent.joinpath(
+                        self.check_if_combination_exists
+                    )
+                ]
+            existing_embed_dirs.sort()
+            self._find_existing_embed_dir(existing_embed_dirs)
+
+    def _get_metadata_from_created_embeddings(self):
+        module = importlib.import_module(
+                f"bacpipe.embedding_generation_pipelines.feature_extractors.{self.model_name}"
+            )
+        already_processed_files = list(Path(self.embed_dir).rglob('*.npy'))
+        already_processed_files.sort()
+        relative_audio_stems = np.array([str(f.relative_to(self.audio_dir)).split('.')[0] for f in self.files])
+        audio_files = np.array(self.files)
+        audio_suffixes = np.array([f.suffix for f in self.files])
+        for file in already_processed_files:
+            with open(file, 'rb') as f:
+                corresponding_audio_file_bool = (
+                    relative_audio_stems==str(
+                        file.relative_to(self.embed_dir)
+                        ).replace(f'_{self.model_name}.npy', '')
+                )
+                embed = np.load(f)
+                self.metadata_dict['files']['audio_files'].append(
+                    relative_audio_stems[corresponding_audio_file_bool][0]
+                    + audio_suffixes[corresponding_audio_file_bool][0]
+                )
+                self.metadata_dict['files']['nr_embeds_per_file'].append(
+                    embed.shape[0]
+                )
+                self.metadata_dict['files']['file_lengths (s)'].append(
+                    embed.shape[0] * (module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE)
+                )
+                self._update_audio_file_list(audio_files, corresponding_audio_file_bool)        
+        
+    def _update_audio_file_list(self, audio_files, corresponding_audio_file_bool):
+        self.files.remove(
+            audio_files[corresponding_audio_file_bool][0]
+        )
+
+    def _find_existing_embed_dir(self, existing_embed_dirs):
+        for d in existing_embed_dirs[::-1]:
+
+            if self.model_name in d.stem and Path(self.audio_dir).stem in d.parts[-1]:
+                if list(d.glob("*yml")) == []:
+                    try:
+                        d.rmdir()
+                        continue
+                    except OSError:
+                        logger.info(
+                            f"\nThe directory {d} is not empty. "
+                            "It seems like a previous run failed, "
+                            "bacpipe is comparing what files were already "
+                            "created and will then continue where it left off."
+                            "If you interrupted the run on purpose and want to "
+                            "start from the beginning, please cancel using "
+                            "Ctrl + C and then remove "
+                            f"the folder {d} manually.\n"
+                        )
+                        self.continue_failed_run = True
+                        self.embed_dir = d
+                        return d
+                with open(d.joinpath("metadata.yml"), "r") as f:
+                    mdata = yaml.load(f, Loader=yaml.CLoader)
+                    if not self.model_name == mdata["model_name"]:
+                        continue
+
+                if self.dim_reduction_model:
+                    if self.dim_reduction_model in d.stem:
+                        self.combination_already_exists = True
+                        logger.info(
+                            "\n### Embeddings already exist. "
+                            f"Using embeddings in {str(d)} ###"
+                        )
+                        self.embed_dir = d
+                        break
+                    else:
+                        return d
+                else:
+                    try:
+                        num_files = len(
+                            [f for f in list(d.rglob(f"*{self.embed_suffix}"))]
+                        )
+                        num_audio_files = len(self._get_audio_files())
+                    except AssertionError as e:
+                        self._get_metadata_dict(d)
+                        self.combination_already_exists = True
+                        logger.info(
+                            f"\nError: {e}. "
+                            "Will proceed without veryfying if the number of embeddings "
+                            "is the same as the number of audio files."
+                        )
+                        logger.info(
+                            "\n### Embeddings already exist. "
+                            f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
+                        )
+                        break
+
+                    if num_audio_files == num_files:
+                        self.combination_already_exists = True
+                        self._get_metadata_dict(d)
+                        logger.info(
+                            "\n### Embeddings already exist. "
+                            f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
+                        )
+                        break
+                    elif (
+                        np.round(num_files / num_audio_files, 1) == 1 # allow 5 % deviation
+                        and num_files > 100
+                    ):
+                        self.combination_already_exists = True
+                        self._get_metadata_dict(d)
+                        logger.info(
+                            "\n### Embeddings already exist. "
+                            f"The number of audio files ({num_audio_files}) "
+                            f"and the number of embeddings files ({num_files}) don't "
+                            "exactly match. That could be down to some of the audio files "
+                            "being corrupt. If you changed the source files and want the "
+                            f"embeddings to be computed again, delete or move {d.stem}. \n\n"
+                            f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
+                        )
+                        break
+
+    def _get_audio_paths(self):
+        self.files = self._get_audio_files()
+        self.files.sort()
+        if not self.continue_failed_run:
+            self.embed_dir = Path(self.embed_parent_dir).joinpath(self.get_timestamp_dir())
+
+    def _get_annotation_files(self):
+        all_annotation_files = list(self.audio_dir.rglob("*.csv"))
+        audio_stems = [file.stem for file in self.files]
+        self.annot_files = [
+            file for file in all_annotation_files if file.stem in audio_stems
+        ]
+
+    def _get_audio_files(self):
+        if self.audio_dir == 'bacpipe/tests/test_data':
+            import importlib.resources as pkg_resources
+            with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
+                audio_dir = Path(audio_dir)
+        files_list = []
+        [
+            [files_list.append(ll) for ll in self.audio_dir.rglob(f"*{string}")]
+            for string in self.audio_suffixes
+        ]
+        files_list = np.unique(files_list).tolist()
+        assert len(files_list) > 0, "No audio files found in audio_dir."
+        return files_list
+
+    def _init_metadata_dict(self):
+        self.metadata_dict = {
+            "model_name": self.model_name,
+            "audio_dir": str(self.audio_dir),
+            "embed_dir": str(self.embed_dir),
+            "files": {
+                "audio_files": [],
+                "file_lengths (s)": [],
+                "nr_embeds_per_file": [],
+            },
+        }
+
+    def _get_metadata_dict(self, folder):
+        with open(folder.joinpath("metadata.yml"), "r") as f:
+            self.metadata_dict = yaml.load(f, Loader=yaml.CLoader)
+        for key, val in self.metadata_dict.items():
+            if isinstance(val, str):
+                if not Path(val).is_dir():
+                    if key == "embed_dir":
+                        val = folder.parent.joinpath(Path(val).stem)
+                    elif key == "audio_dir":
+                        logger.info(
+                            "The audio files are no longer where they used to be "
+                            "during the previous run. This might cause a problem."
+                        )
+                setattr(self, key, Path(val))
+        if self.dim_reduction_model:
+            self.dim_reduc_embed_dir = folder
+
+    def get_embeddings(self):
+        embed_dir = self.get_embedding_dir()
+        self.files = [f for f in embed_dir.rglob(f"*{self.embed_suffix}")]
+        self.files.sort()
+
+        if not self.combination_already_exists:
+            self._get_metadata_dict(embed_dir)
+            self.metadata_dict["files"].update(
+                {"embedding_files": [], "embedding_dimensions": []}
+            )
+            self.embed_dir = Path(self.dim_reduc_parent_dir).joinpath(
+                self.get_timestamp_dir() + f"-{self.model_name}"
             )
         else:
-            print(
-                "### Generating visualizations of embeddings using "
-                f"{dim_reduction_model}. Plots are saved in "
-                f"{loader_dim_reduced.embed_dir} ###"
-            )
-            vis_loader = EmbedAndLabelLoader(
-                dim_reduction_model=dim_reduction_model, **kwargs
-            )
-            plot_embeddings(
-                vis_loader,
-                paths=paths,
-                model_name=loader_dim_reduced.model_name,
-                dim_reduction_model=dim_reduction_model,
-                bool_plot_centroids=False,
-                label_by="time_of_day",
-                **kwargs,
-            )
-    return loader_embeddings
+            self.embed_dir = embed_dir
 
-
-def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
-    if "dim_reduction_model" in kwargs:
-        print(
-            f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"
-        )
-    elif "model_name" in kwargs:
-        print(
-            f"\n\n\n###### Generating embeddings using {kwargs['model_name'].upper()} ######\n"
-        )
-    else:
-        error = "\nmodel_name not provided in kwargs."
-        logger.exception(error)
-        raise ValueError(error)
-    if kwargs['model_name'] in TF_MODELS:
-        import tensorflow as tf
-    try:
-        start = time.time()
-        ld = ge.Loader(**kwargs)
-        logger.debug(f"Loading the data took {time.time()-start:.2f}s.")
-        if not ld.combination_already_exists:
-            embed = ge.Embedder(**kwargs)
-
-            if ld.dim_reduction_model:
-                # (1) Dimensionality reduction stage
-                for idx, file in enumerate(
-                    tqdm(ld.files, desc="processing files", position=1, leave=False)
-                ):
-                    if idx == 0:
-                        embeddings = ld.embed_read(idx, file)
-                    else:
-                        embeddings = np.concatenate(
-                            [embeddings, ld.embed_read(idx, file)]
-                        )
-
-                dim_reduced_embeddings = embed.get_embeddings_from_model(embeddings)
-                embed.save_embeddings(idx, ld, file, dim_reduced_embeddings)
-
-            elif embed.model.device == "cuda" and not avoid_pipelined_gpu_inference:
-                # (2) GPU path with pipelined embedding generation
-                embed.get_pipelined_embeddings_from_model(ld)
-
+    def get_embedding_dir(self):
+        if self.dim_reduction_model:
+            if self.combination_already_exists:
+                self.embed_parent_dir = Path(self.dim_reduc_parent_dir)
+                return self.embed_dir
             else:
-                # (3) CPU path with sequential embedding generation
-                for idx, file in enumerate(
-                    tqdm(ld.files, desc="processing files", position=1, leave=False)
-                ):
-                    try:
-                        try:
-                            embeddings = embed.get_embeddings_from_model(file)
-                        except soundfile.LibsndfileError as e:
-                            logger.warning(
-                                f"\n Error loading audio, skipping file. \n"
-                                f"Error: {e}"
-                            )
-                            continue
-                        except tf.errors.ResourceExhaustedError:
-                                                    
-                            logger.error(
-                                "\nGPU device is out of memory. Your Vram doesn't seem to be "
-                                "large enough for this process. This could be down to the "
-                                "size of the audio files. Use `cpu` instead of `cuda`."
-                            )
-                            os._exit(1) 
-                    except Exception as e:
-                        logger.warning(
-                            f"\n Error generating embeddings, skipping file. \n"
-                            f"Error: {e}"
-                        )
-                        continue
-                    ld.write_audio_file_to_metadata(idx, file, embed, embeddings)
-                    embed.save_embeddings(idx, ld, file, embeddings)
-                    if embed.model.bool_classifier:
-                        embed.save_classifier_outputs(ld, file)
+                self.embed_parent_dir = Path(self.embed_parent_dir)
+                self.embed_suffix = ".npy"
+        else:
+            return self.embed_dir
+        self.audio_dir = Path(self.audio_dir)
 
-            # Finalize
-            if embed.model.bool_classifier and not embed.dim_reduction_model:
-                embed.cumulative_annotations.to_csv(
-                    embed.paths.class_path / "default_classifier_annotations.csv",
-                    index=False,
+        if self.dim_reduc_embed_dir:
+            # check if they are compatible
+            return self.dim_reduc_embed_dir
+
+        embed_dirs = [
+            d
+            for d in self.embed_parent_dir.iterdir()
+            if self.audio_dir.stem in d.parts[-1] and self.model_name in d.stem
+        ]
+        # check if timestamp of umap is after timestamp of model embeddings
+        embed_dirs.sort()
+        return self._find_existing_embed_dir(embed_dirs)
+
+    def get_timestamp_dir(self):
+        if self.dim_reduction_model:
+            model_name = self.dim_reduction_model
+        else:
+            model_name = self.model_name
+        return time.strftime(
+            "%Y-%m-%d_%H-%M___" + model_name + "-" + self.audio_dir.stem,
+            time.localtime(),
+        )
+
+    def embed_read(self, index, file):
+        embeds = np.load(file)
+        try:
+            rel_file_path = file.relative_to(self.metadata_dict["embed_dir"])
+        except ValueError as e:
+            logger.debug(
+                "\nEmbedding file is not in the same directory structure "
+                "as it was when created.\n",
+                e,
+            )
+            rel_file_path = file.relative_to(
+                self.embed_parent_dir.joinpath(
+                    Path(self.metadata_dict["embed_dir"]).stem
                 )
-            ld.write_metadata_file()
-            ld.update_files()
+            )
+        self.metadata_dict["files"]["embedding_files"].append(str(rel_file_path))
+        if len(embeds.shape) == 1:
+            embeds = np.expand_dims(embeds, axis=0)
+        self.metadata_dict["files"]["embedding_dimensions"].append(embeds.shape)
+        return embeds
+
+    def embedding_dict(self):
+        d = {}
+        for file in self.files:
+            if not self.dim_reduction_model:
+                embeds = np.load(file)
+            else:
+                with open(file, "r") as f:
+                    embeds = json.load(f)
+                embeds = np.array(embeds)
+            d[str(file.relative_to(self.embed_dir))] = embeds
+        return d
+
+    def write_audio_file_to_metadata(self, index, file, embed, embeddings):
+        if (
+            not "segment_length (samples)" in self.metadata_dict.keys()
+            or not "sample_rate (Hz)" in self.metadata_dict.keys()
+            or not "embedding_size" in self.metadata_dict.keys()
+        ):
+            self.metadata_dict["segment_length (samples)"] = embed.model.segment_length
+            self.metadata_dict["sample_rate (Hz)"] = embed.model.sr
+            self.metadata_dict["embedding_size"] = embeddings.shape[-1]
+        rel_file_path = Path(file).relative_to(self.audio_dir)
+        self.metadata_dict["files"]["audio_files"].append(str(rel_file_path))
+        self.metadata_dict["files"]["file_lengths (s)"].append(
+            embed.file_length[file.stem]
+        )
+        self.metadata_dict["files"]["nr_embeds_per_file"].append(embeddings.shape[0])
+
+    def write_metadata_file(self):
+        self.metadata_dict["nr_embeds_total"] = sum(
+            self.metadata_dict["files"]["nr_embeds_per_file"]
+        )
+        self.metadata_dict["total_dataset_length (s)"] = sum(
+            self.metadata_dict["files"]["file_lengths (s)"]
+        )
+        with open(str(self.embed_dir.joinpath("metadata.yml")), "w") as f:
+            yaml.safe_dump(self.metadata_dict, f)
+
+    def update_files(self):
+        if self.dim_reduction_model:
+            self.files = [f for f in self.embed_dir.iterdir() if f.suffix == ".json"]
+        else:
+            self.files = list(self.embed_dir.rglob("*.npy"))
+
+
+import queue
+import threading
+from tqdm import tqdm
+
+
+class Embedder:
+    def __init__(
+        self,
+        model_name,
+        dim_reduction_model=False,
+        paths=None,
+        classifier_threshold=None,
+        **kwargs,
+    ):
+        """
+        This class defines all the entry points to generate embedding files. 
+        Parameters are kept minimal, to accomodate as many cases as possible.
+        At the end if instantiation, the selected model is loaded and the 
+        model is associated with the device specified.
+
+        Parameters
+        ----------
+        model_name : str
+            name of selected embedding model
+        dim_reduction_model : bool, optional
+            Can be bool or the string corresponding to the dimensionality reduction model, by default False
+        paths : SimpleNamespace, optional
+            dict-like structure with all the results paths, by default None
+        testing : bool, optional
+            _description_, by default False
+        classifier_threshold : float, optional
+            Value under which class predictions are discarded, by default None
+        """
+        self.paths = paths
+        self.file_length = {}
+
+        if classifier_threshold:
+            self.classifier_threshold = classifier_threshold
+
+        self.dim_reduction_model = dim_reduction_model
+        if dim_reduction_model:
+            self.dim_reduction_model = True
+            self.model_name = dim_reduction_model
+        else:
+            self.model_name = model_name
+        self._init_model(dim_reduction_model=dim_reduction_model, **kwargs)
+
+    def _init_model(self, **kwargs):
+        """
+        Load model specific module, instantiate model and allocate device for model.
+        """
+        if self.dim_reduction_model:
+            module = importlib.import_module(
+                f"bacpipe.embedding_generation_pipelines.dimensionality_reduction.{self.model_name}"
+            )
+        else:
+            module = importlib.import_module(
+                f"bacpipe.embedding_generation_pipelines.feature_extractors.{self.model_name}"
+            )
+        self.model = module.Model(model_name=self.model_name, **kwargs)
+        self.model.prepare_inference()
+
+    def prepare_audio(self, sample):
+        """
+        Use bacpipe pipeline to load audio file, window it according to 
+        model specific window length and preprocess the data, ready for 
+        batch inference computation. Also log file length and shape for
+        metadata files.
+
+        Parameters
+        ----------
+        sample : pathlib.Path or str
+            path to audio file
+
+        Returns
+        -------
+        torch.Tensor
+            audio frames preprocessed with model specific preprocessing
+        """
+        audio = self.model.load_and_resample(sample)
+        audio = audio.to(self.model.device)
+        if self.model.only_embed_annotations:
+            frames = self.model.only_load_annotated_segments(sample, audio)
+        else:
+            frames = self.model.window_audio(audio)
+        preprocessed_frames = self.model.preprocess(frames)
+        self.file_length[sample.stem] = len(audio[0]) / self.model.sr
+        self.preprocessed_shape = tuple(preprocessed_frames.shape)
+        if self.model.device == 'cuda':
+            del audio, frames
+            torch.cuda.empty_cache()
+        return preprocessed_frames
+
+    def get_embeddings_for_audio(self, sample):
+        """
+        Create a dataloader for the processed audio frames and 
+        run batch inference. Both are methods of the self.model
+        class, which can be found in the utils.py file.
+
+        Parameters
+        ----------
+        sample : torch.Tensor
+            preprocessed audio frames
+
+        Returns
+        -------
+        np.array
+            embeddings from model
+        """
+        batched_samples = self.model.init_dataloader(sample)
+        embeds = self.model.batch_inference(batched_samples)
+        if not isinstance(embeds, np.ndarray):
+            try:
+                embeds = embeds.numpy()
+            except:
+                try:
+                    embeds = embeds.detach().numpy()
+                except:
+                    embeds = embeds.cpu().detach().numpy()
+        return embeds
+
+    def get_reduced_dimensionality_embeddings(self, embeds):
+        samples = self.model.preprocess(embeds)
+        if "umap" in self.model.__module__:
+            if samples.shape[0] <= self.model.umap_config["n_neighbors"]:
+                logger.warning(
+                    "Not enough embeddings were created to compute a dimensionality"
+                    " reduction with the chosen settings. Please embed more audio or "
+                    "reduce the n_neighbors in the umap config."
+                )
+        return self.model(samples)
+
+    def get_pipelined_embeddings_from_model(self, fileloader_obj):
+        """
+        Generate embeddings for all files in a pipelined manner:
+        - Producer thread loads and preprocesses audio
+        - Consumer (main thread) embeds audio while producer prepares next batch
+        Ensures metadata and embeddings are written exactly like in the sequential version.
+
+        Parameters
+        ----------
+        fileloader_obj : Loader object
+            contains all metadata of a model specific embedding creation session
+
+        Returns
+        -------
+        Loader object
+            updated object with metadata on embedding creation session
+        """
+        task_queue = queue.Queue(maxsize=4)  # small buffer to balance I/O vs compute
+
+        # --- Producer: load + preprocess in background ---
+        def producer():
+            for idx, file in enumerate(fileloader_obj.files):
+                try:
+                    preprocessed = self.prepare_audio(file)
+                    task_queue.put((idx, file, preprocessed))
+                                    
+                except torch.cuda.OutOfMemoryError:
+                    logger.error(
+                        "\nCuda device is out of memory. Your Vram doesn't seem to be "
+                        "large enough for this process. Try setting the variable "
+                        "`avoid_pipelined_gpu_inference` to `True`. That way data "
+                        "will be processed in series instead of parallel which will "
+                        "reduce memory requirements. If that also fails use `cpu` "
+                        "instead of `cuda`."
+                    )
+                    os._exit(1) 
+                except Exception as e:
+                    task_queue.put((idx, file, e))
+            task_queue.put(None)  # sentinel = done
+
+        threading.Thread(target=producer, daemon=True).start()
+
+        # --- Consumer: embed + save metadata/embeddings ---
+        with tqdm(
+            total=len(fileloader_obj.files),
+            desc="processing files",
+            position=1,
+            leave=False,
+        ) as pbar:
+            while True:
+                item = task_queue.get()
+                if item is None:
+                    break
+
+                idx, file, data = item
+                if isinstance(data, Exception):
+                    logger.warning(
+                        f"Error preprocessing {file}, skipping file.\nError: {data}"
+                    )
+                    pbar.update(1)
+                    continue
+
+                try:
+                    embeddings = self.get_embeddings_for_audio(data)
+                except Exception as e:
+                    logger.warning(
+                        f"Error generating embeddings for {file}, skipping file.\nError: {e}"
+                    )
+                    pbar.update(1)
+                    continue
+
+                fileloader_obj.write_audio_file_to_metadata(idx, file, self, embeddings)
+                self.save_embeddings(idx, fileloader_obj, file, embeddings)
+                if self.model.bool_classifier:
+                    self.save_classifier_outputs(fileloader_obj, file)
+
+                pbar.update(1)
+
+        return fileloader_obj  # same return type as sequential version
+
+    def get_embeddings_from_model(self, sample):
+        """
+        Run full embedding generation pipeline, both for generating
+        embeddings from audio data or generating dimensionality reductions
+        from embedding data. Depending on that sample can be an embedding
+        array or a audio file path.
+
+        Parameters
+        ----------
+        sample : np.array or string-like
+            embedding array of path to audio file
+
+        Returns
+        -------
+        np.array
+            embeddings
+        """
+        start = time.time()
+        if self.dim_reduction_model:
+            embeds = self.get_reduced_dimensionality_embeddings(sample)
+        else:
+            if not isinstance(sample, Path):
+                sample = Path(sample)
+                if not sample.suffix in self.model.audio_suffixes:
+                    error = (
+                        "\nThe provided path does not lead to a supported audio file with the ending"
+                        f" {self.model.audio_suffixes}. Please check again that you provided the correct"
+                        " path."
+                    )
+                    logger.exception(error)
+                    raise AssertionError(error)
+            sample = self.prepare_audio(sample)
+            embeds = self.get_embeddings_for_audio(sample)
+
+        logger.debug(f"{self.model_name} embeddings have shape: {embeds.shape}")
+        logger.info(f"{self.model_name} inference took {time.time()-start:.2f}s.")
+        return embeds
+
+    def save_embeddings(self, file_idx, fileloader_obj, file, embeds):
+        if self.dim_reduction_model:
+            file_dest = fileloader_obj.embed_dir.joinpath(
+                fileloader_obj.audio_dir.stem + "_" + self.model_name
+            )
+            file_dest = str(file_dest) + ".json"
+            input_len = (
+                fileloader_obj.metadata_dict["segment_length (samples)"]
+                / fileloader_obj.metadata_dict["sample_rate (Hz)"]
+            )
+            save_embeddings_dict_with_timestamps(
+                file_dest, embeds, input_len, fileloader_obj, file_idx
+            )
+        else:
+            relative_parent_path = (
+                Path(file).relative_to(fileloader_obj.audio_dir).parent
+            )
+            parent_path = fileloader_obj.embed_dir.joinpath(relative_parent_path)
+            parent_path.mkdir(exist_ok=True, parents=True)
+            file_dest = parent_path.joinpath(file.stem + "_" + self.model_name)
+            file_dest = str(file_dest) + ".npy"
+            if len(embeds.shape) == 1:
+                embeds = np.expand_dims(embeds, axis=0)
+            np.save(file_dest, embeds)
+
+
+    @staticmethod
+    def filter_top_k_classifications(probabilities, class_names,
+                                     class_indices, class_time_bins, 
+                                     k=50):
+        """
+        Generate a dictionary with the top k classes. By limiting the class number to 
+        k, it prevents from this step taking too long but has the benefit of generating
+        a dicitonary which can be saved as a .json file to quickly get a overview of 
+        species that are well represented within an audio file. 
+
+        Parameters
+        ----------
+        probabilities : np.array
+            Probabilities for each class
+        class_names : list
+            class names
+        class_indices : np.array
+            class indices exceeding the threshold
+        class_time_bins : np.array
+            time bin indices exceeding the threshold
+        k : int, optional
+            number of classes to save in the dict. keep this below 100
+            otherwise the operation will start slowing the process down
+            a lot, by default 50
+
+        Returns
+        -------
+        dict
+            dictionary of top k classes with time bin indices exceeding threshold
+        """
+        classes, class_counts = np.unique(class_indices, 
+                                          return_counts=True)
         
-            # clear GPU
-            del embed
-            import tensorflow as tf
-            tf.keras.backend.clear_session()
+        cls_dict = {k: v for k, v in zip(classes, class_counts)}
+        cls_dict = dict(sorted(cls_dict.items(), key=lambda x: x[1], 
+                               reverse=True))
+        top_k_cls = {k: v for i, (k, v) 
+                     in enumerate(cls_dict.items()) 
+                     if i < k}
+                
+        cls_results = {
+            class_names[cls]: {
+                "time_bins_exceeding_threshold": class_time_bins[
+                    class_indices == cls
+                    ].tolist(),
+                "classifier_predictions": np.array(
+                    probabilities[class_indices[class_indices == cls], 
+                                  class_time_bins[class_indices == cls]]
+                ).tolist(),
+            }
+            for cls in top_k_cls.keys()
+        }
+        return cls_results
+
+    @staticmethod
+    def make_classification_dict(probabilities, classes, threshold):
+        if probabilities.shape[0] != len(classes):
+            probabilities = probabilities.swapaxes(0, 1)
+
+        cls_idx, tmp_idx = np.where(probabilities > threshold)
+
+        cls_results = Embedder.filter_top_k_classifications(probabilities, 
+                                                            classes,
+                                                            cls_idx, 
+                                                            tmp_idx)
+
+        cls_results["head"] = {
+            "Time bins in this file": probabilities.shape[-1],
+            "Threshold for classifier predictions": threshold,
+        }
+        return cls_results
+    
+    def run_clfier_for_previous_embeddings(self, fileloader_obj):
+        existing_embeddings = list(Path(fileloader_obj.embed_dir).rglob('*.npy'))
+        for file in existing_embeddings:
+            with open(file, 'rb') as f:
+                embed = np.load(f)
+                
+    
+    def fill_dataframe_with_classiefier_results(self, fileloader_obj, file):
+        """
+        Append or create a dataframe and fill it with the results from the 
+        classifier to later be saved as a csv file.
+
+        Parameters
+        ----------
+        fileloader_obj : bacpipe.Loader object
+            All paths and metadata of embeddings creation run
+        file : pathlike
+            audio file path
+        """
+        classifier_annotations = pd.DataFrame()
+        
+        maxes = torch.max(self.model.classifier_outputs, dim=0)
+        outputs_exceeding_thresh = self.model.classifier_outputs[:,
+            maxes.values > self.classifier_threshold
+        ]
+        
+        active_time_bins = np.arange(
+            self.model.classifier_outputs.shape[-1]
+            )[maxes.values > self.classifier_threshold]
+        
+        classifier_annotations["start"] = active_time_bins * (
+            self.model.segment_length / self.model.sr
+        )
+        classifier_annotations["end"] = classifier_annotations["start"] + (
+            self.model.segment_length / self.model.sr
+        )
+        classifier_annotations["audiofilename"] = str(
+            file.relative_to(fileloader_obj.audio_dir)
+        )
+        classifier_annotations["label:default_classifier"] = np.array(
+            self.model.classes
+        )[maxes.indices[maxes.values > self.classifier_threshold]].tolist()
+
+        if not hasattr(self, "cumulative_annotations"):
+            if fileloader_obj.continue_failed_run:
+                self.load_existing_clfier_outputs(fileloader_obj, 
+                                                  classifier_annotations)
+            else:
+                self.cumulative_annotations = classifier_annotations
+        else:
+            self.cumulative_annotations = pd.concat(
+                [self.cumulative_annotations, classifier_annotations], ignore_index=True
+            )
+
+    def load_existing_clfier_outputs(self, fileloader_obj, clfier_annotations):
+        clfier_dir = Path(
+            fileloader_obj.paths.class_path / 'original_classifier_outputs'
+            )
+        existing_clfier_outputs = list(clfier_dir.rglob('*.json'))
+        existing_clfier_outputs.sort()
+        
+        seg_len = self.model.segment_length / self.model.sr
+        
+        relative_audio = np.array(
+            # we omit the last item assuming that it's just been processed
+            # and corresponds to the clfier_annotations contents
+            [
+                f.split('.')
+                for f in 
+                fileloader_obj.metadata_dict['files']['audio_files'][:-1]
+                ]
+            )
+        relative_audio_stems = relative_audio[:, 0]
+        relative_audio_suffixes = relative_audio[:, 1]
+        
+        
+        df_dict = {
+            'start': [],
+            'end': [],
+            'audiofilename': [],
+            'label:default_classifier': []
+            }
+        for file in existing_clfier_outputs:
+            corresponding_audio_file_bool = (
+                relative_audio_stems==str(
+                    file.relative_to(clfier_dir)
+                    ).replace(f'_{fileloader_obj.model_name}.json', '')
+            )
+            with open(file, 'r') as f:
+                outputs = json.load(f)
+            outputs.pop('head')
+            if len(outputs) == 0:
+                continue
+            all_active_time_bins = []
+            clfier_preds = []
+            species = []
+            for k, v in outputs.items():
+                all_active_time_bins.append(v['time_bins_exceeding_threshold'])
+                clfier_preds.append(v['classifier_predictions'])
+                species.append(k)
+                
+            width = max(max(a) for a in all_active_time_bins) + 1 
+            clfier_preds_np = np.zeros([len(clfier_preds), width])
+            for i, (j,pred) in enumerate(zip(all_active_time_bins, clfier_preds)):
+                clfier_preds_np[i][j] = pred
             
-        return ld
-    except KeyboardInterrupt:
-        if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
-            print("KeyboardInterrupt: Exiting and deleting created embeddings.")
-            import shutil
+            active_time_bins = np.where(np.max(clfier_preds_np, axis=0))[0]
+            active_species = np.array(species)[
+                np.argmax(clfier_preds_np, axis=0)[active_time_bins]
+                ].tolist()
+            
+            df_dict['start'].extend(
+                (active_time_bins * seg_len).tolist()
+            )
+            df_dict['end'].extend(
+                ((active_time_bins * seg_len) + seg_len).tolist()
+            )
+            df_dict['audiofilename'].extend(
+                [
+                    relative_audio_stems[corresponding_audio_file_bool][0] 
+                    + '.' 
+                    +relative_audio_suffixes[corresponding_audio_file_bool][0]
+                    ] * len(active_species)
+            )
+            df_dict['label:default_classifier'].extend(active_species)
+        self.cumulative_annotations = pd.DataFrame(df_dict)
+        self.cumulative_annotations = pd.concat(
+                [self.cumulative_annotations, clfier_annotations], 
+                ignore_index=True
+            )
+        
+        
+    def save_classifier_outputs(self, fileloader_obj, file):
+        relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
+        results_path = self.paths.class_path.joinpath(
+            "original_classifier_outputs"
+        ).joinpath(relative_parent_path)
+        results_path.mkdir(exist_ok=True, parents=True)
+        file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
+        file_dest = str(file_dest) + ".json"
 
-            shutil.rmtree(ld.embed_dir)
-        import sys
+        if self.model.classifier_outputs.shape[0] != len(self.model.classes):
+            self.model.classifier_outputs = self.model.classifier_outputs.swapaxes(0, 1)
 
-        sys.exit()
+        if self.model.only_embed_annotations: #annotation file exists
+            np.save(file_dest.replace('.json', '.npy'), self.model.classifier_outputs)
+        
+        self.fill_dataframe_with_classiefier_results(fileloader_obj, file)
+        
+        cls_results = self.make_classification_dict(
+            self.model.classifier_outputs, self.model.classes, self.classifier_threshold
+        )
+
+        with open(file_dest, "w") as f:
+            json.dump(cls_results, f, indent=2)
+        self.model.classifier_outputs = torch.tensor([])
+
+
+def save_embeddings_dict_with_timestamps(
+    file_dest, embeds, input_len, loader_obj, f_idx
+):
+
+    t_stamps = []
+    for num_segments, _ in loader_obj.metadata_dict["files"]["embedding_dimensions"]:
+        [t_stamps.append(t) for t in np.arange(0, num_segments * input_len, input_len)]
+    d = {
+        var: embeds[:, i].tolist() for i, var in zip(range(embeds.shape[1]), ["x", "y"])
+    }
+    d["timestamp"] = t_stamps
+
+    d["metadata"] = {
+        k: (v if isinstance(v, list) else v)
+        for (k, v) in loader_obj.metadata_dict["files"].items()
+    }
+    d["metadata"].update(
+        {k: v for (k, v) in loader_obj.metadata_dict.items() if not isinstance(v, dict)}
+    )
+
+    import json
+
+    with open(file_dest, "w") as f:
+        json.dump(d, f, indent=2)
+
+    if embeds.shape[-1] > 2:
+        embed_dict = {}
+        acc_shape = 0
+        for shape, file in zip(
+            loader_obj.metadata_dict["files"]["embedding_dimensions"],
+            loader_obj.files,
+        ):
+            embed_dict[file.stem] = embeds[acc_shape : acc_shape + shape[0]]
+            acc_shape += shape[0]
+        np.save(file_dest.replace(".json", f"{embeds.shape[-1]}.npy"), embed_dict)

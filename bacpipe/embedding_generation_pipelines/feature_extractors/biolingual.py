@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from transformers import ClapModel, ClapProcessor
 
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 
 SAMPLE_RATE = 48_000

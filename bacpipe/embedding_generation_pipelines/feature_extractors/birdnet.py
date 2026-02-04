@@ -6,7 +6,7 @@ import numpy as np
 SAMPLE_RATE = 48000
 LENGTH_IN_SAMPLES = 144000
 
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 
 class Model(ModelBaseClass):

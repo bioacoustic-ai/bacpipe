@@ -5,7 +5,7 @@ import pandas as pd
 import logging
 logger = logging.getLogger("bacpipe")
 
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 SAMPLE_RATE = 32000
 LENGTH_IN_SAMPLES = 160000

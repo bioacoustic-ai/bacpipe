@@ -6,8 +6,8 @@ from pathlib import Path
 
 import bacpipe
 from bacpipe import EMBEDDING_DIMENSIONS
-from bacpipe.main import get_embeddings, embeds_array_without_noise
-from bacpipe.generate_embeddings import Loader, Embedder
+from bacpipe.main_utils import get_embeddings, embeds_array_without_noise
+from bacpipe.main import Loader, Embedder
 from bacpipe.embedding_evaluation.label_embeddings import (
     generate_annotations_for_classification_task,
     make_set_paths_func,

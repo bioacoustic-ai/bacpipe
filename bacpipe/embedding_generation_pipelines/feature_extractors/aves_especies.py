@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 # extract_feature in the torchaudio version will output all 12 layers' output, -1 to select the final one
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 BATCH_SIZE = 1  # necessary due to padding problem, experiment with this
 

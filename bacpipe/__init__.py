@@ -61,9 +61,9 @@ NEEDS_CHECKPOINT = [
 # --------------------------------------------------------------------
 ### EXPOSE API ENDPOINTS ### 
 # --------------------------------------------------------------------
-from bacpipe.generate_embeddings import Embedder, Loader
+from bacpipe.main import Embedder, Loader
 
-from bacpipe.main import (
+from bacpipe.main_utils import (
     get_model_names,
     evaluation_with_settings_already_exists,
     model_specific_embedding_creation,

@@ -7,7 +7,7 @@ SAMPLE_RATE = 32_000
 LENGTH_IN_SAMPLES = 160_000
 
 from bacpipe.model_specific_utils.convnext_birdset.preprocess import ConvNextPreProcess
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 
 class Model(ModelBaseClass):

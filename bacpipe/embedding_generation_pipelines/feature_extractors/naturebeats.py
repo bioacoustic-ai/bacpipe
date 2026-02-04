@@ -5,7 +5,7 @@ import yaml
 
 import bacpipe
 from .beats import BeatsModel
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 
 SAMPLE_RATE = 16_000

@@ -1,4 +1,4 @@
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 import umap
 
 
