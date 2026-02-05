@@ -3,7 +3,9 @@ import matplotlib
 import sys
 import seaborn as sns
 import numpy as np
+import logging
 
+logger = logging.getLogger("bacpipe")
 
 import importlib.resources as pkg_resources
 import bacpipe.imgs
@@ -561,3 +563,45 @@ class DashBoard(DashBoardHelper):
 
         # Return the assembled panel
         return pn.Column(fig_panel, pn.Row(button), notification)
+
+
+def visualize_using_dashboard(models, **kwargs):
+    """
+    Create and serve the dashboard for visualization.
+
+    Parameters
+    ----------
+    models : list
+        embedding models
+    kwargs : dict
+        Dictionary with parameters for dashboard creation
+    """
+    from bacpipe.embedding_evaluation.visualization.dashboard import DashBoard
+    import panel as pn
+
+    # Configure dashboard
+    dashboard = DashBoard(models, **kwargs)
+
+    # Build the dashboard layout
+    try:
+        dashboard.build_layout()
+    except Exception as e:
+        logger.exception(
+            f"\nError building dashboard layout: {e}\n \n "
+            "Are you sure all the evaluations have been performed? "
+            "If not, rerun the pipeline with `overwrite=True`.\n \n "
+        )
+        raise e
+
+    with pkg_resources.path(bacpipe.imgs, 'bacpipe_favicon_white.png') as p:
+        favicon_path = str(p)
+
+    template = pn.template.BootstrapTemplate(
+        site="bacpipe dashboard",
+        title="Explore embeddings of audio data",
+        favicon=str(favicon_path),  # must be a path ending in .ico, .png, etc.
+        main=[dashboard.app],
+    )
+    
+
+    template.show(port=5006, address="localhost")

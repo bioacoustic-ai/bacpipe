@@ -1,17 +1,22 @@
-import os
 import time
 import logging
 from pathlib import Path
 import importlib.resources as pkg_resources
-import bacpipe.imgs
-import soundfile
 
-from bacpipe.main import Embedder
+from pathlib import Path
+from huggingface_hub import hf_hub_download
+import tarfile
 
 import numpy as np
-from tqdm import tqdm
 
-import bacpipe.main as ge
+from bacpipe.core.experiment_manager import (
+    Loader, save_logs
+    )
+from bacpipe.model_pipelines.runner import Embedder
+
+from bacpipe.embedding_evaluation.visualization.dashboard import (
+    visualize_using_dashboard
+)
 
 from bacpipe.embedding_evaluation.visualization.visualize import (
     plot_comparison,
@@ -24,17 +29,148 @@ from bacpipe.embedding_evaluation.label_embeddings import (
     generate_annotations_for_classification_task,
     ground_truth_by_model,
 )
-
-from bacpipe.embedding_evaluation.classification.classify import classification_pipeline
-
+from bacpipe.embedding_evaluation.classification.classify import (
+    classification_pipeline
+    )
 from bacpipe.embedding_evaluation.clustering.cluster import clustering
 
-
-from bacpipe.embedding_evaluation.visualization.dashboard import DashBoard
-
-from bacpipe import TF_MODELS
+from bacpipe.core.constants import TF_MODELS, NEEDS_CHECKPOINT
+from bacpipe import config, settings
 
 logger = logging.getLogger("bacpipe")
+
+def play(config=config, settings=settings, bool_save_logs=False):
+    """
+    Play the bacpipe! The pipeline will run using the models specified in
+    bacpipe.config.models and generate results in the directory
+    bacpipe.settings.results_dir. For more details see the ReadMe file on the
+    repository page https://github.com/bioacoustic-ai/bacpipe.
+
+    Parameters
+    ----------
+    config : dict, optional
+        configurations for pipeline execution, by default config
+    settings : dict, optional
+        settings for pipeline execution, by default settings
+    bool_save_logs : bool, optional
+        Save logs, config and settings file. This is important if you get a bug,
+        sharing this will be very helpful to find the source of
+        the problem, by default False
+
+
+    Raises
+    ------
+    FileNotFoundError
+        If no audio files are found we can't compute any embeddings. So make
+        sure the path is correct :)
+    """
+    settings.model_base_path = ensure_models_exist(Path(settings.model_base_path),
+                                                   model_names=config.models)
+    overwrite, dashboard = config.overwrite, config.dashboard
+
+    if config.audio_dir == 'bacpipe/tests/test_data':
+        with pkg_resources.path(
+            __package__.split('.')[0] + ".tests.test_data", ""
+            ) as audio_dir:
+            audio_dir = Path(audio_dir)
+
+        if not audio_dir.exists():
+            error = (
+                f"\nAudio directory {config.audio_dir} does not exist. Please check the path. "
+                "It should be in the format 'C:\\path\\to\\audio' on Windows or "
+                "'/path/to/audio' on Linux/Mac. Use single quotes '!"
+            )
+            logger.exception(error)
+            raise FileNotFoundError(error)
+        else:
+            config.audio_dir = audio_dir
+
+        # ----------------------------------------------------------------
+    # Setup logging to file if requested
+    # ----------------------------------------------------------------
+    if bool_save_logs:
+        save_logs(config, settings)
+
+    config.models = get_model_names(**vars(config), **vars(settings))
+
+    if overwrite or not evaluation_with_settings_already_exists(
+        **vars(config), **vars(settings)
+    ):
+
+        loader_dict = model_specific_embedding_creation(
+            **vars(config), **vars(settings)
+        )
+
+        model_specific_evaluation(loader_dict, **vars(config), **vars(settings))
+
+        cross_model_evaluation(**vars(config), **vars(settings))
+
+    if dashboard:
+        visualize_using_dashboard(**vars(config), **vars(settings))
+
+
+
+
+def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_models"):
+    """
+    Ensure that the model checkpoints for the selected models are
+    available locally. Downloads from Hugging Face Hub if missing.
+
+    Parameters
+    ----------
+    model_base_path : Path
+        Local base directory where the checkpoints should be stored.
+    model_names : list
+        list of models to run
+    repo_id : str, optional
+        Hugging Face Hub repo ID, by default "vinikay/bacpipe_models"
+    """
+    model_base_path = Path(model_base_path)
+    model_base_path.parent.mkdir(exist_ok=True, parents=True)
+    
+    logger.info(
+        "Checking if the selected models require a checkpoint, and if so, "
+        "if the checkpoint already exists.\n"
+    )
+    remove_from_list = []
+    if 'naturebeats' in model_names and not 'beats' in model_names:
+        model_names.append('beats')
+        remove_from_list = ['beats']
+        
+    for model_name in model_names:
+        if model_name in NEEDS_CHECKPOINT:
+            if ((model_base_path / model_name).exists()
+                and len(list((model_base_path / model_name).iterdir())) > 0):
+                logger.info(f"{model_name} checkpoint exists.\n")    
+                continue
+            else:   
+                if model_name == 'birdnet':
+                    import tensorflow as tf
+                    if tf.__version__ == '2.15.1':
+                        hf_url = f"{model_name}/{model_name}_tf215.tar.xz"
+                    else:
+                        hf_url = f"{model_name}/{model_name}.tar.xz"
+                else:
+                    hf_url = f"{model_name}/{model_name}.tar.xz"
+                    
+                logger.info(
+                    f"{model_name} checkpoint does not exists. "
+                    "Downloading the model from "
+                    f"https://huggingface.co/datasets/{repo_id}/blob/main/{hf_url}\n"
+                    )    
+                hf_hub_download(
+                    repo_id=repo_id,
+                    filename=hf_url,
+                    local_dir=model_base_path,
+                    repo_type="dataset",
+                )
+                tar = tarfile.open(model_base_path / hf_url)
+                tar.extractall(path=model_base_path)
+                tar.close()
+                
+    [model_names.remove(l) for l in remove_from_list]
+    return model_base_path.parent / "model_checkpoints"
+
 
 
 def get_model_names(
@@ -251,7 +387,7 @@ def model_specific_evaluation(
             )
                 
         if not evaluation_task in ["None", [], False]:
-            embeds = loader_dict[model_name].get_embeddings()
+            embeds = loader_dict[model_name].embeddings()
             try:
                 ground_truth = ground_truth_by_model(paths, model_name, **kwargs)
             except FileNotFoundError as e:
@@ -295,6 +431,11 @@ def model_specific_evaluation(
             clustering(paths, embeds_array, ground_truth, **kwargs)
 
 
+def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
+    return np.concatenate(list(embeds.values()))[
+        ground_truth[f"label:{label_column}"] > -1
+    ]
+
 
 def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwargs):
     """
@@ -325,54 +466,6 @@ def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwarg
                 dashboard=False,
                 **kwargs,
             )
-
-
-def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
-    return np.concatenate(list(embeds.values()))[
-        ground_truth[f"label:{label_column}"] > -1
-    ]
-
-
-def visualize_using_dashboard(models, **kwargs):
-    """
-    Create and serve the dashboard for visualization.
-
-    Parameters
-    ----------
-    models : list
-        embedding models
-    kwargs : dict
-        Dictionary with parameters for dashboard creation
-    """
-    from bacpipe.embedding_evaluation.visualization.dashboard import DashBoard
-    import panel as pn
-
-    # Configure dashboard
-    dashboard = DashBoard(models, **kwargs)
-
-    # Build the dashboard layout
-    try:
-        dashboard.build_layout()
-    except Exception as e:
-        logger.exception(
-            f"\nError building dashboard layout: {e}\n \n "
-            "Are you sure all the evaluations have been performed? "
-            "If not, rerun the pipeline with `overwrite=True`.\n \n "
-        )
-        raise e
-
-    with pkg_resources.path(bacpipe.imgs, 'bacpipe_favicon_white.png') as p:
-        favicon_path = str(p)
-
-    template = pn.template.BootstrapTemplate(
-        site="bacpipe dashboard",
-        title="Explore embeddings of audio data",
-        favicon=str(favicon_path),  # must be a path ending in .ico, .png, etc.
-        main=[dashboard.app],
-    )
-    
-
-    template.show(port=5006, address="localhost")
 
 
 def run_pipeline_for_model(
@@ -457,10 +550,10 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
         raise ValueError(error)
     try:
         start = time.time()
-        ld = ge.Loader(**kwargs)
+        ld = Loader(**kwargs)
         logger.debug(f"Loading the data took {time.time()-start:.2f}s.")
         if not ld.combination_already_exists:
-            embed = ge.Embedder(loader=ld, **kwargs)
+            embed = Embedder(loader=ld, **kwargs)
 
             if ld.dim_reduction_model:
                 # (1) Dimensionality reduction stage

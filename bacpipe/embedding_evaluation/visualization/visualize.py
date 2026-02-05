@@ -822,7 +822,7 @@ def visualise_results_across_models(plot_path, task_name, model_list):
             plot_overview_metrics, plot_path, task_name, model_list, metrics
         )
     else:
-        plot_overview_metrics(plot_path, task_name, model_list, metrics)
+        plot_overview_metrics(plot_path, task_name, model_list, metrics, path_func=le.get_paths)
 
 
 def iterate_through_subtasks(plot_func, plot_path, task_name, model_list, metrics):

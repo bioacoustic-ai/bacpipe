@@ -39,11 +39,11 @@ class DashBoardHelper:
         return getattr(self, f"{w_type}_select")[idx]
     
     def collect_all_embeddings(self, model):
-        import bacpipe.main as ge
+        from bacpipe.core.experiment_manager import Loader
         dataset_path = self.path_func(model).dataset_path
         audio_dir = dataset_path.stem
         parent_dir = dataset_path.parent
-        ld = ge.Loader(audio_dir=audio_dir, 
+        ld = Loader(audio_dir=audio_dir, 
                        model_name=model, 
                        main_results_dir=parent_dir, 
                        **self.kwargs)
