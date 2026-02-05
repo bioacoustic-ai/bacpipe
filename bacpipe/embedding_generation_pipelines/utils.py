@@ -124,7 +124,7 @@ class ModelBaseClass:
 
     def load_and_resample(self, path):
         try:
-            audio, sr = ta.load(path, normalize=True)
+            audio, sr = ta.load(str(path), normalize=True)
         except Exception as e:
             logger.exception(
                 f"Error loading audio with torchaudio. "
