@@ -61,16 +61,11 @@ class Model(ModelBaseClass):
                     ])
         return tf.convert_to_tensor(processed, dtype=tf.float32)
 
-    def __call__(self, input, return_class_results=False):
-        if not return_class_results:
-            return self.embeds(input, training=False)
-        else:
-            embeds = self.embeds(input, training=False)
-            class_preds = self.classifier_predictions(embeds)
-            return embeds, class_preds
+    def __call__(self, input):
+        return self.embeds(input, training=False)
 
-    def classifier_predictions(self, inferece_results):
-        logits = self.classifier(inferece_results).numpy()
+    def classifier_predictions(self, embeddings):
+        logits = self.classifier(embeddings).numpy()
         return tf.nn.sigmoid(logits).numpy()
 
 

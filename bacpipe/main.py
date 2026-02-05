@@ -12,6 +12,9 @@ import os
 import queue
 import threading
 from tqdm import tqdm
+import torchaudio as ta
+import bacpipe
+import soundfile
 
 logger = logging.getLogger("bacpipe")
 
@@ -285,6 +288,8 @@ class Loader:
             self.metadata_dict = yaml.load(f, Loader=yaml.CLoader)
         for key, val in self.metadata_dict.items():
             if isinstance(val, str):
+                if key == 'model_name':
+                    continue
                 if not Path(val).is_dir():
                     if key == "embed_dir":
                         val = folder.parent.joinpath(Path(val).stem)
@@ -369,7 +374,7 @@ class Loader:
         self.metadata_dict["files"]["embedding_dimensions"].append(embeds.shape)
         return embeds
 
-    def embedding_dict(self):
+    def embeddings(self, as_type='dict'):
         d = {}
         for file in self.files:
             if not self.dim_reduction_model:
@@ -379,21 +384,24 @@ class Loader:
                     embeds = json.load(f)
                 embeds = np.array(embeds)
             d[str(file.relative_to(self.embed_dir))] = embeds
-        return d
+        if as_type == 'dict':
+            return d
+        elif as_type == 'array':
+            return np.array(d.values())
 
-    def write_audio_file_to_metadata(self, index, file, embed, embeddings):
+    def write_audio_file_to_metadata(self, file, model, embeddings, file_length):
         if (
             not "segment_length (samples)" in self.metadata_dict.keys()
             or not "sample_rate (Hz)" in self.metadata_dict.keys()
             or not "embedding_size" in self.metadata_dict.keys()
         ):
-            self.metadata_dict["segment_length (samples)"] = embed.model.segment_length
-            self.metadata_dict["sample_rate (Hz)"] = embed.model.sr
+            self.metadata_dict["segment_length (samples)"] = model.segment_length
+            self.metadata_dict["sample_rate (Hz)"] = model.sr
             self.metadata_dict["embedding_size"] = embeddings.shape[-1]
         rel_file_path = Path(file).relative_to(self.audio_dir)
         self.metadata_dict["files"]["audio_files"].append(str(rel_file_path))
         self.metadata_dict["files"]["file_lengths (s)"].append(
-            embed.file_length[file.stem]
+            file_length[file.stem]
         )
         self.metadata_dict["files"]["nr_embeds_per_file"].append(embeddings.shape[0])
 
@@ -412,65 +420,87 @@ class Loader:
             self.files = [f for f in self.embed_dir.iterdir() if f.suffix == ".json"]
         else:
             self.files = list(self.embed_dir.rglob("*.npy"))
+            
+    def save_embeddings(self, file_idx, file, embeds):
+        if self.dim_reduction_model:
+            file_dest = self.embed_dir.joinpath(
+                self.audio_dir.stem + "_" + self.model_name
+            )
+            file_dest = str(file_dest) + ".json"
+            input_len = (
+                self.metadata_dict["segment_length (samples)"]
+                / self.metadata_dict["sample_rate (Hz)"]
+            )
+            self.save_embeddings_dict_with_timestamps(
+                file_dest, embeds, input_len
+            )
+        else:
+            relative_parent_path = (
+                Path(file).relative_to(self.audio_dir).parent
+            )
+            parent_path = self.embed_dir.joinpath(relative_parent_path)
+            parent_path.mkdir(exist_ok=True, parents=True)
+            file_dest = parent_path.joinpath(file.stem + "_" + self.model_name)
+            file_dest = str(file_dest) + ".npy"
+            if len(embeds.shape) == 1:
+                embeds = np.expand_dims(embeds, axis=0)
+            np.save(file_dest, embeds)
 
-
-class Embedder:
-    def __init__(
-        self,
-        model_name,
-        dim_reduction_model=False,
-        paths=None,
-        classifier_threshold=None,
-        **kwargs,
+    def save_embeddings_dict_with_timestamps(
+        self, file_dest, embeds, input_len
     ):
+        t_stamps = []
+        for num_segments, _ in self.metadata_dict["files"]["embedding_dimensions"]:
+            [t_stamps.append(t) for t in np.arange(0, num_segments * input_len, input_len)]
+        d = {
+            var: embeds[:, i].tolist() for i, var in zip(range(embeds.shape[1]), ["x", "y"])
+        }
+        d["timestamp"] = t_stamps
+
+        d["metadata"] = {
+            k: (v if isinstance(v, list) else v)
+            for (k, v) in self.metadata_dict["files"].items()
+        }
+        d["metadata"].update(
+            {k: v for (k, v) in self.metadata_dict.items() if not isinstance(v, dict)}
+        )
+
+        import json
+
+        with open(file_dest, "w") as f:
+            json.dump(d, f, indent=2)
+
+        if embeds.shape[-1] > 2:
+            embed_dict = {}
+            acc_shape = 0
+            for shape, file in zip(
+                self.metadata_dict["files"]["embedding_dimensions"],
+                self.files,
+            ):
+                embed_dict[file.stem] = embeds[acc_shape : acc_shape + shape[0]]
+                acc_shape += shape[0]
+            np.save(file_dest.replace(".json", f"{embeds.shape[-1]}.npy"), embed_dict)
+
+class AudioHelper:
+    def __init__(self, model, padding, audio_dir, **kwargs):
         """
-        This class defines all the entry points to generate embedding files. 
-        Parameters are kept minimal, to accomodate as many cases as possible.
-        At the end if instantiation, the selected model is loaded and the 
-        model is associated with the device specified.
+        Helper class for all methods related to loading and padding audio. 
 
         Parameters
         ----------
-        model_name : str
-            name of selected embedding model
-        dim_reduction_model : bool, optional
-            Can be bool or the string corresponding to the dimensionality reduction model, by default False
-        paths : SimpleNamespace, optional
-            dict-like structure with all the results paths, by default None
-        testing : bool, optional
-            _description_, by default False
-        classifier_threshold : float, optional
-            Value under which class predictions are discarded, by default None
+        model : Model object
+            has attributes for all the model characteristics like 
+            sample rate, segment length etc. as well as the methods
+            to run the model
+        padding : str
+            padding function to use for where padding is necessary
+        audio_dir : pathlib.Path object
+            path to audio dir
         """
-        self.paths = paths
-        self.file_length = {}
-
-        if classifier_threshold:
-            self.classifier_threshold = classifier_threshold
-
-        self.dim_reduction_model = dim_reduction_model
-        if dim_reduction_model:
-            self.dim_reduction_model = True
-            self.model_name = dim_reduction_model
-        else:
-            self.model_name = model_name
-        self._init_model(dim_reduction_model=dim_reduction_model, **kwargs)
-
-    def _init_model(self, **kwargs):
-        """
-        Load model specific module, instantiate model and allocate device for model.
-        """
-        if self.dim_reduction_model:
-            module = importlib.import_module(
-                f"bacpipe.model_pipelines.dimensionality_reduction.{self.model_name}"
-            )
-        else:
-            module = importlib.import_module(
-                f"bacpipe.model_pipelines.feature_extractors.{self.model_name}"
-            )
-        self.model = module.Model(model_name=self.model_name, **kwargs)
-        self.model.prepare_inference()
-
+        self.model = model
+        self.padding = padding
+        self.audio_dir = audio_dir
+    
     def prepare_audio(self, sample):
         """
         Use bacpipe pipeline to load audio file, window it according to 
@@ -488,12 +518,12 @@ class Embedder:
         torch.Tensor
             audio frames preprocessed with model specific preprocessing
         """
-        audio = self.model.load_and_resample(sample)
+        audio = self.load_and_resample(sample)
         audio = audio.to(self.model.device)
         if self.model.only_embed_annotations:
-            frames = self.model.only_load_annotated_segments(sample, audio)
+            frames = self.only_load_annotated_segments(sample, audio)
         else:
-            frames = self.model.window_audio(audio)
+            frames = self.window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
         self.file_length[sample.stem] = len(audio[0]) / self.model.sr
         self.preprocessed_shape = tuple(preprocessed_frames.shape)
@@ -501,6 +531,182 @@ class Embedder:
             del audio, frames
             torch.cuda.empty_cache()
         return preprocessed_frames
+    
+    def load_and_resample(self, path):
+        try:
+            audio, sr = ta.load(str(path), normalize=True)
+        except Exception as e:
+            logger.exception(
+                f"\nError loading audio with torchaudio. "
+                f"Skipping {path}."
+                f"Error: {e}"
+            )
+            raise e
+        if audio.shape[0] > 1:
+            audio = audio.mean(axis=0).unsqueeze(0)
+        if len(audio[0]) == 0:
+            error = f"Audio file {path} is empty. " f"Skipping {path}."
+            logger.exception(error)
+            raise ValueError(error)
+        re_audio = ta.functional.resample(audio, sr, self.model.sr)
+        return re_audio
+
+    def only_load_annotated_segments(self, file_path, audio):
+        import pandas as pd
+        annots = pd.read_csv(Path(self.audio_dir) / 'annotations.csv')
+        # filter current file
+        file_annots = annots[annots.audiofilename==file_path.relative_to(self.audio_dir)]
+        if len(file_annots) == 0:
+            file_annots = annots[annots.audiofilename==file_path.stem+file_path.suffix]
+        
+        starts = np.array(file_annots.start, dtype=np.float32)*self.model.sr
+        ends = np.array(file_annots.end, dtype=np.float32)*self.model.sr
+
+        audio = audio.cpu().squeeze()
+        for idx, (s, e) in enumerate(zip(starts, ends)):
+            s, e = int(s), int(e)
+            if e > len(audio):
+                logger.warning(
+                    f"Annotation with start {s} and end {e} is outside of "
+                    f"range of {file_path}. Skipping annotation."
+                )
+                continue
+            segments = lb.util.fix_length(
+                audio[s:e+1],
+                size=self.model.segment_length,
+                mode=self.padding
+                )
+            if idx == 0:
+                cumulative_segments = segments
+            else:
+                cumulative_segments = np.vstack([cumulative_segments, segments])
+        cumulative_segments = torch.Tensor(cumulative_segments)
+        cumulative_segments = cumulative_segments.to(self.device)
+        return cumulative_segments
+
+    def window_audio(self, audio):
+        num_frames = int(np.ceil(len(audio[0]) / self.model.segment_length))
+        if isinstance(audio, torch.Tensor):
+            audio = audio.cpu()
+        padded_audio = lb.util.fix_length(
+            audio,
+            size=int(num_frames * self.model.segment_length),
+            mode=self.padding,
+        )
+        logger.debug(f"{self.padding} was used on an audio segment.")
+        frames = padded_audio.reshape([num_frames, self.model.segment_length])
+        if not isinstance(frames, torch.Tensor):
+            frames = torch.tensor(frames)
+        frames = frames.to(self.model.device)
+        return frames
+
+class Embedder(AudioHelper):
+    def __init__(
+        self,
+        model_name,
+        loader, 
+        dim_reduction_model=False,
+        **kwargs,
+    ):
+        """
+        This class defines all the entry points to generate embedding files. 
+        Parameters are kept minimal, to accomodate as many cases as possible.
+        At the end if instantiation, the selected model is loaded and the 
+        model is associated with the device specified.
+
+        Parameters
+        ----------
+        model_name : str
+            name of selected embedding model
+        loader : Loader object
+            Object that has all the necessary path information and methods
+            to load and save all the processed data
+        dim_reduction_model : bool, optional
+            Can be bool or the string corresponding to the 
+            dimensionality reduction model, by default False
+        testing : bool, optional
+            _description_, by default False
+        """
+        self.file_length = {}
+        self.loader = loader
+
+        self.dim_reduction_model = dim_reduction_model
+        if dim_reduction_model:
+            self.dim_reduction_model = True
+            self.model_name = dim_reduction_model
+        else:
+            self.model_name = model_name
+        self._init_model(dim_reduction_model=dim_reduction_model, **kwargs)
+        super().__init__(model=self.model, **kwargs)
+        if self.model.bool_classifier:
+            self.classifier = Classifier(
+                self.model, model_name, **kwargs
+                )
+
+    def _init_model(self, **kwargs):
+        """
+        Load model specific module, instantiate model and allocate device for model.
+        """
+        if self.dim_reduction_model:
+            module = importlib.import_module(
+                f"bacpipe.model_pipelines.dimensionality_reduction.{self.model_name}"
+            )
+        else:
+            module = importlib.import_module(
+                f"bacpipe.model_pipelines.feature_extractors.{self.model_name}"
+            )
+        self.model = module.Model(model_name=self.model_name, **kwargs)
+        self.model.prepare_inference()
+
+    def init_dataloader(self, audio):
+        if "tensorflow" in str(type(audio)):
+            import tensorflow as tf
+
+            return tf.data.Dataset.from_tensor_slices(audio).batch(self.model.batch_size)
+        elif "torch" in str(type(audio)):
+
+            return torch.utils.data.DataLoader(
+                audio, batch_size=self.model.batch_size, shuffle=False
+            )
+
+    def batch_inference(self, batched_samples, callback=None):
+        if self.model_name in bacpipe.TF_MODELS:
+            import tensorflow
+        
+        embeds = []
+        total_batches = len(batched_samples)
+
+        for idx, batch in enumerate(
+            tqdm(batched_samples, desc=" processing batches", position=0, leave=False)
+        ):
+            with torch.no_grad():
+                if (
+                    self.model.device == "cuda" 
+                    and not isinstance(batch, tensorflow.Tensor)
+                    ):
+                    batch = batch.cuda()
+                embeddings = self.model(batch)
+                if self.model.bool_classifier:
+                    self.classifier.classify(embeddings)
+
+            if isinstance(embeddings, torch.Tensor) and embeddings.dim() == 1:
+                embeddings = embeddings.unsqueeze(0)
+            embeds.append(embeddings)
+
+            # callback with progress if progressbar should be updated
+            if callback and total_batches > 0:
+                fraction = (idx + 1) / total_batches
+                callback(fraction)
+
+        if self.model.bool_classifier:
+            self.classifier.predictions = self.classifier.predictions.cpu()
+
+        if isinstance(embeds[0], torch.Tensor):
+            return torch.cat(embeds, axis=0)
+        else:
+            import tensorflow as tf
+            return_embeds = tf.concat(embeds, axis=0).numpy().squeeze()
+            return return_embeds
 
     def get_embeddings_for_audio(self, sample):
         """
@@ -518,8 +724,8 @@ class Embedder:
         np.array
             embeddings from model
         """
-        batched_samples = self.model.init_dataloader(sample)
-        embeds = self.model.batch_inference(batched_samples)
+        batched_samples = self.init_dataloader(sample)
+        embeds = self.batch_inference(batched_samples)
         if not isinstance(embeds, np.ndarray):
             try:
                 embeds = embeds.numpy()
@@ -541,7 +747,21 @@ class Embedder:
                 )
         return self.model(samples)
 
-    def get_pipelined_embeddings_from_model(self, fileloader_obj):
+    def get_dimensionality_reduced_embeddings_pipeline(self):
+        for idx, file in enumerate(
+            tqdm(self.loader.files, desc="processing files", position=1, leave=False)
+        ):
+            if idx == 0:
+                embeddings = self.loader.embed_read(idx, file)
+            else:
+                embeddings = np.concatenate(
+                    [embeddings, self.loader.embed_read(idx, file)]
+                )
+
+        dim_reduced_embeddings = self.get_embeddings_from_model(embeddings)
+        self.loader.save_embeddings(idx, file, dim_reduced_embeddings)
+
+    def get_embeddings_using_multithreading_pipeline(self):
         """
         Generate embeddings for all files in a pipelined manner:
         - Producer thread loads and preprocesses audio
@@ -562,7 +782,7 @@ class Embedder:
 
         # --- Producer: load + preprocess in background ---
         def producer():
-            for idx, file in enumerate(fileloader_obj.files):
+            for idx, file in enumerate(self.loader.files):
                 try:
                     preprocessed = self.prepare_audio(file)
                     task_queue.put((idx, file, preprocessed))
@@ -585,7 +805,7 @@ class Embedder:
 
         # --- Consumer: embed + save metadata/embeddings ---
         with tqdm(
-            total=len(fileloader_obj.files),
+            total=len(self.loader.files),
             desc="processing files",
             position=1,
             leave=False,
@@ -611,15 +831,52 @@ class Embedder:
                     )
                     pbar.update(1)
                     continue
-
-                fileloader_obj.write_audio_file_to_metadata(idx, file, self, embeddings)
-                self.save_embeddings(idx, fileloader_obj, file, embeddings)
+            
+                self.loader.write_audio_file_to_metadata(
+                    idx, self.model, embeddings, self.file_length
+                    )
+                self.loader.save_embeddings(idx, file, embeddings)
                 if self.model.bool_classifier:
-                    self.save_classifier_outputs(fileloader_obj, file)
+                    self.classifier.save_classifier_outputs(self.loader, file)
 
                 pbar.update(1)
 
-        return fileloader_obj  # same return type as sequential version
+    def get_embeddings_sequentially_pipeline(self):
+        if self.model_name in bacpipe.TF_MODELS:
+            import tensorflow as tf
+        for idx, file in enumerate(
+            tqdm(self.loader.files, desc="processing files", position=1, leave=False)
+        ):
+            try:
+                try:
+                    embeddings = self.get_embeddings_from_model(file)
+                except soundfile.LibsndfileError as e:
+                    logger.warning(
+                        f"\n Error loading audio, skipping file. \n"
+                        f"Error: {e}"
+                    )
+                    continue
+                except tf.errors.ResourceExhaustedError: # TODO this needs fixing
+                                            
+                    logger.error(
+                        "\nGPU device is out of memory. Your Vram doesn't seem to be "
+                        "large enough for this process. This could be down to the "
+                        "size of the audio files. Use `cpu` instead of `cuda`."
+                    )
+                    os._exit(1) 
+            except Exception as e:
+                logger.warning(
+                    f"\n Error generating embeddings, skipping file. \n"
+                    f"Error: {e}"
+                )
+                continue
+            
+            self.loader.write_audio_file_to_metadata(
+                file, self.model, embeddings, self.file_length
+                )
+            self.loader.save_embeddings(idx, file, embeddings)
+            if self.model.bool_classifier:
+                self.classifier.save_classifier_outputs(self.loader, file)
 
     def get_embeddings_from_model(self, sample):
         """
@@ -644,10 +901,10 @@ class Embedder:
         else:
             if not isinstance(sample, Path):
                 sample = Path(sample)
-                if not sample.suffix in self.model.audio_suffixes:
+                if not sample.suffix in self.audio_suffixes:
                     error = (
                         "\nThe provided path does not lead to a supported audio file with the ending"
-                        f" {self.model.audio_suffixes}. Please check again that you provided the correct"
+                        f" {self.audio_suffixes}. Please check again that you provided the correct"
                         " path."
                     )
                     logger.exception(error)
@@ -659,32 +916,41 @@ class Embedder:
         logger.info(f"{self.model_name} inference took {time.time()-start:.2f}s.")
         return embeds
 
-    def save_embeddings(self, file_idx, fileloader_obj, file, embeds):
-        if self.dim_reduction_model:
-            file_dest = fileloader_obj.embed_dir.joinpath(
-                fileloader_obj.audio_dir.stem + "_" + self.model_name
-            )
-            file_dest = str(file_dest) + ".json"
-            input_len = (
-                fileloader_obj.metadata_dict["segment_length (samples)"]
-                / fileloader_obj.metadata_dict["sample_rate (Hz)"]
-            )
-            save_embeddings_dict_with_timestamps(
-                file_dest, embeds, input_len, fileloader_obj, file_idx
-            )
-        else:
-            relative_parent_path = (
-                Path(file).relative_to(fileloader_obj.audio_dir).parent
-            )
-            parent_path = fileloader_obj.embed_dir.joinpath(relative_parent_path)
-            parent_path.mkdir(exist_ok=True, parents=True)
-            file_dest = parent_path.joinpath(file.stem + "_" + self.model_name)
-            file_dest = str(file_dest) + ".npy"
-            if len(embeds.shape) == 1:
-                embeds = np.expand_dims(embeds, axis=0)
-            np.save(file_dest, embeds)
+class Classifier:
+    def __init__(
+        self, 
+        model, 
+        model_name, 
+        audio_dir, 
+        main_results_dir, 
+        classifier_threshold, 
+        **kwargs
+        ):
+        """
+        Class to handle all tasks surrounding classification. Both generating
+        the classifications from embeddings, as well as managing them, collecting
+        them in arrays and creating dataframes and annotation tables from them. 
 
-
+        Parameters
+        ----------
+        model : Model object
+            has attributes for all the model characteristics like 
+            sample rate, segment length etc. as well as the methods
+            to run the model
+        model_name : str
+            name of the model
+        classifier_threshold : float, optional
+            Value under which class predictions are discarded, by default None
+        """
+        self.model = model
+        self.model_name = model_name
+        self.classifier_threshold = classifier_threshold
+        from bacpipe.embedding_evaluation.label_embeddings import make_set_paths_func
+        self.paths = make_set_paths_func(audio_dir, main_results_dir)(model_name)
+        
+        self.predictions = torch.tensor([])
+        
+    
     @staticmethod
     def filter_top_k_classifications(probabilities, class_names,
                                      class_indices, class_time_bins, 
@@ -746,7 +1012,7 @@ class Embedder:
 
         cls_idx, tmp_idx = np.where(probabilities > threshold)
 
-        cls_results = Embedder.filter_top_k_classifications(probabilities, 
+        cls_results = Classifier.filter_top_k_classifications(probabilities, 
                                                             classes,
                                                             cls_idx, 
                                                             tmp_idx)
@@ -757,11 +1023,32 @@ class Embedder:
         }
         return cls_results
     
+    def classify(self, embeddings):
+        clfier_output = self.model.classifier_predictions(embeddings)
+            
+        if self.model.device == "cuda" and isinstance(clfier_output, torch.Tensor):
+            self.predictions = self.predictions.cuda()
+            self.classifier = self.classifier.cuda()
+
+        if isinstance(clfier_output, torch.Tensor):
+            self.predictions = torch.cat(
+                [self.predictions, clfier_output.clone().detach()]
+            )
+        else:
+            self.predictions = torch.cat(
+                [self.predictions, torch.Tensor(clfier_output)]
+            )
+    
     def run_clfier_for_previous_embeddings(self, fileloader_obj):
-        existing_embeddings = list(Path(fileloader_obj.embed_dir).rglob('*.npy'))
-        for file in existing_embeddings:
+        existing_embeddings_files = list(
+            Path(fileloader_obj.embed_dir).rglob('*.npy')
+            )
+        for file in existing_embeddings_files:
             with open(file, 'rb') as f:
-                embed = np.load(f)
+                embeddings = np.load(f)
+            self.classify(embeddings)
+                
+        
                 
     
     def fill_dataframe_with_classiefier_results(self, fileloader_obj, file):
@@ -778,13 +1065,13 @@ class Embedder:
         """
         classifier_annotations = pd.DataFrame()
         
-        maxes = torch.max(self.model.classifier_outputs, dim=0)
-        outputs_exceeding_thresh = self.model.classifier_outputs[:,
+        maxes = torch.max(self.predictions, dim=0)
+        outputs_exceeding_thresh = self.predictions[:,
             maxes.values > self.classifier_threshold
         ]
         
         active_time_bins = np.arange(
-            self.model.classifier_outputs.shape[-1]
+            self.predictions.shape[-1]
             )[maxes.values > self.classifier_threshold]
         
         classifier_annotations["start"] = active_time_bins * (
@@ -813,7 +1100,7 @@ class Embedder:
 
     def load_existing_clfier_outputs(self, fileloader_obj, clfier_annotations):
         clfier_dir = Path(
-            fileloader_obj.paths.class_path / 'original_classifier_outputs'
+            self.paths.class_path / 'original_classifier_outputs'
             )
         existing_clfier_outputs = list(clfier_dir.rglob('*.json'))
         existing_clfier_outputs.sort()
@@ -888,6 +1175,12 @@ class Embedder:
                 ignore_index=True
             )
         
+    def save_annotation_table(self, loader_obj):
+        save_path = (
+            self.paths.class_path 
+            / f"{loader_obj.model_name}_classifier_annotations.csv"
+            )
+        self.cumulative_annotations.to_csv(save_path, index=False)
         
     def save_classifier_outputs(self, fileloader_obj, file):
         relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
@@ -898,59 +1191,18 @@ class Embedder:
         file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
         file_dest = str(file_dest) + ".json"
 
-        if self.model.classifier_outputs.shape[0] != len(self.model.classes):
-            self.model.classifier_outputs = self.model.classifier_outputs.swapaxes(0, 1)
+        if self.predictions.shape[0] != len(self.model.classes):
+            self.predictions = self.predictions.swapaxes(0, 1)
 
         if self.model.only_embed_annotations: #annotation file exists
-            np.save(file_dest.replace('.json', '.npy'), self.model.classifier_outputs)
+            np.save(file_dest.replace('.json', '.npy'), self.predictions)
         
         self.fill_dataframe_with_classiefier_results(fileloader_obj, file)
         
         cls_results = self.make_classification_dict(
-            self.model.classifier_outputs, self.model.classes, self.classifier_threshold
+            self.predictions, self.model.classes, self.classifier_threshold
         )
 
         with open(file_dest, "w") as f:
             json.dump(cls_results, f, indent=2)
-        self.model.classifier_outputs = torch.tensor([])
-
-
-class Classifier:
-    def __init__(self):
-        pass
-
-def save_embeddings_dict_with_timestamps(
-    file_dest, embeds, input_len, loader_obj, f_idx
-):
-
-    t_stamps = []
-    for num_segments, _ in loader_obj.metadata_dict["files"]["embedding_dimensions"]:
-        [t_stamps.append(t) for t in np.arange(0, num_segments * input_len, input_len)]
-    d = {
-        var: embeds[:, i].tolist() for i, var in zip(range(embeds.shape[1]), ["x", "y"])
-    }
-    d["timestamp"] = t_stamps
-
-    d["metadata"] = {
-        k: (v if isinstance(v, list) else v)
-        for (k, v) in loader_obj.metadata_dict["files"].items()
-    }
-    d["metadata"].update(
-        {k: v for (k, v) in loader_obj.metadata_dict.items() if not isinstance(v, dict)}
-    )
-
-    import json
-
-    with open(file_dest, "w") as f:
-        json.dump(d, f, indent=2)
-
-    if embeds.shape[-1] > 2:
-        embed_dict = {}
-        acc_shape = 0
-        for shape, file in zip(
-            loader_obj.metadata_dict["files"]["embedding_dimensions"],
-            loader_obj.files,
-        ):
-            embed_dict[file.stem] = embeds[acc_shape : acc_shape + shape[0]]
-            acc_shape += shape[0]
-        np.save(file_dest.replace(".json", f"{embeds.shape[-1]}.npy"), embed_dict)
+        self.predictions = torch.tensor([])

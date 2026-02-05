@@ -48,7 +48,7 @@ print(audio_dir)
 # -------------------------------------------------------------------------
 def embedder_fn(loader, model_name):
     """Return embeddings from a single model using the test loader."""
-    embedder = Embedder(model_name, **kwargs)
+    embedder = Embedder(model_name, loader=loader, **kwargs)
     return embedder.get_embeddings_from_model(loader.files[0])
 
 
@@ -80,7 +80,7 @@ def test_embedding_dimensions(model):
 
 
 def test_evaluation(model):
-    embeds = embeddings[model].embedding_dict()
+    embeds = embeddings[model].get_embeddings()
     paths = get_paths(model)
 
     try:

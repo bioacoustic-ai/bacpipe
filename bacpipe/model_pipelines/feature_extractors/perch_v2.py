@@ -59,9 +59,9 @@ class Model(ModelBaseClass):
         audio = audio.cpu()
         return tf.convert_to_tensor(audio, dtype=tf.float32)
 
-    def __call__(self, input, return_class_results=False):
+    def __call__(self, input):
         try:
-            results = self.model(input)
+            self.results = self.model(input)
         except Exception as e:
             logger.exception(
                 "You are on a operating system that does not currently support this model. "
@@ -71,12 +71,9 @@ class Model(ModelBaseClass):
             )
             import sys
             sys.exit(0)
-        embeddings = results.embeddings
-        if return_class_results:
-            cls_vals = self.classifier_predictions(results.logits[self.class_label_key])
-            return embeddings, cls_vals
-        else:
-            return embeddings
+        
+        return self.results.embeddings
 
-    def classifier_predictions(self, inferece_results):
+    def classifier_predictions(self, embeddings):
+        inferece_results = self.results.logits[self.class_label_key]
         return tf.nn.sigmoid(inferece_results).numpy()

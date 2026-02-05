@@ -173,7 +173,7 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **
     # be ready to load them. The loader keys will be the model name and the values will
     # be the loader objects for each model. Each object contains all the information
     # on the generated embeddings. To name access them:
-    loader['birdnet'].embedding_dict() 
+    loader['birdnet'].get_embeddings() 
     # this will give you a dictionary with the keys corresponding to embedding files
     # and the values corresponding to the embeddings as numpy arrays
 
@@ -219,7 +219,7 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **
 
 def run_default_clfier_and_save_results(loader, embed):
     import torch
-    all_embeds = loader.embedding_dict()
+    all_embeds = loader.get_embeddings()
     for f_name, embeddings in tqdm(
         all_embeds.items(),
         desc='Running pretrained classifier',
@@ -261,7 +261,7 @@ def check_if_default_clfier_should_be_run(
             return
         embed = Embedder(
             model_name, 
-            paths=loader_dict['birdnet'].paths, 
+            loader=loader_dict['birdnet'],
             **kwargs
             )
         if hasattr(embed.model, 'classifier_predictions'):
@@ -303,7 +303,7 @@ def model_specific_evaluation(
             )
                 
         if not evaluation_task in ["None", [], False]:
-            embeds = loader_dict[model_name].embedding_dict()
+            embeds = loader_dict[model_name].get_embeddings()
             paths = get_paths(model_name)
             try:
                 ground_truth = ground_truth_by_model(paths, model_name, **kwargs)
@@ -508,80 +508,37 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
         error = "\nmodel_name not provided in kwargs."
         logger.exception(error)
         raise ValueError(error)
-    if kwargs['model_name'] in TF_MODELS:
-        import tensorflow as tf
     try:
         start = time.time()
         ld = ge.Loader(**kwargs)
         logger.debug(f"Loading the data took {time.time()-start:.2f}s.")
         if not ld.combination_already_exists:
-            embed = ge.Embedder(**kwargs)
+            embed = ge.Embedder(loader=ld, **kwargs)
 
             if ld.dim_reduction_model:
                 # (1) Dimensionality reduction stage
-                for idx, file in enumerate(
-                    tqdm(ld.files, desc="processing files", position=1, leave=False)
-                ):
-                    if idx == 0:
-                        embeddings = ld.embed_read(idx, file)
-                    else:
-                        embeddings = np.concatenate(
-                            [embeddings, ld.embed_read(idx, file)]
-                        )
-
-                dim_reduced_embeddings = embed.get_embeddings_from_model(embeddings)
-                embed.save_embeddings(idx, ld, file, dim_reduced_embeddings)
+                embed.get_dimensionality_reduced_embeddings_pipeline()
 
             elif embed.model.device == "cuda" and not avoid_pipelined_gpu_inference:
                 # (2) GPU path with pipelined embedding generation
-                embed.get_pipelined_embeddings_from_model(ld)
+                embed.get_embeddings_using_multithreading_pipeline()
 
             else:
                 # (3) CPU path with sequential embedding generation
-                for idx, file in enumerate(
-                    tqdm(ld.files, desc="processing files", position=1, leave=False)
-                ):
-                    try:
-                        try:
-                            embeddings = embed.get_embeddings_from_model(file)
-                        except soundfile.LibsndfileError as e:
-                            logger.warning(
-                                f"\n Error loading audio, skipping file. \n"
-                                f"Error: {e}"
-                            )
-                            continue
-                        except tf.errors.ResourceExhaustedError:
-                                                    
-                            logger.error(
-                                "\nGPU device is out of memory. Your Vram doesn't seem to be "
-                                "large enough for this process. This could be down to the "
-                                "size of the audio files. Use `cpu` instead of `cuda`."
-                            )
-                            os._exit(1) 
-                    except Exception as e:
-                        logger.warning(
-                            f"\n Error generating embeddings, skipping file. \n"
-                            f"Error: {e}"
-                        )
-                        continue
-                    ld.write_audio_file_to_metadata(idx, file, embed, embeddings)
-                    embed.save_embeddings(idx, ld, file, embeddings)
-                    if embed.model.bool_classifier:
-                        embed.save_classifier_outputs(ld, file)
+                embed.get_embeddings_sequentially_pipeline()
 
             # Finalize
             if embed.model.bool_classifier and not embed.dim_reduction_model:
-                embed.cumulative_annotations.to_csv(
-                    embed.paths.class_path / "default_classifier_annotations.csv",
-                    index=False,
-                )
+                embed.classifier.save_annotation_table(ld)
             ld.write_metadata_file()
             ld.update_files()
         
             # clear GPU
             del embed
-            import tensorflow as tf
-            tf.keras.backend.clear_session()
+            
+            if kwargs['model_name'] in TF_MODELS:
+                import tensorflow as tf
+                tf.keras.backend.clear_session()
             
         return ld
     except KeyboardInterrupt:

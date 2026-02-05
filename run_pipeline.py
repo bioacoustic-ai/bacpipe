@@ -21,5 +21,5 @@ if __name__ == "__main__":
     # But it's probably easier if you just modify the config.yaml or bacpipe/settings.yaml files
     
     
-    bacpipe.play(save_logs=True)
+    bacpipe.play(bool_save_logs=True)
     
