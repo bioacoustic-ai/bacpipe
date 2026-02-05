@@ -234,7 +234,7 @@ loader = bacpipe.model_specific_embedding_creation(
 # be ready to load them. The loader keys will be the model name and the values will
 # be the loader objects for each model. Each object contains all the information
 # on the generated embeddings. To name access them:
-loader['birdnet'].get_embeddings() 
+loader['birdnet'].embeddings() 
 # this will give you a dictionary with the keys corresponding to embedding files
 # and the values corresponding to the embeddings as numpy arrays
 

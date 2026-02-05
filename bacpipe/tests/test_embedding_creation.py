@@ -6,7 +6,7 @@ from pathlib import Path
 
 import bacpipe
 from bacpipe import EMBEDDING_DIMENSIONS
-from bacpipe.main_utils import get_embeddings, embeds_array_without_noise
+from bacpipe.main_utils import run_pipeline_for_model, embeds_array_without_noise
 from bacpipe.main import Loader, Embedder
 from bacpipe.embedding_evaluation.label_embeddings import (
     generate_annotations_for_classification_task,
@@ -64,7 +64,7 @@ def loader_fn():
 # -------------------------------------------------------------------------
 def test_embedding_generation(model, device):
     settings['device'] = device
-    embeddings[model] = get_embeddings(
+    embeddings[model] = run_pipeline_for_model(
         model_name=model,
         check_if_primary_combination_exists=False,
         check_if_secondary_combination_exists=False,
@@ -80,7 +80,7 @@ def test_embedding_dimensions(model):
 
 
 def test_evaluation(model):
-    embeds = embeddings[model].get_embeddings()
+    embeds = embeddings[model].embeddings()
     paths = get_paths(model)
 
     try:

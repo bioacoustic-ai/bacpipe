@@ -173,7 +173,7 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **
     # be ready to load them. The loader keys will be the model name and the values will
     # be the loader objects for each model. Each object contains all the information
     # on the generated embeddings. To name access them:
-    loader['birdnet'].get_embeddings() 
+    loader['birdnet'].embeddings() 
     # this will give you a dictionary with the keys corresponding to embedding files
     # and the values corresponding to the embeddings as numpy arrays
 
@@ -209,66 +209,13 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **
     """
     loader_dict = {}
     for model_name in models:
-        loader_dict[model_name] = get_embeddings(
+        loader_dict[model_name] = run_pipeline_for_model(
             model_name=model_name,
             dim_reduction_model=dim_reduction_model,
             audio_dir=audio_dir,
             **kwargs,
         )
     return loader_dict
-
-def run_default_clfier_and_save_results(loader, embed):
-    import torch
-    all_embeds = loader.get_embeddings()
-    for f_name, embeddings in tqdm(
-        all_embeds.items(),
-        desc='Running pretrained classifier',
-        total=len(all_embeds)
-        ):
-        cls_vals = embed.model.classifier_predictions(embeddings)
-        if not isinstance(embeddings, np.ndarray):
-            embed.model.classifier_outputs = torch.cat(
-                [embed.model.classifier_outputs, cls_vals.clone().detach()]
-            )
-        else:
-            embed.model.classifier_outputs = torch.cat(
-                [embed.model.classifier_outputs, torch.Tensor(cls_vals)]
-            )
-        embed.save_classifier_outputs(loader, loader.audio_dir / f_name)
-    del embed
-    import tensorflow as tf
-    tf.keras.backend.clear_session()
-    
-def check_if_default_clfier_should_be_run(
-    loader_dict, model_name, **kwargs
-):
-    if (
-        not loader_dict[model_name].paths.class_path.joinpath(
-            "original_classifier_outputs"
-            ).exists()
-        and loader_dict[model_name].run_pretrained_classifier
-    ):
-        dim_reduction_model = kwargs.pop('dim_reduction_model')
-        if model_name in ['perch_v2', 'perch_bird', 'vggish', 'surfperch', 'google_whale']:
-            logger.warning(
-                f"The google family of models (which {model_name} is part of) "
-                "calculate embeddings and classifications at once, making it "
-                "impossible to only run the classifier, like with any other model. "
-                "Please remove the embeddings corresponding to this model and then "
-                "rerun bacpipe with the setting `run_pretrained_classifier` set to True. "
-                "That way classification results will be saved immediately."
-            )
-            return
-        embed = Embedder(
-            model_name, 
-            loader=loader_dict['birdnet'],
-            **kwargs
-            )
-        if hasattr(embed.model, 'classifier_predictions'):
-            run_default_clfier_and_save_results(
-                loader_dict[model_name], embed
-                )
-        kwargs['dim_reduction_model'] = dim_reduction_model
 
 def model_specific_evaluation(
     loader_dict, evaluation_task, class_configs, models, **kwargs
@@ -298,13 +245,13 @@ def model_specific_evaluation(
         embedding models
     """
     for model_name in models:
-        check_if_default_clfier_should_be_run(
-            loader_dict, model_name, **kwargs
+        paths = get_paths(model_name)
+        loader_dict[model_name].check_if_default_clfier_should_be_run(
+            paths, **kwargs
             )
                 
         if not evaluation_task in ["None", [], False]:
             embeds = loader_dict[model_name].get_embeddings()
-            paths = get_paths(model_name)
             try:
                 ground_truth = ground_truth_by_model(paths, model_name, **kwargs)
             except FileNotFoundError as e:
@@ -428,7 +375,7 @@ def visualize_using_dashboard(models, **kwargs):
     template.show(port=5006, address="localhost")
 
 
-def get_embeddings(
+def run_pipeline_for_model(
     model_name,
     audio_dir,
     dim_reduction_model="None",

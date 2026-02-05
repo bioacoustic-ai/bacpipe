@@ -557,6 +557,42 @@ class Loader:
                 file_dest.replace(".json", f"{embeds.shape[-1]}.npy"), 
                 embed_dict
                 )
+            
+    def check_if_default_clfier_should_be_run(
+        self, paths, run_pretrained_classifier, 
+        testing, dim_reduction_model, **kwargs
+        ):
+        
+        if (
+            testing 
+            or (
+                not paths.class_path.joinpath(
+                "original_classifier_outputs"
+                ).exists() 
+                and run_pretrained_classifier
+            )
+        ):
+            if self.model_name in ['perch_v2', 'perch_bird', 'vggish', 'surfperch', 'google_whale']:
+                logger.warning(
+                    f"The google family of models (which {self.model_name} is part of) "
+                    "calculate embeddings and classifications at once, making it "
+                    "impossible to only run the classifier, like with any other model. "
+                    "Please remove the embeddings corresponding to this model and then "
+                    "rerun bacpipe with the setting `run_pretrained_classifier` set to True. "
+                    "That way classification results will be saved immediately."
+                )
+                return
+            embed = Embedder(
+                self.model_name, 
+                loader=self,
+                dim_reduction_model=False,
+                run_pretrained_classifier=run_pretrained_classifier,
+                **kwargs
+                )
+            if hasattr(embed.model, 'classifier_predictions'):
+                embed.classifier.run_default_clfier_and_save_results(self)
+    
+    
 
 class AudioHelper:
     def __init__(self, model, padding, audio_dir, **kwargs):
@@ -1032,7 +1068,6 @@ class Classifier:
         
         self.predictions = torch.tensor([])
         
-    
     @staticmethod
     def filter_top_k_classifications(probabilities, class_names,
                                      class_indices, class_time_bins, 
@@ -1129,7 +1164,6 @@ class Classifier:
             with open(file, 'rb') as f:
                 embeddings = np.load(f)
             self.classify(embeddings)
-                
         
     def _fill_dataframe_with_classiefier_results(self, fileloader_obj, file):
         """
@@ -1175,7 +1209,8 @@ class Classifier:
                 self.cumulative_annotations = classifier_annotations
         else:
             self.cumulative_annotations = pd.concat(
-                [self.cumulative_annotations, classifier_annotations], ignore_index=True
+                [self.cumulative_annotations, classifier_annotations], 
+                ignore_index=True
             )
 
     def _load_existing_clfier_outputs(self, fileloader_obj, clfier_annotations):
@@ -1286,3 +1321,28 @@ class Classifier:
         with open(file_dest, "w") as f:
             json.dump(cls_results, f, indent=2)
         self.predictions = torch.tensor([])
+        
+    def run_default_clfier_and_save_results(self, loader):
+        all_embeds = loader.embeddings()
+        
+        for f_name, embeddings in tqdm(
+            all_embeds.items(),
+            desc='Running pretrained classifier',
+            total=len(all_embeds)
+            ):        
+            
+            clfier_output = self.model.classifier_predictions(embeddings)
+            if isinstance(clfier_output, torch.Tensor):
+                self.predictions = torch.cat(
+                    [self.predictions, clfier_output.clone().detach()]
+                )
+            else:
+                self.predictions = torch.cat(
+                    [self.predictions, torch.Tensor(clfier_output)]
+                )
+
+            self.save_classifier_outputs(loader, loader.audio_dir / f_name)
+        
+        if loader.model_name in bacpipe.TF_MODELS:
+            import tensorflow as tf
+            tf.keras.backend.clear_session()
