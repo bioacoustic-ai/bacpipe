@@ -56,7 +56,7 @@ class Loader:
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
 
-        self.initialize_path_structure(testing=testing, **kwargs)
+        self._initialize_path_structure(testing=testing, **kwargs)
 
         self.check_if_combination_exists = check_if_combination_exists
         self.continue_failed_run = False
@@ -67,13 +67,13 @@ class Loader:
             self.embed_suffix = ".npy"
         
         start = time.time()
-        self.check_embeds_already_exist()
+        self._check_embeds_already_exist()
         logger.debug(
             f"Checking if embeddings already exist took {time.time()-start:.2f}s."
         )
 
         if self.combination_already_exists or self.dim_reduction_model:
-            self.get_embeddings()
+            self._get_embeddings()
         else:
             self._get_audio_paths()
             self._init_metadata_dict()
@@ -90,7 +90,7 @@ class Loader:
                 )
             )
 
-    def initialize_path_structure(self, testing=False, **kwargs):
+    def _initialize_path_structure(self, testing=False, **kwargs):
         if testing:
             kwargs["main_results_dir"] = "bacpipe/tests/results_files"
 
@@ -106,26 +106,28 @@ class Loader:
                 val.mkdir(exist_ok=True, parents=True)
             setattr(self, key, val)
 
-    def check_embeds_already_exist(self):
+    def _check_embeds_already_exist(self):
         self.combination_already_exists = False
         self.dim_reduc_embed_dir = False
 
-        if self.check_if_combination_exists:
-            if self.dim_reduction_model:
-                existing_embed_dirs = Path(self.dim_reduc_parent_dir).iterdir()
-            else:
-                existing_embed_dirs = Path(self.embed_parent_dir).iterdir()
-            if self.testing:
-                return
-            existing_embed_dirs = list(existing_embed_dirs)
-            if isinstance(self.check_if_combination_exists, str):
-                existing_embed_dirs = [
-                    existing_embed_dirs[0].parent.joinpath(
-                        self.check_if_combination_exists
-                    )
-                ]
-            existing_embed_dirs.sort()
-            self._find_existing_embed_dir(existing_embed_dirs)
+        if not self.check_if_combination_exists:
+            return 
+        
+        if self.dim_reduction_model:
+            existing_embed_dirs = Path(self.dim_reduc_parent_dir).iterdir()
+        else:
+            existing_embed_dirs = Path(self.embed_parent_dir).iterdir()
+        if self.testing:
+            return
+        existing_embed_dirs = list(existing_embed_dirs)
+        if isinstance(self.check_if_combination_exists, str):
+            existing_embed_dirs = [
+                existing_embed_dirs[0].parent.joinpath(
+                    self.check_if_combination_exists
+                )
+            ]
+        existing_embed_dirs.sort()
+        self._find_existing_embed_dir(existing_embed_dirs)
 
     def _get_metadata_from_created_embeddings(self):
         module = importlib.import_module(
@@ -133,7 +135,10 @@ class Loader:
             )
         already_processed_files = list(Path(self.embed_dir).rglob('*.npy'))
         already_processed_files.sort()
-        relative_audio_stems = np.array([str(f.relative_to(self.audio_dir)).split('.')[0] for f in self.files])
+        relative_audio_stems = np.array(
+            [str(f.relative_to(self.audio_dir)).split('.')[0] 
+             for f in self.files]
+            )
         audio_files = np.array(self.files)
         audio_suffixes = np.array([f.suffix for f in self.files])
         for file in already_processed_files:
@@ -152,9 +157,13 @@ class Loader:
                     embed.shape[0]
                 )
                 self.metadata_dict['files']['file_lengths (s)'].append(
-                    embed.shape[0] * (module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE)
+                    embed.shape[0] * (
+                        module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE
+                        )
                 )
-                self._update_audio_file_list(audio_files, corresponding_audio_file_bool)        
+                self._update_audio_file_list(
+                    audio_files, corresponding_audio_file_bool
+                    )
         
     def _update_audio_file_list(self, audio_files, corresponding_audio_file_bool):
         self.files.remove(
@@ -162,102 +171,155 @@ class Loader:
         )
 
     def _find_existing_embed_dir(self, existing_embed_dirs):
-        for d in existing_embed_dirs[::-1]:
+        """
+        Check if embeddings have already been calculated for this combination
+        of model and audio dir. If the combination exists, check if it's empty
+        or very incomplete. If empty, delete it. If incomplete continue where
+        it was left off. If it exists and contains a metadata.yml file, then
+        load the file. The check can be avoided by specifying 
+        check_if_combination_exists as False. The function only returns if 
+        it is a dimensionality reduction model we are currently working on
+        to locate previously computed dimensionality reduced embeddings. 
 
-            if self.model_name in d.stem and Path(self.audio_dir).stem in d.parts[-1]:
-                if list(d.glob("*yml")) == []:
-                    try:
-                        d.rmdir()
-                        continue
-                    except OSError:
-                        logger.info(
-                            f"\nThe directory {d} is not empty. "
-                            "It seems like a previous run failed, "
-                            "bacpipe is comparing what files were already "
-                            "created and will then continue where it left off."
-                            "If you interrupted the run on purpose and want to "
-                            "start from the beginning, please cancel using "
-                            "Ctrl + C and then remove "
-                            f"the folder {d} manually.\n"
-                        )
-                        self.continue_failed_run = True
-                        self.embed_dir = d
-                        return d
-                with open(d.joinpath("metadata.yml"), "r") as f:
-                    mdata = yaml.load(f, Loader=yaml.CLoader)
-                    if not self.model_name == mdata["model_name"]:
-                        continue
+        Parameters
+        ----------
+        existing_embed_dirs : list
+            list of directories to check if the combination we are trying
+            to process is potentially contained in
 
-                if self.dim_reduction_model:
-                    if self.dim_reduction_model in d.stem:
-                        self.combination_already_exists = True
-                        logger.info(
-                            "\n### Embeddings already exist. "
-                            f"Using embeddings in {str(d)} ###"
-                        )
-                        self.embed_dir = d
-                        break
-                    else:
-                        return d
+        Returns
+        -------
+        pathlib.Path object
+            directory containing dimensionality reduced embeddings 
+            that were already processed 
+        """
+        # iterate through directories backwards, starting with most recent first
+        for d in existing_embed_dirs[::-1]: 
+            # require that the model name and the audio dir are in the folder name
+            if not (
+                self.model_name in d.stem 
+                and Path(self.audio_dir).stem in d.parts[-1]
+                ):
+                continue
+            
+            # is directory empty?
+            if list(d.glob("*yml")) == []:
+                try:
+                    d.rmdir()
+                    continue
+                except OSError:
+                    logger.info(
+                        f"\nThe directory {d} is not empty. "
+                        "It seems like a previous run failed, "
+                        "bacpipe is comparing what files were already "
+                        "created and will then continue where it left off."
+                        "If you interrupted the run on purpose and want to "
+                        "start from the beginning, please cancel using "
+                        "Ctrl + C and then remove "
+                        f"the folder {d} manually.\n"
+                    )
+                    self.continue_failed_run = True
+                    self.embed_dir = d
+                    return d
+            
+            # load the metadata.yml file contained in d
+            with open(d.joinpath("metadata.yml"), "r") as f:
+                mdata = yaml.load(f, Loader=yaml.CLoader)
+                if not self.model_name == mdata["model_name"]:
+                    continue
+
+            # are we using a dimensionality reduction model?
+            if self.dim_reduction_model:
+                if self.dim_reduction_model in d.stem:
+                    self.combination_already_exists = True
+                    logger.info(
+                        "\n### Embeddings already exist. "
+                        f"Using embeddings in {str(d)} ###"
+                    )
+                    self.embed_dir = d
+                    break
                 else:
-                    try:
-                        num_files = len(
-                            [f for f in list(d.rglob(f"*{self.embed_suffix}"))]
-                        )
-                        num_audio_files = len(self._get_audio_files())
-                    except AssertionError as e:
-                        self._get_metadata_dict(d)
-                        self.combination_already_exists = True
-                        logger.info(
-                            f"\nError: {e}. "
-                            "Will proceed without veryfying if the number of embeddings "
-                            "is the same as the number of audio files."
-                        )
-                        logger.info(
-                            "\n### Embeddings already exist. "
-                            f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
-                        )
-                        break
+                    return d
+            else:
+                self._verify_previous_embedding_directory(d)
 
-                    if num_audio_files == num_files:
-                        self.combination_already_exists = True
-                        self._get_metadata_dict(d)
-                        logger.info(
-                            "\n### Embeddings already exist. "
-                            f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
-                        )
-                        break
-                    elif (
-                        np.round(num_files / num_audio_files, 1) == 1 # allow 5 % deviation
-                        and num_files > 100
-                    ):
-                        self.combination_already_exists = True
-                        self._get_metadata_dict(d)
-                        logger.info(
-                            "\n### Embeddings already exist. "
-                            f"The number of audio files ({num_audio_files}) "
-                            f"and the number of embeddings files ({num_files}) don't "
-                            "exactly match. That could be down to some of the audio files "
-                            "being corrupt. If you changed the source files and want the "
-                            f"embeddings to be computed again, delete or move {d.stem}. \n\n"
-                            f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
-                        )
-                        break
+    def _verify_previous_embedding_directory(self, d):
+        """
+        Check if number of embedding files and number of audio files match 
+        to decide if this directory contains all the embeddings for the 
+        current combination of model and audio dir. If the number of audio 
+        files and the number of embedding files deviate by more than 1% 
+        then continue with the missing files. If not treat the run as 
+        complete and load the metadata and asign class attributs
+        based on it.
+
+        Parameters
+        ----------
+        d : None
+        """
+        try:
+            num_files = len(
+                [f for f in list(d.rglob(f"*{self.embed_suffix}"))]
+            )
+            num_audio_files = len(self.get_audio_files())
+        except AssertionError as e:
+            self._get_metadata_dict(d)
+            self.combination_already_exists = True
+            logger.info(
+                f"\nError: {e}. "
+                "Will proceed without veryfying if the number of embeddings "
+                "is the same as the number of audio files."
+            )
+            logger.info(
+                "\n### Embeddings already exist. "
+                f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
+            )
+            return
+
+        if num_audio_files == num_files:
+            self.combination_already_exists = True
+            self._get_metadata_dict(d)
+            logger.info(
+                "\n### Embeddings already exist. "
+                f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
+            )
+            return
+        elif (
+            # allow 1 % deviation
+            np.round(num_files / num_audio_files, 1) == 1 
+            and num_files > 100
+        ):
+            self.combination_already_exists = True
+            self._get_metadata_dict(d)
+            logger.info(
+                "\n### Embeddings already exist. "
+                f"The number of audio files ({num_audio_files}) "
+                f"and the number of embeddings files ({num_files}) don't "
+                "exactly match. That could be down to some of the audio files "
+                "being corrupt. If you changed the source files and want the "
+                f"embeddings to be computed again, delete or move {d.stem}. \n\n"
+                f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
+            )
+            return
 
     def _get_audio_paths(self):
-        self.files = self._get_audio_files()
+        self.files = self.get_audio_files()
         self.files.sort()
         if not self.continue_failed_run:
-            self.embed_dir = Path(self.embed_parent_dir).joinpath(self.get_timestamp_dir())
+            self.embed_dir = (
+                Path(self.embed_parent_dir)
+                .joinpath(self._get_timestamp_dir())
+                )
 
     def _get_annotation_files(self):
         all_annotation_files = list(self.audio_dir.rglob("*.csv"))
         audio_stems = [file.stem for file in self.files]
         self.annot_files = [
-            file for file in all_annotation_files if file.stem in audio_stems
+            file for file in all_annotation_files 
+            if file.stem in audio_stems
         ]
 
-    def _get_audio_files(self):
+    def get_audio_files(self):
         if self.audio_dir == 'bacpipe/tests/test_data':
             import importlib.resources as pkg_resources
             with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
@@ -302,7 +364,7 @@ class Loader:
         if self.dim_reduction_model:
             self.dim_reduc_embed_dir = folder
 
-    def get_embeddings(self):
+    def _get_embeddings(self):
         embed_dir = self.get_embedding_dir()
         self.files = [f for f in embed_dir.rglob(f"*{self.embed_suffix}")]
         self.files.sort()
@@ -313,7 +375,7 @@ class Loader:
                 {"embedding_files": [], "embedding_dimensions": []}
             )
             self.embed_dir = Path(self.dim_reduc_parent_dir).joinpath(
-                self.get_timestamp_dir() + f"-{self.model_name}"
+                self._get_timestamp_dir() + f"-{self.model_name}"
             )
         else:
             self.embed_dir = embed_dir
@@ -343,7 +405,7 @@ class Loader:
         embed_dirs.sort()
         return self._find_existing_embed_dir(embed_dirs)
 
-    def get_timestamp_dir(self):
+    def _get_timestamp_dir(self):
         if self.dim_reduction_model:
             model_name = self.dim_reduction_model
         else:
@@ -353,7 +415,7 @@ class Loader:
             time.localtime(),
         )
 
-    def embed_read(self, index, file):
+    def read_embedding_file(self, file):
         embeds = np.load(file)
         try:
             rel_file_path = file.relative_to(self.metadata_dict["embed_dir"])
@@ -389,7 +451,7 @@ class Loader:
         elif as_type == 'array':
             return np.array(d.values())
 
-    def write_audio_file_to_metadata(self, file, model, embeddings, file_length):
+    def _write_audio_file_to_metadata(self, file, model, embeddings, file_length):
         if (
             not "segment_length (samples)" in self.metadata_dict.keys()
             or not "sample_rate (Hz)" in self.metadata_dict.keys()
@@ -417,11 +479,13 @@ class Loader:
 
     def update_files(self):
         if self.dim_reduction_model:
-            self.files = [f for f in self.embed_dir.iterdir() if f.suffix == ".json"]
+            self.files = [
+                f for f in self.embed_dir.iterdir() if f.suffix == ".json"
+                ]
         else:
             self.files = list(self.embed_dir.rglob("*.npy"))
             
-    def save_embeddings(self, file_idx, file, embeds):
+    def save_embedding_file(self, file, embeds):
         if self.dim_reduction_model:
             file_dest = self.embed_dir.joinpath(
                 self.audio_dir.stem + "_" + self.model_name
@@ -431,7 +495,7 @@ class Loader:
                 self.metadata_dict["segment_length (samples)"]
                 / self.metadata_dict["sample_rate (Hz)"]
             )
-            self.save_embeddings_dict_with_timestamps(
+            self._save_embeddings_dict_with_timestamps(
                 file_dest, embeds, input_len
             )
         else:
@@ -446,26 +510,36 @@ class Loader:
                 embeds = np.expand_dims(embeds, axis=0)
             np.save(file_dest, embeds)
 
-    def save_embeddings_dict_with_timestamps(
+    def _save_embeddings_dict_with_timestamps(
         self, file_dest, embeds, input_len
     ):
         t_stamps = []
-        for num_segments, _ in self.metadata_dict["files"]["embedding_dimensions"]:
-            [t_stamps.append(t) for t in np.arange(0, num_segments * input_len, input_len)]
         d = {
-            var: embeds[:, i].tolist() for i, var in zip(range(embeds.shape[1]), ["x", "y"])
+            var: embeds[:, i].tolist() 
+            for i, var in zip(range(embeds.shape[1]), ["x", "y"])
         }
+        
+        embedding_dimensions = self.metadata_dict["files"]["embedding_dimensions"]
+        for num_segments, _ in embedding_dimensions:
+            [
+                t_stamps.append(t) 
+                for t in np.arange(0, num_segments * input_len, input_len)
+            ]
+            
         d["timestamp"] = t_stamps
 
         d["metadata"] = {
             k: (v if isinstance(v, list) else v)
             for (k, v) in self.metadata_dict["files"].items()
         }
+        
         d["metadata"].update(
-            {k: v for (k, v) in self.metadata_dict.items() if not isinstance(v, dict)}
+            {
+                k: v 
+                for (k, v) in self.metadata_dict.items() 
+                if not isinstance(v, dict)
+            }
         )
-
-        import json
 
         with open(file_dest, "w") as f:
             json.dump(d, f, indent=2)
@@ -479,7 +553,10 @@ class Loader:
             ):
                 embed_dict[file.stem] = embeds[acc_shape : acc_shape + shape[0]]
                 acc_shape += shape[0]
-            np.save(file_dest.replace(".json", f"{embeds.shape[-1]}.npy"), embed_dict)
+            np.save(
+                file_dest.replace(".json", f"{embeds.shape[-1]}.npy"), 
+                embed_dict
+                )
 
 class AudioHelper:
     def __init__(self, model, padding, audio_dir, **kwargs):
@@ -518,12 +595,12 @@ class AudioHelper:
         torch.Tensor
             audio frames preprocessed with model specific preprocessing
         """
-        audio = self.load_and_resample(sample)
+        audio = self._load_and_resample(sample)
         audio = audio.to(self.model.device)
         if self.model.only_embed_annotations:
-            frames = self.only_load_annotated_segments(sample, audio)
+            frames = self._only_load_annotated_segments(sample, audio)
         else:
-            frames = self.window_audio(audio)
+            frames = self._window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
         self.file_length[sample.stem] = len(audio[0]) / self.model.sr
         self.preprocessed_shape = tuple(preprocessed_frames.shape)
@@ -532,7 +609,7 @@ class AudioHelper:
             torch.cuda.empty_cache()
         return preprocessed_frames
     
-    def load_and_resample(self, path):
+    def _load_and_resample(self, path):
         try:
             audio, sr = ta.load(str(path), normalize=True)
         except Exception as e:
@@ -551,7 +628,7 @@ class AudioHelper:
         re_audio = ta.functional.resample(audio, sr, self.model.sr)
         return re_audio
 
-    def only_load_annotated_segments(self, file_path, audio):
+    def _only_load_annotated_segments(self, file_path, audio):
         import pandas as pd
         annots = pd.read_csv(Path(self.audio_dir) / 'annotations.csv')
         # filter current file
@@ -584,7 +661,7 @@ class AudioHelper:
         cumulative_segments = cumulative_segments.to(self.device)
         return cumulative_segments
 
-    def window_audio(self, audio):
+    def _window_audio(self, audio):
         num_frames = int(np.ceil(len(audio[0]) / self.model.segment_length))
         if isinstance(audio, torch.Tensor):
             audio = audio.cpu()
@@ -662,7 +739,12 @@ class Embedder(AudioHelper):
         if "tensorflow" in str(type(audio)):
             import tensorflow as tf
 
-            return tf.data.Dataset.from_tensor_slices(audio).batch(self.model.batch_size)
+            return (
+                tf.data.Dataset
+                .from_tensor_slices(audio)
+                .batch(self.model.batch_size)
+                )
+            
         elif "torch" in str(type(audio)):
 
             return torch.utils.data.DataLoader(
@@ -747,21 +829,21 @@ class Embedder(AudioHelper):
                 )
         return self.model(samples)
 
-    def get_dimensionality_reduced_embeddings_pipeline(self):
+    def run_dimensionality_reduction_pipeline(self):
         for idx, file in enumerate(
             tqdm(self.loader.files, desc="processing files", position=1, leave=False)
         ):
             if idx == 0:
-                embeddings = self.loader.embed_read(idx, file)
+                embeddings = self.loader.read_embedding_file(file)
             else:
                 embeddings = np.concatenate(
-                    [embeddings, self.loader.embed_read(idx, file)]
+                    [embeddings, self.loader.read_embedding_file(file)]
                 )
 
         dim_reduced_embeddings = self.get_embeddings_from_model(embeddings)
-        self.loader.save_embeddings(idx, file, dim_reduced_embeddings)
+        self.loader.save_embedding_file(file, dim_reduced_embeddings)
 
-    def get_embeddings_using_multithreading_pipeline(self):
+    def run_inference_pipeline_using_multithreading(self):
         """
         Generate embeddings for all files in a pipelined manner:
         - Producer thread loads and preprocesses audio
@@ -832,16 +914,16 @@ class Embedder(AudioHelper):
                     pbar.update(1)
                     continue
             
-                self.loader.write_audio_file_to_metadata(
+                self.loader._write_audio_file_to_metadata(
                     idx, self.model, embeddings, self.file_length
                     )
-                self.loader.save_embeddings(idx, file, embeddings)
+                self.loader.save_embedding_file(file, embeddings)
                 if self.model.bool_classifier:
                     self.classifier.save_classifier_outputs(self.loader, file)
 
                 pbar.update(1)
 
-    def get_embeddings_sequentially_pipeline(self):
+    def run_inference_pipeline_sequentially(self):
         if self.model_name in bacpipe.TF_MODELS:
             import tensorflow as tf
         for idx, file in enumerate(
@@ -871,10 +953,10 @@ class Embedder(AudioHelper):
                 )
                 continue
             
-            self.loader.write_audio_file_to_metadata(
+            self.loader._write_audio_file_to_metadata(
                 file, self.model, embeddings, self.file_length
                 )
-            self.loader.save_embeddings(idx, file, embeddings)
+            self.loader.save_embedding_file(file, embeddings)
             if self.model.bool_classifier:
                 self.classifier.save_classifier_outputs(self.loader, file)
 
@@ -1049,9 +1131,7 @@ class Classifier:
             self.classify(embeddings)
                 
         
-                
-    
-    def fill_dataframe_with_classiefier_results(self, fileloader_obj, file):
+    def _fill_dataframe_with_classiefier_results(self, fileloader_obj, file):
         """
         Append or create a dataframe and fill it with the results from the 
         classifier to later be saved as a csv file.
@@ -1089,7 +1169,7 @@ class Classifier:
 
         if not hasattr(self, "cumulative_annotations"):
             if fileloader_obj.continue_failed_run:
-                self.load_existing_clfier_outputs(fileloader_obj, 
+                self._load_existing_clfier_outputs(fileloader_obj, 
                                                   classifier_annotations)
             else:
                 self.cumulative_annotations = classifier_annotations
@@ -1098,7 +1178,7 @@ class Classifier:
                 [self.cumulative_annotations, classifier_annotations], ignore_index=True
             )
 
-    def load_existing_clfier_outputs(self, fileloader_obj, clfier_annotations):
+    def _load_existing_clfier_outputs(self, fileloader_obj, clfier_annotations):
         clfier_dir = Path(
             self.paths.class_path / 'original_classifier_outputs'
             )
@@ -1197,7 +1277,7 @@ class Classifier:
         if self.model.only_embed_annotations: #annotation file exists
             np.save(file_dest.replace('.json', '.npy'), self.predictions)
         
-        self.fill_dataframe_with_classiefier_results(fileloader_obj, file)
+        self._fill_dataframe_with_classiefier_results(fileloader_obj, file)
         
         cls_results = self.make_classification_dict(
             self.predictions, self.model.classes, self.classifier_threshold

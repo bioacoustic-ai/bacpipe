@@ -517,15 +517,15 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
 
             if ld.dim_reduction_model:
                 # (1) Dimensionality reduction stage
-                embed.get_dimensionality_reduced_embeddings_pipeline()
+                embed.run_dimensionality_reduction_pipeline()
 
             elif embed.model.device == "cuda" and not avoid_pipelined_gpu_inference:
                 # (2) GPU path with pipelined embedding generation
-                embed.get_embeddings_using_multithreading_pipeline()
+                embed.run_inference_pipeline_using_multithreading()
 
             else:
                 # (3) CPU path with sequential embedding generation
-                embed.get_embeddings_sequentially_pipeline()
+                embed.run_inference_pipeline_sequentially()
 
             # Finalize
             if embed.model.bool_classifier and not embed.dim_reduction_model:
