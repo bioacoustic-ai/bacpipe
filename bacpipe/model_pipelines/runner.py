@@ -459,15 +459,6 @@ class Classifier:
             self.predictions = torch.cat(
                 [self.predictions, torch.Tensor(clfier_output)]
             )
-    
-    def run_clfier_for_previous_embeddings(self, fileloader_obj):
-        existing_embeddings_files = list(
-            Path(fileloader_obj.embed_dir).rglob('*.npy')
-            )
-        for file in existing_embeddings_files:
-            with open(file, 'rb') as f:
-                embeddings = np.load(f)
-            self.classify(embeddings)
         
     def _fill_dataframe_with_classiefier_results(self, fileloader_obj, file):
         """
