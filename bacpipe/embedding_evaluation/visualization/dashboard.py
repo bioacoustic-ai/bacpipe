@@ -426,10 +426,13 @@ class DashBoard(DashBoardHelper):
         model1_page = self.single_model_page(1)
         model_all_page = self.all_models_page(1)
         apply_classifier_page = self.apply_clfier_page(0)
+        apply_classifier1_page = self.apply_clfier_page(1)
 
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
         sidebar1, content1 = model1_page.objects
+        sidebar2, content2 = apply_classifier_page.objects
+        sidebar3, content3 = apply_classifier1_page.objects
 
         # Wrap sidebars with titles
         sidebar0 = pn.Column(
@@ -450,7 +453,16 @@ class DashBoard(DashBoardHelper):
                 ),
             ),
             ("All models", model_all_page),
-            ("Apply Classifer", apply_classifier_page)
+            ("Apply Classifer", apply_classifier_page),
+            (
+                "Two classifiers",
+                pn.Row(
+                    pn.Column(sidebar2, sidebar3),
+                    pn.Row(content2, content3),
+                    sizing_mode="stretch_both",
+                ),
+            ),
+            
         )
         
         self.add_styling(model1_page, model_all_page, apply_classifier_page)

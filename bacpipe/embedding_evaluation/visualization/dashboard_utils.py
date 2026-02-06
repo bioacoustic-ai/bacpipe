@@ -11,6 +11,8 @@ import torch
 from pathlib import Path
 from bacpipe.embedding_evaluation.classification.train_classifier import LinearClassifier
 
+from bacpipe.embedding_evaluation.visualization.visualize import plot_classification_heatmap
+
 sns.set_theme(style="whitegrid")
 
 matplotlib.use("agg")
@@ -110,24 +112,6 @@ class DashBoardHelper:
             ))
         return sorted_l2i
         
-    def get_timestamps(self, eval_dir, model, label_key):
-        from datetime import datetime 
-        default_labels = np.load(
-            # self.ld.evaluations_dir 
-            # / self.ld.metadata_dict['model_name']
-            eval_dir
-            / model
-            / 'labels/default_labels.npy',
-            allow_pickle=True
-            ).item()
-        labels = default_labels[label_key]
-        if label_key == 'time_of_day':
-            labels_ts = [datetime.strptime(ts ,'%H-%M-%S').timestamp() for ts in labels]
-        if label_key == 'continuous_timestamp':
-            labels_ts = [datetime.strptime(ts ,'%Y-%m-%d %H-%M-%S').timestamp() for ts in labels]
-        return labels_ts
-        
-        
     def get_classes(self, path):
         if path == '':
             path = (
@@ -211,7 +195,7 @@ class DashBoardHelper:
         ):
         accumulated = np.zeros([24, len(np.unique(accumulator, axis=0))], dtype=np.int8)
         for acc_idx, item in enumerate(np.unique(accumulator, axis=0)):
-            month_presence_idx = np.where(accumulator==item)[0]
+            month_presence_idx = np.where(np.all(accumulator == item, axis=1))[0]
             for hour in range(24):
                 hourly_presence_idx = np.where(
                     hours[month_presence_idx]==hour
@@ -221,7 +205,6 @@ class DashBoardHelper:
                     )
         return accumulated
         
-
     def get_timestamps_per_embedding(self, model):
         from bacpipe.embedding_evaluation.label_embeddings import get_dt_filename
         import datetime as dt
@@ -244,7 +227,6 @@ class DashBoardHelper:
         
     def prepare_heatmap(self, threshold, model, clfier_type, progress, widget_idx=0):
         
-        # timestamps = self.get_timestamps(self.path_func(model).eval_path, model, 'continuous_timestamp')
         if progress == False:
             return None
         threshold = self.verify_threshold(threshold)
@@ -283,63 +265,12 @@ class DashBoardHelper:
             )
             
         
-        return self.plot_widget(self.plot_heatmap, 
-                         accumulated_presence=accumulated_presence, 
-                         timestamps=timestamps,
-                         accumulate_by=self.accumulate_select[widget_idx], 
-                         species=self.species_select[widget_idx],
-                         threshold=threshold)
-        
-        
-    def plot_heatmap(self, accumulated_presence, timestamps, accumulate_by, species, threshold):
-        
-        import matplotlib.pyplot as plt
-        fig = plt.figure(figsize=[11, 8])
-        fig.suptitle(
-            f'Presence heatmap for {species} with threshold of {threshold}',
-            fontsize=10
-            )
-        ax = sns.heatmap(
-            accumulated_presence.T, 
-            vmin=0,
-            # vmax=1,
-            cmap='viridis'
+        return self.plot_widget(
+            plot_classification_heatmap, 
+            accumulated_presence=accumulated_presence, 
+            timestamps=timestamps,
+            accumulate_by=self.accumulate_select[widget_idx], 
+            species=self.species_select[widget_idx],
+            threshold=threshold
             )
         
-        y_locs, yticklabels = ax.get_yticks(), ax.get_yticklabels()
-        if accumulate_by == 'day':
-            labels = np.unique([ts.date() for ts in timestamps])
-            ax.set_ylabel('dates')
-        elif accumulate_by == 'month':
-            labels = np.unique(
-                [f'{date.year}-{date.month}' for date in timestamps], 
-                axis=0
-                )
-            ax.set_ylabel('months')
-        elif accumulate_by == 'week':
-            labels = np.unique(
-                [f'{date.year}-{date.isocalendar().week}' for date in timestamps], 
-                axis=0
-                )
-            ax.set_ylabel('weeks')
-        selected_labels = labels[[int(i.get_text()) for i in yticklabels]]
-        x_locs, labels = ax.get_xticks(), ax.get_xticklabels()
-        x_idxs = [0, 6, 12, 18, 23]
-        ax.set_xticks(x_locs[x_idxs], np.array(labels)[x_idxs])
-            
-        
-        ax.set_xlabel('hours')
-        ax.set_yticks(y_locs)
-        ax.set_yticklabels(selected_labels)
-        
-        # force the rotation on the axis itself
-        ax.tick_params(axis='y', rotation=0)
-        
-        # access the last axis created in the figure (which is the colorbar)
-        cbar = ax.collections[0].colorbar
-        cbar.set_label('Binary presence per hour', fontsize=12, labelpad=15)
-        
-        fig.set_size_inches(6, 5)
-        fig.set_dpi(300)
-        fig.tight_layout()
-        return fig      

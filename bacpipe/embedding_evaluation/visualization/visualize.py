@@ -1,17 +1,18 @@
 import json
 
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import numpy as np
 from pathlib import Path
 
 import bacpipe.embedding_evaluation.label_embeddings as le
+import matplotlib
+import seaborn as sns
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-import matplotlib.pyplot as plt
-import matplotlib
 
 matplotlib.rcParams.update(
     {
@@ -549,15 +550,14 @@ def plot_comparison(
     rows, cols = return_rows_cols(len(models))
 
     if not bool_spherical:
-        fig, axes = plt.subplots(
-            rows, cols, figsize=set_figsize_for_comparison(rows, cols)
-        )
+        fig = Figure(figsize=set_figsize_for_comparison(rows, cols))
+        axes = fig.subplots(rows, cols)
     else:
-        fig, axes = plt.subplots(
+        fig = Figure(figsize=set_figsize_for_comparison(rows, cols))
+        axes = fig.subplots(
             rows,
             cols,
             subplot_kw={"projection": "3d"},
-            figsize=set_figsize_for_comparison(rows, cols),
         )
     if not dashboard:
         vis_loader = EmbedAndLabelLoader(dim_reduction_model, **kwargs)
@@ -1198,39 +1198,58 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
     )
     plt.close(fig)
 
-
-#################################################################
-
-
-def plot_violins(left, right):
-    import pandas as pd
-    import seaborn as sns
-
-    val = []
-    typ = []
-    cat = []
-    for idx, (intra, inter) in enumerate(zip(left, right)):
-        val.append(intra.tolist())
-        val.append(inter.tolist())
-        typ.extend(["Intra"] * len(intra))
-        typ.extend(["Inter"] * len(inter))
-        cat.extend([f"Group {idx}"] * len(intra))
-        cat.extend([f"Group {idx}"] * len(inter))
-
-    # Convert to long-form format
-    data_long = pd.DataFrame(
-        {"Value": np.concatenate(val), "Type": typ, "Category": cat}
-    )
-
-    # Create the violin plot
-    plt.figure(figsize=(14, 8))
-    sns.violinplot(
-        x="Category",
-        y="Value",
-        hue="Type",
-        data=data_long,
-        split=True,
-        inner="quartile",
-    )
-
-    plt.show()
+        
+def plot_classification_heatmap(
+    accumulated_presence, timestamps, accumulate_by, species, threshold
+    ):
+    
+    fig = Figure(figsize=[11, 8])
+    ax = fig.subplots()
+    
+    fig.suptitle(
+        f'Presence heatmap for {species} with threshold of {threshold}',
+        fontsize=10
+        )
+    sns.heatmap(
+        accumulated_presence.T, 
+        vmin=0,
+        # vmax=1,
+        cmap='viridis',
+        cbar_kws={'label': 'Binary presence per hour'},
+        ax=ax
+        )
+    
+    y_locs, yticklabels = ax.get_yticks(), ax.get_yticklabels()
+    if accumulate_by == 'day':
+        labels = np.unique([ts.date() for ts in timestamps])
+        ax.set_ylabel('dates')
+    elif accumulate_by == 'month':
+        labels = np.unique(
+            [f'{date.year}-{date.month}' for date in timestamps], 
+            axis=0
+            )
+        ax.set_ylabel('months')
+    elif accumulate_by == 'week':
+        labels = np.unique(
+            [f'{date.year}-{date.isocalendar().week}' for date in timestamps], 
+            axis=0
+            )
+        ax.set_ylabel('weeks')
+    selected_labels = labels[[int(i.get_text()) for i in yticklabels]]
+    x_locs, labels = ax.get_xticks(), ax.get_xticklabels()
+    x_idxs = [0, 6, 12, 18, 23]
+    ax.set_xticks(x_locs[x_idxs], np.array(labels)[x_idxs])
+        
+    
+    ax.set_xlabel('hours')
+    ax.set_yticks(y_locs)
+    ax.set_yticklabels(selected_labels)
+    
+    # force the rotation on the axis itself
+    ax.tick_params(axis='y', rotation=0)
+    
+    
+    fig.set_size_inches(6, 5)
+    fig.set_dpi(300)
+    fig.tight_layout()
+    return fig      
