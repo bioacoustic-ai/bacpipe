@@ -86,6 +86,8 @@ class AudioHandler:
         file_annots = annots[annots.audiofilename==file_path.relative_to(self.audio_dir)]
         if len(file_annots) == 0:
             file_annots = annots[annots.audiofilename==file_path.stem+file_path.suffix]
+        if len(file_annots) == 0:
+            file_annots = annots[annots.audiofilename==str(file_path.relative_to(self.audio_dir))]
         
         starts = np.array(file_annots.start, dtype=np.float32)*self.model.sr
         ends = np.array(file_annots.end, dtype=np.float32)*self.model.sr
