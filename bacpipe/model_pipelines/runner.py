@@ -617,7 +617,7 @@ class Classifier:
             json.dump(cls_results, f, indent=2)
         self.predictions = torch.tensor([])
         
-    def run_default_clfier_and_save_results(self, loader):
+    def run_default_classifier(self, loader):
         all_embeds = loader.embeddings()
         
         for f_name, embeddings in tqdm(

@@ -93,7 +93,7 @@ class Loader:
         self._initialize_path_structure(testing=testing, **kwargs)
 
         self.check_if_combination_exists = check_if_combination_exists
-        self.continue_failed_run = False
+        self.continue_failed_run = False #TODO add to settings
 
         if self.dim_reduction_model:
             self.embed_suffix = ".json"
@@ -354,10 +354,6 @@ class Loader:
         ]
 
     def get_audio_files(self):
-        if self.audio_dir == 'bacpipe/tests/test_data':
-            import importlib.resources as pkg_resources
-            with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
-                audio_dir = Path(audio_dir)
         files_list = []
         [
             [files_list.append(ll) for ll in self.audio_dir.rglob(f"*{string}")]
@@ -483,7 +479,7 @@ class Loader:
         if as_type == 'dict':
             return d
         elif as_type == 'array':
-            return np.array(d.values())
+            return np.vstack(list(d.values()))
 
     def _write_audio_file_to_metadata(self, file, model, embeddings, file_length):
         if (
@@ -592,9 +588,8 @@ class Loader:
                 embed_dict
                 )
             
-    def check_if_default_clfier_should_be_run(
-        self, paths, run_pretrained_classifier, 
-        testing, dim_reduction_model, **kwargs
+    def classifier_should_be_run(
+        self, paths, run_pretrained_classifier, testing, **kwargs
         ):
         
         if (
@@ -615,15 +610,7 @@ class Loader:
                     "rerun bacpipe with the setting `run_pretrained_classifier` set to True. "
                     "That way classification results will be saved immediately."
                 )
-                return
-            embed = Embedder(
-                self.model_name, 
-                loader=self,
-                dim_reduction_model=False,
-                run_pretrained_classifier=run_pretrained_classifier,
-                **kwargs
-                )
-            if hasattr(embed.model, 'classifier_predictions'):
-                embed.classifier.run_default_clfier_and_save_results(self)
-
+                return False
+            else:
+                return True
 

@@ -354,7 +354,8 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **
     return loader_dict
 
 def model_specific_evaluation(
-    loader_dict, evaluation_task, class_configs, models, **kwargs
+    loader_dict, evaluation_task, class_configs, 
+    models, dim_reduction_model=False, **kwargs
 ):
     """
     Perform evaluation of the embeddings using the specified
@@ -382,9 +383,12 @@ def model_specific_evaluation(
     """
     for model_name in models:
         paths = get_paths(model_name)
-        loader_dict[model_name].check_if_default_clfier_should_be_run(
-            paths, **kwargs
-            )
+        if loader_dict[model_name].classifier_should_be_run(paths, **kwargs):
+            embed = Embedder(model_name, loader_dict[model_name], **kwargs)
+            if hasattr(embed.model, 'classifier_predictions'):
+                embed.classifier.run_default_classifier(
+                    loader_dict[model_name]
+                    )
                 
         if not evaluation_task in ["None", [], False]:
             embeds = loader_dict[model_name].embeddings()
