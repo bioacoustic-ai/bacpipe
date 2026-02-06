@@ -133,7 +133,7 @@ available_evaluation_tasks: [
 
 The repository also includes a panel dashboard for visualizing the generated embeddings. To enable the dashboard, simply set the `dashboard` variable to `True` in the [settings.yaml](bacpipe/settings.yaml) file. The dashboard will automatically open in your browser (at `http://localhost:8050`) after running the `run_dashboard.py` script.
 
-The pipeline is designed to be modular, so you can easily add or remove models as needed. The models are organized into pipelines, which are defined in the `bacpipe/embedding_generation_pipelines/feature_extractors` directory. If you want to add a different dimensionality reduction model, you do so by adding new pipeline to the `bacpipe/embedding_generation_pipelines/dimensionality_reduction` directory.
+The pipeline is designed to be modular, so you can easily add or remove models as needed. The models are organized into pipelines, which are defined in the `bacpipe/model_pipelines/feature_extractors` directory. If you want to add a different dimensionality reduction model, you do so by adding new pipeline to the `bacpipe/model_pipelines/dimensionality_reduction` directory.
 
 ## Using annotations for evaluation
 
@@ -234,7 +234,7 @@ loader = bacpipe.model_specific_embedding_creation(
 # be ready to load them. The loader keys will be the model name and the values will
 # be the loader objects for each model. Each object contains all the information
 # on the generated embeddings. To name access them:
-loader['birdnet'].embedding_dict() 
+loader['birdnet'].embeddings() 
 # this will give you a dictionary with the keys corresponding to embedding files
 # and the values corresponding to the embeddings as numpy arrays
 
@@ -566,7 +566,7 @@ It is important that the name of this directory remains unchanged, so that it ca
 
 ### Evaluation folders
 
-Within the `evaluations_dir` folder, you will find the following folders: `classification`, `clustering`, `distances`, `labels` and `plots`. These folders will be filled with results if the corresponding evaluation tasks are selected. `distanctes` is currently not supported and therefore only a place-holder. `label` will contain a `.npy` file containing the auto-generated labels from the metadata and if available ground_truth.
+Within the `evaluations_dir` folder, you will find the following folders: `classification`, `clustering`, `labels` and `plots`. These folders will be filled with results if the corresponding evaluation tasks are selected. `distanctes` is currently not supported and therefore only a place-holder. `label` will contain a `.npy` file containing the auto-generated labels from the metadata and if available ground_truth.
 
 ### Pretrained classifier annotations
 
@@ -608,7 +608,6 @@ This is the resulting folder structure:
     │   │           ├── FewShot
     │   │           └── UrbanSoundscape
     │   ├── clustering
-    │   ├── distances
     │   ├── labels
     │   └── plots
     ├── overview
@@ -619,7 +618,6 @@ This is the resulting folder structure:
         │           ├── FewShot
         │           └── UrbanSoundscape
         ├── clustering
-        ├── distances
         ├── labels
         └── plots
 ```

@@ -48,48 +48,12 @@ class DefaultLabels:
                     {default_label: getattr(self, f"{default_label}_per_embedding")}
                 )
 
-    @staticmethod
-    def get_dt_filename(file):
-        if "+" in file:
-            file = file.split("+")[0]
-        numbs = re.findall("[0-9]+", file)
-        numbs = [n for n in numbs if len(n) % 2 == 0]
-
-        i, datetime = 1, ""
-        while len(datetime) < 12:
-            if i > 1000:
-                logger.warning(
-                    f"Could not find a valid datetime in the filename {file}. "
-                    "Please check the filename format."
-                    "Creating a default datetime corresponding to 2000, 1, 1."
-                )
-                datetime = "20001010000000"
-                break
-            datetime = "".join(numbs[-i:])
-            i += 1
-
-        i = 1
-        while 12 <= len(datetime) > 14:
-            datetime = datetime[:-i]
-
-        for _ in range(2):
-            try:
-                if len(datetime) == 12:
-                    file_date = dt.datetime.strptime(datetime, "%y%m%d%H%M%S")
-                elif len(datetime) == 14:
-                    file_date = dt.datetime.strptime(datetime, "%Y%m%d%H%M%S")
-            except:
-                i = 1
-                while len(datetime) > 12:
-                    datetime = datetime[:-i]
-        return file_date
-
     def get_datetimes(self):
         if not hasattr(self, "timestamp_per_file"):
             self.timestamp_per_file = {}
             for file in self.metadata["files"]["audio_files"]:
                 file_stem = Path(file).stem
-                self.timestamp_per_file.update({file: self.get_dt_filename(file_stem)})
+                self.timestamp_per_file.update({file: get_dt_filename(file_stem)})
 
     def time_of_day(self):
         self.get_datetimes()
@@ -177,10 +141,31 @@ class DefaultLabels:
             self.default_label_keys.remove("default_classifier")
         else:
             df = pd.read_csv(path)
+            if not len(self.parent_directory_per_embedding) == len(df):
+                df = self.fill_remaining_labels(df)
             self.default_classifier_per_embedding = df[
                 "label:default_classifier"
             ].values.tolist()
 
+    def fill_remaining_labels(self, df):
+        seg_len = self.metadata['segment_length (samples)'] / self.metadata['sample_rate (Hz)']
+        df_new = {
+            'start': [],
+            'end': [],
+            'audiofilename': [],
+            'label:default_classifier': []
+        }
+        for file, nr_embeds in zip(self.metadata['files']['audio_files'], self.metadata['files']['nr_embeds_per_file']):
+            df_part = df[df.audiofilename == file]
+            all_time_bins = (np.arange(nr_embeds) * seg_len).tolist()
+            [all_time_bins.remove(l) for l in df_part.start]
+            df_new['start'].extend(all_time_bins)
+            df_new['end'].extend((np.array(all_time_bins) + seg_len).tolist())
+            df_new['audiofilename'].extend([file] * len(all_time_bins))
+            df_new['label:default_classifier'].extend(['below_thresh'] * len(all_time_bins))
+            
+        df = pd.concat([df, pd.DataFrame(df_new)], ignore_index=True)
+        return df.sort_values(['audiofilename', 'start'])
 
 def make_set_paths_func(
     audio_dir,
@@ -198,7 +183,7 @@ def make_set_paths_func(
         """
         Generate model specific paths for the results of the embedding evaluation.
         This includes paths for the embeddings, labels, clustering, classification,
-        distances, and plots. The paths are created based on the audio directory,
+        and plots. The paths are created based on the audio directory,
         and model name.
 
         Parameters
@@ -225,7 +210,6 @@ def make_set_paths_func(
             "labels_path": task_path.joinpath("labels"),
             "clust_path": task_path.joinpath("clustering"),
             "class_path": task_path.joinpath("classification"),
-            "distances_path": task_path.joinpath("distances"),
             "plot_path": task_path.joinpath("plots"),
         }
 
@@ -235,7 +219,6 @@ def make_set_paths_func(
         paths.labels_path.mkdir(exist_ok=True, parents=True)
         paths.clust_path.mkdir(exist_ok=True)
         paths.class_path.mkdir(exist_ok=True)
-        paths.distances_path.mkdir(exist_ok=True)
         paths.plot_path.mkdir(exist_ok=True)
         return paths
 
@@ -258,15 +241,96 @@ def get_dim_reduc_path_func(model_name, dim_reduction_model="umap", **kwargs):
 
 
 def get_default_labels(model_name, **kwargs):
+    """
+    Return dictionary of the default labels based on the files that were 
+    already processed and saved. This is model dependent, as the input length is 
+    model dependent and therefore this function requires a model name as input. 
+    The default labels are calculated based on the default labels specified in the
+    settings.yaml file. 
+
+    Parameters
+    ----------
+    model_name : str
+        model name
+
+    Returns
+    -------
+    dict
+        dictionary of default labels
+    """
     return create_default_labels(get_paths(model_name), model_name, **kwargs)
 
 
 def get_ground_truth(model_name):
+    """
+    Return dictionary of the ground truth labels based on the files that were 
+    already processed and saved. This is model dependent, as the input length is 
+    model dependent and therefore this function requires a model name as input. 
+
+    Parameters
+    ----------
+    model_name : str
+        model name
+
+    Returns
+    -------
+    dict
+        dictionary of ground truth labels
+    """
     return np.load(
         get_paths(model_name).labels_path.joinpath("ground_truth.npy"),
         allow_pickle=True,
     ).item()
 
+def get_dt_filename(file):
+    """
+    Return the timestamp within a filename as a datetime object based on
+    the most common naming conventions in bioacoustics. This is not bullet
+    proof but it works with the vast majority of naming conventions for files.
+
+    Parameters
+    ----------
+    file : str
+        filename as string
+
+    Returns
+    -------
+    dt.datetime object
+        datetime object of the filename
+    """
+    if "+" in file:
+        file = file.split("+")[0]
+    numbs = re.findall("[0-9]+", file)
+    numbs = [n for n in numbs if len(n) % 2 == 0]
+
+    i, datetime = 1, ""
+    while len(datetime) < 12:
+        if i > 1000:
+            logger.warning(
+                f"Could not find a valid datetime in the filename {file}. "
+                "Please check the filename format."
+                "Creating a default datetime corresponding to 2000, 1, 1."
+            )
+            datetime = "20001010000000"
+            break
+        datetime = "".join(numbs[-i:])
+        i += 1
+
+    i = 1
+    while 12 <= len(datetime) > 14:
+        datetime = datetime[:-i]
+
+    for _ in range(2):
+        try:
+            if len(datetime) == 12:
+                file_date = dt.datetime.strptime(datetime, "%y%m%d%H%M%S")
+            elif len(datetime) == 14:
+                file_date = dt.datetime.strptime(datetime, "%Y%m%d%H%M%S")
+        except:
+            i = 1
+            while len(datetime) > 12:
+                datetime = datetime[:-i]
+    return file_date
 
 def model_specific_embedding_path(path, model, dim_reduction_model=None, **kwargs):
     """

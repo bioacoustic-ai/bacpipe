@@ -6,8 +6,11 @@ from pathlib import Path
 
 import bacpipe
 from bacpipe import EMBEDDING_DIMENSIONS
-from bacpipe.main import get_embeddings, embeds_array_without_noise
-from bacpipe.generate_embeddings import Loader, Embedder
+from bacpipe.core.workflows import run_pipeline_for_model, embeds_array_without_noise
+
+from bacpipe.core.experiment_manager import Loader
+from bacpipe.model_pipelines.runner import Embedder
+
 from bacpipe.embedding_evaluation.label_embeddings import (
     generate_annotations_for_classification_task,
     make_set_paths_func,
@@ -39,16 +42,16 @@ kwargs = {**config, **settings}
 embeddings = {}
 with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
     audio_dir = Path(audio_dir)
-config["audio_dir"] = audio_dir
+kwargs["audio_dir"] = audio_dir
 get_paths = make_set_paths_func(**kwargs)
-
+print(audio_dir)
 
 # -------------------------------------------------------------------------
 # Helper functions
 # -------------------------------------------------------------------------
 def embedder_fn(loader, model_name):
     """Return embeddings from a single model using the test loader."""
-    embedder = Embedder(model_name, **kwargs)
+    embedder = Embedder(model_name, loader=loader, **kwargs)
     return embedder.get_embeddings_from_model(loader.files[0])
 
 
@@ -64,7 +67,7 @@ def loader_fn():
 # -------------------------------------------------------------------------
 def test_embedding_generation(model, device):
     settings['device'] = device
-    embeddings[model] = get_embeddings(
+    embeddings[model] = run_pipeline_for_model(
         model_name=model,
         check_if_primary_combination_exists=False,
         check_if_secondary_combination_exists=False,
@@ -80,7 +83,7 @@ def test_embedding_dimensions(model):
 
 
 def test_evaluation(model):
-    embeds = embeddings[model].embedding_dict()
+    embeds = embeddings[model].embeddings()
     paths = get_paths(model)
 
     try:

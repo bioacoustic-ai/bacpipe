@@ -123,15 +123,6 @@ clust_configs:
       metric: "euclidean"
     
 
-## DISTANCE EVALUATION ## 
-
-distance_configs:
-  config_1: 
-    bool: False
-    name: "euclidean"
-    method: "intra_vs_inter"
-
-
 
 ######################################################
 ##################   PATH SETTINGS ###################

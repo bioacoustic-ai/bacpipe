@@ -3,6 +3,10 @@ import matplotlib
 import sys
 import seaborn as sns
 import numpy as np
+import logging
+
+logger = logging.getLogger("bacpipe")
+
 import importlib.resources as pkg_resources
 import bacpipe.imgs
 from .visualize import (
@@ -15,6 +19,7 @@ from .visualize import (
     EmbedAndLabelLoader,
 )
 import bacpipe.embedding_evaluation.label_embeddings as le
+from bacpipe.embedding_evaluation.classification.train_classifier import LinearClassifier
 
 sns.set_theme(style="whitegrid")
 
@@ -22,9 +27,9 @@ matplotlib.use("agg")
 
 # Enable Panel
 pn.extension()
+from .dashboard_utils import DashBoardHelper
 
-
-class DashBoard:
+class DashBoard(DashBoardHelper):
     def __init__(
         self,
         model_names,
@@ -81,30 +86,14 @@ class DashBoard:
         self.model_select = dict()
         self.label_select = dict()
         self.noise_select = dict()
+        self.clfier_select = dict()
+        self.species_select = dict()
+        self.accumulate_select = dict()
         self.class_select = dict()
         self.embed_plot = dict()
+        
+        self.heatmap_plot = dict()
         self.kwargs = kwargs
-
-    def init_plot(self, p_type, plot_func, widget_idx, **kwargs):
-        getattr(self, f"{p_type}_plot")[widget_idx] = pn.panel(
-            self.plot_widget(plot_func, widget_idx=widget_idx, **kwargs), tight=False
-        )
-        return getattr(self, f"{p_type}_plot")[widget_idx]
-
-    def plot_widget(self, plot_func, **kwargs):
-        if kwargs.get("return_fig", False):
-            return pn.bind(plot_func, **kwargs)
-        else:
-            return self.add_save_button(plot_func, **kwargs)
-
-    def widget(self, name, options, attr="Select", width=120, **kwargs):
-        return getattr(pn.widgets, attr)(
-            name=name, options=options, width=self.widget_width, **kwargs
-        )
-
-    def init_widget(self, idx, w_type, **kwargs):
-        getattr(self, f"{w_type}_select")[idx] = self.widget(**kwargs)
-        return getattr(self, f"{w_type}_select")[idx]
 
     def single_model_page(self, widget_idx):
         sidebar = self.make_sidebar(widget_idx, model=True)
@@ -254,8 +243,104 @@ class DashBoard:
         )
 
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
+    
+    def apply_clfier_page(self, widget_idx):
+        self.class_options = []
+        sidebar = self.make_sidebar(widget_idx, model=True, classifier_page=True)
+        self.class_tuples = []
+        
+        # input box where i can input the path to the linear classifier
+        clfier_path = pn.widgets.TextInput(
+                name='Path to Linear Classifier', 
+                placeholder=(
+                    self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
+                    ).as_posix(),
+                width=800,
+                max_length=800
+                )
+        
+        clfier_thresh = pn.widgets.TextInput(
+            name='Threshold for classification', 
+            placeholder='0.5',
+            width=80,
+            )
+        
+        from src.btn_icon import icon_str
+        self.btn_run_clfier = pn.widgets.Button(
+            name='Apply linear classifier', 
+            icon=icon_str, 
+            width=100, 
+            height=30,
+            )
+        
+        
+        self.progress_bar = pn.indicators.Progress(
+            value=0,
+            max=100,
+            bar_color='primary',
+            width=800
+        )
+        
+        self.trigger_classification = pn.bind(
+            self.classify_embeddings, 
+            self.model_select[widget_idx], 
+            clfier_path, 
+            clfier_thresh
+            )
+        
+        self.loading_test_placeholder = pn.widgets.StaticText(
+            name='Preparing classification', 
+            value=''
+            )
+            
+        main_content = pn.Column(
+            pn.pane.Markdown("## All Models Dashboard"),
+            pn.Accordion(
+                (
+                    "Classification settings",
+                    pn.Column(
+                        clfier_path,
+                
+                        # after that show me the classes that this 
+                        # linear classifier will classify
+                        pn.widgets.StaticText(
+                            name='Classes', 
+                            value=pn.bind(self.get_classes, clfier_path)
+                            ),
+                
+                        # input section to give a threshold for classification
+                        clfier_thresh,
+                    
+                        # button to click run
+                        self.btn_run_clfier,
+                        
+                        # placeholder textbox to show that something 
+                        # is happening while waiting on embeddings to load
+                        self.loading_test_placeholder,
+                                    
+                        # progbar
+                        self.progress_bar,
+                    )
+                ),
+                (
+                    "Classification heatmap",
+                    # heatmap for 20 top species
+                    pn.bind(self.prepare_heatmap,
+                            clfier_thresh,
+                            model=self.model_select[widget_idx], 
+                            clfier_type=self.clfier_select[widget_idx],
+                            progress=self.btn_run_clfier)
+                ),
+                active=[0, 1, 2],
+                # by default create all annotations as one big annotations file
+                # # add button to save as raven annotations
+                ),
+                width=900
+            )
+        return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
+        
 
-    def make_sidebar(self, widget_idx, model=True):
+    def make_sidebar(self, widget_idx, model=True, classifier_page=False):
         widgets = [pn.pane.Markdown("## Settings")]
 
         if model:
@@ -263,40 +348,67 @@ class DashBoard:
                 self.init_widget(widget_idx, "model", name="Model", options=self.models)
             )
 
-        widgets.extend(
-            [
-                self.init_widget(
-                    widget_idx, "label", name="Label by", options=self.label_by
-                ),
-                (
-                    pn.widgets.StaticText(name="", value="Remove noise?")
-                    if not self.ground_truth is None
-                    else None
-                ),
-                (
+        if not classifier_page:
+            widgets.extend(
+                [
+                    self.init_widget(
+                        widget_idx, "label", name="Label by", options=self.label_by
+                    ),
+                    (
+                        pn.widgets.StaticText(name="", value="Remove noise?")
+                        if not self.ground_truth is None
+                        else None
+                    ),
+                    (
+                        self.init_widget(
+                            widget_idx,
+                            "noise",
+                            name="Remove Noise",
+                            options=[True, False],
+                            attr="RadioBoxGroup",
+                            value=False,
+                        )
+                        if not self.ground_truth is None
+                        else None
+                    ),
+                    (
+                        self.init_widget(
+                            widget_idx,
+                            "class",
+                            name="Classification Type",
+                            options=["knn", "linear"],
+                        )
+                        if "classification" in self.evaluation_task
+                        else None
+                    ),
+                ]
+            )
+        else:
+            widgets.extend(
+                [
                     self.init_widget(
                         widget_idx,
-                        "noise",
-                        name="Remove Noise",
-                        options=[True, False],
+                        w_type="clfier",
+                        name="Integrated or linear classifier",
+                        options=['Integrated', 'Linear'],
                         attr="RadioBoxGroup",
-                        value=False,
-                    )
-                    if not self.ground_truth is None
-                    else None
-                ),
-                (
+                        value='Integrated',
+                        ),
                     self.init_widget(
-                        widget_idx,
-                        "class",
-                        name="Classification Type",
-                        options=["knn", "linear"],
-                    )
-                    if "classification" in self.evaluation_task
-                    else None
-                ),
-            ]
-        )
+                        widget_idx, 
+                        w_type='species', 
+                        name='Select species', 
+                        options=self.class_options
+                        ),
+                    self.init_widget(
+                        widget_idx, 
+                        w_type='accumulate', 
+                        name='Select what to aggregate by', 
+                        options=['day', 'week', 'month']
+                        ),
+        
+                ]
+            )
 
         return pn.Column(*widgets, width=200, margin=(10, 10))
 
@@ -313,6 +425,7 @@ class DashBoard:
         model0_page = self.single_model_page(0)
         model1_page = self.single_model_page(1)
         model_all_page = self.all_models_page(1)
+        apply_classifier_page = self.apply_clfier_page(0)
 
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
@@ -337,15 +450,17 @@ class DashBoard:
                 ),
             ),
             ("All models", model_all_page),
+            ("Apply Classifer", apply_classifier_page)
         )
         
-        self.add_styling(model1_page, model_all_page)
+        self.add_styling(model1_page, model_all_page, apply_classifier_page)
         
-    def add_styling(self, model1_page, model_all_page):
+    def add_styling(self, *pages):
         with pkg_resources.path(bacpipe.imgs, 'bacpipe_unlabelled.png') as p:
             logo_path = str(p)
 
-        for sidebar in [model1_page.objects[0], model_all_page.objects[0]]:
+        for page in pages:
+            sidebar = page.objects[0]
             # Add logo to the sidebar
             sidebar.append(
                 pn.pane.PNG(logo_path, sizing_mode="scale_width")
@@ -448,3 +563,45 @@ class DashBoard:
 
         # Return the assembled panel
         return pn.Column(fig_panel, pn.Row(button), notification)
+
+
+def visualize_using_dashboard(models, **kwargs):
+    """
+    Create and serve the dashboard for visualization.
+
+    Parameters
+    ----------
+    models : list
+        embedding models
+    kwargs : dict
+        Dictionary with parameters for dashboard creation
+    """
+    from bacpipe.embedding_evaluation.visualization.dashboard import DashBoard
+    import panel as pn
+
+    # Configure dashboard
+    dashboard = DashBoard(models, **kwargs)
+
+    # Build the dashboard layout
+    try:
+        dashboard.build_layout()
+    except Exception as e:
+        logger.exception(
+            f"\nError building dashboard layout: {e}\n \n "
+            "Are you sure all the evaluations have been performed? "
+            "If not, rerun the pipeline with `overwrite=True`.\n \n "
+        )
+        raise e
+
+    with pkg_resources.path(bacpipe.imgs, 'bacpipe_favicon_white.png') as p:
+        favicon_path = str(p)
+
+    template = pn.template.BootstrapTemplate(
+        site="bacpipe dashboard",
+        title="Explore embeddings of audio data",
+        favicon=str(favicon_path),  # must be a path ending in .ico, .png, etc.
+        main=[dashboard.app],
+    )
+    
+
+    template.show(port=5006, address="localhost")

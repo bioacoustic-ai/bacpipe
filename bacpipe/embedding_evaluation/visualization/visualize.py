@@ -822,7 +822,7 @@ def visualise_results_across_models(plot_path, task_name, model_list):
             plot_overview_metrics, plot_path, task_name, model_list, metrics
         )
     else:
-        plot_overview_metrics(plot_path, task_name, model_list, metrics)
+        plot_overview_metrics(plot_path, task_name, model_list, metrics, path_func=le.get_paths)
 
 
 def iterate_through_subtasks(plot_func, plot_path, task_name, model_list, metrics):
@@ -1056,8 +1056,12 @@ def plot_overview_metrics(
             "multiple models were computed. Try selecting at least two models, that way "
             "this error should be fixed."
         )
-        logger.exception(error)
-        raise AttributeError(error)
+    elif not all([model in metrics for model in model_list]):
+        raise AttributeError(
+            "It seems like you have selected models for which the classification scores "
+            "haven't been saved yet, but for some reason bacpipe didn't realize this. "
+            "Try running bacpipe again with the setting `overwrite` set to `True`."
+        )
     num_metrics = len(metrics[model_list[0]])
     bar_width = 1 / (num_metrics + 1)
 
