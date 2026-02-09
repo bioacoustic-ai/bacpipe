@@ -537,8 +537,9 @@ def load_labels_and_build_dict(
             label: idx
             for idx, label in enumerate(label_df[label_column].unique())
         }
-    with open(paths.labels_path.joinpath("label_idx_dict.json"), "w") as f:
-        json.dump(label_idx_dict, f, indent=1)
+    if paths.labels_path.exists():
+        with open(paths.labels_path.joinpath("label_idx_dict.json"), "w") as f:
+            json.dump(label_idx_dict, f, indent=1)
     return label_df, label_idx_dict
 
 
@@ -549,31 +550,71 @@ def fit_labels_to_embedding_timestamps(
     segment_s,
     label_column=None,
     single_label=True,
+    min_annotation_length=0.65,
     **kwargs,
 ):
     file_labels = np.ones(num_embeds) * -1
     embed_timestamps = np.arange(num_embeds) * segment_s
     if single_label:
         single_label_arr = [True] * len(embed_timestamps)
+    else:
+        file_labels = file_labels.reshape([len(file_labels), 1])
+        multi_label_dict = {}
 
     for _, row in df.iterrows():
-        em_start = np.argmin(np.abs(embed_timestamps - row.start))
-        em_end = np.argmin(np.abs(embed_timestamps - row.end))
-        if single_label:
-            if (
-                not all(file_labels[em_start:em_end] == -1)
-                and not label_idx_dict[row[f"label:{label_column}"]]
-                in file_labels[em_start:em_end]
-            ):
+        em_start = np.where(embed_timestamps - row.start < 0)[0][-1]
+        em_end = np.where(embed_timestamps - row.end > 0)[0]
+        if len(em_end) > 0:
+            em_end = em_end[0]
+        else:
+            em_end = len(embed_timestamps)
+        if (
+            not np.all(file_labels[em_start:em_end] == -1)
+            and not label_idx_dict[row[f"label:{label_column}"]]
+            in file_labels[em_start:em_end]
+        ):
+            if single_label:
                 single_label_arr[em_start:em_end] = [False] * (em_end - em_start)
+            else:
+                if np.any(file_labels[em_start:em_end] == -1):
+                    file_labels[em_start:em_end][file_labels[em_start:em_end]==-1] = label_idx_dict[row[f"label:{label_column}"]]
+                elif np.all(
+                    file_labels[em_start:em_end] == 
+                    label_idx_dict[row[f"label:{label_column}"]]
+                    ):
+                    continue
+                else:
+                    new_column = np.ones(len(file_labels)) * -1
+                    new_column = new_column.reshape([len(file_labels), 1])
+                    file_labels = np.hstack([file_labels, new_column])
+                    file_labels[em_start:em_end, -1] = label_idx_dict[row[f"label:{label_column}"]]
 
-        # at least 0.65 seconds of the bbox have
-        # to be in the embedding timestamp window
-        if row.end - row.start > 0.65:
-            file_labels[em_start:em_end] = label_idx_dict[row[f"label:{label_column}"]]
+        elif row.end - row.start > min_annotation_length:
+            if single_label:
+                file_labels[em_start:em_end] = label_idx_dict[row[f"label:{label_column}"]]
+            else:
+                file_labels[em_start:em_end, 0] = label_idx_dict[row[f"label:{label_column}"]]
+                
+    file_labels = file_labels.squeeze()
+            
     if single_label:
         file_labels[~np.array(single_label_arr)] = -2
-    return file_labels
+        return file_labels
+    else:
+        if len(file_labels.shape) == 1:
+            array = np.ones([len(file_labels), 2])
+            array[:, 0] = file_labels
+            return array
+        else:
+            _, counts = np.unique(
+                np.array(list(multi_label_dict.keys()))[:, 0], 
+                return_counts=True
+                )
+            multi_label_arr = np.ones([len(file_labels), max(counts) + 1]) * -1
+            multi_label_arr[:, 0] = file_labels
+            for (start, end), label_index in multi_label_dict.items():
+                multi_label_arr[start:end, 1] = label_index
+            return multi_label_arr
 
 
 def build_ground_truth_labels_by_file(
@@ -604,7 +645,13 @@ def build_ground_truth_labels_by_file(
     file_labels = fit_labels_to_embedding_timestamps(
         df, label_idx_dict, num_embeds, segment_s, label_column=label_column, **kwargs
     )
-    all_labels = np.concatenate((all_labels, file_labels))
+    if len(file_labels.shape) > 1:
+        if len(all_labels) == 0:
+            all_labels = file_labels
+        else:
+            all_labels = np.concatenate((all_labels, file_labels))
+    else:
+        all_labels = np.concatenate((all_labels, file_labels))
 
     if np.unique(file_labels).shape[0] > 2:
         embed_timestamps = np.arange(num_embeds) * segment_s
@@ -683,6 +730,96 @@ def collect_ground_truth_labels_by_file(
         )
     return ground_truth
 
+def ground_truth_api_call(
+    model,
+    label_column='label:species',
+    paths=None,
+    label_file="annotations.csv",
+    overwrite=True,
+    single_label=True,
+    **kwargs,
+):
+    if (
+        overwrite 
+        or paths is None
+        or not paths.labels_path.joinpath("ground_truth.npy").exists()
+        ):
+
+        if paths is not None:
+            path = model_specific_embedding_path(paths.main_embeds_path, model)
+        else:
+            paths = get_paths(model)
+            path = Path(paths.main_embeds_path)
+
+        label_df, label_idx_dict = load_labels_and_build_dict(
+            paths, label_file, main_label_column=label_column, **kwargs
+        )
+
+        if len(list(path.iterdir())) > 0:
+            files = list(path.rglob("*.npy"))
+            files.sort()
+
+            metadata = yaml.safe_load(open(path.joinpath("metadata.yml"), "r"))
+            segment_s = metadata["segment_length (samples)"] / metadata["sample_rate (Hz)"]
+        else:
+            files = label_df.audiofilename.unique()
+            from importlib import import_module
+            module = import_module(
+                f"bacpipe.model_pipelines.feature_extractors.{model}"
+            )
+            segment_s = module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE
+            try:        
+                rel_audio_dir = list(
+                    Path(kwargs['audio_dir']).rglob(files[0])
+                    )[0].relative_to(kwargs['audio_dir']).parent
+            except Exception as e:
+                logger.exception(
+                    f"{files[0]} was not found in {kwargs['audio_dir']}. "
+                    "Are you sure you entered the correct path to the audio data?"
+                )
+            from librosa import get_duration
+            metadata = {}
+            metadata['files'] = {}
+            metadata['files']['audio_files'] = files
+            metadata['files']['nr_embeds_per_file'] = [
+                int(
+                    get_duration(
+                        filename=Path(kwargs['audio_dir']
+                                ) / rel_audio_dir / f) 
+                    / segment_s 
+                )
+                for f in files
+            ]
+            files = [Path(f'{Path(d).stem}_{model}') for d in files]
+            files.sort()
+            
+        label_columns = [col for col in label_df.columns if "label:" in col]
+        ground_truth_dict = {}
+        for label_col in label_columns:
+            labels = label_col.split("label:")[-1]
+            ground_truth = collect_ground_truth_labels_by_file(
+                paths,
+                files,
+                model,
+                segment_s,
+                metadata,
+                label_df,
+                label_idx_dict[label_col],
+                single_label=single_label,
+                label_column=labels,
+                **kwargs,
+            )
+
+            ground_truth_dict.update({
+                f"label:{labels}": ground_truth,
+                f"label_dict:{labels}": label_idx_dict[label_col],
+            })
+        np.save(paths.labels_path.joinpath("ground_truth.npy"), ground_truth_dict)
+    else:
+        ground_truth_dict = np.load(
+            paths.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
+        ).item()
+    return ground_truth_dict
 
 def ground_truth_by_model(
     paths,
