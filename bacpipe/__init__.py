@@ -40,6 +40,7 @@ EMBEDDING_DIMENSIONS = {
     "surfperch": 1280,
     "google_whale": 1280,
     "vggish": 128,
+    "batdetect2": 32,
 }
 
 NEEDS_CHECKPOINT = [
