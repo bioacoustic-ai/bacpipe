@@ -489,7 +489,7 @@ def filter_annotations_by_minimum_number_of_occurrences(
 
 def load_labels_and_build_dict(
     paths,
-    label_file,
+    annotations_filename,
     audio_dir,
     bool_filter_labels=True,
     min_label_occurrences=150,
@@ -499,16 +499,16 @@ def load_labels_and_build_dict(
 ):
     try:
         try:
-            label_df = pd.read_csv(Path(audio_dir).joinpath(label_file))
+            label_df = pd.read_csv(Path(audio_dir).joinpath(annotations_filename))
         except FileNotFoundError as e:
-            label_df = pd.read_csv(list(Path(audio_dir).rglob(label_file))[0])
+            label_df = pd.read_csv(list(Path(audio_dir).rglob(annotations_filename))[0])
     except FileNotFoundError as e:
         logger.warning(
             f"No annotations file found in {audio_dir}, trying in "
             f"{str(paths.dataset_path.resolve())}."
         )
         try:
-            label_df = pd.read_csv(paths.dataset_path.joinpath(label_file))
+            label_df = pd.read_csv(paths.dataset_path.joinpath(annotations_filename))
         except:
             logger.warning(
                 "No annotations file found, not able to create ground_truth.npy file. "
@@ -519,8 +519,8 @@ def load_labels_and_build_dict(
     if bool_filter_labels and not testing:
         filtered_labels = [
             lab
-            for lab in np.unique(label_df[f"label:{main_label_column}"])
-            if len(label_df[label_df[f"label:{main_label_column}"] == lab])
+            for lab in np.unique(label_df[main_label_column])
+            if len(label_df[label_df[main_label_column] == lab])
             > min_label_occurrences
         ]
         if not filtered_labels:
@@ -637,7 +637,8 @@ def build_ground_truth_labels_by_file(
         return all_labels
 
     file_labels = fit_labels_to_embedding_timestamps(
-        df, label_idx_dict, num_embeds, segment_s, label_column=label_column, **kwargs
+        df, label_idx_dict, num_embeds, segment_s, 
+        label_column=label_column, **kwargs
     )
     if len(file_labels.shape) > 1:
         if len(all_labels) == 0:
@@ -733,11 +734,13 @@ def collect_ground_truth_labels_by_file(
 
 def ground_truth_api_call(
     model,
+    audio_dir,
     label_column='label:species',
     paths=None,
-    label_file="annotations.csv",
+    annotations_filename="annotations.csv",
     overwrite=True,
     single_label=True,
+    bool_filter_labels=False,
     **kwargs,
 ):
     if (
@@ -746,21 +749,24 @@ def ground_truth_api_call(
         or not paths.labels_path.joinpath("ground_truth.npy").exists()
         ):
 
-        if paths is not None:
-            path = model_specific_embedding_path(paths.main_embeds_path, model)
-        else:
+        if paths is None:
             paths = get_paths(model)
-            path = Path(paths.main_embeds_path)
+            
+        path = model_specific_embedding_path(paths.main_embeds_path, model)
 
         label_df, label_idx_dict = load_labels_and_build_dict(
-            paths, label_file, main_label_column=label_column, **kwargs
+            paths, annotations_filename, 
+            main_label_column=label_column, 
+            audio_dir=audio_dir, 
+            bool_filter_labels=bool_filter_labels,
+            **kwargs
         )
 
         if len(list(path.iterdir())) > 0:
             files = list(path.rglob("*.npy"))
             files.sort()
 
-            metadata = yaml.safe_load(open(path.joinpath("metadata.yml"), "r"))
+            metadata = yaml.safe_load(open(list(path.rglob("metadata.yml"))[0], "r"))
             segment_s = metadata["segment_length (samples)"] / metadata["sample_rate (Hz)"]
         else:
             files = label_df.audiofilename.unique()
@@ -775,7 +781,7 @@ def ground_truth_api_call(
                     )[0].relative_to(kwargs['audio_dir']).parent
             except Exception as e:
                 logger.exception(
-                    f"{files[0]} was not found in {kwargs['audio_dir']}. "
+                    f"{files[0]} was not found in {audio_dir}. "
                     "Are you sure you entered the correct path to the audio data?"
                 )
             from librosa import get_duration
@@ -826,7 +832,7 @@ def ground_truth_by_model(
     paths,
     model,
     label_column,
-    label_file="annotations.csv",
+    annotations_filename="annotations.csv",
     overwrite=False,
     single_label=True,
     **kwargs,
@@ -836,7 +842,7 @@ def ground_truth_by_model(
         path = model_specific_embedding_path(paths.main_embeds_path, model)
 
         label_df, label_idx_dict = load_labels_and_build_dict(
-            paths, label_file, main_label_column=label_column, **kwargs
+            paths, annotations_filename, main_label_column=label_column, **kwargs
         )
 
         files = list(path.rglob("*.npy"))
