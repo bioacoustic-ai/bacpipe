@@ -418,7 +418,7 @@ def model_specific_evaluation(
                 ground_truth = None
 
         if "classification" in evaluation_task and not ground_truth is None:
-            print(
+            logger.info(
                 "\nTraining classifier to evaluate " f"{model_name.upper()} embeddings"
             )
 
@@ -446,7 +446,7 @@ def model_specific_evaluation(
                     )
 
         if "clustering" in evaluation_task:
-            print(
+            logger.info(
                 "\nGenerating clusterings to evaluate "
                 f"{model_name.upper()} embeddings"
             )
@@ -540,7 +540,7 @@ def run_pipeline_for_model(
                 " Skipping visualization generation."
             )
         else:
-            print(
+            logger.info(
                 "### Generating visualizations of embeddings using "
                 f"{dim_reduction_model}. Plots are saved in "
                 f"{loader_dim_reduced.embed_dir} ###"
@@ -569,11 +569,11 @@ def run_pipeline_for_model(
 
 def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
     if "dim_reduction_model" in kwargs:
-        print(
+        logger.info(
             f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"
         )
     elif "model_name" in kwargs:
-        print(
+        logger.info(
             f"\n\n\n###### Generating embeddings using {kwargs['model_name'].upper()} ######\n"
         )
     else:
@@ -615,10 +615,14 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
         return ld
     except KeyboardInterrupt:
         if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
-            print("KeyboardInterrupt: Exiting and deleting created embeddings.")
-            import shutil
+            all_files = list(Path(ld.embed_dir).rglob('*'))
+            if len(all_files) < 25:
+                logger.info(f"KeyboardInterrupt: Exiting and deleting created {ld.embed_dir}.")
+                import shutil
 
-            shutil.rmtree(ld.embed_dir)
+                shutil.rmtree(ld.embed_dir)
+            else:
+                logger.info(f"KeyboardInterrupt: Exiting and but not deleting {ld.embed_dir}.")
         import sys
 
         sys.exit()

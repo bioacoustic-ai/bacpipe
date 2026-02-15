@@ -1035,7 +1035,7 @@ def turn_multilabel_into_singlelabel(df_full):
 
         dff = dff.sort_values("start")
         if dff.isna().sum().sum() > 0:
-            print(dff)
-            print("NA values in the dataframe")
+            logger.info(dff)
+            logger.info("NA values in the dataframe")
         df = pd.concat([df, dff], ignore_index=True)
     return df

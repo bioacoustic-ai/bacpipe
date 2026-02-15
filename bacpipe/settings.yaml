@@ -1,25 +1,50 @@
 ######################################################
-#########   EMBEDDING GENERATION SETTINGS ############
+##################   PATH SETTINGS ###################
 ######################################################
 
-# specify your device, if unsure use 'cpu', if you are working on a 
-# gpu computer use 'cuda'
-device: 'cpu'
+# fixed path, embeddings will be stored here, advised not to change
+# because this is also where bacpipe will look for existing embeddings
+### IMPORTANT! WINODWS USERS DON'T USE QUOTATIONS HERE
+main_results_dir :      bacpipe_results
+embed_parent_dir :      embeddings
+dim_reduc_parent_dir :  dim_reduced_embeddings
+evaluations_dir :       evaluations
 
 # fixed path, model checkpoints are/should be stored here
 # this is also where bacpipe will look for existing checkpoints
 model_base_path: bacpipe/model_checkpoints
 
-# If you have an annotations.csv file in the format specified in the 
+
+######################################################
+#########   USING YOUR ANOOTATION SETTINGS ###########
+######################################################
+
+# key corresponding to the label in the annotation.csv file, if labeled data exists
+# by default this is species, but change if needed
+label_column: 'species'
+
+# file name of the annotations file. This file needs to be located
+# in the root directory of your audio data.
+annotations_filename :  annotations.csv
+
+# If you have an annotations file in the format specified in the 
 # ReadMe file, you can choose to only create embeddings for the segments
 # corresponding to the annotations. For model's that require input segments
 # longer than an annotation, the audio will be padded according to the 
 # padding specified below (see `padding`).
 only_embed_annotations: False
 
+######################################################
+#########   EMBEDDING GENERATION SETTINGS ############
+######################################################
+
+# specify your device, if unsure use 'cpu', if you are working on a 
+# gpu computer use 'cuda'
+device: 'cuda'
+
 # batch size for embedding generation, modify if you have memory issues
 # or if you want to speed up the process and have enough memory available
-global_batch_size: 16
+global_batch_size: 8
 
 
 # supported formats of audio files
@@ -70,9 +95,6 @@ default_label_keys: [
   "audio_file_name"
   ]
 
-# key corresponding to the label in the annotation.csv file, if labeled data exists
-# by default this is species, but change if needed
-label_column: 'species'
 
 ## CLASSIFICATION SETTINGS ##
 
@@ -123,18 +145,6 @@ clust_configs:
       metric: "euclidean"
     
 
-
-######################################################
-##################   PATH SETTINGS ###################
-######################################################
-
-# fixed path, embeddings will be stored here, advised not to change
-# because this is also where bacpipe will look for existing embeddings
-### IMPORTANT! WINODWS USERS DON'T USE QUOTATIONS HERE
-main_results_dir :      bacpipe_results
-embed_parent_dir :      embeddings
-dim_reduc_parent_dir :  dim_reduced_embeddings
-evaluations_dir :       evaluations
 
 # If set to true bacpipe will always use the same test files and save it in a 
 # directory other than the results directory. Results will also be deleted at 

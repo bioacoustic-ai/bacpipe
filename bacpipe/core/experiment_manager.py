@@ -89,7 +89,7 @@ class Loader:
         self.audio_dir = Path(audio_dir)
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
-        self.continue_failed_run = False
+        self.continue_incomplete_run = False
 
         self._initialize_path_structure(testing=testing, **kwargs)
 
@@ -251,7 +251,7 @@ class Loader:
                         "Ctrl + C and then remove "
                         f"the folder {d} manually.\n"
                     )
-                    # self.continue_failed_run = True
+                    self.continue_incomplete_run = True
                     self.embed_dir = d
                     return d
             
@@ -336,8 +336,7 @@ class Loader:
             return
         else:
             
-            self.continue_failed_run = True #TODO add to settings
-        # elif self.continue_failed_run:
+            self.continue_incomplete_run = True
             self.embed_dir = d
             self.files = self.get_audio_files()
             self._init_metadata_dict()
@@ -346,7 +345,6 @@ class Loader:
     def _get_audio_paths(self):
         self.files = self.get_audio_files()
         self.files.sort()
-        # if not self.continue_failed_run:
         self.embed_dir = (
             Path(self.embed_parent_dir)
             .joinpath(self._get_timestamp_dir())

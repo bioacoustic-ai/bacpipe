@@ -499,7 +499,7 @@ class DashBoard(DashBoardHelper):
             close_button = pn.widgets.Button(name="❌ close dashboard")
 
             def shutdown_callback(event):
-                print("Shutting down dashboard server...")
+                logger.info("Shutting down dashboard server...")
                 sys.exit(0)
 
             close_button.on_click(shutdown_callback)

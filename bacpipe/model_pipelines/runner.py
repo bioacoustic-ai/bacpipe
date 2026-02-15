@@ -505,7 +505,7 @@ class Classifier:
         )[maxes.indices[maxes.values > self.classifier_threshold]].tolist()
 
         if not hasattr(self, "cumulative_annotations"):
-            if fileloader_obj.continue_failed_run:
+            if fileloader_obj.continue_incomplete_run:
                 self._load_existing_clfier_outputs(fileloader_obj, 
                                                   classifier_annotations)
             else:

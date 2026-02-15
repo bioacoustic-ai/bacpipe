@@ -28,6 +28,7 @@ class AudioHandler:
         self.model = model
         self.padding = padding
         self.audio_dir = audio_dir
+        self.kwargs = kwargs
     
     def prepare_audio(self, sample):
         """
@@ -49,7 +50,7 @@ class AudioHandler:
         audio = self._load_and_resample(sample)
         audio = audio.to(self.model.device)
         if self.model.only_embed_annotations:
-            frames = self._only_load_annotated_segments(sample, audio)
+            frames = self._only_load_annotated_segments(sample, audio, **self.kwargs)
         else:
             frames = self._window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
@@ -79,9 +80,11 @@ class AudioHandler:
         re_audio = ta.functional.resample(audio, sr, self.model.sr)
         return re_audio
 
-    def _only_load_annotated_segments(self, file_path, audio):
+    def _only_load_annotated_segments(
+        self, file_path, audio, annotations_filename='annotations.csv', **_
+        ):
         import pandas as pd
-        annots = pd.read_csv(Path(self.audio_dir) / 'annotations.csv')
+        annots = pd.read_csv(Path(self.audio_dir) / annotations_filename)
         # filter current file
         file_annots = annots[annots.audiofilename==file_path.relative_to(self.audio_dir)]
         if len(file_annots) == 0:
@@ -95,7 +98,7 @@ class AudioHandler:
         audio = audio.cpu().squeeze()
         for idx, (s, e) in enumerate(zip(starts, ends)):
             s, e = int(s), int(e)
-            if e > len(audio):
+            if s > len(audio):
                 logger.warning(
                     f"Annotation with start {s} and end {e} is outside of "
                     f"range of {file_path}. Skipping annotation."

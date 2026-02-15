@@ -42,7 +42,7 @@ class ClassificationLoader(Dataset):
         else:
             self.dataset = class_df
 
-        print(
+        logger.info(
             f"Found {len(self.dataset)} samples in the {set_name} set with "
             f"{len(self.dataset.label.unique())} unique labels."
         )
