@@ -4,6 +4,9 @@ import torch.nn as nn
 import torchaudio
 import torch
 import yaml
+import pandas as pd
+
+
 
 SAMPLE_RATE = 32000
 LENGTH_IN_SAMPLES = int(3 * SAMPLE_RATE)  # burooj used 3 seconds
@@ -130,6 +133,11 @@ class Model(ModelBaseClass):
             n_mels=128, sr=SAMPLE_RATE, win_length=800, hopsize=320, n_fft=1024
         )
         self.preprocessor = self.preprocessor.to(self.device)
+        class_file_path = (
+            'bacpipe/model_pipelines/model_specific_utils/avesecho_passt/list_AvesEcho.csv'
+        )
+        df = pd.read_csv(class_file_path, header=None)
+        self.classes = df.iloc[:, 1].values.tolist()
 
     def preprocess(self, audio):
         return self.preprocessor(audio)
