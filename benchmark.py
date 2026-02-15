@@ -7,8 +7,8 @@ paths = fnc(model_name)
 
 
         
-from bacpipe.embedding_evaluation.label_embeddings import ground_truth_api_call
-gt = ground_truth_api_call(
+from bacpipe.embedding_evaluation.label_embeddings import ground_truth_by_model
+gt = ground_truth_by_model(
     model_name, 
     audio_dir=bacpipe.config.audio_dir,
     annotations_filename='annotations.csv',
@@ -54,7 +54,7 @@ df['label:species'] = species
 l2i = {v: k for k, v in enumerate(df['label:species'].unique())}
 meta_dict = {'label:species': l2i}
 
-pred = ground_truth_api_call(
+pred = ground_truth_by_model(
     model_name, 
     label_df = df,
     label_idx_dict=meta_dict,

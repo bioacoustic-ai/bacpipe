@@ -413,7 +413,7 @@ def model_specific_evaluation(
         if not evaluation_task in ["None", [], False]:
             embeds = loader_dict[model_name].embeddings()
             try:
-                ground_truth = ground_truth_by_model(paths, model_name, **kwargs)
+                ground_truth = ground_truth_by_model(model_name, paths=paths, **kwargs)
             except FileNotFoundError as e:
                 ground_truth = None
 

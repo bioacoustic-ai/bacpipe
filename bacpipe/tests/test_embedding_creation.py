@@ -89,7 +89,7 @@ def test_evaluation(model):
     paths = get_paths(model)
 
     try:
-        ground_truth = ground_truth_by_model(paths, model, **kwargs)
+        ground_truth = ground_truth_by_model(model, paths=paths, **kwargs)
     except FileNotFoundError:
         ground_truth = None
 
