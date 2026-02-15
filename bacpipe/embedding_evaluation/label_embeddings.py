@@ -579,12 +579,14 @@ def fit_labels_to_embedding_timestamps(
                     if np.any(file_labels[idx:idx+1] == -1):
                         file_labels[idx:idx+1][
                                 file_labels[idx:idx+1]==-1
-                                ][0] = label_idx_dict[row[f"label:{label_column}"]]
+                                ] = label_idx_dict[row[f"label:{label_column}"]]
                     elif (
                         label_idx_dict[row[f"label:{label_column}"]]
                         in file_labels[idx:idx+1]
                         ):
                         continue
+                    elif len(np.unique(file_labels[idx:idx+1])) == 1:
+                        file_labels[idx:idx+1, -1] = label_idx_dict[row[f"label:{label_column}"]]
                     else:
                         new_column = np.ones(len(file_labels)) * -1
                         new_column = new_column.reshape([len(file_labels), 1])
@@ -631,8 +633,15 @@ def build_ground_truth_labels_by_file(
         df = label_df[
             label_df.audiofilename == Path(audio_file).stem + Path(audio_file).suffix
         ]
+    if len(df) == 0:
+            df = label_df[
+                label_df.audiofilename
+                ==Path(audio_file).parent / (Path(audio_file).stem + f'_{model}.json')
+            ]
+        
 
     if df.empty:
+        print(f'df is empty for {audio_file}')
         all_labels = np.concatenate((all_labels, np.ones(num_embeds) * -1))
         return all_labels
 
@@ -645,7 +654,7 @@ def build_ground_truth_labels_by_file(
             all_labels = file_labels
         else:
             if all_labels.shape[-1] < file_labels.shape[-1]:
-                new_column = np.ones([len(all_labels), 1]) * -1
+                new_column = np.ones([len(all_labels), file_labels.shape[-1] - all_labels.shape[-1]]) * -1
                 all_labels = np.hstack([all_labels, new_column])
             elif all_labels.shape[-1] > file_labels.shape[-1]:
                 new_column = np.ones([len(file_labels), all_labels.shape[-1] - file_labels.shape[-1]]) * -1
@@ -735,6 +744,8 @@ def collect_ground_truth_labels_by_file(
 def ground_truth_api_call(
     model,
     audio_dir,
+    label_df=None,
+    label_idx_dict=None,
     label_column='label:species',
     paths=None,
     annotations_filename="annotations.csv",
@@ -754,13 +765,14 @@ def ground_truth_api_call(
             
         path = model_specific_embedding_path(paths.main_embeds_path, model)
 
-        label_df, label_idx_dict = load_labels_and_build_dict(
-            paths, annotations_filename, 
-            main_label_column=label_column, 
-            audio_dir=audio_dir, 
-            bool_filter_labels=bool_filter_labels,
-            **kwargs
-        )
+        if label_df is None or label_idx_dict is None:
+            label_df, label_idx_dict = load_labels_and_build_dict(
+                paths, annotations_filename, 
+                main_label_column=label_column, 
+                audio_dir=audio_dir, 
+                bool_filter_labels=bool_filter_labels,
+                **kwargs
+            )
 
         if len(list(path.iterdir())) > 0:
             files = list(path.rglob("*.npy"))
