@@ -887,7 +887,7 @@ Here is an example:
 
 ```python 
 import torch
-from bacpipe.model_specific_utils.newmodel.module import MyClass
+from bacpipe.model_pipelines.model_specific_utils.newmodel.module import MyClass
 
 SAMPLE_RATE = 12345
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)

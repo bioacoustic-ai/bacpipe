@@ -89,11 +89,11 @@ class Loader:
         self.audio_dir = Path(audio_dir)
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
+        self.continue_failed_run = False
 
         self._initialize_path_structure(testing=testing, **kwargs)
 
         self.check_if_combination_exists = check_if_combination_exists
-        self.continue_failed_run = False #TODO add to settings
 
         if self.dim_reduction_model:
             self.embed_suffix = ".json"
@@ -108,13 +108,11 @@ class Loader:
 
         if self.combination_already_exists or self.dim_reduction_model:
             self._get_embeddings()
-        else:
+        elif not hasattr(self, 'files'):
             self._get_audio_paths()
             self._init_metadata_dict()
 
-        if self.continue_failed_run:
-            self._get_metadata_from_created_embeddings()
-        elif not self.combination_already_exists:
+        if not self.combination_already_exists:
             self.embed_dir.mkdir(exist_ok=True, parents=True)
         else:
             logger.debug(
@@ -232,6 +230,7 @@ class Loader:
             # require that the model name and the audio dir are in the folder name
             if not (
                 self.model_name in d.stem 
+                and not self.combination_already_exists
                 and Path(self.audio_dir).stem in d.parts[-1]
                 ):
                 continue
@@ -252,7 +251,7 @@ class Loader:
                         "Ctrl + C and then remove "
                         f"the folder {d} manually.\n"
                     )
-                    self.continue_failed_run = True
+                    # self.continue_failed_run = True
                     self.embed_dir = d
                     return d
             
@@ -320,7 +319,7 @@ class Loader:
             return
         elif (
             # allow 1 % deviation
-            np.round(num_files / num_audio_files, 1) == 1 
+            np.round(num_files / num_audio_files, 2) >= 0.99
             and num_files > 100
         ):
             self.combination_already_exists = True
@@ -335,15 +334,23 @@ class Loader:
                 f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
             )
             return
+        else:
+            
+            self.continue_failed_run = True #TODO add to settings
+        # elif self.continue_failed_run:
+            self.embed_dir = d
+            self.files = self.get_audio_files()
+            self._init_metadata_dict()
+            self._get_metadata_from_created_embeddings()
 
     def _get_audio_paths(self):
         self.files = self.get_audio_files()
         self.files.sort()
-        if not self.continue_failed_run:
-            self.embed_dir = (
-                Path(self.embed_parent_dir)
-                .joinpath(self._get_timestamp_dir())
-                )
+        # if not self.continue_failed_run:
+        self.embed_dir = (
+            Path(self.embed_parent_dir)
+            .joinpath(self._get_timestamp_dir())
+            )
 
     def _get_annotation_files(self):
         all_annotation_files = list(self.audio_dir.rglob("*.csv"))
@@ -504,6 +511,11 @@ class Loader:
         self.metadata_dict["total_dataset_length (s)"] = sum(
             self.metadata_dict["files"]["file_lengths (s)"]
         )
+        # sort files in case a run was continued and files were added
+        sorted_indices = np.argsort(self.metadata_dict["files"]["audio_files"])
+        for key, lists in self.metadata_dict["files"].items():
+            self.metadata_dict["files"][key] = np.array(lists)[sorted_indices].tolist()
+        
         with open(str(self.embed_dir.joinpath("metadata.yml")), "w") as f:
             yaml.safe_dump(self.metadata_dict, f)
 

@@ -498,7 +498,10 @@ def load_labels_and_build_dict(
     **kwargs,
 ):
     try:
-        label_df = pd.read_csv(Path(audio_dir).joinpath(label_file))
+        try:
+            label_df = pd.read_csv(Path(audio_dir).joinpath(label_file))
+        except FileNotFoundError as e:
+            label_df = pd.read_csv(list(Path(audio_dir).rglob(label_file))[0])
     except FileNotFoundError as e:
         logger.warning(
             f"No annotations file found in {audio_dir}, trying in "
@@ -559,35 +562,34 @@ def fit_labels_to_embedding_timestamps(
         single_label_arr = [True] * len(embed_timestamps)
     else:
         file_labels = file_labels.reshape([len(file_labels), 1])
-        multi_label_dict = {}
+
 
     for _, row in df.iterrows():
-        em_start = np.where(embed_timestamps - row.start < 0)[0][-1]
+        em_start = np.where(embed_timestamps - row.start <= 0)[0][-1]
         em_end = np.where(embed_timestamps - row.end > 0)[0]
         if len(em_end) > 0:
             em_end = em_end[0]
         else:
             em_end = len(embed_timestamps)
-        if (
-            not np.all(file_labels[em_start:em_end] == -1)
-            and not label_idx_dict[row[f"label:{label_column}"]]
-            in file_labels[em_start:em_end]
-        ):
+        if not np.all(file_labels[em_start:em_end] == -1):
             if single_label:
                 single_label_arr[em_start:em_end] = [False] * (em_end - em_start)
             else:
-                if np.any(file_labels[em_start:em_end] == -1):
-                    file_labels[em_start:em_end][file_labels[em_start:em_end]==-1] = label_idx_dict[row[f"label:{label_column}"]]
-                elif np.all(
-                    file_labels[em_start:em_end] == 
-                    label_idx_dict[row[f"label:{label_column}"]]
-                    ):
-                    continue
-                else:
-                    new_column = np.ones(len(file_labels)) * -1
-                    new_column = new_column.reshape([len(file_labels), 1])
-                    file_labels = np.hstack([file_labels, new_column])
-                    file_labels[em_start:em_end, -1] = label_idx_dict[row[f"label:{label_column}"]]
+                for idx in range(em_start, em_end):
+                    if np.any(file_labels[idx:idx+1] == -1):
+                        file_labels[idx:idx+1][
+                                file_labels[idx:idx+1]==-1
+                                ][0] = label_idx_dict[row[f"label:{label_column}"]]
+                    elif (
+                        label_idx_dict[row[f"label:{label_column}"]]
+                        in file_labels[idx:idx+1]
+                        ):
+                        continue
+                    else:
+                        new_column = np.ones(len(file_labels)) * -1
+                        new_column = new_column.reshape([len(file_labels), 1])
+                        file_labels = np.hstack([file_labels, new_column])
+                        file_labels[idx:idx+1, -1] = label_idx_dict[row[f"label:{label_column}"]]
 
         elif row.end - row.start > min_annotation_length:
             if single_label:
@@ -606,15 +608,7 @@ def fit_labels_to_embedding_timestamps(
             array[:, 0] = file_labels
             return array
         else:
-            _, counts = np.unique(
-                np.array(list(multi_label_dict.keys()))[:, 0], 
-                return_counts=True
-                )
-            multi_label_arr = np.ones([len(file_labels), max(counts) + 1]) * -1
-            multi_label_arr[:, 0] = file_labels
-            for (start, end), label_index in multi_label_dict.items():
-                multi_label_arr[start:end, 1] = label_index
-            return multi_label_arr
+            return file_labels
 
 
 def build_ground_truth_labels_by_file(
@@ -649,6 +643,13 @@ def build_ground_truth_labels_by_file(
         if len(all_labels) == 0:
             all_labels = file_labels
         else:
+            if all_labels.shape[-1] < file_labels.shape[-1]:
+                new_column = np.ones([len(all_labels), 1]) * -1
+                all_labels = np.hstack([all_labels, new_column])
+            elif all_labels.shape[-1] > file_labels.shape[-1]:
+                new_column = np.ones([len(file_labels), all_labels.shape[-1] - file_labels.shape[-1]]) * -1
+                file_labels = np.hstack([file_labels, new_column])
+                
             all_labels = np.concatenate((all_labels, file_labels))
     else:
         all_labels = np.concatenate((all_labels, file_labels))

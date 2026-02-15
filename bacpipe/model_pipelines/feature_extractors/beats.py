@@ -1,6 +1,6 @@
 import torch
 
-from bacpipe.model_specific_utils.naturebeats.BEATs import BEATs, BEATsConfig
+from bacpipe.model_pipelines.model_specific_utils.naturebeats.BEATs import BEATs, BEATsConfig
 from ..model_utils import ModelBaseClass
 
 

@@ -1,4 +1,10 @@
 import torch
+import os
+# Force Hugging Face to use PyTorch and ignore TensorFlow
+os.environ["USE_TF"] = "0"
+os.environ["TRANSFORMERS_NO_TF"] = "1"
+
+
 from transformers import (
     AutoFeatureExtractor,
     AutoModel,
@@ -16,6 +22,7 @@ from ..model_utils import ModelBaseClass
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
+        self.batch_size = 4
         model = AutoModelForSequenceClassification.from_pretrained(
             "DBD-research-group/AudioProtoPNet-5-BirdSet-XCL",
             trust_remote_code=True,
@@ -52,14 +59,10 @@ class Model(ModelBaseClass):
     def preprocess(self, audio):
         return self.preprocessor(audio)
 
-    def __call__(self, x, return_class_results=False):
-        if not return_class_results:
-            return self.model(x).pooler_output
-        else:
-            embeds = self.model(x)
-            class_preds = self.classifier_predictions(embeds.last_hidden_state)
-            return embeds.pooler_output, class_preds
+    def __call__(self, x):
+        self.results = self.model(x)
+        return self.results.pooler_output
 
     def classifier_predictions(self, embeddings):
-        logits, _ = self.classifier(embeddings)
+        logits, _ = self.classifier(self.results.last_hidden_state)
         return torch.sigmoid(logits).detach()

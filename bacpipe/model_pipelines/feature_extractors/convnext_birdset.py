@@ -6,7 +6,7 @@ import pandas as pd
 SAMPLE_RATE = 32_000
 LENGTH_IN_SAMPLES = 160_000
 
-from bacpipe.model_specific_utils.convnext_birdset.preprocess import ConvNextPreProcess
+from bacpipe.model_pipelines.model_specific_utils.convnext_birdset.preprocess import ConvNextPreProcess
 from ..model_utils import ModelBaseClass
 
 
@@ -42,19 +42,10 @@ class Model(ModelBaseClass):
     def preprocess(self, audio):
         return self.preprocessor(audio)
 
-    def __call__(self, x, return_class_results=False):
-        if not return_class_results:
-            return self.model(x).pooler_output
-        else:
-            embeds = self.model(x)
-            class_preds = self.classifier_predictions(embeds.pooler_output)
-            return embeds.pooler_output, class_preds
+    def __call__(self, x):
+        results = self.model(x)
+        return results.pooler_output
 
     def classifier_predictions(self, embeddings):
-        for i, batch in enumerate(embeddings):
-            logits = self.classifier(batch)
-            if i == 0:
-                cumulated_logits = logits
-            else:
-                cumulated_logits = torch.vstack([cumulated_logits, logits])
-        return torch.sigmoid(cumulated_logits).detach()
+        logits = self.classifier(embeddings)
+        return torch.sigmoid(logits).detach()

@@ -35,20 +35,15 @@ class Model(Model):
             ]
 
     def __call__(self, input, return_class_results=False):
-        if return_class_results:
-            embeds, class_preds = [], []
+        # if return_class_results:
+        #     embeds, class_preds = [], []
         embeds = []
+        self.logits = []
         for frame in input:
             results = self.model(frame)
-            if return_class_results:
-                cls_vals = self.classifier_predictions(
-                    results.logits[self.class_label_key]
-                    )
-                class_preds.append(cls_vals)
+            self.logits.append(list(results.logits.values()))
             embeds.append(results.embeddings.squeeze())
+        return np.array(embeds)
 
-        if return_class_results:
-            class_preds = np.array(class_preds).squeeze()
-            return np.array(embeds), class_preds
-        else:
-            return np.array(embeds)
+    def classifier_predictions(self, embeddings):
+        return np.array(self.logits).squeeze()

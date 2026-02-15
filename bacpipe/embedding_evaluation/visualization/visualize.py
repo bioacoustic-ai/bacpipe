@@ -264,7 +264,11 @@ def get_labels_for_plot(model_name=None, **kwargs):
             inv[-2.0] = "noise"
             # technically -2.0 is not noise, but corresponds to sections
             # with multiple sources vocalizing simultaneously
-            labels[label] = [inv[v] for v in ground_truth[label_column]]
+            if len(ground_truth[label_column].shape) > 1:
+                # TODO for display we're just taking the first label
+                labels[label] = [inv[v] for v in ground_truth[label_column][:, 0]]
+            else:
+                labels[label] = [inv[v] for v in ground_truth[label_column]]
             bool_noise = np.array(labels[label]) == "noise"
     else:
         bool_noise = np.array([False] * len(list(labels.values())[0]))
@@ -353,6 +357,14 @@ def plot_embedding_points(
         #     bool_labels = [True] * len(labels)
 
         num_labels = np.array([c_label_dict[lab] for lab in labels])
+        if not len(labels) == len(embeds['x']):
+            raise AssertionError(
+                f"The number of labels is {len(labels)} whereas the number of "
+                f"embedding points is {len(embeds['x'])}. This mismatch could "
+                "be the result of an incomplete run and bacpipe is using "
+                "the dim_reduced_embeddings corresponding to that. Check if in your results folder "
+                "there are not multiple dim_reduced_embeddings, and if so, delete the incomplete one."
+            )
         points = axes.scatter(
             # np.array(embeds["x"])[bool_labels],
             # np.array(embeds["y"])[bool_labels],
@@ -1038,6 +1050,8 @@ def plot_overview_metrics(
     sort_string : str
         string to sort the metrics by, defaults to "kmeans-audio_file_name"
     """
+    # TODO when first ran mutliple models and then just one, metrics 
+    # doesn't know the current model and this should be caught
     if not metrics:
         res_path = path_func(model_list[0]).plot_path.parent.parent.joinpath("overview")
         with open(res_path.joinpath(f"classification_results.json"), "r") as f:

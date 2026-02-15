@@ -1,4 +1,4 @@
-from bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.model_configs import load_model_by_name
+from bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.model_configs import load_model_by_name
 import tensorflow as tf
 import numpy as np
 import pandas as pd

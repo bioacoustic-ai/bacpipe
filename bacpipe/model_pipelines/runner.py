@@ -104,7 +104,7 @@ class Embedder(AudioHandler):
             with torch.no_grad():
                 if (
                     self.model.device == "cuda" 
-                    and not isinstance(batch, tensorflow.Tensor)
+                    and hasattr(batch, 'cuda')
                     ):
                     batch = batch.cuda()
                 embeddings = self.model(batch)
@@ -247,19 +247,28 @@ class Embedder(AudioHandler):
 
                 try:
                     embeddings = self.get_embeddings_for_audio(data)
+            
+                    self.loader._write_audio_file_to_metadata(
+                        file, self.model, embeddings, self.file_length
+                        )
+                    self.loader.save_embedding_file(file, embeddings)
+                    if self.model.bool_classifier:
+                        self.classifier.save_classifier_outputs(self.loader, file)
+                except torch.cuda.OutOfMemoryError as e:
+                    logger.exception(
+                        "You're out of memory unfortunately. This can happend because you are "
+                        "running a tensorflow model first and then a pytorch model and tensorflow "
+                        "grabs all the VRAM and subsequently pytorch doesn't have enough. If this "
+                        "is the case, simply rerunning bacpipe without the tensorflow model should "
+                        "do the trick. If you simply don't have enough VRAM, you can reduce the global "
+                        f"batch size in the settings file. Or just compute on the cpu. {e}"
+                    )
                 except Exception as e:
                     logger.warning(
                         f"Error generating embeddings for {file}, skipping file.\nError: {e}"
                     )
                     pbar.update(1)
                     continue
-            
-                self.loader._write_audio_file_to_metadata(
-                    idx, self.model, embeddings, self.file_length
-                    )
-                self.loader.save_embedding_file(file, embeddings)
-                if self.model.bool_classifier:
-                    self.classifier.save_classifier_outputs(self.loader, file)
 
                 pbar.update(1)
 
@@ -449,7 +458,6 @@ class Classifier:
             
         if self.model.device == "cuda" and isinstance(clfier_output, torch.Tensor):
             self.predictions = self.predictions.cuda()
-            self.classifier = self.classifier.cuda()
 
         if isinstance(clfier_output, torch.Tensor):
             self.predictions = torch.cat(

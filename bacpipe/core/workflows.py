@@ -68,7 +68,7 @@ def play(config=config, settings=settings, bool_save_logs=False):
                                                    model_names=config.models)
     overwrite, dashboard = config.overwrite, config.dashboard
 
-    if config.audio_dir == 'bacpipe/tests/test_data':
+    if config.audio_dir == 'bacpipe/tests/test_data' or settings.testing:
         with pkg_resources.path(
             __package__.split('.')[0] + ".tests.test_data", ""
             ) as audio_dir:
@@ -344,13 +344,33 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **
         dictionary containing the loader objects for each model
     """
     loader_dict = {}
+    remove_models_from_list = []
     for model_name in models:
-        loader_dict[model_name] = run_pipeline_for_model(
-            model_name=model_name,
-            dim_reduction_model=dim_reduction_model,
-            audio_dir=audio_dir,
-            **kwargs,
-        )
+        try:
+            loader_dict[model_name] = run_pipeline_for_model(
+                model_name=model_name,
+                dim_reduction_model=dim_reduction_model,
+                audio_dir=audio_dir,
+                **kwargs,
+            )
+        except AssertionError as e:
+            remove_models_from_list.append(model_name)
+            if kwargs['already_computed']:
+                logger.exception(
+                    f"Bacpipe was not able to process {model_name} because {e}. "
+                    f"Because `already_computed` is True, it looks like {model_name} "
+                    "didn't fully finish on the last run. "
+                    "Bacpipe will continue without this model so that the rest of "
+                    "the processing can still be completed. "
+                    "To ensure this model get's processed, set `already_computed` to False."
+                    )
+            else:
+                logger.exception(
+                    f"Bacpipe was not able to process {model_name} because {e}."
+                )
+    if len(remove_models_from_list) > 0:
+        for model in remove_models_from_list:
+            models.remove(model)
     return loader_dict
 
 def model_specific_evaluation(
@@ -497,9 +517,10 @@ def run_pipeline_for_model(
 
     if not dim_reduction_model in ["None", False]:
 
-        assert len(loader_embeddings.files) > 1, (
+        assert len(loader_embeddings.files) > 1, logger.exception(
             "Too few files to perform dimensionality reduction. "
-            + "Are you sure you have selected the right data?"
+            "Are you sure you have selected the right data? "
+            f"Will continue without {model_name}."
         )
         loader_dim_reduced = generate_embeddings(
             model_name=model_name,
@@ -527,15 +548,22 @@ def run_pipeline_for_model(
             vis_loader = EmbedAndLabelLoader(
                 dim_reduction_model=dim_reduction_model, **kwargs
             )
-            plot_embeddings(
-                vis_loader,
-                paths=paths,
-                model_name=loader_dim_reduced.model_name,
-                dim_reduction_model=dim_reduction_model,
-                bool_plot_centroids=False,
-                label_by="time_of_day",
-                **kwargs,
-            )
+            try:
+                plot_embeddings(
+                    vis_loader,
+                    paths=paths,
+                    model_name=loader_dim_reduced.model_name,
+                    dim_reduction_model=dim_reduction_model,
+                    bool_plot_centroids=False,
+                    label_by="time_of_day",
+                    **kwargs,
+                )
+            except AssertionError as e:
+                logger.exception(
+                    "Plotting of embeddings has failed. Continuing with processing "
+                    f"embeddings, but this will cause evaluation problems later on. {e}"
+                )
+                
     return loader_embeddings
 
 

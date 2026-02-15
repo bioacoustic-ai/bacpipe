@@ -136,5 +136,9 @@ class Model(ModelBaseClass):
 
     @torch.inference_mode()
     def __call__(self, input):
-        classes, features = self.model.net(input.unsqueeze(1))
+        self.logits, features = self.model.net(input.unsqueeze(1))
         return features
+
+    def classifier_predictions(self, embeddings):
+        probs = torch.sigmoid(self.logits)
+        return probs
