@@ -19,6 +19,64 @@ matplotlib.use("agg")
 
 class DashBoardHelper:
     
+    def update_main_plot(self, plot_func, widget_idx, **kwargs):
+        # 1. Call your plotting function (the px one)
+        fig = plot_func(**kwargs)
+        
+        # 2. Update the EXISTING pane's object
+        self.main_plot_pane.object = fig
+        
+        # 3. Return nothing (or the pane if you must, but side-effect is key)
+        return self.main_plot_pane
+    
+    def handle_click(self, event):
+        if not event.new: return
+        try:
+            point_data = event.new['points'][0]
+            print(f"DEBUG CLICK: {point_data}")
+            # Your logic here...
+        except Exception as e:
+            print(f"Error handling click: {e}")
+            
+    def clear_selection(self, event=None):
+        # Setting selection_data to None doesn't always clear the visual highlight
+        # You usually have to redraw the plot or trigger a relayout.
+        self.main_plot_pane.selection_data = None
+        # Trigger a re-plot if necessary to reset visuals
+        # self.update_main_plot(...)
+            
+    def handle_selection(self, event):
+        """
+        Triggered when the user uses the Lasso or Box select tool.
+        """
+        if not event.new: 
+            return
+            
+        # event.new contains a dictionary with the selected points
+        # Structure: {'points': [{'pointIndex': 0, 'customdata': [...], ...}, ...]}
+        try:
+            selected_points = event.new.get('points', [])
+            
+            if not selected_points:
+                print("Selection cleared")
+                return
+
+            print(f"Selected {len(selected_points)} points")
+            
+            # Extract data from the selected points
+            # Remember your custom_data order: ['filename', 'start', 'end', 'idx']
+            filenames = [p['customdata'][0] for p in selected_points]
+            
+            # Example Action: Filter a dataframe or update a list
+            print(f"First 5 files: {filenames[:5]}")
+            
+            # --- YOUR LOGIC HERE ---
+            # e.g., self.filter_table(filenames)
+            
+        except Exception as e:
+            print(f"Error handling selection: {e}")
+            
+            
     def init_plot(self, p_type, plot_func, widget_idx, **kwargs):
         getattr(self, f"{p_type}_plot")[widget_idx] = pn.panel(
             self.plot_widget(plot_func, widget_idx=widget_idx, **kwargs), tight=False

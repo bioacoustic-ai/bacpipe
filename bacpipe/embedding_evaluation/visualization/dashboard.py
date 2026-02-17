@@ -26,7 +26,7 @@ sns.set_theme(style="whitegrid")
 matplotlib.use("agg")
 
 # Enable Panel
-pn.extension()
+pn.extension('plotly')
 from .dashboard_utils import DashBoardHelper
 
 class DashBoard(DashBoardHelper):
@@ -82,6 +82,8 @@ class DashBoard(DashBoardHelper):
             default_label_keys=default_label_keys,
             **kwargs,
         )
+        
+        self.interactive_embedding_plot = True
 
         self.model_select = dict()
         self.label_select = dict()
@@ -92,19 +94,41 @@ class DashBoard(DashBoardHelper):
         self.class_select = dict()
         self.embed_plot = dict()
         
+        self.main_plot_pane = pn.pane.Plotly(
+            # sizing_mode='stretch_both', 
+            min_height=600
+        )
+        # Attach the watcher IMMEDIATELY
+        self.main_plot_pane.param.watch(self.handle_click, 'click_data')
+        
+        self.main_plot_pane.param.watch(self.handle_selection, 'selected_data')
+        
         self.heatmap_plot = dict()
         self.kwargs = kwargs
 
-    def single_model_page(self, widget_idx):
-        sidebar = self.make_sidebar(widget_idx, model=True)
-
-        main_content = pn.Column(
-            pn.pane.Markdown(f"## Model Dashboard"),
-            pn.Accordion(
-                (
-                    "2D Embedding Plot",
-                    self.init_plot(
-                        "embed",
+    def col(self, widget_idx):
+        if not self.interactive_embedding_plot:
+            updater = self.init_plot(
+                            # self.init_interactive_plot(
+                                "embed",
+                                plot_embeddings,
+                                widget_idx,
+                                loader=self.vis_loader,
+                                model_name=self.model_select[widget_idx],
+                                label_by=self.label_select[widget_idx],
+                                ground_truth=self.ground_truth,
+                                dim_reduction_model=self.dim_reduction_model,
+                                remove_noise=(
+                                    self.noise_select[widget_idx]
+                                    if len(self.noise_select.keys()) > 0
+                                    else False
+                                ),
+                                dashboard=True,
+                                dashboard_idx=widget_idx,
+                            )
+        else:
+            updater = pn.bind(
+                        self.update_main_plot,
                         plot_embeddings,
                         widget_idx,
                         loader=self.vis_loader,
@@ -119,7 +143,23 @@ class DashBoard(DashBoardHelper):
                         ),
                         dashboard=True,
                         dashboard_idx=widget_idx,
-                    ),
+                        )
+        return pn.Column(
+            "2D Embedding Plot",
+            updater,
+            # self.main_plot_pane
+        )
+    
+
+
+    def single_model_page(self, widget_idx):
+        sidebar = self.make_sidebar(widget_idx, model=True)
+    
+        main_content = pn.Column(
+            pn.pane.Markdown(f"## Model Dashboard"),
+            pn.Accordion(
+                (
+                    self.col(widget_idx)
                 ),
                 (
                     "Clustering Results",

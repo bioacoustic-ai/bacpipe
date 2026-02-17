@@ -8,6 +8,7 @@ from pathlib import Path
 import bacpipe.embedding_evaluation.label_embeddings as le
 import matplotlib
 import seaborn as sns
+from matplotlib.colors import rgb2hex
 
 import logging
 
@@ -214,19 +215,29 @@ def plot_embeddings(
     if return_axes:
         return axes, c_label_dict, points
     elif dashboard:
-        fig.set_size_inches(6, 5)
-        fig.set_dpi(300)
-        fig.tight_layout()
-        set_colorbar_or_legend(
-            fig,
-            axes,
-            points,
-            c_label_dict,
-            dashboard=dashboard,
-            label_by=label_by,
-            **kwargs,
-        )
-        return fig
+        if True:
+            # return plotly_mutual_information(
+            return plot_embeddings_px(
+                embeds, 
+                labels,
+                labels,
+                np.arange(len(labels)),
+                np.arange(1, len(labels)+1)
+            )
+        else:
+            fig.set_size_inches(6, 5)
+            fig.set_dpi(300)
+            fig.tight_layout()
+            set_colorbar_or_legend(
+                fig,
+                axes,
+                points,
+                c_label_dict,
+                dashboard=dashboard,
+                label_by=label_by,
+                **kwargs,
+            )
+            return fig
     else:
         set_colorbar_or_legend(
             fig, axes, points, c_label_dict, label_by=label_by, **kwargs
@@ -235,7 +246,112 @@ def plot_embeddings(
         axes.set_title(f"{dim_reduction_model.upper()} embeddings")
         fig.savefig(paths.plot_path.joinpath("embeddings.png"), dpi=300)
         plt.close(fig)
+import pandas as pd
+import numpy as np
+import plotly.express as px
 
+def plot_embeddings_px(
+    umaps,
+    labels,
+    filenames,
+    starts,
+    ends,
+    label_by="label", # Added to use for titles/colorbar label
+    **kwargs
+):
+    # 1. Prepare Data
+    x_data = umaps['x'] if isinstance(umaps, dict) else umaps[:, 0]
+    y_data = umaps['y'] if isinstance(umaps, dict) else umaps[:, 1]
+    
+    # Calculate unique labels to decide on Legend vs Colorbar
+    unique_labels = np.unique(labels)
+    n_labels = len(unique_labels)
+    
+    # Create an integer mapping for high-cardinality plotting
+    # (Plotly needs numbers to generate a gradient colorbar)
+    label_to_id = {lbl: i for i, lbl in enumerate(unique_labels)}
+    label_ids = [label_to_id[l] for l in labels]
+
+    df = pd.DataFrame({
+        'x': x_data,
+        'y': y_data,
+        'label': labels,            # The actual string (for hover/legend)
+        'label_id': label_ids,      # The integer (for colorbar)
+        'filename': filenames,
+        'start': starts,
+        'end': ends,
+        'idx': range(len(filenames))
+    })
+
+    # 2. Setup Figure based on Label Count
+    if n_labels > 20:
+        # --- HIGH CARDINALITY: Use Colorbar ---
+        # We map color to 'label_id' (int) to force a continuous scale
+        fig = px.scatter(
+            df, x='x', y='y',
+            color='label_id', 
+            hover_data={'label': True, 'label_id': False, 'filename':True, 'start':True, 'end':True},
+            custom_data=['filename', 'start', 'end', 'idx'],
+            title=f"Embedding Plot - {label_by}",
+            render_mode='webgl',
+            color_continuous_scale='Turbo' # High contrast for many classes
+        )
+
+        # Calculate Tick Positions (simulating your numpy logic)
+        # We want roughly 5-6 ticks evenly spaced
+        tick_vals = np.linspace(0, n_labels - 1, 6).astype(int)
+        tick_text = [unique_labels[i] for i in tick_vals]
+
+        # Customize the Colorbar to show Text instead of Numbers
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                title=label_by,
+                tickmode='array',
+                tickvals=tick_vals,
+                ticktext=tick_text,
+                ticks='outside',
+                len=1, # Height of colorbar (1 = 100%)
+            )
+        )
+    else:
+        # --- LOW CARDINALITY: Use Legend ---
+        # We map color to 'label' (string) to force a discrete legend
+        fig = px.scatter(
+            df, x='x', y='y',
+            color='label', 
+            hover_data=['filename', 'start', 'end'],
+            custom_data=['filename', 'start', 'end', 'idx'],
+            title=f"Embedding Plot - {label_by}",
+            render_mode='webgl'
+        )
+        
+        # Configure the Discrete Legend
+        fig.update_layout(
+            legend=dict(
+                orientation="h", 
+                yanchor="bottom", 
+                y=1.02, 
+                xanchor="right", 
+                x=1,
+                title_text="" # Hide legend title to save space
+            )
+        )
+
+    # 3. Global Layout adjustments (Applied to both modes)
+    fig.update_layout(
+        clickmode='event', 
+        dragmode='lasso',
+        height=400,
+        hovermode='closest',
+        margin=dict(l=20, r=20, t=40, b=20),
+        # Ensure selection tools are available
+        modebar=dict(add=['lasso2d', 'select2d'], remove=['autoScale2d'])
+    )
+    
+    # Improve marker appearance
+    fig.update_traces(marker=dict(size=8, opacity=0.6))
+
+    return fig
 
 def init_embed_figure(fig, axes, bool_3d=False, **kwargs):
     if not fig:
