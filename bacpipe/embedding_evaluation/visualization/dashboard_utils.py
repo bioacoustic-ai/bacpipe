@@ -392,6 +392,15 @@ class DashBoardHelper:
             return None
         threshold = self.verify_threshold(threshold)
         
+        if not (
+            self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
+            ).exists():
+            clfier_type = 'Integrated'
+            # return pn.pane.Markdown(
+            #     "No classification task specified. "
+            #     "Please check the config file."
+            # )
+        
         if clfier_type == 'Linear':
             self.loading_test_placeholder.value = 'Loading embeddings'
             self.binary_presence, self.class_dict = self.trigger_classification(progress)
