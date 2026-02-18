@@ -9,9 +9,14 @@ import librosa as lb
 import numpy as np
 import torchaudio as ta
 import torch
-import tensorflow
 
 logger = logging.getLogger("bacpipe")
+
+
+def _is_tensorflow_tensor(value):
+    """Avoid importing TensorFlow unless we actually need TF-specific logic."""
+    module_name = type(value).__module__
+    return module_name.startswith("tensorflow")
 
 class ModelBaseClass:    
     def __init__(self, sr, segment_length, device, 
@@ -190,11 +195,11 @@ class ModelBaseClass:
         return frames
 
     def init_dataloader(self, audio):
-        if "tensorflow" in str(type(audio)):
+        if _is_tensorflow_tensor(audio):
             import tensorflow as tf
 
             return tf.data.Dataset.from_tensor_slices(audio).batch(self.batch_size)
-        elif "torch" in str(type(audio)):
+        elif isinstance(audio, torch.Tensor):
 
             return torch.utils.data.DataLoader(
                 audio, batch_size=self.batch_size, shuffle=False
@@ -209,13 +214,13 @@ class ModelBaseClass:
         ):
             with torch.no_grad():
                 if self.bool_classifier:
-                    if self.device == "cuda" and not isinstance(batch, tensorflow.Tensor):
+                    if self.device == "cuda" and not _is_tensorflow_tensor(batch):
                         batch = batch.cuda()
                         self.classifier_outputs = self.classifier_outputs.cuda()
                         self.classifier = self.classifier.cuda()
 
                     embedding, cls_vals = self.__call__(batch, return_class_results=True)
-                    if not isinstance(batch, tensorflow.Tensor):
+                    if not _is_tensorflow_tensor(batch):
                         self.classifier_outputs = torch.cat(
                             [self.classifier_outputs, cls_vals.clone().detach()]
                         )
@@ -224,7 +229,7 @@ class ModelBaseClass:
                             [self.classifier_outputs, torch.Tensor(cls_vals)]
                         )
                 else:
-                    if self.device == "cuda" and not isinstance(batch, tensorflow.Tensor):
+                    if self.device == "cuda" and not _is_tensorflow_tensor(batch):
                         batch = batch.cuda()
                     embedding = self.__call__(batch)
 

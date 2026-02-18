@@ -452,8 +452,12 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
         )
     else:
         raise ValueError("model_name not provided in kwargs.")
-    if kwargs['model_name'] in TF_MODELS:
+    tf = None
+    tf_resource_exhausted = ()
+    if kwargs["model_name"] in TF_MODELS:
         import tensorflow as tf
+
+        tf_resource_exhausted = (tf.errors.ResourceExhaustedError,)
     try:
         start = time.time()
         ld = ge.Loader(**kwargs)
@@ -487,8 +491,7 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                 ):
                     try:
                         embeddings = embed.get_embeddings_from_model(file)
-                    except tf.errors.ResourceExhaustedError:
-                                                   
+                    except tf_resource_exhausted:
                         logger.error(
                             "\nGPU device is out of memory. Your Vram doesn't seem to be "
                             "large enough for this process. This could be down to the "
@@ -517,8 +520,8 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
         
             # clear GPU
             del embed
-            import tensorflow as tf
-            tf.keras.backend.clear_session()
+            if tf is not None:
+                tf.keras.backend.clear_session()
             
         return ld
     except KeyboardInterrupt:
