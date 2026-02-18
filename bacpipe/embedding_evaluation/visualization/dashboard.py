@@ -43,6 +43,7 @@ class DashBoard(DashBoardHelper):
     ):
         self.models = model_names
         self.default_label_keys = default_label_keys
+        self.audio_dir = audio_dir
         self.path_func = le.make_set_paths_func(
             audio_dir, main_results_dir, dim_reduc_parent_dir, **kwargs
         )
@@ -103,6 +104,12 @@ class DashBoard(DashBoardHelper):
         
         self.main_plot_pane.param.watch(self.handle_selection, 'selected_data')
         
+        self.spectrogram_plot = pn.pane.Plotly(
+                    self.dummy_image(), 
+                    sizing_mode='stretch_width',
+                    height=300
+                )
+        
         self.heatmap_plot = dict()
         self.kwargs = kwargs
 
@@ -147,6 +154,7 @@ class DashBoard(DashBoardHelper):
         return pn.Column(
             "2D Embedding Plot",
             updater,
+            self.spectrogram_plot
             # self.main_plot_pane
         )
     

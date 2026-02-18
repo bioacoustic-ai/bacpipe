@@ -220,9 +220,7 @@ def plot_embeddings(
             return plot_embeddings_px(
                 embeds, 
                 labels,
-                labels,
-                np.arange(len(labels)),
-                np.arange(1, len(labels)+1)
+                c_label_dict
             )
         else:
             fig.set_size_inches(6, 5)
@@ -251,17 +249,30 @@ import numpy as np
 import plotly.express as px
 
 def plot_embeddings_px(
-    umaps,
+    embeds,
     labels,
-    filenames,
-    starts,
-    ends,
+    c_label_dict,
     label_by="label", # Added to use for titles/colorbar label
     **kwargs
 ):
     # 1. Prepare Data
-    x_data = umaps['x'] if isinstance(umaps, dict) else umaps[:, 0]
-    y_data = umaps['y'] if isinstance(umaps, dict) else umaps[:, 1]
+    x_data = embeds['x']
+    y_data = embeds['y']
+    
+    audiofilenames = []
+    [
+        audiofilenames.extend([f] * nr) 
+        for f, nr in zip(
+            embeds['metadata']['audio_files']
+            , embeds['metadata']['nr_embeds_per_file']
+            )
+    ]
+    starts = embeds['timestamp']
+    ends = np.array(starts) + (
+        embeds['metadata']['segment_length (samples)'] 
+        / embeds['metadata']['sample_rate (Hz)']
+        )
+    ends = ends.tolist()
     
     # Calculate unique labels to decide on Legend vs Colorbar
     unique_labels = np.unique(labels)
@@ -277,10 +288,10 @@ def plot_embeddings_px(
         'y': y_data,
         'label': labels,            # The actual string (for hover/legend)
         'label_id': label_ids,      # The integer (for colorbar)
-        'filename': filenames,
+        'audiofilename': audiofilenames,
         'start': starts,
         'end': ends,
-        'idx': range(len(filenames))
+        'idx': range(len(audiofilenames))
     })
 
     # 2. Setup Figure based on Label Count
@@ -290,8 +301,8 @@ def plot_embeddings_px(
         fig = px.scatter(
             df, x='x', y='y',
             color='label_id', 
-            hover_data={'label': True, 'label_id': False, 'filename':True, 'start':True, 'end':True},
-            custom_data=['filename', 'start', 'end', 'idx'],
+            hover_data={'label': True, 'label_id': False, 'audiofilename':True, 'start':True, 'end':True},
+            custom_data=['audiofilename', 'start', 'end', 'idx'],
             title=f"Embedding Plot - {label_by}",
             render_mode='webgl',
             color_continuous_scale='Turbo' # High contrast for many classes
@@ -340,7 +351,7 @@ def plot_embeddings_px(
     # 3. Global Layout adjustments (Applied to both modes)
     fig.update_layout(
         clickmode='event', 
-        dragmode='lasso',
+        # dragmode='lasso',
         height=400,
         hovermode='closest',
         margin=dict(l=20, r=20, t=40, b=20),
