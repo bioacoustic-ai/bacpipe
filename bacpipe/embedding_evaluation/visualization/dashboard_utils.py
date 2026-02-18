@@ -278,9 +278,12 @@ class DashBoardHelper:
             path = (
                 self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
                 ).as_posix()
-        with open(Path(path).parent / 'label2index.json', 'r') as f:
-            classes = json.load(f)
-        return list(classes.keys())
+        if path.exists():
+            with open(Path(path).parent / 'label2index.json', 'r') as f:
+                classes = json.load(f)
+            return list(classes.keys())
+        else:
+            return []
             
     def load_classification(self, model, thresh):
         integrated_clfier_path = (
