@@ -17,6 +17,7 @@ from .visualize import (
     plot_overview_metrics,
     plot_classification_results,
     EmbedAndLabelLoader,
+    SpectrogramPlot
 )
 import bacpipe.embedding_evaluation.label_embeddings as le
 from bacpipe.embedding_evaluation.classification.train_classifier import LinearClassifier
@@ -95,25 +96,24 @@ class DashBoard(DashBoardHelper):
         self.class_select = dict()
         self.embed_plot = dict()
         
-        self.main_plot_pane = pn.pane.Plotly(
-            # sizing_mode='stretch_both', 
-            min_height=600
-        )
-        # Attach the watcher IMMEDIATELY
-        self.main_plot_pane.param.watch(self.handle_click, 'click_data')
+        self.interactive_embed_plot = dict()
+        self.spectrogram_plot = dict()
+        self.spectrogram_plot_obj = dict() 
+
         
-        self.main_plot_pane.param.watch(self.handle_selection, 'selected_data')
+        # self.main_plot_pane = pn.pane.Plotly(
+        #     # sizing_mode='stretch_both', 
+        #     min_height=600
+        # )
+        # # Attach the watcher IMMEDIATELY
+        # self.main_plot_pane.param.watch(self.handle_click, 'click_data')
         
-        self.spectrogram_plot = pn.pane.Plotly(
-                    self.dummy_image(), 
-                    sizing_mode='stretch_width',
-                    height=300
-                )
+        # self.main_plot_pane.param.watch(self.handle_selection, 'selected_data')
         
         self.heatmap_plot = dict()
         self.kwargs = kwargs
 
-    def col(self, widget_idx):
+    def col(self, widget_idx=0):
         if not self.interactive_embedding_plot:
             updater = self.init_plot(
                             # self.init_interactive_plot(
@@ -134,6 +134,25 @@ class DashBoard(DashBoardHelper):
                                 dashboard_idx=widget_idx,
                             )
         else:
+            self.interactive_embed_plot[widget_idx] = pn.pane.Plotly(
+                # sizing_mode='stretch_both', 
+                min_height=600
+                )
+            self.interactive_embed_plot[widget_idx].param.watch(
+                self.handle_click, 'click_data'
+                )
+            self.interactive_embed_plot[widget_idx].param.watch(
+                self.handle_selection, 'selected_data'
+                )
+            
+            self.spectrogram_plot_obj[widget_idx] = SpectrogramPlot(
+                self.audio_dir, **self.kwargs
+                )
+            self.spectrogram_plot[widget_idx] = pn.pane.Plotly(
+                    SpectrogramPlot.dummy_image(), 
+                    sizing_mode='stretch_width',
+                    height=300
+                )
             updater = pn.bind(
                         self.update_main_plot,
                         plot_embeddings,
@@ -154,7 +173,9 @@ class DashBoard(DashBoardHelper):
         return pn.Column(
             "2D Embedding Plot",
             updater,
-            self.spectrogram_plot
+            self.spectrogram_plot[widget_idx] 
+            #     if len(self.spectrogram_plot) > 0 else None
+            # )
             # self.main_plot_pane
         )
     

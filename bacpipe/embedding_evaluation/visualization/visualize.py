@@ -15,6 +15,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+SPECTROGRAM_PLOT_HEIGHT = 300
+
 matplotlib.rcParams.update(
     {
         "figure.dpi": 600,  # High-resolution figures
@@ -217,7 +219,7 @@ def plot_embeddings(
     elif dashboard:
         if True:
             # return plotly_mutual_information(
-            return plot_embeddings_px(
+            return SpectrogramPlot.plot_embeddings_px(
                 embeds, 
                 labels,
                 c_label_dict
@@ -247,122 +249,212 @@ def plot_embeddings(
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import librosa as lb
+from scipy.signal.windows import tukey
 
-def plot_embeddings_px(
-    embeds,
-    labels,
-    c_label_dict,
-    label_by="label", # Added to use for titles/colorbar label
-    **kwargs
-):
-    # 1. Prepare Data
-    x_data = embeds['x']
-    y_data = embeds['y']
-    
-    audiofilenames = []
-    [
-        audiofilenames.extend([f] * nr) 
-        for f, nr in zip(
-            embeds['metadata']['audio_files']
-            , embeds['metadata']['nr_embeds_per_file']
-            )
-    ]
-    starts = embeds['timestamp']
-    ends = np.array(starts) + (
-        embeds['metadata']['segment_length (samples)'] 
-        / embeds['metadata']['sample_rate (Hz)']
-        )
-    ends = ends.tolist()
-    
-    # Calculate unique labels to decide on Legend vs Colorbar
-    unique_labels = np.unique(labels)
-    n_labels = len(unique_labels)
-    
-    # Create an integer mapping for high-cardinality plotting
-    # (Plotly needs numbers to generate a gradient colorbar)
-    label_to_id = {lbl: i for i, lbl in enumerate(unique_labels)}
-    label_ids = [label_to_id[l] for l in labels]
 
-    df = pd.DataFrame({
-        'x': x_data,
-        'y': y_data,
-        'label': labels,            # The actual string (for hover/legend)
-        'label_id': label_ids,      # The integer (for colorbar)
-        'audiofilename': audiofilenames,
-        'start': starts,
-        'end': ends,
-        'idx': range(len(audiofilenames))
-    })
+class SpectrogramPlot:
+    def __init__(self, audio_dir, **kwargs):
+        self.audio_dir = audio_dir
+        self.kwargs = kwargs
 
-    # 2. Setup Figure based on Label Count
-    if n_labels > 20:
-        # --- HIGH CARDINALITY: Use Colorbar ---
-        # We map color to 'label_id' (int) to force a continuous scale
-        fig = px.scatter(
-            df, x='x', y='y',
-            color='label_id', 
-            hover_data={'label': True, 'label_id': False, 'audiofilename':True, 'start':True, 'end':True},
-            custom_data=['audiofilename', 'start', 'end', 'idx'],
-            title=f"Embedding Plot - {label_by}",
-            render_mode='webgl',
-            color_continuous_scale='Turbo' # High contrast for many classes
-        )
-
-        # Calculate Tick Positions (simulating your numpy logic)
-        # We want roughly 5-6 ticks evenly spaced
-        tick_vals = np.linspace(0, n_labels - 1, 6).astype(int)
-        tick_text = [unique_labels[i] for i in tick_vals]
-
-        # Customize the Colorbar to show Text instead of Numbers
+    @staticmethod
+    def dummy_image():
+        # initial dummy figure, as a placeholder
+        fig = px.imshow(np.zeros((100, 100, 3), dtype=np.uint8))
         fig.update_layout(
-            coloraxis_colorbar=dict(
-                title=label_by,
-                tickmode='array',
-                tickvals=tick_vals,
-                ticktext=tick_text,
-                ticks='outside',
-                len=1, # Height of colorbar (1 = 100%)
-            )
+            title="Click an embedding to see the corresponding spectrogram", 
+            margin=dict(l=20, r=20, t=40, b=20),
+            height=SPECTROGRAM_PLOT_HEIGHT,
+            xaxis={'visible': False}, 
+            yaxis={'visible': False}
         )
-    else:
-        # --- LOW CARDINALITY: Use Legend ---
-        # We map color to 'label' (string) to force a discrete legend
-        fig = px.scatter(
-            df, x='x', y='y',
-            color='label', 
-            hover_data=['filename', 'start', 'end'],
-            custom_data=['filename', 'start', 'end', 'idx'],
-            title=f"Embedding Plot - {label_by}",
-            render_mode='webgl'
+        return fig
+    
+    
+    def update_spectrogram(self, clickData=None, play_btn=None, autoplay_radio=None):
+        # Sohw black image initially
+        if not clickData:
+            return SpectrogramPlot.dummy_image()
+        
+        # Extract data from click
+        point_data = clickData.get('customdata', [None]*6)
+        audiofilename, start_s, end_s, idx, date, label_id = point_data
+        
+        # Load Audio
+        audio, sr, file_stem = self.load_audio(start_s, end_s, audiofilename)
+        spec_fig = self.create_specs(audio, sr)
+        
+        # Update title info
+        # heading = html.P([
+        #     f"file: {file_stem}", html.Br(),
+        #     f"time in file: {start_s}"
+        # ])
+
+        # # Handle Audio Playback
+        # # dash.ctx.triggered_id tells us exactly which input fired the callback
+        # trigger_id = dash.ctx.triggered_id
+        
+        # should_play = (autoplay_radio == "Autoplay on" 
+        #                and trigger_id == "bar_chart") or \
+        #                 (trigger_id == "play_audio_btn")
+
+        # if should_play:
+        #     self.play_audio(audio, sr)
+            
+        return spec_fig#, heading
+
+
+    # --- HELPERS ---
+    def create_specs(self, audio, audio_sr):
+        S = np.abs(lb.stft(audio, win_length=1024))
+        S_dB = lb.amplitude_to_db(S, ref=np.max)
+        f_max, S_dB = self.set_axis_lims_dep_sr(S_dB, audio_sr)
+        fig = px.imshow(
+            S_dB, origin='lower', aspect='auto',
+            y=np.linspace(0, f_max, S_dB.shape[0]),
+            x=np.linspace(0, 3, S_dB.shape[1]),
+            labels={'x': 'time (s)', 'y': 'freq (Hz)'}, 
+            color_continuous_scale='Viridis'
+        )
+        fig.update_layout(margin=dict(l=20, r=20, t=20, b=20))
+        return fig
+        
+    # def play_audio(self, audio, sr):
+    #     sd.play(self.fade_audio(audio), sr)
+        
+    def load_audio(self, start, end, filename):
+        path = Path(self.audio_dir) / filename
+        audio, sr = lb.load(path, offset=float(start), duration=float(end)-float(start))
+        if True:#self.use_tukey_filter:
+            audio = tukey(len(audio), alpha=0.01) * audio
+        audio_padded = lb.util.fix_length(
+            audio, size=int((end - start) * sr), mode=self.kwargs['padding']
+            )
+        return audio_padded, sr, path.stem
+    
+    def set_axis_lims_dep_sr(self, S_dB, audio_sr):
+        f_max = 48000 / 2
+        reduce = audio_sr / (f_max * 2)
+        S_dB = S_dB[:int(S_dB.shape[0] / reduce), :]
+        return f_max, S_dB
+
+
+    def plot_embeddings_px(
+        embeds,
+        labels,
+        c_label_dict,
+        label_by="label", # Added to use for titles/colorbar label
+        **kwargs
+    ):
+        # 1. Prepare Data
+        x_data = embeds['x']
+        y_data = embeds['y']
+        
+        audiofilenames = []
+        [
+            audiofilenames.extend([f] * nr) 
+            for f, nr in zip(
+                embeds['metadata']['audio_files']
+                , embeds['metadata']['nr_embeds_per_file']
+                )
+        ]
+        starts = embeds['timestamp']
+        ends = np.array(starts) + (
+            embeds['metadata']['segment_length (samples)'] 
+            / embeds['metadata']['sample_rate (Hz)']
+            )
+        ends = ends.tolist()
+        
+        # Calculate unique labels to decide on Legend vs Colorbar
+        unique_labels = np.unique(labels)
+        n_labels = len(unique_labels)
+        
+        # Create an integer mapping for high-cardinality plotting
+        # (Plotly needs numbers to generate a gradient colorbar)
+        label_to_id = {lbl: i for i, lbl in enumerate(unique_labels)}
+        label_ids = [label_to_id[l] for l in labels]
+
+        df = pd.DataFrame({
+            'x': x_data,
+            'y': y_data,
+            'label': labels,            # The actual string (for hover/legend)
+            'label_id': label_ids,      # The integer (for colorbar)
+            'audiofilename': audiofilenames,
+            'start': starts,
+            'end': ends,
+            'idx': range(len(audiofilenames))
+        })
+
+        # 2. Setup Figure based on Label Count
+        if n_labels > 20:
+            # --- HIGH CARDINALITY: Use Colorbar ---
+            # We map color to 'label_id' (int) to force a continuous scale
+            fig = px.scatter(
+                df, x='x', y='y',
+                color='label_id', 
+                hover_data={'label': True, 'label_id': False, 'audiofilename':True, 'start':True, 'end':True},
+                custom_data=['audiofilename', 'start', 'end', 'idx'],
+                title=f"Embedding Plot - {label_by}",
+                render_mode='webgl',
+                color_continuous_scale='Turbo' # High contrast for many classes
+            )
+
+            # Calculate Tick Positions (simulating your numpy logic)
+            # We want roughly 5-6 ticks evenly spaced
+            tick_vals = np.linspace(0, n_labels - 1, 6).astype(int)
+            tick_text = [unique_labels[i] for i in tick_vals]
+
+            # Customize the Colorbar to show Text instead of Numbers
+            fig.update_layout(
+                coloraxis_colorbar=dict(
+                    title=label_by,
+                    tickmode='array',
+                    tickvals=tick_vals,
+                    ticktext=tick_text,
+                    ticks='outside',
+                    len=1, # Height of colorbar (1 = 100%)
+                )
+            )
+        else:
+            # --- LOW CARDINALITY: Use Legend ---
+            # We map color to 'label' (string) to force a discrete legend
+            fig = px.scatter(
+                df, x='x', y='y',
+                color='label', 
+                hover_data=['filename', 'start', 'end'],
+                custom_data=['filename', 'start', 'end', 'idx'],
+                title=f"Embedding Plot - {label_by}",
+                render_mode='webgl'
+            )
+            
+            # Configure the Discrete Legend
+            fig.update_layout(
+                legend=dict(
+                    orientation="h", 
+                    yanchor="bottom", 
+                    y=1.02, 
+                    xanchor="right", 
+                    x=1,
+                    title_text="" # Hide legend title to save space
+                )
+            )
+
+        # 3. Global Layout adjustments (Applied to both modes)
+        fig.update_layout(
+            clickmode='event', 
+            # dragmode='lasso',
+            height=400,
+            hovermode='closest',
+            margin=dict(l=20, r=20, t=40, b=20),
+            # Ensure selection tools are available
+            modebar=dict(add=['lasso2d', 'select2d'], remove=['autoScale2d'])
         )
         
-        # Configure the Discrete Legend
-        fig.update_layout(
-            legend=dict(
-                orientation="h", 
-                yanchor="bottom", 
-                y=1.02, 
-                xanchor="right", 
-                x=1,
-                title_text="" # Hide legend title to save space
-            )
-        )
+        # Improve marker appearance
+        fig.update_traces(marker=dict(size=8, opacity=0.6))
 
-    # 3. Global Layout adjustments (Applied to both modes)
-    fig.update_layout(
-        clickmode='event', 
-        # dragmode='lasso',
-        height=400,
-        hovermode='closest',
-        margin=dict(l=20, r=20, t=40, b=20),
-        # Ensure selection tools are available
-        modebar=dict(add=['lasso2d', 'select2d'], remove=['autoScale2d'])
-    )
-    
-    # Improve marker appearance
-    fig.update_traces(marker=dict(size=8, opacity=0.6))
-
-    return fig
+        return fig
 
 def init_embed_figure(fig, axes, bool_3d=False, **kwargs):
     if not fig:

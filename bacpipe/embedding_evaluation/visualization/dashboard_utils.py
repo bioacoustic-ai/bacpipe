@@ -12,143 +12,18 @@ from pathlib import Path
 from bacpipe.embedding_evaluation.classification.train_classifier import LinearClassifier
 
 from bacpipe.embedding_evaluation.visualization.visualize import (
-    plot_classification_heatmap
+    plot_classification_heatmap,
+    SpectrogramPlot
     )
 
 sns.set_theme(style="whitegrid")
 
 matplotlib.use("agg")
-import librosa as lb
-import plotly.express as px
-from scipy.signal.windows import tukey
+
+
 class DashBoardHelper:
-    
-    @staticmethod
-    def dummy_image():
-        # Return the Figure directly, don't wrap in pn.panel yet
-        fig = px.imshow(np.zeros((100, 100, 3), dtype=np.uint8))
-        fig.update_layout(
-            title="Click a point to see spectrogram", 
-            margin=dict(l=20, r=20, t=40, b=20),
-            height=300,
-            xaxis={'visible': False}, 
-            yaxis={'visible': False}
-        )
-        return fig
-    
-    def update_spectrogram(self, clickData=None, play_btn=None, autoplay_radio=None):
-        # Default state
-        if not clickData:
-            return self.dummy_image()#, "Click a point to see spectrogram"
-        
-        # Extract data from click
-        point_data = clickData.get('customdata', [None]*6)
-        audiofilename, start_s, end_s, idx, date, label_id = point_data
-        
-        # Load Audio
-        audio, sr, file_stem = self.load_audio(start_s, end_s, audiofilename)
-        spec_fig = self.create_specs(audio, sr)
-        
-        # Update title info
-        # heading = html.P([
-        #     f"file: {file_stem}", html.Br(),
-        #     f"time in file: {start_s}"
-        # ])
-
-        # # Handle Audio Playback
-        # # dash.ctx.triggered_id tells us exactly which input fired the callback
-        # trigger_id = dash.ctx.triggered_id
-        
-        # should_play = (autoplay_radio == "Autoplay on" 
-        #                and trigger_id == "bar_chart") or \
-        #                 (trigger_id == "play_audio_btn")
-
-        # if should_play:
-        #     self.play_audio(audio, sr)
             
-        return spec_fig#, heading
-
-
-    # --- HELPERS ---
-    def create_specs(self, audio, audio_sr):
-        S = np.abs(lb.stft(audio, win_length=1024))
-        S_dB = lb.amplitude_to_db(S, ref=np.max)
-        f_max, S_dB = self.set_axis_lims_dep_sr(S_dB, audio_sr)
-        fig = px.imshow(
-            S_dB, origin='lower', aspect='auto',
-            y=np.linspace(0, f_max, S_dB.shape[0]),
-            x=np.linspace(0, 3, S_dB.shape[1]),
-            labels={'x': 'time (s)', 'y': 'freq (Hz)'}, 
-            color_continuous_scale='Viridis'
-        )
-        fig.update_layout(margin=dict(l=20, r=20, t=20, b=20))
-        return fig
-
-    def smoothing_func(self, num_samps, func='sin'):
-        return getattr(np, func)(np.linspace(0, np.pi/2, num_samps))
-
-    def fade_audio(self, audio):
-        # Your custom fade logic
-        perc_aud = np.linspace(0, len(audio), 100).astype(int)
-        return [*[0]*perc_aud[3], 
-                *audio[perc_aud[3]:perc_aud[7]]*self.amp
-                    *self.smoothing_func(perc_aud[7]-perc_aud[3]),
-                *audio[perc_aud[7]:perc_aud[70]]*self.amp, 
-                *audio[perc_aud[70]:perc_aud[93]]*self.amp
-                    *self.smoothing_func(perc_aud[93]-perc_aud[70], func='cos'),
-                *[0]*(perc_aud[-1]-perc_aud[93])]
-        
-    # def play_audio(self, audio, sr):
-    #     sd.play(self.fade_audio(audio), sr)
-        
-    def load_audio(self, start, end, filename):
-        path = Path(self.audio_dir) / filename
-        audio, sr = lb.load(path, offset=float(start), duration=float(end)-float(start))
-        if True:#self.use_tukey_filter:
-            audio = tukey(len(audio), alpha=0.01) * audio
-        audio_padded = lb.util.fix_length(audio, size=int((end - start) * sr), mode=self.kwargs['padding'])
-        return audio_padded, sr, path.stem
-    
-    def set_axis_lims_dep_sr(self, S_dB, audio_sr):
-        f_max = 48000 / 2
-        reduce = audio_sr / (f_max * 2)
-        S_dB = S_dB[:int(S_dB.shape[0] / reduce), :]
-        return f_max, S_dB
-    
-    def update_main_plot(self, plot_func, widget_idx, **kwargs):
-        # 1. Call your plotting function (the px one)
-        fig = plot_func(**kwargs)
-        
-        # 2. Update the EXISTING pane's object
-        self.main_plot_pane.object = fig
-        
-        # 3. Return nothing (or the pane if you must, but side-effect is key)
-        return self.main_plot_pane
-    
-    def handle_click(self, event):
-        if not event.new: return
-        try:
-            point_data = event.new['points'][0]
-            print(f"DEBUG CLICK: {point_data}")
-            
-            # Generate the new figure
-            new_fig = self.update_spectrogram(point_data)
-            
-            # CRITICAL FIX: Update the EXISTING pane's object
-            self.spectrogram_plot.object = new_fig
-            
-            # Your logic here...
-        except Exception as e:
-            print(f"Error handling click: {e}")
-            
-    def clear_selection(self, event=None):
-        # Setting selection_data to None doesn't always clear the visual highlight
-        # You usually have to redraw the plot or trigger a relayout.
-        self.main_plot_pane.selection_data = None
-        # Trigger a re-plot if necessary to reset visuals
-        # self.update_main_plot(...)
-            
-    def handle_selection(self, event):
+    def handle_selection(self, event, widget_idx = None):
         """
         Triggered when the user uses the Lasso or Box select tool.
         """
@@ -178,6 +53,41 @@ class DashBoardHelper:
             
         except Exception as e:
             print(f"Error handling selection: {e}")
+    
+    def handle_click(self, event, widget_idx = 0):
+        if not event.new: return
+        try:
+            point_data = event.new['points'][0]
+            print(f"DEBUG CLICK: {point_data}")
+            
+            # Generate the new figure
+            # new_fig = self.update_spectrogram(point_data)
+            new_fig = self.spectrogram_plot_obj[widget_idx].update_spectrogram(clickData=point_data)
+            
+            # CRITICAL FIX: Update the EXISTING pane's object
+            # self.spectrogram_plot.object = new_fig
+            self.spectrogram_plot[widget_idx].object = new_fig
+            
+            # Your logic here...
+        except Exception as e:
+            print(f"Error handling click: {e}")
+            
+    def clear_selection(self, event=None, widget_idx = 0):
+        if len(self.interactive_embed_plot) == 0:
+            return
+        # Setting selection_data to None doesn't always clear the visual highlight
+        # You usually have to redraw the plot or trigger a relayout.
+        self.interactive_embed_plot[widget_idx].selection_data = None
+        # Trigger a re-plot if necessary to reset visuals
+        # self.update_main_plot(...)
+        
+    
+    def update_main_plot(self, plot_func, widget_idx, **kwargs):
+        if len(self.interactive_embed_plot) == 0:
+            return
+        self.interactive_embed_plot[widget_idx].object = plot_func(**kwargs)
+        
+        return self.interactive_embed_plot[widget_idx]
             
             
     def init_plot(self, p_type, plot_func, widget_idx, **kwargs):
@@ -277,7 +187,7 @@ class DashBoardHelper:
         if path == '':
             path = (
                 self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
-                ).as_posix()
+                )
         if path.exists():
             with open(Path(path).parent / 'label2index.json', 'r') as f:
                 classes = json.load(f)
