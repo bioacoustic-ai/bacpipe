@@ -139,10 +139,10 @@ class DashBoard(DashBoardHelper):
                 min_height=600
                 )
             self.interactive_embed_plot[widget_idx].param.watch(
-                self.handle_click, 'click_data'
+                lambda x: self.handle_click(x, widget_idx), 'click_data'
                 )
             self.interactive_embed_plot[widget_idx].param.watch(
-                self.handle_selection, 'selected_data'
+                lambda x: self.handle_selection(x, widget_idx), 'selected_data'
                 )
             
             self.spectrogram_plot_obj[widget_idx] = SpectrogramPlot(
