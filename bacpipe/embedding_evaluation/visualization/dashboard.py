@@ -20,7 +20,11 @@ from .visualize import (
     plot_overview_metrics,
 )
 from .visualize_spectrograms import SpectrogramPlot
-from .visualize_predictions import plot_classification_results
+from .visualize_predictions import (
+    plot_classification_results, 
+    plot_classification_heatmap, 
+    PredictionsLoader
+    )
     
 import bacpipe.embedding_evaluation.label_embeddings as le
 from bacpipe.embedding_evaluation.classification.train_classifier import LinearClassifier
@@ -105,10 +109,19 @@ class DashBoard(DashBoardHelper):
         self.spec_plot_obj = dict() 
         self._trigger_spec_obj_update = dict()
         
+        self.class_options = dict()
+        self.preds_data = dict()
+        self.clfier_path = dict()
+        self.clfier_thresh = dict()
+        self.btn_run_clfier = dict()
+        self.progress_bar = dict()
+        self.trigger_classification = dict()
+        self.loading_test_placeholder = dict()
+        
         self.heatmap_plot = dict()
         self.kwargs = kwargs
 
-    def col(self, widget_idx=0):
+    def embedding_panel(self, widget_idx=0):
         if not self.interactive_embedding_plot:
             embedding_plot = self.init_plot(
                             # self.init_interactive_plot(
@@ -129,6 +142,7 @@ class DashBoard(DashBoardHelper):
                                 dashboard_idx=widget_idx,
                             )
         else:
+            
             self.interactive_embed_plot[widget_idx] = pn.pane.Plotly(
                 config={'responsive': True},
                 sizing_mode='stretch_both'
@@ -138,16 +152,19 @@ class DashBoard(DashBoardHelper):
                 )
             self.interactive_embed_plot[widget_idx].param.watch(
                 lambda x: self.handle_selection(x, widget_idx), 'selected_data'
-                )            
+                )           
+             
             embedding_info_dialogue = pn.widgets.StaticText(
                     value="", width=400
                     )
+            
             self.spec_plot_obj[widget_idx] = SpectrogramPlot(
                 self.audio_dir, self.vis_loader, 
                 self.model_select[widget_idx], 
                 embedding_info_dialogue,
                 **self.kwargs
                 )
+            
             self._trigger_spec_obj_update[widget_idx] = pn.bind(
                 (
                     self.spec_plot_obj[widget_idx]._update_spec_obj
@@ -155,13 +172,17 @@ class DashBoard(DashBoardHelper):
                 self.model_select[widget_idx],
                 self.autoplay_audio_select[widget_idx]
             )
+            
             self.spectrogram_plot_panel[widget_idx] = pn.pane.Plotly(
-                    SpectrogramPlot.dummy_image(), 
+                    SpectrogramPlot.dummy_image(title=''), 
                     sizing_mode='stretch_width',
                     height=300
                 )
+            
             embedding_plot = pn.bind(
                         self.update_main_plot,
+                        # self.init_plot,
+                        "interactive_embed",
                         plot_embeddings,
                         widget_idx,
                         loader=self.vis_loader,
@@ -177,11 +198,13 @@ class DashBoard(DashBoardHelper):
                         dashboard=True,
                         dashboard_idx=widget_idx,
                         )
+            
             play_audio_button = pn.widgets.Button(name="Play audio", button_type="primary")
             play_audio_button.on_click(self.spec_plot_obj[widget_idx].play_audio)
             save_selection_dialogue = pn.widgets.StaticText(
                     value="", width=400
                     )
+            
             save_selection_button = pn.widgets.Button(
                 name="Save selection to file", button_type="primary"
                 )
@@ -191,6 +214,8 @@ class DashBoard(DashBoardHelper):
                     )
                 )
             save_selection_dialogue.visible = False
+            
+            
         return pn.Column(
             embedding_plot,
             embedding_info_dialogue,
@@ -213,7 +238,7 @@ class DashBoard(DashBoardHelper):
             pn.Accordion(
                 (
                     "2D Embedding Plot",
-                    self.col(widget_idx)
+                    self.embedding_panel(widget_idx)
                 ),
                 (
                     "Clustering Results",
@@ -339,91 +364,127 @@ class DashBoard(DashBoardHelper):
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
     
     def apply_clfier_page(self, widget_idx):
-        self.class_options = []
+        self.class_options[widget_idx] = []
         sidebar = self.make_sidebar(widget_idx, model=True, classifier_page=True)
-        self.class_tuples = []
         
         # input box where i can input the path to the linear classifier
-        clfier_path = pn.widgets.TextInput(
+        self.clfier_path[widget_idx] = pn.widgets.TextInput(
                 name='Path to Linear Classifier', 
                 placeholder=(
                     self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
                     ).as_posix(),
                 width=800,
-                max_length=800
+                max_length=800,
+                visible=False
                 )
         
-        clfier_thresh = pn.widgets.TextInput(
+        self.clfier_thresh[widget_idx] = pn.widgets.TextInput(
             name='Threshold for classification', 
             placeholder='0.5',
             width=80,
             )
         
         from src.btn_icon import icon_str
-        self.btn_run_clfier = pn.widgets.Button(
-            name='Apply linear classifier', 
+        self.btn_run_clfier[widget_idx] = pn.widgets.Button(
+            # name='Apply linear classifier', 
+            name='Load predictions from integrated classifier', 
             icon=icon_str, 
             width=100, 
             height=30,
             )
+
         
-        
-        self.progress_bar = pn.indicators.Progress(
+        self.progress_bar[widget_idx] = pn.indicators.Progress(
             value=0,
             max=100,
             bar_color='primary',
             width=800
         )
         
-        self.trigger_classification = pn.bind(
-            self.classify_embeddings, 
-            self.model_select[widget_idx], 
-            clfier_path, 
-            clfier_thresh
-            )
-        
-        self.loading_test_placeholder = pn.widgets.StaticText(
+        self.loading_test_placeholder[widget_idx] = pn.widgets.StaticText(
             name='Preparing classification', 
             value=''
             )
             
+        self.clfier_select[widget_idx].param.watch(
+            lambda x: self.change_input_options(x, widget_idx=widget_idx),
+            'value'
+        )
+        
+        
+        self.preds_data[widget_idx] = PredictionsLoader(
+            self.vis_loader,
+            self.path_func,
+            self.models,
+            panel_selection=self.species_select[widget_idx],
+            progress_bar=self.progress_bar[widget_idx],
+            loading_pane=self.loading_test_placeholder[widget_idx]
+            )
+        
+        self.btn_run_clfier[widget_idx].on_click(
+            lambda x: self.update_main_plot(
+                "heatmap",
+                plot_classification_heatmap,
+                widget_idx=widget_idx,
+                event=x,
+                predictions_loader=self.preds_data[widget_idx],
+                model=self.model_select[widget_idx], 
+                accumulate_by=self.accumulate_select[widget_idx], 
+                species=self.species_select[widget_idx],
+                threshold=self.clfier_thresh[widget_idx],
+                clfier_path=self.clfier_path[widget_idx],
+                clfier_type=self.clfier_select[widget_idx]
+            )
+        )
+        
+        
         main_content = pn.Column(
             pn.pane.Markdown("## All Models Dashboard"),
             pn.Accordion(
                 (
                     "Classification settings",
                     pn.Column(
-                        clfier_path,
+                        # trigger_input_options,
+                        self.clfier_path[widget_idx],
                 
                         # after that show me the classes that this 
                         # linear classifier will classify
                         pn.widgets.StaticText(
                             name='Classes', 
-                            value=pn.bind(self.get_classes, clfier_path)
+                            value=pn.bind(
+                                self.preds_data[widget_idx].get_classes, 
+                                self.clfier_path[widget_idx]
+                                )
                             ),
                 
                         # input section to give a threshold for classification
-                        clfier_thresh,
+                        self.clfier_thresh[widget_idx],
                     
                         # button to click run
-                        self.btn_run_clfier,
+                        self.btn_run_clfier[widget_idx],
                         
                         # placeholder textbox to show that something 
                         # is happening while waiting on embeddings to load
-                        self.loading_test_placeholder,
+                        self.loading_test_placeholder[widget_idx],
                                     
                         # progbar
-                        self.progress_bar,
+                        self.progress_bar[widget_idx],
                     )
                 ),
                 (
                     "Classification heatmap",
-                    # heatmap for 20 top species
-                    pn.bind(self.prepare_heatmap,
-                            clfier_thresh,
-                            model=self.model_select[widget_idx], 
-                            clfier_type=self.clfier_select[widget_idx],
-                            progress=self.btn_run_clfier)
+                    self.init_plot(
+                        "heatmap",
+                        plot_classification_heatmap, 
+                        widget_idx=widget_idx,
+                        event=None,
+                        predictions_loader=self.preds_data[widget_idx],
+                        model=self.model_select[widget_idx], 
+                        accumulate_by=self.accumulate_select[widget_idx], 
+                        species=self.species_select[widget_idx],
+                        threshold=self.clfier_thresh[widget_idx]
+                        )
+                    
                 ),
                 active=[0, 1, 2],
                 # by default create all annotations as one big annotations file
@@ -517,7 +578,7 @@ class DashBoard(DashBoardHelper):
                         widget_idx, 
                         w_type='species', 
                         name='Select species', 
-                        options=self.class_options
+                        options=self.class_options[widget_idx]
                         ),
                     self.init_widget(
                         widget_idx, 
@@ -544,13 +605,13 @@ class DashBoard(DashBoardHelper):
         model0_page = self.single_model_page(0)
         model1_page = self.single_model_page(1)
         model_all_page = self.all_models_page(1)
-        apply_classifier_page = self.apply_clfier_page(0)
+        apply_classifier0_page = self.apply_clfier_page(0)
         apply_classifier1_page = self.apply_clfier_page(1)
 
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
         sidebar1, content1 = model1_page.objects
-        sidebar2, content2 = apply_classifier_page.objects
+        sidebar2, content2 = apply_classifier0_page.objects
         sidebar3, content3 = apply_classifier1_page.objects
 
         # Wrap sidebars with titles
@@ -572,7 +633,7 @@ class DashBoard(DashBoardHelper):
                 ),
             ),
             ("All models", model_all_page),
-            ("Apply Classifer", apply_classifier_page),
+            ("Apply Classifer", apply_classifier1_page),
             (
                 "Two classifiers",
                 pn.Row(
@@ -584,7 +645,7 @@ class DashBoard(DashBoardHelper):
             
         )
         
-        self.add_styling(model1_page, model_all_page, apply_classifier_page)
+        self.add_styling(model1_page, model_all_page, apply_classifier1_page)
         
     def add_styling(self, *pages):
         with pkg_resources.path(bacpipe.imgs, 'bacpipe_unlabelled.png') as p:

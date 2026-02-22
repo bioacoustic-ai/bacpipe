@@ -4,11 +4,16 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import numpy as np
 
-import seaborn as sns
-
+import plotly.express as px
 import logging
 
 logger = logging.getLogger(__name__)
+
+from pathlib import Path
+from bacpipe.embedding_evaluation.classification.train_classifier import (
+    LinearClassifier
+    )
+
 
 
 
@@ -244,58 +249,357 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
     )
     plt.close(fig)
 
-        
+import plotly.express as px
+import numpy as np
+from bacpipe.embedding_evaluation.visualization.visualize_spectrograms import SpectrogramPlot
+
 def plot_classification_heatmap(
-    accumulated_presence, timestamps, accumulate_by, species, threshold
+    event, predictions_loader, model, accumulate_by, 
+    threshold, species=None, **kwargs
     ):
+    if event is None and species is None:
+        return SpectrogramPlot.dummy_image(title="Click the button to generate a prediction heatmap.")
+    predictions_loader.get_data(model, threshold, **kwargs)
+    if predictions_loader.binary_presence is None:
+        return predictions_loader.failed_fig
+    accumulated_presence = predictions_loader.accumulate_data(species, accumulate_by)
+    timestamps = predictions_loader.timestamps
     
-    fig = Figure(figsize=[11, 8])
-    ax = fig.subplots()
+    logger.info('Redrawing heatmap plot')
     
-    fig.suptitle(
-        f'Presence heatmap for {species} with threshold of {threshold}',
-        fontsize=10
-        )
-    sns.heatmap(
-        accumulated_presence.T, 
-        vmin=0,
-        # vmax=1,
-        cmap='viridis',
-        cbar_kws={'label': 'Binary presence per hour'},
-        ax=ax
-        )
+    # Prepare data - mask values below 0
+    plot_data = accumulated_presence.T.copy()
+    plot_data = np.where(plot_data < 0, np.nan, plot_data)
     
-    y_locs, yticklabels = ax.get_yticks(), ax.get_yticklabels()
+    # Get time labels based on accumulation type
     if accumulate_by == 'day':
-        labels = np.unique([ts.date() for ts in timestamps])
-        ax.set_ylabel('dates')
+        y_labels = [str(ts.date()) for ts in timestamps]
+        y_axis_label = 'Dates'
     elif accumulate_by == 'month':
-        labels = np.unique(
-            [f'{date.year}-{date.month}' for date in timestamps], 
-            axis=0
-            )
-        ax.set_ylabel('months')
+        y_labels = [f'{date.year}-{date.month}' for date in timestamps]
+        y_axis_label = 'Months'
     elif accumulate_by == 'week':
-        labels = np.unique(
-            [f'{date.year}-{date.isocalendar().week}' for date in timestamps], 
-            axis=0
+        y_labels = [f'{date.year}-W{date.isocalendar().week}' for date in timestamps]
+        y_axis_label = 'Weeks'
+    
+    # Hour labels (0-23)
+    x_labels = list(range(24))
+    
+    # Create heatmap
+    fig = px.imshow(
+        plot_data,
+        labels=dict(x="Hours", y=y_axis_label, color="Binary presence per hour"),
+        x=x_labels,
+        y=np.unique(y_labels),
+        color_continuous_scale='Viridis',
+        zmin=0,  # Values below this will be white (nan handling)
+        aspect="auto",
+        title=(
+            f'Presence heatmap using {model} with '
+            f'{predictions_loader.current_clfier_type} classifier <br>'
+            f'for {species} '
+            f'with threshold of {PredictionsLoader.verify_threshold(threshold)}.'
             )
-        ax.set_ylabel('weeks')
-    selected_labels = labels[[int(i.get_text()) for i in yticklabels]]
-    x_locs, labels = ax.get_xticks(), ax.get_xticklabels()
-    x_idxs = [0, 6, 12, 18, 23]
-    ax.set_xticks(x_locs[x_idxs], np.array(labels)[x_idxs])
+    )
+    
+    # Customize layout
+    fig.update_layout(
+        autosize=True,
+        # width=600,
+        height=500,
+        xaxis=dict(
+            tickmode='array',
+            tickvals=[0, 6, 12, 18, 23],
+            ticktext=['0', '6', '12', '18', '23']
+        ),
+        yaxis=dict(
+            autorange='reversed'  # Optional: match seaborn orientation
+        ),
+        coloraxis_colorbar=dict(
+            title="Binary presence per hour"
+        )
+    )
+    
+    # Make NaN values appear white
+    fig.update_traces(
+        hovertemplate='Hour: %{x}<br>' + y_axis_label + ': %{y}<br>Presence: %{z}<extra></extra>'
+    )
+    
+    return fig
+
+
+class PredictionsLoader:
+    def __init__(
+        self, vis_loader, path_func, models, 
+        panel_selection, progress_bar, loading_pane, 
+        thresh=0.5
+        ):
+        self.vis_loader = vis_loader
+        self.path_func = path_func
+        self.models = models
+        self.thresh = thresh
+        self.panel_selection = panel_selection
+        self.progress_bar = progress_bar
+        self.loading_pane = loading_pane
+    
+    def get_data(
+        self, model, threshold, 
+        clfier_type=None, clfier_path='', **kwargs
+        ):
+        threshold = self.verify_threshold(threshold)
+        if hasattr(self, 'binary_presence'):
+            if (
+                self.current_model == model
+                and self.current_threshold == threshold
+                and (
+                    self.current_clfier_type == clfier_type
+                    or clfier_type is None
+                    )
+                ):
+                return
+            
+        self.current_model = model
+        self.current_threshold = threshold
+        self.current_clfier_type = clfier_type
+            
+        
+        if not (
+            self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
+            ).exists():
+            clfier_type = 'Integrated'
+        
+        if clfier_type == 'Linear':
+            self.loading_pane.value = 'Loading embeddings for classification'
+            self.binary_presence, self.class_dict = self.classify_embeddings(
+                model, threshold, clfier_path
+            )
+        elif clfier_type == 'Integrated':
+            self.loading_pane.name = 'Preparing heatmap'
+            self.loading_pane.value = 'Loading precomputed embeddings'
+            self.binary_presence, self.class_dict = self.load_classification(
+                model, threshold
+                )
+        
+        
+        self.embed_dict = self.vis_loader.embeds[model]
+        
+        if self.binary_presence is None:
+            logger.info(
+                "It seems like the classifier hasn't been run yet. "
+                "Please rerun bacpipe with the setting "
+                "`run default classifier` set to `True`."
+            )
+            return
+        
+        self.get_timestamps_per_embedding(model)
+        
+        self.class_dict['overall'] = len(self.class_dict)
+        self.binary_presence = np.concatenate(
+            [self.binary_presence.T, 
+             [np.sum(self.binary_presence, axis=1).astype(np.int8)]]
+            ).T
+        
+        
+        self.class_dict = self.reorder_by_most_occurrance(
+            self.binary_presence, self.class_dict
+            )
+        
+        self.panel_selection.options = list(self.class_dict.keys())        
+    
+    
+    def collect_all_embeddings(self, model, Loader, config, settings):
+        ld = Loader(
+            audio_dir=config.audio_dir, 
+            model_name=model,
+            **vars(settings)
+            )
+        
+        embeds = ld.embeddings(as_type='array')
+        return embeds
+    
+    def run_classifier(self, embeds, linear_clfier, threshold):
+        import torch.nn.functional as F
+        probs = []
+        for idx, batch in enumerate(embeds):
+            logits = linear_clfier(batch)
+            probabilities = F.softmax(logits, dim=0).detach().cpu().numpy()
+            binary_classification = np.zeros(probabilities.shape, dtype=np.int8)
+            binary_classification[probabilities > threshold] = 1
+            probs.append(binary_classification.tolist())
+            self.progress_bar.value = int((idx+1)/len(embeds)*100)
+        return np.array(probs, dtype=np.int8)
+            
+    @staticmethod
+    def verify_threshold(threshold):
+        if threshold == '':
+            threshold = 0.5
+        else:
+            threshold = float(threshold)
+        return threshold
         
     
-    ax.set_xlabel('hours')
-    ax.set_yticks(y_locs)
-    ax.set_yticklabels(selected_labels)
+    def classify_embeddings(self, model, threshold, clfier_path):
+        import torch
+        from bacpipe.core.experiment_manager import Loader
+        from bacpipe import config, settings
+        if clfier_path == '':
+            clfier_path = (
+                self.path_func(model).class_path / 'linear_classifier.pt'
+                ).as_posix()
+        threshold = self.verify_threshold(threshold)
+        
+        embeds = self.collect_all_embeddings(model, Loader, config, settings)
+        
+        embeds = torch.Tensor(embeds).to(settings.device)
+        
+        self.loading_pane.value = 'Running classifier'
+        
+        with open(Path(clfier_path).parent / 'label2index.json', 'r') as f:
+            label2index = json.load(f)
+            
+        clfier_weights = torch.load(clfier_path, map_location=settings.device)
+        clfier = LinearClassifier(
+            clfier_weights['clfier.weight'].shape[-1], 
+            len(label2index)
+            )
+        clfier.load_state_dict(clfier_weights)
+        clfier.to(settings.device)
+        
+        probs = self.run_classifier(embeds, clfier, threshold)
+        
+        return probs, label2index
     
-    # force the rotation on the axis itself
-    ax.tick_params(axis='y', rotation=0)
+    @staticmethod
+    def reorder_by_most_occurrance(probs, label2index):
+        sums = [sum(probs[:,a]) for a in range(probs.shape[1])]
+        
+        sorted_l2i = dict(sorted(
+            label2index.items(), 
+            key=lambda x: sums[x[1]],
+            reverse=True
+            ))
+        return sorted_l2i
+        
+    def get_classes(self, path):
+        if path == '':
+            path = (
+                self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
+                )
+        if path.exists():
+            with open(Path(path).parent / 'label2index.json', 'r') as f:
+                classes = json.load(f)
+            return list(classes.keys())
+        else:
+            return []
+            
+    def load_classification(self, model, threshold):
+        integrated_clfier_path = (
+            self.path_func(model)
+            .class_path.joinpath('original_classifier_outputs')
+        )
+        if not integrated_clfier_path.exists():
+            return None, None
+        else:
+            files = list(integrated_clfier_path.rglob('*json'))
+            
+        cl_dict = {}
+        total_length = 0
+        keys2idx = {}
+        for idx, file in enumerate(files):
+            with open(file, 'r') as f:
+                d = json.load(f)
+                current_time_bins = d['head']['Time bins in this file']
+                d.pop('head')
+                
+                for k, v in d.items():
+                    cl_dict[k] = np.zeros([total_length + current_time_bins])    
+                    if not keys2idx:
+                        keys2idx[k] = 0
+                    if not k in keys2idx:
+                        keys2idx[k] = max(keys2idx.values()) + 1
+                        
+                    cl_dict[k][np.array(v['time_bins_exceeding_threshold']) + total_length] = v['classifier_predictions']
+                    # file_specific_classification[v['time_bins_exceeding_threshold'], k2idx[k]] = v['classifier_predictions']
+                for species in [
+                    k for k, v in cl_dict.items() 
+                    if len(v) < total_length + current_time_bins
+                    ]:
+                    cl_dict[species] = np.hstack([cl_dict[species], np.zeros([current_time_bins])])
+                
+                total_length += current_time_bins
+            self.progress_bar.value = int((idx+1)/len(files)*100)
+        
+        probs_array = np.array(list(cl_dict.values())).T
+        # binary_classification = probs_array[probs_array > thresh]
+        binary_classification = np.zeros(probs_array.shape, dtype=np.int8)
+        binary_classification[probs_array > threshold] = 1
+        
+        return binary_classification, keys2idx
     
-    
-    fig.set_size_inches(6, 5)
-    fig.set_dpi(300)
-    fig.tight_layout()
-    return fig      
+    def accumulate_data(
+        self, species, accumulate_by='day'
+        ):
+        if not species:
+            species = 'overall'
+        self.panel_selection.value = species
+        species_idx = self.class_dict[species]
+        species_presence = self.binary_presence[:, species_idx]
+        
+        dates = np.array([ts.date() for ts in self.timestamps])
+        hours = np.array([ts.hour for ts in self.timestamps])
+        if accumulate_by == 'day':
+            date_tuple = [(d.year, d.month, d.day) for d in dates]
+            accumulated = self.transform_presence_into_hour_heatmap(
+                species_presence, hours, accumulator=date_tuple
+                )
+        elif accumulate_by == 'week':
+            week_tuple = [(date.year, date.isocalendar().week) for date in dates]
+            accumulated = self.transform_presence_into_hour_heatmap(
+                species_presence, hours, accumulator=week_tuple
+                )
+        elif accumulate_by == 'month':
+            month_tuple = [(date.year, date.month) for date in dates]
+            accumulated = self.transform_presence_into_hour_heatmap(
+                species_presence, hours, accumulator=month_tuple
+                )
+        return accumulated
+            
+    @staticmethod
+    def transform_presence_into_hour_heatmap(
+        species_presence, hours, accumulator
+        ):
+        accumulated = np.ones(
+            [24, len(np.unique(accumulator, axis=0))]
+            , dtype=np.int8
+            ) *-1
+        for acc_idx, item in enumerate(np.unique(accumulator, axis=0)):
+            month_presence_idx = np.where(np.all(accumulator == item, axis=1))[0]
+            for hour in range(24):
+                hourly_presence_idx = np.where(
+                    hours[month_presence_idx]==hour
+                    )[0]
+                if len(hourly_presence_idx) > 0:
+                    accumulated[hour, acc_idx] = sum(
+                        species_presence[month_presence_idx[hourly_presence_idx]]
+                        )
+        return accumulated
+        
+    def get_timestamps_per_embedding(self, model):
+        from bacpipe.embedding_evaluation.label_embeddings import get_dt_filename
+        import datetime as dt
+        
+        # embed_dict = self.vis_loader.embeds[model]
+        ts_within_audio_files = [dt.timedelta(seconds=ts) for ts in self.embed_dict['timestamp']]
+        ts_files = [get_dt_filename(f) for f in self.embed_dict['metadata']['audio_files']]
+        ts_files_same_length_as_embeds = []
+        [
+            ts_files_same_length_as_embeds.extend([ts_file] * embed_len) 
+            for ts_file, embed_len in zip(ts_files, self.embed_dict['metadata']['nr_embeds_per_file'])
+        ]
+        
+        self.timestamps = [
+            ts_file+ts_within_audio_file
+            for ts_file, ts_within_audio_file in 
+            zip(ts_files_same_length_as_embeds, ts_within_audio_files)
+            ]
+        

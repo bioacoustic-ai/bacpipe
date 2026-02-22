@@ -32,11 +32,11 @@ class SpectrogramPlot:
         self.selected_points = selected_points
 
     @staticmethod
-    def dummy_image():
+    def dummy_image(title):
         # initial dummy figure, as a placeholder
         fig = px.imshow(np.zeros((100, 100, 3), dtype=np.uint8))
         fig.update_layout(
-            title="Click an embedding to see the corresponding spectrogram", 
+            title=title, 
             margin=dict(l=20, r=20, t=40, b=20),
             height=SPECTROGRAM_PLOT_HEIGHT,
             xaxis={'visible': False}, 
@@ -50,7 +50,9 @@ class SpectrogramPlot:
         ):
         # Sohw black image initially
         if not clickData:
-            return SpectrogramPlot.dummy_image()
+            return SpectrogramPlot.dummy_image(
+                "Click an embedding to see the corresponding spectrogram"
+            )
         
         # Extract data from click
         point_data = clickData.get('customdata', [None]*6)

@@ -613,12 +613,12 @@ class Loader:
         ):
             if self.model_name in ['perch_v2', 'perch_bird', 'vggish', 'surfperch', 'google_whale']:
                 logger.warning(
-                    f"The google family of models (which {self.model_name} is part of) "
+                    f"\n \n The google family of models (which {self.model_name} is part of) "
                     "calculate embeddings and classifications at once, making it "
                     "impossible to only run the classifier, like with any other model. "
                     "Please remove the embeddings corresponding to this model and then "
                     "rerun bacpipe with the setting `run_pretrained_classifier` set to True. "
-                    "That way classification results will be saved immediately."
+                    "That way classification results will be saved immediately.\n \n"
                 )
                 return False
             else:
