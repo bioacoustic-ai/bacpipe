@@ -10,6 +10,9 @@ from tqdm import tqdm
 from pathlib import Path
 import datetime as dt
 
+from importlib import import_module
+from librosa import get_duration
+
 import logging
 
 logger = logging.getLogger("bacpipe")
@@ -489,7 +492,7 @@ def filter_annotations_by_minimum_number_of_occurrences(
 
 def load_labels_and_build_dict(
     paths,
-    label_file,
+    annotations_filename,
     audio_dir,
     bool_filter_labels=True,
     min_label_occurrences=150,
@@ -498,14 +501,17 @@ def load_labels_and_build_dict(
     **kwargs,
 ):
     try:
-        label_df = pd.read_csv(Path(audio_dir).joinpath(label_file))
+        try:
+            label_df = pd.read_csv(Path(audio_dir).joinpath(annotations_filename))
+        except FileNotFoundError as e:
+            label_df = pd.read_csv(list(Path(audio_dir).rglob(annotations_filename))[0])
     except FileNotFoundError as e:
         logger.warning(
             f"No annotations file found in {audio_dir}, trying in "
             f"{str(paths.dataset_path.resolve())}."
         )
         try:
-            label_df = pd.read_csv(paths.dataset_path.joinpath(label_file))
+            label_df = pd.read_csv(paths.dataset_path.joinpath(annotations_filename))
         except:
             logger.warning(
                 "No annotations file found, not able to create ground_truth.npy file. "
@@ -516,8 +522,8 @@ def load_labels_and_build_dict(
     if bool_filter_labels and not testing:
         filtered_labels = [
             lab
-            for lab in np.unique(label_df[f"label:{main_label_column}"])
-            if len(label_df[label_df[f"label:{main_label_column}"] == lab])
+            for lab in np.unique(label_df[main_label_column])
+            if len(label_df[label_df[main_label_column] == lab])
             > min_label_occurrences
         ]
         if not filtered_labels:
@@ -537,8 +543,9 @@ def load_labels_and_build_dict(
             label: idx
             for idx, label in enumerate(label_df[label_column].unique())
         }
-    with open(paths.labels_path.joinpath("label_idx_dict.json"), "w") as f:
-        json.dump(label_idx_dict, f, indent=1)
+    if paths.labels_path.exists():
+        with open(paths.labels_path.joinpath("label_idx_dict.json"), "w") as f:
+            json.dump(label_idx_dict, f, indent=1)
     return label_df, label_idx_dict
 
 
@@ -549,31 +556,84 @@ def fit_labels_to_embedding_timestamps(
     segment_s,
     label_column=None,
     single_label=True,
+    min_annotation_length=0.65,
     **kwargs,
 ):
     file_labels = np.ones(num_embeds) * -1
     embed_timestamps = np.arange(num_embeds) * segment_s
     if single_label:
         single_label_arr = [True] * len(embed_timestamps)
+    else:
+        file_labels = file_labels.reshape([len(file_labels), 1])
 
     for _, row in df.iterrows():
-        em_start = np.argmin(np.abs(embed_timestamps - row.start))
-        em_end = np.argmin(np.abs(embed_timestamps - row.end))
-        if single_label:
-            if (
-                not all(file_labels[em_start:em_end] == -1)
-                and not label_idx_dict[row[f"label:{label_column}"]]
-                in file_labels[em_start:em_end]
-            ):
+        em_start = np.where(embed_timestamps - row.start <= 0)[0][-1]
+        em_end = np.where(embed_timestamps - row.end > 0)[0]
+        if len(em_end) > 0:
+            em_end = em_end[0]
+        else:
+            em_end = len(embed_timestamps)
+            
+        # if not all of the values are noise, meaning there are already
+        # some labels in this segment
+        if not np.all(file_labels[em_start:em_end] == -1):
+            if single_label:
                 single_label_arr[em_start:em_end] = [False] * (em_end - em_start)
+            else:
+                for idx in range(em_start, em_end):
+                    
+                    # if there is any noise in this segment, we'll write into 
+                    # those places
+                    if np.any(file_labels[idx:idx+1] == -1):
+                        file_labels[idx:idx+1][
+                                file_labels[idx:idx+1]==-1
+                                ] = label_idx_dict[row[f"label:{label_column}"]]
+                    
+                    # if the current label is already written in that segment
+                    # skip. This assumes that we don't have two annotations of the 
+                    # same class of varying length overlaying each other
+                    elif (
+                        label_idx_dict[row[f"label:{label_column}"]]
+                        in file_labels[idx:idx+1]
+                        ):
+                        continue
+                    
+                    # if all labels in this segment are the same. meaning that
+                    # if we have a 2d array already but for each timestamp the
+                    # labels are the same, we can just overwrite one. we won't 
+                    # loose anything and we don't have to create any new columns
+                    elif len(np.unique(file_labels[idx:idx+1])) == 1:
+                        file_labels[idx:idx+1, -1] = label_idx_dict[row[f"label:{label_column}"]]
+                        
+                    # We only go here, if there is no place we can write our new 
+                    # class into the array without loosing information. we therefore
+                    # create a new column, which is created with noise (-1) values and
+                    # we then write our current label index into that column
+                    else:
+                        new_column = np.ones(len(file_labels)) * -1
+                        new_column = new_column.reshape([len(file_labels), 1])
+                        file_labels = np.hstack([file_labels, new_column])
+                        file_labels[idx:idx+1, -1] = label_idx_dict[row[f"label:{label_column}"]]
 
-        # at least 0.65 seconds of the bbox have
-        # to be in the embedding timestamp window
-        if row.end - row.start > 0.65:
-            file_labels[em_start:em_end] = label_idx_dict[row[f"label:{label_column}"]]
+        # check if the annotation length is longer that the specified min_annotation_length
+        elif row.end - row.start > min_annotation_length:
+            if single_label:
+                file_labels[em_start:em_end] = label_idx_dict[row[f"label:{label_column}"]]
+            else:
+                file_labels[em_start:em_end, 0] = label_idx_dict[row[f"label:{label_column}"]]
+                
+    file_labels = file_labels.squeeze()
+            
     if single_label:
         file_labels[~np.array(single_label_arr)] = -2
-    return file_labels
+        return file_labels
+    else:
+        if len(file_labels.shape) == 1:
+            array = np.ones([len(file_labels), 2]) * -1
+            array[:, 0] = file_labels
+            return array
+        else:
+            return file_labels
 
 
 def build_ground_truth_labels_by_file(
@@ -589,50 +649,107 @@ def build_ground_truth_labels_by_file(
     label_column=None,
     **kwargs,
 ):
+
     audio_file = metadata["files"]["audio_files"][ind]
-
-    df = label_df[label_df.audiofilename == Path(audio_file).as_posix()]
-    if len(df) == 0:
-        df = label_df[
-            label_df.audiofilename == Path(audio_file).stem + Path(audio_file).suffix
-        ]
-
+    df = filter_df_by_filename(label_df, audio_file, model=model)
+        
     if df.empty:
+        logger.info(
+            f'df is empty for {audio_file}, meaning no annotations. '
+            "If that's incorrect, ensure the audiofilename column has the correct "
+            "file names."
+            )
         all_labels = np.concatenate((all_labels, np.ones(num_embeds) * -1))
         return all_labels
 
     file_labels = fit_labels_to_embedding_timestamps(
-        df, label_idx_dict, num_embeds, segment_s, label_column=label_column, **kwargs
+        df, label_idx_dict, num_embeds, segment_s, 
+        label_column=label_column, **kwargs
     )
-    all_labels = np.concatenate((all_labels, file_labels))
+    
+    all_labels = fill_all_labels_array(file_labels, all_labels)
 
     if np.unique(file_labels).shape[0] > 2:
-        embed_timestamps = np.arange(num_embeds) * segment_s
-        path = paths.labels_path.joinpath("raven_tables_for_sanity_check")
-        path.mkdir(exist_ok=True, parents=True)
-        if (
-            len(list(path.iterdir())) < 10
-        ):  # make sure to only do this a handful of times
-            df_file_gt = label_df[label_df.audiofilename == audio_file]
-            df_file_fit = pd.DataFrame()
-            df_file_fit["start"] = embed_timestamps[file_labels > -1]
-            df_file_fit["end"] = embed_timestamps[file_labels > -1] + segment_s
-            inv = {v: k for k, v in label_idx_dict.items()}
-            df_file_fit[f"label:{label_column}"] = [
-                inv[i] for i in file_labels[file_labels > -1]
-            ]
-            raven_gt = create_Raven_annotation_table(df_file_gt, label_column)
-            raven_fit = create_Raven_annotation_table(df_file_fit, label_column)
-            raven_fit["Low Freq (Hz)"] = 1500
-            raven_fit["High Freq (Hz)"] = 2000
-            raven_gt.to_csv(
-                path.joinpath(f"{Path(audio_file).stem}_gt.txt"), sep="\t", index=False
-            )
-            raven_fit.to_csv(
-                path.joinpath(f"{Path(audio_file).stem}_fit.txt"), sep="\t", index=False
-            )
+        raven_tables_sanity_check(
+            num_embeds, segment_s, paths, audio_file, 
+            label_df, label_idx_dict, label_column, file_labels
+        )
     return all_labels
 
+def filter_df_by_filename(
+    df_to_filer, file_name, file_name_column = 'audiofilename', model=None
+    ):
+    df = df_to_filer[df_to_filer[file_name_column] == Path(file_name).as_posix()]
+    if len(df) == 0:
+        df = df_to_filer[
+            df_to_filer[file_name_column] == Path(file_name).stem + Path(file_name).suffix
+        ]
+    # if no files are found, match by classifier_prediction files
+    if len(df) == 0:
+            df = df_to_filer[
+                df_to_filer[file_name_column]
+                == Path(file_name).parent / (
+                    Path(file_name).stem + f'_{model}.json'
+                    )
+            ]
+    return df
+
+def fill_all_labels_array(file_labels, all_labels):
+    if len(file_labels.shape) > 1:
+        if len(all_labels) == 0:
+            all_labels = file_labels
+        else:
+            # if file_labels got columns that all_labels don't have
+            # add noise columns to ensure both can be stacked
+            if all_labels.shape[-1] < file_labels.shape[-1]:
+                new_column = np.ones([
+                        len(all_labels), 
+                        file_labels.shape[-1] - all_labels.shape[-1]
+                    ]) * -1
+                all_labels = np.hstack([all_labels, new_column])
+            # if all_labels got columns that file_labels don't have
+            # add noise columns to ensure both can be stacked
+            elif all_labels.shape[-1] > file_labels.shape[-1]:
+                new_column = np.ones([
+                    len(file_labels), 
+                    all_labels.shape[-1] - file_labels.shape[-1]
+                    ]) * -1
+                file_labels = np.hstack([file_labels, new_column])
+                
+            all_labels = np.concatenate((all_labels, file_labels))
+    else:
+        all_labels = np.concatenate((all_labels, file_labels))
+    return all_labels
+
+def raven_tables_sanity_check(
+    num_embeds, segment_s, paths, audio_file, 
+    label_df, label_idx_dict, label_column, file_labels
+    ):
+    file_labels = file_labels[:, 0]
+    embed_timestamps = np.arange(num_embeds) * segment_s
+    path = paths.labels_path.joinpath("raven_tables_for_sanity_check")
+    path.mkdir(exist_ok=True, parents=True)
+    if (
+        len(list(path.iterdir())) < 10
+    ):  # make sure to only do this a handful of times
+        df_file_gt = label_df[label_df.audiofilename == audio_file]
+        df_file_fit = pd.DataFrame()
+        df_file_fit["start"] = embed_timestamps[file_labels > -1]
+        df_file_fit["end"] = embed_timestamps[file_labels > -1] + segment_s
+        inv = {v: k for k, v in label_idx_dict.items()}
+        df_file_fit[f"label:{label_column}"] = [
+            inv[i] for i in file_labels[file_labels > -1]
+        ]
+        raven_gt = create_Raven_annotation_table(df_file_gt, label_column)
+        raven_fit = create_Raven_annotation_table(df_file_fit, label_column)
+        raven_fit["Low Freq (Hz)"] = 1500
+        raven_fit["High Freq (Hz)"] = 2000
+        raven_gt.to_csv(
+            path.joinpath(f"{Path(audio_file).stem}_gt.txt"), sep="\t", index=False
+        )
+        raven_fit.to_csv(
+            path.joinpath(f"{Path(audio_file).stem}_fit.txt"), sep="\t", index=False
+        )
 
 def create_Raven_annotation_table(df, label_column):
     df.index = np.arange(1, len(df) + 1)
@@ -649,8 +766,9 @@ def create_Raven_annotation_table(df, label_column):
     return raven_df
 
 
-def collect_ground_truth_labels_by_file(
-    paths, files, model, segment_s, metadata, label_df, label_idx_dict, **kwargs
+def collect_ground_truth_labels(
+    paths, files, model, segment_s, metadata, 
+    label_df, label_idx_dict, **kwargs
 ):
 
     ground_truth = np.array([])
@@ -683,35 +801,73 @@ def collect_ground_truth_labels_by_file(
         )
     return ground_truth
 
-
 def ground_truth_by_model(
-    paths,
     model,
-    label_column,
-    label_file="annotations.csv",
-    overwrite=False,
+    audio_dir,
+    label_df=None,
+    label_idx_dict=None,
+    label_column='label:species',
+    paths=None,
+    annotations_filename="annotations.csv",
+    overwrite=True,
     single_label=True,
+    bool_filter_labels=False,
     **kwargs,
 ):
-    if overwrite or not paths.labels_path.joinpath("ground_truth.npy").exists():
+    if (
+        overwrite 
+        or paths is None
+        or not paths.labels_path.joinpath("ground_truth.npy").exists()
+        ):
 
-        path = model_specific_embedding_path(paths.main_embeds_path, model)
+        if paths is None:
+            paths = get_paths(model)
+            
+        # check if embeddings exist
+        try:    
+            path = model_specific_embedding_path(paths.main_embeds_path, model)
+        except Exception as e:
+            logger.warning(
+                f"No embeddings directory seems to exist. {e}"
+            )
+            path = None
 
-        label_df, label_idx_dict = load_labels_and_build_dict(
-            paths, label_file, main_label_column=label_column, **kwargs
-        )
+        # get annotations is not provided
+        if label_df is None or label_idx_dict is None:
+            label_df, label_idx_dict = load_labels_and_build_dict(
+                paths, annotations_filename, 
+                main_label_column=label_column, 
+                audio_dir=audio_dir, 
+                bool_filter_labels=bool_filter_labels,
+                **kwargs
+            )
 
-        files = list(path.rglob("*.npy"))
-        files.sort()
+        # build files, segment_s and metadata variables
+        # depending if embeddings exist or not
+        if path is not None and len(list(path.iterdir())) > 0:
+            files = list(path.rglob("*.npy"))
+            files.sort()
 
-        metadata = yaml.safe_load(open(path.joinpath("metadata.yml"), "r"))
-        segment_s = metadata["segment_length (samples)"] / metadata["sample_rate (Hz)"]
-
+            metadata = yaml.safe_load(
+                open(list(path.rglob("metadata.yml"))[0], "r")
+                )
+            segment_s = (
+                metadata["segment_length (samples)"] 
+                / metadata["sample_rate (Hz)"]
+                )
+        else:
+            files, segment_s, metadata = get_files_if_no_embeds(
+                audio_dir, model, label_df
+                )
+            
+        # find all label columns
         label_columns = [col for col in label_df.columns if "label:" in col]
         ground_truth_dict = {}
+        
+        # collect all the ground truth for all the label columns 
         for label_col in label_columns:
             labels = label_col.split("label:")[-1]
-            ground_truth = collect_ground_truth_labels_by_file(
+            ground_truth = collect_ground_truth_labels(
                 paths,
                 files,
                 model,
@@ -734,6 +890,91 @@ def ground_truth_by_model(
             paths.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
         ).item()
     return ground_truth_dict
+
+def get_files_if_no_embeds(audio_dir, model, label_df):
+    files = label_df.audiofilename.unique()
+    
+    module = import_module(
+        f"bacpipe.model_pipelines.feature_extractors.{model}"
+    )
+    segment_s = module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE
+    try:        
+        rel_audio_dir = list(
+            Path(audio_dir).rglob(files[0])
+            )[0].relative_to(audio_dir).parent
+    except Exception as e:
+        logger.exception(
+            f"{files[0]} was not found in {audio_dir}. "
+            "Are you sure you entered the correct path to the audio data?"
+        )
+    
+    metadata = {}
+    metadata['files'] = {}
+    metadata['files']['audio_files'] = files
+    metadata['files']['nr_embeds_per_file'] = [
+        int(
+            get_duration(
+                filename=Path(audio_dir
+                        ) / rel_audio_dir / f) 
+            / segment_s 
+        )
+        for f in files
+    ]
+    files = [Path(f'{Path(d).stem}_{model}') for d in files]
+    files.sort()
+    
+    return files, segment_s, metadata
+
+# def ground_truth_by_model(
+#     paths,
+#     model,
+#     label_column,
+#     annotations_filename="annotations.csv",
+#     overwrite=False,
+#     single_label=True,
+#     **kwargs,
+# ):
+#     if overwrite or not paths.labels_path.joinpath("ground_truth.npy").exists():
+
+#         path = model_specific_embedding_path(paths.main_embeds_path, model)
+
+#         label_df, label_idx_dict = load_labels_and_build_dict(
+#             paths, annotations_filename, main_label_column=label_column, **kwargs
+#         )
+
+#         files = list(path.rglob("*.npy"))
+#         files.sort()
+
+#         metadata = yaml.safe_load(open(path.joinpath("metadata.yml"), "r"))
+#         segment_s = metadata["segment_length (samples)"] / metadata["sample_rate (Hz)"]
+
+#         label_columns = [col for col in label_df.columns if "label:" in col]
+#         ground_truth_dict = {}
+#         for label_col in label_columns:
+#             labels = label_col.split("label:")[-1]
+#             ground_truth = collect_ground_truth_labels(
+#                 paths,
+#                 files,
+#                 model,
+#                 segment_s,
+#                 metadata,
+#                 label_df,
+#                 label_idx_dict[label_col],
+#                 single_label=single_label,
+#                 label_column=labels,
+#                 **kwargs,
+#             )
+
+#             ground_truth_dict.update({
+#                 f"label:{labels}": ground_truth,
+#                 f"label_dict:{labels}": label_idx_dict[label_col],
+#             })
+#         np.save(paths.labels_path.joinpath("ground_truth.npy"), ground_truth_dict)
+#     else:
+#         ground_truth_dict = np.load(
+#             paths.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
+#         ).item()
+#     return ground_truth_dict
 
 
 def generate_annotations_for_classification_task(paths, label_column, **kwargs):
@@ -897,7 +1138,7 @@ def turn_multilabel_into_singlelabel(df_full):
 
         dff = dff.sort_values("start")
         if dff.isna().sum().sum() > 0:
-            print(dff)
-            print("NA values in the dataframe")
+            logger.info(dff)
+            logger.info("NA values in the dataframe")
         df = pd.concat([df, dff], ignore_index=True)
     return df

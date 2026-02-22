@@ -676,7 +676,7 @@ def build_model(config, **kwargs):
 def cvt13(**kwargs):
 
     import importlib.resources as pkg_resources
-    from bacpipe.model_specific_utils.protoclr import config
+    from bacpipe.model_pipelines.model_specific_utils.protoclr import config
 
     with pkg_resources.open_text(config, "cvt-13-224x224.yaml") as f:
         cgf = yaml.load(f, Loader=yaml.CLoader)

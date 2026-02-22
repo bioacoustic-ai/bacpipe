@@ -1,6 +1,6 @@
 from torchaudio import transforms as T
 import torch
-from bacpipe.model_specific_utils.protoclr.cvt import cvt13
+from bacpipe.model_pipelines.model_specific_utils.protoclr.cvt import cvt13
 from ..model_utils import ModelBaseClass
 import yaml
 

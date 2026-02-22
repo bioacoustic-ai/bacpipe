@@ -79,7 +79,7 @@ def train_linear_classifier(
     # Training loop
     for epoch in range(num_epochs):
         linear_classifier.train()
-        print(f"Epoch {epoch+1}/{num_epochs}")
+        logger.info(f"Epoch {epoch+1}/{num_epochs}")
         running_loss = 0.0
         correct_train = 0
         total_train = 0
@@ -107,9 +107,9 @@ def train_linear_classifier(
         train_loss = running_loss / len(train_dataloader.dataset)
         train_accuracy = 100 * correct_train / total_train
 
-        # print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss}, Accuracy: {train_accuracy}")
+        # logger.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss}, Accuracy: {train_accuracy}")
 
-        print(
+        logger.info(
             f"Epoch [{epoch+1}/{num_epochs}], Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.2f}%"
         )
 
@@ -242,6 +242,6 @@ def train_knn_classifier(knn_classifier, train_dataloader, device="cpu", **kwarg
 
     # Train KNN
     knn_classifier.fit(all_embeddings, all_labels)
-    print("KNN Training Complete!")
+    logger.info("KNN Training Complete!")
 
     return knn_classifier

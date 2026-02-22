@@ -20,8 +20,8 @@ import enum
 import importlib
 
 from ml_collections import config_dict
-from bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo import hub
-from bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo import zoo_interface
+from bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo import hub
+from bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo import zoo_interface
 
 
 class ModelConfigName(enum.Enum):
@@ -86,26 +86,26 @@ def get_model_class(model_key: str) -> type[zoo_interface.EmbeddingModel]:
       'perch_v2_cpu',
       'surfperch',
   ):
-    module = importlib.import_module('bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.taxonomy_model_tf')
+    module = importlib.import_module('bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.taxonomy_model_tf')
     return _get_obj(module, 'TaxonomyModelTF')
   elif model_key == 'google_whale':
-    module = importlib.import_module('bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.models_tf')
+    module = importlib.import_module('bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.models_tf')
     return _get_obj(module, 'GoogleWhaleModel')
   elif model_key == 'placeholder_model':
-    module = importlib.import_module('bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.placeholder_model')
+    module = importlib.import_module('bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.placeholder_model')
     return _get_obj(module, 'PlaceholderModel')
   elif model_key == 'birdnet':
-    module = importlib.import_module('bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.models_tf')
+    module = importlib.import_module('bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.models_tf')
     return _get_obj(module, 'BirdNet')
   elif model_key == 'tfhub_model':
-    module = importlib.import_module('bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.models_tf')
+    module = importlib.import_module('bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.models_tf')
     return _get_obj(module, 'TFHubModel')
   elif model_key == 'aves':
-    module = importlib.import_module('bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.aves_model')
+    module = importlib.import_module('bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.aves_model')
     return _get_obj(module, 'AVES')
   elif model_key == 'handcrafted_features_model':
     module = importlib.import_module(
-        'bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.handcrafted_features_model'
+        'bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.handcrafted_features_model'
     )
     return _get_obj(module, 'HandcraftedFeaturesModel')
   else:
@@ -159,7 +159,7 @@ def get_preset_model_config(preset_name: str | ModelConfigName) -> PresetInfo:
     model_config.hop_size_s = 5.0
     model_config.sample_rate = 32000
     taxonomy_model_tf = importlib.import_module(
-        'bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.taxonomy_model_tf')
+        'bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.taxonomy_model_tf')
     model_config.tfhub_path = hub.PERCH_V2_SLUG
     model_config.tfhub_version = 2
     model_config.model_path = ''
@@ -170,7 +170,7 @@ def get_preset_model_config(preset_name: str | ModelConfigName) -> PresetInfo:
     model_config.hop_size_s = 5.0
     model_config.sample_rate = 32000
     taxonomy_model_tf = importlib.import_module(
-        'bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.taxonomy_model_tf')
+        'bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.taxonomy_model_tf')
     model_config.tfhub_path = hub.PERCH_V2_CPU_SLUG
     model_config.tfhub_version = 1
     model_config.model_path = ''
@@ -195,7 +195,7 @@ def get_preset_model_config(preset_name: str | ModelConfigName) -> PresetInfo:
     model_config.hop_size_s = 5.0
     model_config.sample_rate = 32000
     taxonomy_model_tf = importlib.import_module(
-        'bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.taxonomy_model_tf')
+        'bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.taxonomy_model_tf')
     model_config.tfhub_version = 1
     model_config.tfhub_path = hub.SURFPERCH_SLUG
     model_config.model_path = ''
@@ -239,7 +239,7 @@ def get_preset_model_config(preset_name: str | ModelConfigName) -> PresetInfo:
     model_config.embedding_index = -1
     model_config.logits_index = -1
   elif preset_name == ModelConfigName.AVES:
-    module = importlib.import_module('bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.aves_model')
+    module = importlib.import_module('bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.aves_model')
     model_key = 'aves'
     embedding_dim = 768
     model_config.sample_rate = 16000
@@ -248,7 +248,7 @@ def get_preset_model_config(preset_name: str | ModelConfigName) -> PresetInfo:
         'https://storage.googleapis.com/esp-public-files/ported_aves/aves-base-bio.onnx'
     )
   elif preset_name == ModelConfigName.BIRDAVES:
-    module = importlib.import_module('bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.aves_model')
+    module = importlib.import_module('bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.aves_model')
     model_key = 'aves'
     embedding_dim = 768
     model_config.sample_rate = 16000
@@ -263,7 +263,7 @@ def get_preset_model_config(preset_name: str | ModelConfigName) -> PresetInfo:
   elif preset_name == ModelConfigName.BEANS_BASELINE:
     model_key = 'handcrafted_features_model'
     module = importlib.import_module(
-        'bacpipe.model_specific_utils.perch_v2.perch_hoplite.zoo.handcrafted_features_model'
+        'bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.handcrafted_features_model'
     )
     model_class = _get_obj(module, 'HandcraftedFeaturesModel')
     model_config = model_class.beans_baseline_config()

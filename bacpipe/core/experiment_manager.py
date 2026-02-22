@@ -89,11 +89,11 @@ class Loader:
         self.audio_dir = Path(audio_dir)
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
+        self.continue_incomplete_run = False
 
         self._initialize_path_structure(testing=testing, **kwargs)
 
         self.check_if_combination_exists = check_if_combination_exists
-        self.continue_failed_run = False
 
         if self.dim_reduction_model:
             self.embed_suffix = ".json"
@@ -108,13 +108,11 @@ class Loader:
 
         if self.combination_already_exists or self.dim_reduction_model:
             self._get_embeddings()
-        else:
+        elif not hasattr(self, 'files'):
             self._get_audio_paths()
             self._init_metadata_dict()
 
-        if self.continue_failed_run:
-            self._get_metadata_from_created_embeddings()
-        elif not self.combination_already_exists:
+        if not self.combination_already_exists:
             self.embed_dir.mkdir(exist_ok=True, parents=True)
         else:
             logger.debug(
@@ -232,6 +230,7 @@ class Loader:
             # require that the model name and the audio dir are in the folder name
             if not (
                 self.model_name in d.stem 
+                and not self.combination_already_exists
                 and Path(self.audio_dir).stem in d.parts[-1]
                 ):
                 continue
@@ -252,7 +251,7 @@ class Loader:
                         "Ctrl + C and then remove "
                         f"the folder {d} manually.\n"
                     )
-                    self.continue_failed_run = True
+                    self.continue_incomplete_run = True
                     self.embed_dir = d
                     return d
             
@@ -320,7 +319,7 @@ class Loader:
             return
         elif (
             # allow 1 % deviation
-            np.round(num_files / num_audio_files, 1) == 1 
+            np.round(num_files / num_audio_files, 2) >= 0.99
             and num_files > 100
         ):
             self.combination_already_exists = True
@@ -335,15 +334,21 @@ class Loader:
                 f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
             )
             return
+        else:
+            
+            self.continue_incomplete_run = True
+            self.embed_dir = d
+            self.files = self.get_audio_files()
+            self._init_metadata_dict()
+            self._get_metadata_from_created_embeddings()
 
     def _get_audio_paths(self):
         self.files = self.get_audio_files()
         self.files.sort()
-        if not self.continue_failed_run:
-            self.embed_dir = (
-                Path(self.embed_parent_dir)
-                .joinpath(self._get_timestamp_dir())
-                )
+        self.embed_dir = (
+            Path(self.embed_parent_dir)
+            .joinpath(self._get_timestamp_dir())
+            )
 
     def _get_annotation_files(self):
         all_annotation_files = list(self.audio_dir.rglob("*.csv"))
@@ -354,10 +359,6 @@ class Loader:
         ]
 
     def get_audio_files(self):
-        if self.audio_dir == 'bacpipe/tests/test_data':
-            import importlib.resources as pkg_resources
-            with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
-                audio_dir = Path(audio_dir)
         files_list = []
         [
             [files_list.append(ll) for ll in self.audio_dir.rglob(f"*{string}")]
@@ -483,7 +484,7 @@ class Loader:
         if as_type == 'dict':
             return d
         elif as_type == 'array':
-            return np.array(d.values())
+            return np.vstack(list(d.values()))
 
     def _write_audio_file_to_metadata(self, file, model, embeddings, file_length):
         if (
@@ -508,6 +509,11 @@ class Loader:
         self.metadata_dict["total_dataset_length (s)"] = sum(
             self.metadata_dict["files"]["file_lengths (s)"]
         )
+        # sort files in case a run was continued and files were added
+        sorted_indices = np.argsort(self.metadata_dict["files"]["audio_files"])
+        for key, lists in self.metadata_dict["files"].items():
+            self.metadata_dict["files"][key] = np.array(lists)[sorted_indices].tolist()
+        
         with open(str(self.embed_dir.joinpath("metadata.yml")), "w") as f:
             yaml.safe_dump(self.metadata_dict, f)
 
@@ -592,9 +598,8 @@ class Loader:
                 embed_dict
                 )
             
-    def check_if_default_clfier_should_be_run(
-        self, paths, run_pretrained_classifier, 
-        testing, dim_reduction_model, **kwargs
+    def classifier_should_be_run(
+        self, paths, run_pretrained_classifier, testing, **kwargs
         ):
         
         if (
@@ -608,22 +613,14 @@ class Loader:
         ):
             if self.model_name in ['perch_v2', 'perch_bird', 'vggish', 'surfperch', 'google_whale']:
                 logger.warning(
-                    f"The google family of models (which {self.model_name} is part of) "
+                    f"\n \n The google family of models (which {self.model_name} is part of) "
                     "calculate embeddings and classifications at once, making it "
                     "impossible to only run the classifier, like with any other model. "
                     "Please remove the embeddings corresponding to this model and then "
                     "rerun bacpipe with the setting `run_pretrained_classifier` set to True. "
-                    "That way classification results will be saved immediately."
+                    "That way classification results will be saved immediately.\n \n"
                 )
-                return
-            embed = Embedder(
-                self.model_name, 
-                loader=self,
-                dim_reduction_model=False,
-                run_pretrained_classifier=run_pretrained_classifier,
-                **kwargs
-                )
-            if hasattr(embed.model, 'classifier_predictions'):
-                embed.classifier.run_default_clfier_and_save_results(self)
-
+                return False
+            else:
+                return True
 

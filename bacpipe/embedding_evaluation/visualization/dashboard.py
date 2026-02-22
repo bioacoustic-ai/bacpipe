@@ -9,15 +9,23 @@ logger = logging.getLogger("bacpipe")
 
 import importlib.resources as pkg_resources
 import bacpipe.imgs
-from .visualize import (
+from .visualize_embeddings import (
     plot_embeddings,
     plot_comparison,
+    EmbedAndLabelLoader,
+)
+from .visualize import (
     plot_clusterings,
     clustering_overview,
     plot_overview_metrics,
-    plot_classification_results,
-    EmbedAndLabelLoader,
 )
+from .visualize_spectrograms import SpectrogramPlot
+from .visualize_predictions import (
+    plot_classification_results, 
+    plot_classification_heatmap, 
+    PredictionsLoader
+    )
+    
 import bacpipe.embedding_evaluation.label_embeddings as le
 from bacpipe.embedding_evaluation.classification.train_classifier import LinearClassifier
 
@@ -26,7 +34,7 @@ sns.set_theme(style="whitegrid")
 matplotlib.use("agg")
 
 # Enable Panel
-pn.extension()
+pn.extension('plotly')
 from .dashboard_utils import DashBoardHelper
 
 class DashBoard(DashBoardHelper):
@@ -43,6 +51,7 @@ class DashBoard(DashBoardHelper):
     ):
         self.models = model_names
         self.default_label_keys = default_label_keys
+        self.audio_dir = audio_dir
         self.path_func = le.make_set_paths_func(
             audio_dir, main_results_dir, dim_reduc_parent_dir, **kwargs
         )
@@ -82,29 +91,98 @@ class DashBoard(DashBoardHelper):
             default_label_keys=default_label_keys,
             **kwargs,
         )
+        
+        self.interactive_embedding_plot = True
 
         self.model_select = dict()
         self.label_select = dict()
         self.noise_select = dict()
+        self.autoplay_audio_select = dict()
         self.clfier_select = dict()
         self.species_select = dict()
         self.accumulate_select = dict()
         self.class_select = dict()
         self.embed_plot = dict()
         
+        self.interactive_embed_plot = dict()
+        self.spectrogram_plot_panel = dict()
+        self.spec_plot_obj = dict() 
+        self._trigger_spec_obj_update = dict()
+        
+        self.class_options = dict()
+        self.preds_data = dict()
+        self.clfier_path = dict()
+        self.clfier_thresh = dict()
+        self.btn_run_clfier = dict()
+        self.progress_bar = dict()
+        self.trigger_classification = dict()
+        self.loading_test_placeholder = dict()
+        
         self.heatmap_plot = dict()
         self.kwargs = kwargs
 
-    def single_model_page(self, widget_idx):
-        sidebar = self.make_sidebar(widget_idx, model=True)
-
-        main_content = pn.Column(
-            pn.pane.Markdown(f"## Model Dashboard"),
-            pn.Accordion(
+    def embedding_panel(self, widget_idx=0):
+        if not self.interactive_embedding_plot:
+            embedding_plot = self.init_plot(
+                            # self.init_interactive_plot(
+                                "embed",
+                                plot_embeddings,
+                                widget_idx,
+                                loader=self.vis_loader,
+                                model_name=self.model_select[widget_idx],
+                                label_by=self.label_select[widget_idx],
+                                ground_truth=self.ground_truth,
+                                dim_reduction_model=self.dim_reduction_model,
+                                remove_noise=(
+                                    self.noise_select[widget_idx]
+                                    if len(self.noise_select.keys()) > 0
+                                    else False
+                                ),
+                                dashboard=True,
+                                dashboard_idx=widget_idx,
+                            )
+        else:
+            
+            self.interactive_embed_plot[widget_idx] = pn.pane.Plotly(
+                config={'responsive': True},
+                sizing_mode='stretch_both'
+            )
+            self.interactive_embed_plot[widget_idx].param.watch(
+                lambda x: self.handle_click(x, widget_idx), 'click_data'
+                )
+            self.interactive_embed_plot[widget_idx].param.watch(
+                lambda x: self.handle_selection(x, widget_idx), 'selected_data'
+                )           
+             
+            embedding_info_dialogue = pn.widgets.StaticText(
+                    value="", width=400
+                    )
+            
+            self.spec_plot_obj[widget_idx] = SpectrogramPlot(
+                self.audio_dir, self.vis_loader, 
+                self.model_select[widget_idx], 
+                embedding_info_dialogue,
+                **self.kwargs
+                )
+            
+            self._trigger_spec_obj_update[widget_idx] = pn.bind(
                 (
-                    "2D Embedding Plot",
-                    self.init_plot(
-                        "embed",
+                    self.spec_plot_obj[widget_idx]._update_spec_obj
+                ),
+                self.model_select[widget_idx],
+                self.autoplay_audio_select[widget_idx]
+            )
+            
+            self.spectrogram_plot_panel[widget_idx] = pn.pane.Plotly(
+                    SpectrogramPlot.dummy_image(title=''), 
+                    sizing_mode='stretch_width',
+                    height=300
+                )
+            
+            embedding_plot = pn.bind(
+                        self.update_main_plot,
+                        # self.init_plot,
+                        "interactive_embed",
                         plot_embeddings,
                         widget_idx,
                         loader=self.vis_loader,
@@ -119,7 +197,48 @@ class DashBoard(DashBoardHelper):
                         ),
                         dashboard=True,
                         dashboard_idx=widget_idx,
-                    ),
+                        )
+            
+            play_audio_button = pn.widgets.Button(name="Play audio", button_type="primary")
+            play_audio_button.on_click(self.spec_plot_obj[widget_idx].play_audio)
+            save_selection_dialogue = pn.widgets.StaticText(
+                    value="", width=400
+                    )
+            
+            save_selection_button = pn.widgets.Button(
+                name="Save selection to file", button_type="primary"
+                )
+            save_selection_button.on_click(
+                lambda x: self.save_selected_points(
+                    x, save_selection_dialogue, widget_idx
+                    )
+                )
+            save_selection_dialogue.visible = False
+            
+            
+        return pn.Column(
+            embedding_plot,
+            embedding_info_dialogue,
+            self.spectrogram_plot_panel[widget_idx],
+            save_selection_dialogue,
+            pn.Row(
+                play_audio_button,
+                save_selection_button
+            ),
+            pn.widgets.StaticText(value="", height=80)
+        )
+    
+
+
+    def single_model_page(self, widget_idx):
+        sidebar = self.make_sidebar(widget_idx, model=True)
+    
+        main_content = pn.Column(
+            pn.pane.Markdown(f"## Model Dashboard"),
+            pn.Accordion(
+                (
+                    "2D Embedding Plot",
+                    self.embedding_panel(widget_idx)
                 ),
                 (
                     "Clustering Results",
@@ -169,7 +288,7 @@ class DashBoard(DashBoardHelper):
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
 
     def all_models_page(self, widget_idx):
-        sidebar = self.make_sidebar(widget_idx, model=False)
+        sidebar = self.make_sidebar(widget_idx, model=False, all_models=True)
 
         main_content = pn.Column(
             pn.pane.Markdown("## All Models Dashboard"),
@@ -245,91 +364,127 @@ class DashBoard(DashBoardHelper):
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
     
     def apply_clfier_page(self, widget_idx):
-        self.class_options = []
+        self.class_options[widget_idx] = []
         sidebar = self.make_sidebar(widget_idx, model=True, classifier_page=True)
-        self.class_tuples = []
         
         # input box where i can input the path to the linear classifier
-        clfier_path = pn.widgets.TextInput(
+        self.clfier_path[widget_idx] = pn.widgets.TextInput(
                 name='Path to Linear Classifier', 
                 placeholder=(
                     self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
                     ).as_posix(),
                 width=800,
-                max_length=800
+                max_length=800,
+                visible=False
                 )
         
-        clfier_thresh = pn.widgets.TextInput(
+        self.clfier_thresh[widget_idx] = pn.widgets.TextInput(
             name='Threshold for classification', 
             placeholder='0.5',
             width=80,
             )
         
         from src.btn_icon import icon_str
-        self.btn_run_clfier = pn.widgets.Button(
-            name='Apply linear classifier', 
+        self.btn_run_clfier[widget_idx] = pn.widgets.Button(
+            # name='Apply linear classifier', 
+            name='Load predictions from integrated classifier', 
             icon=icon_str, 
             width=100, 
             height=30,
             )
+
         
-        
-        self.progress_bar = pn.indicators.Progress(
+        self.progress_bar[widget_idx] = pn.indicators.Progress(
             value=0,
             max=100,
             bar_color='primary',
             width=800
         )
         
-        self.trigger_classification = pn.bind(
-            self.classify_embeddings, 
-            self.model_select[widget_idx], 
-            clfier_path, 
-            clfier_thresh
-            )
-        
-        self.loading_test_placeholder = pn.widgets.StaticText(
+        self.loading_test_placeholder[widget_idx] = pn.widgets.StaticText(
             name='Preparing classification', 
             value=''
             )
             
+        self.clfier_select[widget_idx].param.watch(
+            lambda x: self.change_input_options(x, widget_idx=widget_idx),
+            'value'
+        )
+        
+        
+        self.preds_data[widget_idx] = PredictionsLoader(
+            self.vis_loader,
+            self.path_func,
+            self.models,
+            panel_selection=self.species_select[widget_idx],
+            progress_bar=self.progress_bar[widget_idx],
+            loading_pane=self.loading_test_placeholder[widget_idx]
+            )
+        
+        self.btn_run_clfier[widget_idx].on_click(
+            lambda x: self.update_main_plot(
+                "heatmap",
+                plot_classification_heatmap,
+                widget_idx=widget_idx,
+                event=x,
+                predictions_loader=self.preds_data[widget_idx],
+                model=self.model_select[widget_idx], 
+                accumulate_by=self.accumulate_select[widget_idx], 
+                species=self.species_select[widget_idx],
+                threshold=self.clfier_thresh[widget_idx],
+                clfier_path=self.clfier_path[widget_idx],
+                clfier_type=self.clfier_select[widget_idx]
+            )
+        )
+        
+        
         main_content = pn.Column(
             pn.pane.Markdown("## All Models Dashboard"),
             pn.Accordion(
                 (
                     "Classification settings",
                     pn.Column(
-                        clfier_path,
+                        # trigger_input_options,
+                        self.clfier_path[widget_idx],
                 
                         # after that show me the classes that this 
                         # linear classifier will classify
                         pn.widgets.StaticText(
                             name='Classes', 
-                            value=pn.bind(self.get_classes, clfier_path)
+                            value=pn.bind(
+                                self.preds_data[widget_idx].get_classes, 
+                                self.clfier_path[widget_idx]
+                                )
                             ),
                 
                         # input section to give a threshold for classification
-                        clfier_thresh,
+                        self.clfier_thresh[widget_idx],
                     
                         # button to click run
-                        self.btn_run_clfier,
+                        self.btn_run_clfier[widget_idx],
                         
                         # placeholder textbox to show that something 
                         # is happening while waiting on embeddings to load
-                        self.loading_test_placeholder,
+                        self.loading_test_placeholder[widget_idx],
                                     
                         # progbar
-                        self.progress_bar,
+                        self.progress_bar[widget_idx],
                     )
                 ),
                 (
                     "Classification heatmap",
-                    # heatmap for 20 top species
-                    pn.bind(self.prepare_heatmap,
-                            clfier_thresh,
-                            model=self.model_select[widget_idx], 
-                            clfier_type=self.clfier_select[widget_idx],
-                            progress=self.btn_run_clfier)
+                    self.init_plot(
+                        "heatmap",
+                        plot_classification_heatmap, 
+                        widget_idx=widget_idx,
+                        event=None,
+                        predictions_loader=self.preds_data[widget_idx],
+                        model=self.model_select[widget_idx], 
+                        accumulate_by=self.accumulate_select[widget_idx], 
+                        species=self.species_select[widget_idx],
+                        threshold=self.clfier_thresh[widget_idx]
+                        )
+                    
                 ),
                 active=[0, 1, 2],
                 # by default create all annotations as one big annotations file
@@ -340,7 +495,9 @@ class DashBoard(DashBoardHelper):
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
         
 
-    def make_sidebar(self, widget_idx, model=True, classifier_page=False):
+    def make_sidebar(
+        self, widget_idx, model=True, classifier_page=False, all_models=False
+        ):
         widgets = [pn.pane.Markdown("## Settings")]
 
         if model:
@@ -355,7 +512,7 @@ class DashBoard(DashBoardHelper):
                         widget_idx, "label", name="Label by", options=self.label_by
                     ),
                     (
-                        pn.widgets.StaticText(name="", value="Remove noise?")
+                        pn.widgets.StaticText(name="", value="View only annotated?")
                         if not self.ground_truth is None
                         else None
                     ),
@@ -363,12 +520,35 @@ class DashBoard(DashBoardHelper):
                         self.init_widget(
                             widget_idx,
                             "noise",
-                            name="Remove Noise",
+                            name="remove_noise",
                             options=[True, False],
                             attr="RadioBoxGroup",
                             value=False,
                         )
                         if not self.ground_truth is None
+                        else None
+                    ),
+                    (
+                        pn.widgets.StaticText(name="", value="Autoplay audio?")
+                        if not (
+                            self.interactive_embedding_plot is None
+                            or all_models is True
+                            )
+                        else None
+                    ),
+                    (
+                        self.init_widget(
+                            widget_idx,
+                            "autoplay_audio",
+                            name="Autoplay audio",
+                            options=[True, False],
+                            attr="RadioBoxGroup",
+                            value=False,
+                        )
+                        if not (
+                            self.interactive_embedding_plot is None
+                            or all_models is True
+                            )
                         else None
                     ),
                     (
@@ -398,7 +578,7 @@ class DashBoard(DashBoardHelper):
                         widget_idx, 
                         w_type='species', 
                         name='Select species', 
-                        options=self.class_options
+                        options=self.class_options[widget_idx]
                         ),
                     self.init_widget(
                         widget_idx, 
@@ -425,11 +605,14 @@ class DashBoard(DashBoardHelper):
         model0_page = self.single_model_page(0)
         model1_page = self.single_model_page(1)
         model_all_page = self.all_models_page(1)
-        apply_classifier_page = self.apply_clfier_page(0)
+        apply_classifier0_page = self.apply_clfier_page(0)
+        apply_classifier1_page = self.apply_clfier_page(1)
 
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
         sidebar1, content1 = model1_page.objects
+        sidebar2, content2 = apply_classifier0_page.objects
+        sidebar3, content3 = apply_classifier1_page.objects
 
         # Wrap sidebars with titles
         sidebar0 = pn.Column(
@@ -450,10 +633,19 @@ class DashBoard(DashBoardHelper):
                 ),
             ),
             ("All models", model_all_page),
-            ("Apply Classifer", apply_classifier_page)
+            ("Apply Classifer", apply_classifier1_page),
+            (
+                "Two classifiers",
+                pn.Row(
+                    pn.Column(sidebar2, sidebar3),
+                    pn.Row(content2, content3),
+                    sizing_mode="stretch_both",
+                ),
+            ),
+            
         )
         
-        self.add_styling(model1_page, model_all_page, apply_classifier_page)
+        self.add_styling(model1_page, model_all_page, apply_classifier1_page)
         
     def add_styling(self, *pages):
         with pkg_resources.path(bacpipe.imgs, 'bacpipe_unlabelled.png') as p:
@@ -487,83 +679,12 @@ class DashBoard(DashBoardHelper):
             close_button = pn.widgets.Button(name="❌ close dashboard")
 
             def shutdown_callback(event):
-                print("Shutting down dashboard server...")
+                logger.info("Shutting down dashboard server...")
                 sys.exit(0)
 
             close_button.on_click(shutdown_callback)
 
             sidebar.append(close_button)
-        
-
-    def add_save_button(self, plot_func, **kwargs):
-        """
-        Adds a save button to the plot panel that allows saving the figure
-        generated by the provided plotting function. The button will save the
-        figure with a filename based on the model name and plot type.
-
-        Parameters
-        ----------
-        plot_func : function
-            The plotting function that generates the figure to be saved.
-
-        Returns
-        -------
-        pn.Column
-            A Panel Column containing the figure panel, a button to save the figure,
-            and a notification area to inform the user about the save status.
-        """
-        # Create the figure panel first using pn.bind
-        fig_panel = pn.panel(pn.bind(plot_func, **kwargs))
-
-        # Define the save function that correctly handles panel widget values
-        def save_figure(event):
-            # Create a copy of kwargs to modify for the direct function call
-            plot_kwargs = {}
-            for key, value in kwargs.items():
-                # Handle panel widgets by getting their value
-                if hasattr(value, "value"):
-                    plot_kwargs[key] = value.value
-                else:
-                    plot_kwargs[key] = value
-
-            # Generate the figure with the processed arguments
-            fig = plot_func(**plot_kwargs)
-
-            # Generate filename based on processed arguments
-            if "model_name" in plot_kwargs:
-                model_name = plot_kwargs["model_name"]
-            else:
-                model_name = "all_models"
-
-            plot_type = plot_func.__name__.replace("plot_", "")
-            default_filename = "{}_{}_{}.png".format(
-                model_name, plot_type, kwargs["label_by"].value
-            )
-
-            # Determine save path
-            if model_name == "all_models":
-                save_dir = (
-                    self.path_func(model_name).plot_path.parent.parent / "overview"
-                )
-            else:
-                save_dir = self.path_func(model_name).plot_path
-            save_dir.mkdir(exist_ok=True, parents=True)
-            save_path = save_dir / default_filename
-
-            # Save the figure
-            fig.savefig(save_path, dpi=300, bbox_inches="tight")
-
-            # Show a notification that saving was successful
-            notification.object = f"✓ Figure saved to: {save_path}"
-
-        # Create the button and notification area
-        button = pn.widgets.Button(name="Save Figure", button_type="primary")
-        button.on_click(save_figure)
-        notification = pn.pane.Markdown("")
-
-        # Return the assembled panel
-        return pn.Column(fig_panel, pn.Row(button), notification)
-
 
 def visualize_using_dashboard(models, **kwargs):
     """

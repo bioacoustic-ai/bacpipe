@@ -191,7 +191,7 @@ Here is an example:
 
 ```python 
 import torch
-from bacpipe.model_specific_utils.newmodel.module import MyClass
+from bacpipe.model_pipelines.model_specific_utils.newmodel.module import MyClass
 from .utils import ModelBaseClass
 
 SAMPLE_RATE = 12345

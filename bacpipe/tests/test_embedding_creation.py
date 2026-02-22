@@ -40,7 +40,9 @@ kwargs = {**config, **settings}
 
 
 embeddings = {}
-with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
+# with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
+#     audio_dir = Path(audio_dir)
+with pkg_resources.path(bacpipe.tests, "test_data") as audio_dir:
     audio_dir = Path(audio_dir)
 kwargs["audio_dir"] = audio_dir
 get_paths = make_set_paths_func(**kwargs)
@@ -87,7 +89,7 @@ def test_evaluation(model):
     paths = get_paths(model)
 
     try:
-        ground_truth = ground_truth_by_model(paths, model, **kwargs)
+        ground_truth = ground_truth_by_model(model, paths=paths, **kwargs)
     except FileNotFoundError:
         ground_truth = None
 
