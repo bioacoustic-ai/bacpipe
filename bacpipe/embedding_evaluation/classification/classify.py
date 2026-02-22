@@ -16,7 +16,7 @@ from .train_classifier import (
     train_knn_classifier,
 )
 from .evaluate_classifier import compute_task_metrics, save_classification
-from bacpipe.embedding_evaluation.visualization.visualize import (
+from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
     plot_classification_results,
 )
 

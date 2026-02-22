@@ -19,9 +19,11 @@ from bacpipe.embedding_evaluation.visualization.dashboard import (
 )
 
 from bacpipe.embedding_evaluation.visualization.visualize import (
+    visualise_results_across_models,
+)
+from bacpipe.embedding_evaluation.visualization.visualize_embeddings import (
     plot_comparison,
     plot_embeddings,
-    visualise_results_across_models,
     EmbedAndLabelLoader,
 )
 from bacpipe.embedding_evaluation.label_embeddings import (
@@ -417,6 +419,14 @@ def model_specific_evaluation(
             except FileNotFoundError as e:
                 ground_truth = None
 
+
+
+        ####################################################################
+        ############      PROBING OF EMBEDDINGS THROUGH       ##############
+        ############      LINEAR AND KNN CLASSIFICATION       ##############
+        ############            SEE SETTINGS.YAML             ##############
+        ####################################################################
+        
         if "classification" in evaluation_task and not ground_truth is None:
             logger.info(
                 "\nTraining classifier to evaluate " f"{model_name.upper()} embeddings"
@@ -445,6 +455,11 @@ def model_specific_evaluation(
                         paths, class_embeds, **class_config, **kwargs
                     )
 
+        ####################################################################
+        ############      CLUSTERING OF EMBEDDINGS THROUGH    ##############
+        ######      KMEANS (AND WHATEVER SPECIFIED IN SETTINGS.YAML)   #####
+        ####################################################################
+                    
         if "clustering" in evaluation_task:
             logger.info(
                 "\nGenerating clusterings to evaluate "

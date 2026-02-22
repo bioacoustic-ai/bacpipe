@@ -9,16 +9,19 @@ logger = logging.getLogger("bacpipe")
 
 import importlib.resources as pkg_resources
 import bacpipe.imgs
-from .visualize import (
+from .visualize_embeddings import (
     plot_embeddings,
     plot_comparison,
+    EmbedAndLabelLoader,
+)
+from .visualize import (
     plot_clusterings,
     clustering_overview,
     plot_overview_metrics,
-    plot_classification_results,
-    EmbedAndLabelLoader,
-    SpectrogramPlot
 )
+from .visualize_spectrograms import SpectrogramPlot
+from .visualize_predictions import plot_classification_results
+    
 import bacpipe.embedding_evaluation.label_embeddings as le
 from bacpipe.embedding_evaluation.classification.train_classifier import LinearClassifier
 
@@ -90,6 +93,7 @@ class DashBoard(DashBoardHelper):
         self.model_select = dict()
         self.label_select = dict()
         self.noise_select = dict()
+        self.autoplay_audio_select = dict()
         self.clfier_select = dict()
         self.species_select = dict()
         self.accumulate_select = dict()
@@ -97,25 +101,16 @@ class DashBoard(DashBoardHelper):
         self.embed_plot = dict()
         
         self.interactive_embed_plot = dict()
-        self.spectrogram_plot = dict()
-        self.spectrogram_plot_obj = dict() 
-
-        
-        # self.main_plot_pane = pn.pane.Plotly(
-        #     # sizing_mode='stretch_both', 
-        #     min_height=600
-        # )
-        # # Attach the watcher IMMEDIATELY
-        # self.main_plot_pane.param.watch(self.handle_click, 'click_data')
-        
-        # self.main_plot_pane.param.watch(self.handle_selection, 'selected_data')
+        self.spectrogram_plot_panel = dict()
+        self.spec_plot_obj = dict() 
+        self._trigger_spec_obj_update = dict()
         
         self.heatmap_plot = dict()
         self.kwargs = kwargs
 
     def col(self, widget_idx=0):
         if not self.interactive_embedding_plot:
-            updater = self.init_plot(
+            embedding_plot = self.init_plot(
                             # self.init_interactive_plot(
                                 "embed",
                                 plot_embeddings,
@@ -135,25 +130,37 @@ class DashBoard(DashBoardHelper):
                             )
         else:
             self.interactive_embed_plot[widget_idx] = pn.pane.Plotly(
-                # sizing_mode='stretch_both', 
-                min_height=600
-                )
+                config={'responsive': True},
+                sizing_mode='stretch_both'
+            )
             self.interactive_embed_plot[widget_idx].param.watch(
                 lambda x: self.handle_click(x, widget_idx), 'click_data'
                 )
             self.interactive_embed_plot[widget_idx].param.watch(
                 lambda x: self.handle_selection(x, widget_idx), 'selected_data'
+                )            
+            embedding_info_dialogue = pn.widgets.StaticText(
+                    value="", width=400
+                    )
+            self.spec_plot_obj[widget_idx] = SpectrogramPlot(
+                self.audio_dir, self.vis_loader, 
+                self.model_select[widget_idx], 
+                embedding_info_dialogue,
+                **self.kwargs
                 )
-            
-            self.spectrogram_plot_obj[widget_idx] = SpectrogramPlot(
-                self.audio_dir, **self.kwargs
-                )
-            self.spectrogram_plot[widget_idx] = pn.pane.Plotly(
+            self._trigger_spec_obj_update[widget_idx] = pn.bind(
+                (
+                    self.spec_plot_obj[widget_idx]._update_spec_obj
+                ),
+                self.model_select[widget_idx],
+                self.autoplay_audio_select[widget_idx]
+            )
+            self.spectrogram_plot_panel[widget_idx] = pn.pane.Plotly(
                     SpectrogramPlot.dummy_image(), 
                     sizing_mode='stretch_width',
                     height=300
                 )
-            updater = pn.bind(
+            embedding_plot = pn.bind(
                         self.update_main_plot,
                         plot_embeddings,
                         widget_idx,
@@ -170,13 +177,30 @@ class DashBoard(DashBoardHelper):
                         dashboard=True,
                         dashboard_idx=widget_idx,
                         )
+            play_audio_button = pn.widgets.Button(name="Play audio", button_type="primary")
+            play_audio_button.on_click(self.spec_plot_obj[widget_idx].play_audio)
+            save_selection_dialogue = pn.widgets.StaticText(
+                    value="", width=400
+                    )
+            save_selection_button = pn.widgets.Button(
+                name="Save selection to file", button_type="primary"
+                )
+            save_selection_button.on_click(
+                lambda x: self.save_selected_points(
+                    x, save_selection_dialogue, widget_idx
+                    )
+                )
+            save_selection_dialogue.visible = False
         return pn.Column(
-            "2D Embedding Plot",
-            updater,
-            self.spectrogram_plot[widget_idx] 
-            #     if len(self.spectrogram_plot) > 0 else None
-            # )
-            # self.main_plot_pane
+            embedding_plot,
+            embedding_info_dialogue,
+            self.spectrogram_plot_panel[widget_idx],
+            save_selection_dialogue,
+            pn.Row(
+                play_audio_button,
+                save_selection_button
+            ),
+            pn.widgets.StaticText(value="", height=80)
         )
     
 
@@ -188,6 +212,7 @@ class DashBoard(DashBoardHelper):
             pn.pane.Markdown(f"## Model Dashboard"),
             pn.Accordion(
                 (
+                    "2D Embedding Plot",
                     self.col(widget_idx)
                 ),
                 (
@@ -238,7 +263,7 @@ class DashBoard(DashBoardHelper):
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
 
     def all_models_page(self, widget_idx):
-        sidebar = self.make_sidebar(widget_idx, model=False)
+        sidebar = self.make_sidebar(widget_idx, model=False, all_models=True)
 
         main_content = pn.Column(
             pn.pane.Markdown("## All Models Dashboard"),
@@ -409,7 +434,9 @@ class DashBoard(DashBoardHelper):
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
         
 
-    def make_sidebar(self, widget_idx, model=True, classifier_page=False):
+    def make_sidebar(
+        self, widget_idx, model=True, classifier_page=False, all_models=False
+        ):
         widgets = [pn.pane.Markdown("## Settings")]
 
         if model:
@@ -424,7 +451,7 @@ class DashBoard(DashBoardHelper):
                         widget_idx, "label", name="Label by", options=self.label_by
                     ),
                     (
-                        pn.widgets.StaticText(name="", value="Remove noise?")
+                        pn.widgets.StaticText(name="", value="View only annotated?")
                         if not self.ground_truth is None
                         else None
                     ),
@@ -432,12 +459,35 @@ class DashBoard(DashBoardHelper):
                         self.init_widget(
                             widget_idx,
                             "noise",
-                            name="Remove Noise",
+                            name="remove_noise",
                             options=[True, False],
                             attr="RadioBoxGroup",
                             value=False,
                         )
                         if not self.ground_truth is None
+                        else None
+                    ),
+                    (
+                        pn.widgets.StaticText(name="", value="Autoplay audio?")
+                        if not (
+                            self.interactive_embedding_plot is None
+                            or all_models is True
+                            )
+                        else None
+                    ),
+                    (
+                        self.init_widget(
+                            widget_idx,
+                            "autoplay_audio",
+                            name="Autoplay audio",
+                            options=[True, False],
+                            attr="RadioBoxGroup",
+                            value=False,
+                        )
+                        if not (
+                            self.interactive_embedding_plot is None
+                            or all_models is True
+                            )
                         else None
                     ),
                     (
@@ -574,77 +624,6 @@ class DashBoard(DashBoardHelper):
             close_button.on_click(shutdown_callback)
 
             sidebar.append(close_button)
-        
-
-    def add_save_button(self, plot_func, **kwargs):
-        """
-        Adds a save button to the plot panel that allows saving the figure
-        generated by the provided plotting function. The button will save the
-        figure with a filename based on the model name and plot type.
-
-        Parameters
-        ----------
-        plot_func : function
-            The plotting function that generates the figure to be saved.
-
-        Returns
-        -------
-        pn.Column
-            A Panel Column containing the figure panel, a button to save the figure,
-            and a notification area to inform the user about the save status.
-        """
-        # Create the figure panel first using pn.bind
-        fig_panel = pn.panel(pn.bind(plot_func, **kwargs))
-
-        # Define the save function that correctly handles panel widget values
-        def save_figure(event):
-            # Create a copy of kwargs to modify for the direct function call
-            plot_kwargs = {}
-            for key, value in kwargs.items():
-                # Handle panel widgets by getting their value
-                if hasattr(value, "value"):
-                    plot_kwargs[key] = value.value
-                else:
-                    plot_kwargs[key] = value
-
-            # Generate the figure with the processed arguments
-            fig = plot_func(**plot_kwargs)
-
-            # Generate filename based on processed arguments
-            if "model_name" in plot_kwargs:
-                model_name = plot_kwargs["model_name"]
-            else:
-                model_name = "all_models"
-
-            plot_type = plot_func.__name__.replace("plot_", "")
-            default_filename = "{}_{}_{}.png".format(
-                model_name, plot_type, kwargs["label_by"].value
-            )
-
-            # Determine save path
-            if model_name == "all_models":
-                save_dir = (
-                    self.path_func(model_name).plot_path.parent.parent / "overview"
-                )
-            else:
-                save_dir = self.path_func(model_name).plot_path
-            save_dir.mkdir(exist_ok=True, parents=True)
-            save_path = save_dir / default_filename
-
-            # Save the figure
-            fig.savefig(save_path, dpi=300, bbox_inches="tight")
-
-            # Show a notification that saving was successful
-            notification.object = f"✓ Figure saved to: {save_path}"
-
-        # Create the button and notification area
-        button = pn.widgets.Button(name="Save Figure", button_type="primary")
-        button.on_click(save_figure)
-        notification = pn.pane.Markdown("")
-
-        # Return the assembled panel
-        return pn.Column(fig_panel, pn.Row(button), notification)
-
 
 def visualize_using_dashboard(models, **kwargs):
     """

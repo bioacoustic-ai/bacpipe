@@ -4,17 +4,20 @@ import json
 import seaborn as sns
 import numpy as np
 import pandas as pd
-
+import datetime
 import torch.nn.functional as F
 import torch
+import logging
+
+logger = logging.getLogger("bacpipe")
 
 from pathlib import Path
 from bacpipe.embedding_evaluation.classification.train_classifier import LinearClassifier
 
-from bacpipe.embedding_evaluation.visualization.visualize import (
+from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
     plot_classification_heatmap,
-    SpectrogramPlot
     )
+from bacpipe.embedding_evaluation.visualization.visualize_spectrograms import SpectrogramPlot
 
 sns.set_theme(style="whitegrid")
 
@@ -29,58 +32,81 @@ class DashBoardHelper:
         """
         if not event.new: 
             return
-            
-        # event.new contains a dictionary with the selected points
-        # Structure: {'points': [{'pointIndex': 0, 'customdata': [...], ...}, ...]}
+        
         try:
             selected_points = event.new.get('points', [])
             
             if not selected_points:
-                print("Selection cleared")
+                logger.info("Selection cleared")
                 return
 
-            print(f"Selected {len(selected_points)} points")
+            logger.info(f"Selected {len(selected_points)} points")
             
             # Extract data from the selected points
-            # Remember your custom_data order: ['filename', 'start', 'end', 'idx']
-            filenames = [p['customdata'][0] for p in selected_points]
+            points = {}
+            for idx, keys in enumerate(
+                ['audiofilename', 'start', 'end', 'index', 'label']
+                ):
+                points[keys] = [p['customdata'][idx] for p in selected_points]
             
-            # Example Action: Filter a dataframe or update a list
-            print(f"First 5 files: {filenames[:5]}")
-            
-            # --- YOUR LOGIC HERE ---
-            # e.g., self.filter_table(filenames)
+            self.spec_plot_obj[widget_idx]._cache_selected_points(points)
+            logger.info(f"First 5 files: {points['audiofilename'][:5]}")
             
         except Exception as e:
-            print(f"Error handling selection: {e}")
+            logger.info(f"Error handling selection: {e}")
+
+
+            
+    def save_selected_points(self, event, dialogue_panel, widget_idx):            
+            if not hasattr(self.spec_plot_obj[widget_idx], 'selected_points'):
+                dialogue_panel.visible = True
+                dialogue_panel.value = "No points have been selected."
+                return 
+            
+            points = self.spec_plot_obj[widget_idx].selected_points
+            df = pd.DataFrame(points)
+            timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            file_name = timestamp + '_selected_points.csv'
+            
+            self._trigger_spec_obj_update[widget_idx]()
+            model_name = self.spec_plot_obj[widget_idx].model_name
+            save_path = self.path_func(model_name).plot_path
+            
+            df.to_csv(save_path / file_name)
+            
+            dialogue_panel.visible = True
+            dialogue_panel.value = (
+                f"{len(df)} selected points were save to "
+                + str(save_path / file_name)
+                )
     
     def handle_click(self, event, widget_idx = 0):
         if not event.new: return
         try:
             point_data = event.new['points'][0]
-            print(f"DEBUG CLICK: {point_data}")
+            logger.info(f"DEBUG CLICK: {point_data}")
+            
+            # this ensures that the sample rate and 
+            # input segment length are set specific to the
+            # currently used model
+            self._trigger_spec_obj_update[widget_idx]()
             
             # Generate the new figure
             # new_fig = self.update_spectrogram(point_data)
-            new_fig = self.spectrogram_plot_obj[widget_idx].update_spectrogram(clickData=point_data)
+            new_fig = (
+                self.spec_plot_obj[widget_idx]
+                .update_spectrogram(clickData=point_data)
+                )
             
-            # CRITICAL FIX: Update the EXISTING pane's object
-            # self.spectrogram_plot.object = new_fig
-            self.spectrogram_plot[widget_idx].object = new_fig
             
-            # Your logic here...
+            self.spectrogram_plot_panel[widget_idx].object = new_fig
+            
+            if self.spec_plot_obj[widget_idx].bool_autoplay_audio:
+                self.spec_plot_obj[widget_idx].play_audio(event=None)
+            
+            
         except Exception as e:
-            print(f"Error handling click: {e}")
-            
-    def clear_selection(self, event=None, widget_idx = 0):
-        if len(self.interactive_embed_plot) == 0:
-            return
-        # Setting selection_data to None doesn't always clear the visual highlight
-        # You usually have to redraw the plot or trigger a relayout.
-        self.interactive_embed_plot[widget_idx].selection_data = None
-        # Trigger a re-plot if necessary to reset visuals
-        # self.update_main_plot(...)
-        
+            logger.info(f"Error handling click: {e}")    
     
     def update_main_plot(self, plot_func, widget_idx, **kwargs):
         if len(self.interactive_embed_plot) == 0:
@@ -357,3 +383,75 @@ class DashBoardHelper:
             threshold=threshold
             )
         
+        
+
+        
+
+    def add_save_button(self, plot_func, **kwargs):
+        """
+        Adds a save button to the plot panel that allows saving the figure
+        generated by the provided plotting function. The button will save the
+        figure with a filename based on the model name and plot type.
+
+        Parameters
+        ----------
+        plot_func : function
+            The plotting function that generates the figure to be saved.
+
+        Returns
+        -------
+        pn.Column
+            A Panel Column containing the figure panel, a button to save the figure,
+            and a notification area to inform the user about the save status.
+        """
+        # Create the figure panel first using pn.bind
+        fig_panel = pn.panel(pn.bind(plot_func, **kwargs))
+
+        # Define the save function that correctly handles panel widget values
+        def save_figure(event):
+            # Create a copy of kwargs to modify for the direct function call
+            plot_kwargs = {}
+            for key, value in kwargs.items():
+                # Handle panel widgets by getting their value
+                if hasattr(value, "value"):
+                    plot_kwargs[key] = value.value
+                else:
+                    plot_kwargs[key] = value
+
+            # Generate the figure with the processed arguments
+            fig = plot_func(**plot_kwargs)
+
+            # Generate filename based on processed arguments
+            if "model_name" in plot_kwargs:
+                model_name = plot_kwargs["model_name"]
+            else:
+                model_name = "all_models"
+
+            plot_type = plot_func.__name__.replace("plot_", "")
+            default_filename = "{}_{}_{}.png".format(
+                model_name, plot_type, kwargs["label_by"].value
+            )
+
+            # Determine save path
+            if model_name == "all_models":
+                save_dir = (
+                    self.path_func(model_name).plot_path.parent.parent / "overview"
+                )
+            else:
+                save_dir = self.path_func(model_name).plot_path
+            save_dir.mkdir(exist_ok=True, parents=True)
+            save_path = save_dir / default_filename
+
+            # Save the figure
+            fig.savefig(save_path, dpi=300, bbox_inches="tight")
+
+            # Show a notification that saving was successful
+            notification.object = f"✓ Figure saved to: {save_path}"
+
+        # Create the button and notification area
+        button = pn.widgets.Button(name="Save Figure", button_type="primary")
+        button.on_click(save_figure)
+        notification = pn.pane.Markdown("")
+
+        # Return the assembled panel
+        return pn.Column(fig_panel, pn.Row(button), notification)
