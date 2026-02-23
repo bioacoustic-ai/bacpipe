@@ -100,9 +100,6 @@ class DashBoardHelper:
         """Update existing plot, handling both Plotly and matplotlib"""
         plots_dict = getattr(self, f"{p_type}_plot")
         
-        if len(plots_dict) == 0:
-            return
-        
         # Recreate with save button
         new_panel = self.add_save_button(plot_func, **kwargs)
         plots_dict[widget_idx] = new_panel
@@ -111,6 +108,13 @@ class DashBoardHelper:
         if isinstance(new_panel[0], pn.pane.Plotly):
             # Plotly plot - update object directly
             new_panel[0].object = plot_func(**kwargs)
+            
+            new_panel[0].param.watch(
+                lambda x: self.handle_click(x, widget_idx), 'click_data'
+                )
+            new_panel[0].param.watch(
+                lambda x: self.handle_selection(x, widget_idx), 'selected_data'
+                )   
         else:
             # Matplotlib plot wrapped in pn.panel with pn.bind
             # It will auto-update through the binding

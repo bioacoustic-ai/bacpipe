@@ -141,19 +141,7 @@ class DashBoard(DashBoardHelper):
                                 dashboard=True,
                                 dashboard_idx=widget_idx,
                             )
-        else:
-            
-            self.interactive_embed_plot[widget_idx] = pn.pane.Plotly(
-                config={'responsive': True},
-                sizing_mode='stretch_both'
-            )
-            self.interactive_embed_plot[widget_idx].param.watch(
-                lambda x: self.handle_click(x, widget_idx), 'click_data'
-                )
-            self.interactive_embed_plot[widget_idx].param.watch(
-                lambda x: self.handle_selection(x, widget_idx), 'selected_data'
-                )           
-             
+        else:             
             embedding_info_dialogue = pn.widgets.StaticText(
                     value="", width=400
                     )
@@ -181,7 +169,6 @@ class DashBoard(DashBoardHelper):
             
             embedding_plot = pn.bind(
                         self.update_main_plot,
-                        # self.init_plot,
                         "interactive_embed",
                         plot_embeddings,
                         widget_idx,
@@ -197,7 +184,7 @@ class DashBoard(DashBoardHelper):
                         ),
                         dashboard=True,
                         dashboard_idx=widget_idx,
-                        )
+                        )        
             
             play_audio_button = pn.widgets.Button(name="Play audio", button_type="primary")
             play_audio_button.on_click(self.spec_plot_obj[widget_idx].play_audio)
