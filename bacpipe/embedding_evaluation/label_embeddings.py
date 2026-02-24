@@ -177,9 +177,9 @@ def make_set_paths_func(
     testing=False,
     **kwargs,
 ):
-    if testing:
-        main_results_dir = Path("bacpipe/tests/results_files")
-        dim_reduc_parent_dir = "dim_reduced_embeddings"
+    # if testing:
+    #     main_results_dir = Path("bacpipe/tests/results_files")
+    #     dim_reduc_parent_dir = "dim_reduced_embeddings"
     global get_paths
 
     def get_paths(model_name):
@@ -522,7 +522,7 @@ def load_labels_and_build_dict(
     if bool_filter_labels and not testing:
         filtered_labels = [
             lab
-            for lab in np.unique(label_df[main_label_column])
+            for lab in set(label_df[main_label_column])
             if len(label_df[label_df[main_label_column] == lab])
             > min_label_occurrences
         ]
@@ -536,7 +536,7 @@ def load_labels_and_build_dict(
                 "This might cause the classification or clustering to crash."
             )
         else:
-            label_df = label_df[label_df[f"label:{main_label_column}"].isin(filtered_labels)]
+            label_df = label_df[label_df[main_label_column].isin(filtered_labels)]
     label_idx_dict = {}
     for label_column in [l for l in label_df.columns if 'label:' in l]:
         label_idx_dict[label_column] = {
@@ -659,7 +659,10 @@ def build_ground_truth_labels_by_file(
             "If that's incorrect, ensure the audiofilename column has the correct "
             "file names."
             )
-        all_labels = np.concatenate((all_labels, np.ones(num_embeds) * -1))
+        label_dimensions = all_labels.shape[-1] if len(all_labels.shape) > 1 else 1
+        all_labels = np.concatenate(
+            (all_labels, np.ones([num_embeds, label_dimensions]).squeeze() * -1)
+            )
         return all_labels
 
     file_labels = fit_labels_to_embedding_timestamps(
@@ -682,7 +685,9 @@ def filter_df_by_filename(
     df = df_to_filer[df_to_filer[file_name_column] == Path(file_name).as_posix()]
     if len(df) == 0:
         df = df_to_filer[
-            df_to_filer[file_name_column] == Path(file_name).stem + Path(file_name).suffix
+            df_to_filer[file_name_column] == (
+                Path(file_name).stem + Path(file_name).suffix
+                )
         ]
     # if no files are found, match by classifier_prediction files
     if len(df) == 0:
@@ -725,7 +730,8 @@ def raven_tables_sanity_check(
     num_embeds, segment_s, paths, audio_file, 
     label_df, label_idx_dict, label_column, file_labels
     ):
-    file_labels = file_labels[:, 0]
+    if len(file_labels.shape) > 1:
+        file_labels = file_labels[:, 0]
     embed_timestamps = np.arange(num_embeds) * segment_s
     path = paths.labels_path.joinpath("raven_tables_for_sanity_check")
     path.mkdir(exist_ok=True, parents=True)
@@ -834,6 +840,10 @@ def ground_truth_by_model(
 
         # get annotations is not provided
         if label_df is None or label_idx_dict is None:
+            if not 'label:' in label_column:
+                label_column = 'label:' + label_column
+            if kwargs['testing']:
+                annotations_filename='annotations.csv'
             label_df, label_idx_dict = load_labels_and_build_dict(
                 paths, annotations_filename, 
                 main_label_column=label_column, 

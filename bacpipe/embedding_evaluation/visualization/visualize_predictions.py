@@ -259,9 +259,14 @@ def plot_classification_heatmap(
     ):
     if event is None and species is None:
         return SpectrogramPlot.dummy_image(title="Click the button to generate a prediction heatmap.")
-    predictions_loader.get_data(model, threshold, **kwargs)
-    if predictions_loader.binary_presence is None:
-        return predictions_loader.failed_fig
+    try:
+        predictions_loader.get_data(model, threshold, **kwargs)
+    except Exception as e:
+        logger.exception(e)
+        # TODO thid doesn't update the plot for some reason
+        return SpectrogramPlot.dummy_image(title=str(e)) 
+    # if predictions_loader.binary_presence is None:
+    #     return predictions_loader.failed_fig
     accumulated_presence = predictions_loader.accumulate_data(species, accumulate_by)
     timestamps = predictions_loader.timestamps
     
@@ -384,12 +389,12 @@ class PredictionsLoader:
         self.embed_dict = self.vis_loader.embeds[model]
         
         if self.binary_presence is None:
-            logger.info(
-                "It seems like the classifier hasn't been run yet. "
-                "Please rerun bacpipe with the setting "
-                "`run default classifier` set to `True`."
+            raise FileNotFoundError(
+                "It seems like the classifier hasn't been run yet, or "
+                f"that {model} doesn't have a pretrained classifier. "
+                "If the model has a pretrained classifier, please rerun "
+                "bacpipe with the setting `run default classifier` set to `True`."
             )
-            return
         
         self.get_timestamps_per_embedding(model)
         

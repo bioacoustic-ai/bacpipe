@@ -415,7 +415,9 @@ def model_specific_evaluation(
         if not evaluation_task in ["None", [], False]:
             embeds = loader_dict[model_name].embeddings()
             try:
-                ground_truth = ground_truth_by_model(model_name, paths=paths, **kwargs)
+                ground_truth = ground_truth_by_model(
+                    model_name, paths=paths, single_label=True, **kwargs
+                    )
             except FileNotFoundError as e:
                 ground_truth = None
 
@@ -471,8 +473,13 @@ def model_specific_evaluation(
 
 
 def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
+    if len(ground_truth[f"label:{label_column}"].shape) > 1:
+        bool_array = np.any(ground_truth[f"label:{label_column}"] > -1, axis=1)
+    else:
+        bool_array = ground_truth[f"label:{label_column}"] > -1
+        
     return np.concatenate(list(embeds.values()))[
-        ground_truth[f"label:{label_column}"] > -1
+        bool_array
     ]
 
 

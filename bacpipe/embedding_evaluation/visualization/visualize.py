@@ -1,12 +1,13 @@
 import json
 
 import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
 import numpy as np
 
 import bacpipe.embedding_evaluation.label_embeddings as le
+from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
+    load_results, plot_per_class_metrics
+)
 import matplotlib
-import seaborn as sns
 
 import logging
 

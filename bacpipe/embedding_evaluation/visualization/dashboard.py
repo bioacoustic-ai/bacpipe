@@ -407,7 +407,6 @@ class DashBoard(DashBoardHelper):
             progress_bar=self.progress_bar[widget_idx],
             loading_pane=self.loading_test_placeholder[widget_idx]
             )
-        
         self.btn_run_clfier[widget_idx].on_click(
             lambda x: self.update_main_plot(
                 "heatmap",
