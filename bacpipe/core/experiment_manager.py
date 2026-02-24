@@ -89,7 +89,7 @@ class Loader:
         self.audio_dir = Path(audio_dir)
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
-        self.continue_incomplete_run = False
+        # self.continue_incomplete_run = False
 
         self._initialize_path_structure(testing=testing, **kwargs)
 
@@ -253,6 +253,9 @@ class Loader:
                     )
                     self.continue_incomplete_run = True
                     self.embed_dir = d
+                    self.files = self.get_audio_files()
+                    self._init_metadata_dict()
+                    self._get_metadata_from_created_embeddings()
                     return d
             
             # load the metadata.yml file contained in d
