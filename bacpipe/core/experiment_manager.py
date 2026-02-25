@@ -7,13 +7,14 @@ import importlib
 import numpy as np
 from pathlib import Path
 
-from bacpipe.model_pipelines.runner import Embedder
+from bacpipe import settings as bacpipe_settings
 logger = logging.getLogger("bacpipe")
 
 
-def save_logs(config, settings):
+def save_logs():
     import datetime
     import json
+    from bacpipe import config, settings
     
     log_dir = Path(settings.main_results_dir) / Path(config.audio_dir).stem / f"logs"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -57,9 +58,10 @@ class Loader:
     def __init__(
         self,
         audio_dir,
-        check_if_combination_exists=True,
         model_name=None,
+        check_if_combination_exists=True,
         dim_reduction_model=False,
+        build_results_dir=False, 
         testing=False,
         **kwargs,
     ):
@@ -74,10 +76,10 @@ class Loader:
         ----------
         audio_dir : string or pathlib.Path
             path to audio data
-        check_if_combination_exists : bool, optional
-            If false new embeddings are created and the checking is skipped, by default True
         model_name : string, optional
             Name of the model that should be used, by default None
+        check_if_combination_exists : bool, optional
+            If false new embeddings are created and the checking is skipped, by default True
         dim_reduction_model : bool, optional
             Either false if primary embeddings are created or the name of
             the dimensionaliry reduction model if dim reduction should be 
@@ -90,8 +92,11 @@ class Loader:
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
         self.continue_incomplete_run = False
+        self.build_results_dir = build_results_dir
 
-        self._initialize_path_structure(testing=testing, **kwargs)
+        self._initialize_path_structure(
+            testing=testing, **kwargs
+            )
 
         self.check_if_combination_exists = check_if_combination_exists
 
@@ -109,10 +114,15 @@ class Loader:
         if self.combination_already_exists or self.dim_reduction_model:
             self._get_embeddings()
         elif not hasattr(self, 'files'):
-            self._get_audio_paths()
+            self._get_audio_paths_and_init_embed_dir()
             self._init_metadata_dict()
 
-        if not self.combination_already_exists:
+        if not self.build_results_dir:
+            logger.info(
+                "No model_name is passed, therefore no directory "
+                "structure will be created."
+            )
+        elif not self.combination_already_exists:
             self.embed_dir.mkdir(exist_ok=True, parents=True)
         else:
             logger.debug(
@@ -122,9 +132,15 @@ class Loader:
                 )
             )
 
-    def _initialize_path_structure(self, testing=False, **kwargs):
+    def _initialize_path_structure(
+        self, testing=False, **kwargs
+        ):
         # if testing:
         #     kwargs["main_results_dir"] = "bacpipe/tests/results_files"
+        
+        if self.build_results_dir:
+            from bacpipe import settings
+            kwargs = {**vars(settings)}
 
         for key, val in kwargs.items():
             if key == "main_results_dir":
@@ -147,6 +163,8 @@ class Loader:
         
         if self.dim_reduction_model:
             existing_embed_dirs = Path(self.dim_reduc_parent_dir).iterdir()
+        elif not hasattr(self, 'embed_parent_dir'):
+            return
         else:
             existing_embed_dirs = Path(self.embed_parent_dir).iterdir()
         if self.testing:
@@ -294,7 +312,9 @@ class Loader:
             num_files = len(
                 [f for f in list(d.rglob(f"*{self.embed_suffix}"))]
             )
-            num_audio_files = len(self.get_audio_files())
+            num_audio_files = len(
+                self.get_audio_files(self.audio_dir)
+                )
         except AssertionError as e:
             self._get_metadata_dict(d)
             self.combination_already_exists = True
@@ -338,13 +358,16 @@ class Loader:
             
             self.continue_incomplete_run = True
             self.embed_dir = d
-            self.files = self.get_audio_files()
+            self.files = self.get_audio_files(self.audio_dir)
             self._init_metadata_dict()
             self._get_metadata_from_created_embeddings()
 
-    def _get_audio_paths(self):
-        self.files = self.get_audio_files()
+    def _get_audio_paths_and_init_embed_dir(self):
+        self.files = self.get_audio_files(self.audio_dir)
         self.files.sort()
+        if not hasattr(self, 'embed_parent_dir'):
+            from bacpipe import settings as bacpipe_settings
+            self.embed_parent_dir = bacpipe_settings.embed_parent_dir
         self.embed_dir = (
             Path(self.embed_parent_dir)
             .joinpath(self._get_timestamp_dir())
@@ -358,15 +381,25 @@ class Loader:
             if file.stem in audio_stems
         ]
 
-    def get_audio_files(self):
+    @staticmethod
+    def get_audio_files(
+        audio_dir, 
+        audio_suffixes=bacpipe_settings.audio_suffixes,
+        return_as='pathlib.Path'
+        ):
+        audio_dir = Path(audio_dir)
         files_list = []
         [
-            [files_list.append(ll) for ll in self.audio_dir.rglob(f"*{string}")]
-            for string in self.audio_suffixes
+            [files_list.append(ll) for ll in audio_dir.rglob(f"*{string}")]
+            for string in audio_suffixes
         ]
         files_list = np.unique(files_list).tolist()
         assert len(files_list) > 0, "No audio files found in audio_dir."
-        return files_list
+        if return_as == 'pathlib.Path':
+            return files_list
+        elif return_as == 'str':
+            return [str(f) for f in files_list]
+        
 
     def _init_metadata_dict(self):
         self.metadata_dict = {
@@ -443,6 +476,8 @@ class Loader:
     def _get_timestamp_dir(self):
         if self.dim_reduction_model:
             model_name = self.dim_reduction_model
+        elif not self.model_name:
+            model_name = ''
         else:
             model_name = self.model_name
         return time.strftime(
@@ -473,6 +508,9 @@ class Loader:
 
     def embeddings(self, as_type='dict'):
         d = {}
+        if not self.files[0].suffix == self.embed_suffix:
+            self.files = list(self.embed_dir.rglob(f'*{self.embed_suffix}'))
+            self.files.sort()
         for file in self.files:
             if not self.dim_reduction_model:
                 embeds = np.load(file)
@@ -560,7 +598,11 @@ class Loader:
         }
         
         embedding_dimensions = self.metadata_dict["files"]["embedding_dimensions"]
-        for num_segments, _ in embedding_dimensions:
+        # if len(embedding_dimensions.shape) > 2:
+        #     logger.exception(
+        #         "Only embeddings with dimensions of "
+        #     )
+        for num_segments, *_ in embedding_dimensions:
             [
                 t_stamps.append(t) 
                 for t in np.arange(0, num_segments * input_len, input_len)
@@ -636,3 +678,20 @@ class Loader:
             else:
                 return True
 
+def replace_default_kwargs_with_user_kwargs(remove_keys=None, **kwargs):
+    from bacpipe import config, settings
+    default_kwargs = {**vars(config), **vars(settings)}
+    if remove_keys:
+        for key in remove_keys:
+            default_kwargs.pop(key)
+    
+    for k, v in kwargs.items():
+        if k in default_kwargs:
+            default_kwargs[k] = kwargs[k]
+            
+    replaced_kwargs = default_kwargs
+    
+    # if there are any other kwargs put them back in
+    for k, v in kwargs.items():
+        replaced_kwargs[k]= v
+    return replaced_kwargs

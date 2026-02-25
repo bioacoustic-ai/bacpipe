@@ -30,10 +30,22 @@ class DefaultLabels:
         elif "default_classifier" in self.default_label_keys:
             self.default_label_keys.remove("default_classifier")
         
-        embed_path = model_specific_embedding_path(paths.main_embeds_path, model)
-        self.metadata = yaml.safe_load(open(embed_path.joinpath("metadata.yml"), "r"))
-        self.nr_embeds_per_file = self.metadata["files"]["nr_embeds_per_file"]
-        self.nr_embeds_total = self.metadata["nr_embeds_total"]
+        try:
+            embed_path = model_specific_embedding_path(paths.main_embeds_path, model)
+            self.metadata = yaml.safe_load(open(embed_path.joinpath("metadata.yml"), "r"))
+            self.nr_embeds_per_file = self.metadata["files"]["nr_embeds_per_file"]
+            self.nr_embeds_total = self.metadata["nr_embeds_total"]
+        except ValueError as e:
+            logger.info(
+                "No embeddings found. Gathering files and nr of embeddings "
+                "per file from audio files."
+            )
+            _, _, metadata = get_files_if_no_embeds(paths.audio_dir, model)
+            self.metadata = metadata
+            self.nr_embeds_per_file = metadata['files']['nr_embeds_per_file']
+            self.nr_embeds_total = sum(
+                metadata['files']['nr_embeds_per_file']
+            )
         if not sum(self.nr_embeds_per_file) == self.nr_embeds_total:
             error = (
                 "\nThe number of embeddings per file does not match "
@@ -207,6 +219,7 @@ def make_set_paths_func(
         task_path = dataset_path.joinpath("evaluations").joinpath(model_name)
 
         paths = {
+            "audio_dir": audio_dir,
             "dataset_path": dataset_path,
             "dim_reduc_parent_dir": dataset_path.joinpath(dim_reduc_parent_dir),
             "main_embeds_path": dataset_path.joinpath("embeddings"),
@@ -261,7 +274,8 @@ def get_default_labels(model_name, **kwargs):
     dict
         dictionary of default labels
     """
-    return create_default_labels(get_paths(model_name), model_name, **kwargs)
+    paths = get_paths(model_name)
+    return create_default_labels(paths.audio_dir, model_name, paths, **kwargs)
 
 
 def get_ground_truth(model_name):
@@ -390,10 +404,19 @@ def model_specific_embedding_path(path, model, dim_reduction_model=None, **kwarg
     return embed_paths_for_this_model[-1]
 
 
-def create_default_labels(paths, model, overwrite=True, **kwargs):
+def create_default_labels(
+    audio_dir=None, model=None, paths=None, overwrite=True, **kwargs
+    ):
+    if paths is None:
+        assign_global_get_paths_function(audio_dir)
+        paths = get_paths(model)
     if overwrite or not paths.labels_path.joinpath("default_labels.npy").exists():
-
-        default_labels = DefaultLabels(paths, model=model, **kwargs)
+        if not kwargs.get('default_label_keys'):
+            from bacpipe import settings as bacpipe_settings
+            kwargs['default_label_keys'] = bacpipe_settings.default_label_keys
+        default_labels = DefaultLabels(
+            paths, model=model, audio_dir=audio_dir, **kwargs
+            )
         default_labels.generate()
 
         def_labels = default_labels.default_label_dict
@@ -807,6 +830,13 @@ def collect_ground_truth_labels(
         )
     return ground_truth
 
+def assign_global_get_paths_function(audio_dir):
+    if not 'get_paths' in globals():
+        from bacpipe import settings as bapcipe_settings
+        make_set_paths_func(
+            audio_dir, bapcipe_settings.main_results_dir
+            )
+
 def ground_truth_by_model(
     model,
     audio_dir,
@@ -827,6 +857,7 @@ def ground_truth_by_model(
         ):
 
         if paths is None:
+            assign_global_get_paths_function(audio_dir)
             paths = get_paths(model)
             
         # check if embeddings exist
@@ -842,7 +873,7 @@ def ground_truth_by_model(
         if label_df is None or label_idx_dict is None:
             if not 'label:' in label_column:
                 label_column = 'label:' + label_column
-            if kwargs['testing']:
+            if kwargs.get('testing'):
                 annotations_filename='annotations.csv'
             label_df, label_idx_dict = load_labels_and_build_dict(
                 paths, annotations_filename, 
@@ -901,37 +932,77 @@ def ground_truth_by_model(
         ).item()
     return ground_truth_dict
 
-def get_files_if_no_embeds(audio_dir, model, label_df):
-    files = label_df.audiofilename.unique()
+def ensure_audio_files(found_audio_files, annotated_audio_files, audio_dir):
+    if not annotated_audio_files:
+        return found_audio_files
+    matching = set(found_audio_files).intersection(set(annotated_audio_files))
+    if len(matching) < len(annotated_audio_files) or len(matching) == 0:
+        relative_to_audio_dir = [
+            Path(f).relative_to(audio_dir) for f in found_audio_files
+        ]
+        matching = set(relative_to_audio_dir).intersection(set(annotated_audio_files))
+        
+    if len(matching) < len(annotated_audio_files) or len(matching) == 0:
+        annotated_stems = [
+            Path(f).stem for f in annotated_audio_files
+        ]
+        found_stems = [
+            Path(f).stem for f in found_audio_files
+        ]
+        matching = set(annotated_stems).intersection(set(found_stems))
+        
+    # TODO maybe a case where they are nested but have duplicate filenames
+    
+    if len(matching) < len(annotated_audio_files) or len(matching) == 0:
+        not_found = []
+        found_annotated_audio_files = [
+            list(Path(audio_dir).rglob(f'*{f.stem + f.suffix}'))[0]
+            if list(Path(audio_dir).rglob(f'*{f.stem + f.suffix}'))
+            else not_found.append(f)
+            for f in annotated_audio_files
+        ]
+        if not_found:
+            logger.warning(
+                f"{not_found} were not found in {audio_dir}. "
+                "Are you sure you entered the correct path to the audio data?"
+            )
+        if len(found_annotated_audio_files) > 0:
+            found_annotated_audio_files = found_audio_files
+        
+    return [str(f) for f in found_audio_files]
+    
+
+def get_files_if_no_embeds(audio_dir, model, label_df=None):
+    if label_df is None:
+        annotated_audio_files = []
+    else:
+        annotated_audio_files = label_df.audiofilename.unique()
+        annotated_audio_files = [Path(f) for f in annotated_audio_files]
     
     module = import_module(
         f"bacpipe.model_pipelines.feature_extractors.{model}"
     )
     segment_s = module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE
-    try:        
-        rel_audio_dir = list(
-            Path(audio_dir).rglob(files[0])
-            )[0].relative_to(audio_dir).parent
-    except Exception as e:
-        logger.exception(
-            f"{files[0]} was not found in {audio_dir}. "
-            "Are you sure you entered the correct path to the audio data?"
-        )
     
     metadata = {}
     metadata['files'] = {}
-    metadata['files']['audio_files'] = files
+    from bacpipe import get_audio_files
+    found_audio_files = get_audio_files(audio_dir)
+    matching_audio_files = ensure_audio_files(
+        found_audio_files, annotated_audio_files, audio_dir
+        )
+    matching_audio_files.sort()
+
+    metadata["segment_length (samples)"] = module.LENGTH_IN_SAMPLES
+    metadata["sample_rate (Hz)"] = module.SAMPLE_RATE
+    metadata['files']['audio_files'] = matching_audio_files
     metadata['files']['nr_embeds_per_file'] = [
         int(
-            get_duration(
-                filename=Path(audio_dir
-                        ) / rel_audio_dir / f) 
-            / segment_s 
+            get_duration(path=f) / segment_s 
         )
-        for f in files
+        for f in matching_audio_files
     ]
-    files = [Path(f'{Path(d).stem}_{model}') for d in files]
-    files.sort()
+    files = [Path(f'{Path(d).stem}_{model}') for d in matching_audio_files]
     
     return files, segment_s, metadata
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import bacpipe
 from bacpipe import EMBEDDING_DIMENSIONS
-from bacpipe.core.workflows import run_pipeline_for_model, embeds_array_without_noise
+from bacpipe.core.workflows import run_pipeline_for_single_model, embeds_array_without_noise
 
 from bacpipe.core.experiment_manager import Loader
 from bacpipe.model_pipelines.runner import Embedder
@@ -59,7 +59,7 @@ def embedder_fn(loader, model_name):
 
 def loader_fn():
     """Return a Loader for the test audio directory."""
-    loader = Loader(check_if_combination_exists=False, model_name="aves", **kwargs)
+    loader = Loader(build_results_dir=True, check_if_combination_exists=False, model_name="aves", **kwargs)
     assert loader.files, "No audio files found in test data directory"
     return loader
 
@@ -69,7 +69,7 @@ def loader_fn():
 # -------------------------------------------------------------------------
 def test_embedding_generation(model, device):
     settings['device'] = device
-    embeddings[model] = run_pipeline_for_model(
+    embeddings[model] = run_pipeline_for_single_model(
         model_name=model,
         check_if_primary_combination_exists=False,
         check_if_secondary_combination_exists=False,

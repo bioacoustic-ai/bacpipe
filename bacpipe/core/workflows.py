@@ -10,7 +10,7 @@ import tarfile
 import numpy as np
 
 from bacpipe.core.experiment_manager import (
-    Loader, save_logs
+    Loader, save_logs, replace_default_kwargs_with_user_kwargs
     )
 from bacpipe.model_pipelines.runner import Embedder
 
@@ -41,7 +41,7 @@ from bacpipe import config, settings
 
 logger = logging.getLogger("bacpipe")
 
-def play(config=config, settings=settings, bool_save_logs=False):
+def play(bool_save_logs=False, **kwargs):
     """
     Play the bacpipe! The pipeline will run using the models specified in
     bacpipe.config.models and generate results in the directory
@@ -66,11 +66,15 @@ def play(config=config, settings=settings, bool_save_logs=False):
         If no audio files are found we can't compute any embeddings. So make
         sure the path is correct :)
     """
-    settings.model_base_path = ensure_models_exist(Path(settings.model_base_path),
-                                                   model_names=config.models)
-    overwrite, dashboard = config.overwrite, config.dashboard
+    kwargs = replace_default_kwargs_with_user_kwargs(**kwargs)
+    
+    kwargs['model_base_path'] = ensure_models_exist(
+        Path(kwargs.get('model_base_path')), 
+        model_names=kwargs.get('models')
+        )
+    overwrite, dashboard = kwargs.get('overwrite'), kwargs.get('dashboard')
 
-    if config.audio_dir == 'bacpipe/tests/test_data' or settings.testing:
+    if kwargs.get('audio_dir') == 'bacpipe/tests/test_data' or kwargs.get('testing'):
         with pkg_resources.path(
             __package__.split('.')[0] + ".tests.test_data", ""
             ) as audio_dir:
@@ -78,37 +82,33 @@ def play(config=config, settings=settings, bool_save_logs=False):
 
         if not audio_dir.exists():
             error = (
-                f"\nAudio directory {config.audio_dir} does not exist. Please check the path. "
+                f"\nAudio directory {kwargs.get('audio_dir')} does not exist. Please check the path. "
                 "It should be in the format 'C:\\path\\to\\audio' on Windows or "
                 "'/path/to/audio' on Linux/Mac. Use single quotes '!"
             )
             logger.exception(error)
             raise FileNotFoundError(error)
         else:
-            config.audio_dir = audio_dir
+            kwargs['audio_dir'] = audio_dir
 
         # ----------------------------------------------------------------
     # Setup logging to file if requested
     # ----------------------------------------------------------------
     if bool_save_logs:
-        save_logs(config, settings)
+        save_logs()
 
-    config.models = get_model_names(**vars(config), **vars(settings))
+    config.models = get_model_names(**kwargs)
 
-    if overwrite or not evaluation_with_settings_already_exists(
-        **vars(config), **vars(settings)
-    ):
+    if overwrite or not evaluation_with_settings_already_exists(**kwargs):
 
-        loader_dict = model_specific_embedding_creation(
-            **vars(config), **vars(settings)
-        )
+        loader_dict = run_pipeline_for_models(**kwargs)
 
-        model_specific_evaluation(loader_dict, **vars(config), **vars(settings))
+        model_specific_evaluation(loader_dict, **kwargs)
 
-        cross_model_evaluation(**vars(config), **vars(settings))
+        cross_model_evaluation(**kwargs)
 
     if dashboard:
-        visualize_using_dashboard(**vars(config), **vars(settings))
+        visualize_using_dashboard(**kwargs)
 
 
 
@@ -290,7 +290,12 @@ def evaluation_with_settings_already_exists(
     return True
 
 
-def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **kwargs):
+def run_pipeline_for_models(
+    models, 
+    audio_dir, 
+    dim_reduction_model, 
+    **kwargs
+    ):
     """
     Generate embeddings for each model in the list of model names.
     The embeddings are generated using the generate_embeddings function
@@ -302,7 +307,7 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **
         
     code example:
     ```
-    loader = bacpipe.model_specific_embedding_creation(
+    loader = bacpipe.run_pipeline_for_models(
     **vars(bacpipe.config), **vars(bacpipe.settings)
     )
 
@@ -347,16 +352,33 @@ def model_specific_embedding_creation(audio_dir, dim_reduction_model, models, **
     """
     loader_dict = {}
     remove_models_from_list = []
-    for model_name in models:
+    if 'CustomModels' in kwargs:
+        assert (len(kwargs['CustomModels']) == len(models)) , (
+            "If you provide custom models, the array needs to be the "
+            "same length as the model name array. That way the association "
+            "is clear. \n For example: models = ['birdnet', 'perch_v2', 'my_model] "
+            "and CustomModels=[None, None, MyModel]. That way for models 0 and 1 "
+            "the integrated models are loaded and for my_model the model class "
+            "MyModel is loaded."
+            )
+        CustomModels = kwargs.pop('CustomModels')
+    else:
+        CustomModels = [None] * len(models)
+    for idx, model_name in enumerate(models):
         try:
-            loader_dict[model_name] = run_pipeline_for_model(
+            loader_dict[model_name] = run_pipeline_for_single_model(
                 model_name=model_name,
                 dim_reduction_model=dim_reduction_model,
                 audio_dir=audio_dir,
+                CustomModel=CustomModels[idx],
                 **kwargs,
             )
         except AssertionError as e:
             remove_models_from_list.append(model_name)
+            if not 'already_computed' in kwargs:
+                from bacpipe import config
+                kwargs['already_computed'] = config.already_computed
+            kwargs
             if kwargs['already_computed']:
                 logger.exception(
                     f"Bacpipe was not able to process {model_name} because {e}. "
@@ -403,10 +425,27 @@ def model_specific_evaluation(
     models : list
         embedding models
     """
-    for model_name in models:
+    if 'CustomModels' in kwargs:
+        assert (len(kwargs['CustomModels']) == len(models)) , (
+            "If you provide custom models, the array needs to be the "
+            "same length as the model name array. That way the association "
+            "is clear. \n For example: models = ['birdnet', 'perch_v2', 'my_model] "
+            "and CustomModels=[None, None, MyModel]. That way for models 0 and 1 "
+            "the integrated models are loaded and for my_model the model class "
+            "MyModel is loaded."
+            )
+        CustomModels = kwargs.pop('CustomModels')
+    else:
+        CustomModels = [None] * len(models)
+    for idx, model_name in enumerate(models):
         paths = get_paths(model_name)
         if loader_dict[model_name].classifier_should_be_run(paths, **kwargs):
-            embed = Embedder(model_name, loader_dict[model_name], **kwargs)
+            embed = Embedder(
+                model_name, 
+                loader_dict[model_name], 
+                CustomModel=CustomModels[idx],
+                **kwargs
+                )
             if hasattr(embed.model, 'classifier_predictions'):
                 embed.classifier.run_default_classifier(
                     loader_dict[model_name]
@@ -504,6 +543,7 @@ def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwarg
                 visualise_results_across_models(plot_path, task, models)
         if not dim_reduction_model == "None":
             kwargs.pop("dashboard")
+            if "audio_dir" in kwargs: kwargs.pop("audio_dir")
             plot_comparison(
                 plot_path,
                 models,
@@ -514,7 +554,7 @@ def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwarg
             )
 
 
-def run_pipeline_for_model(
+def run_pipeline_for_single_model(
     model_name,
     audio_dir,
     dim_reduction_model="None",
@@ -524,6 +564,10 @@ def run_pipeline_for_model(
     testing=False,
     **kwargs,
 ):
+    kwargs = replace_default_kwargs_with_user_kwargs(
+        remove_keys=['audio_dir', 'dim_reduction_model', 'testing'], 
+        **kwargs
+        )
     global get_paths
     get_paths = make_set_paths_func(audio_dir, testing=testing, **kwargs)
     paths = get_paths(model_name)
@@ -604,7 +648,7 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
         raise ValueError(error)
     try:
         start = time.time()
-        ld = Loader(**kwargs)
+        ld = Loader(build_results_dir=True, **kwargs)
         logger.debug(f"Loading the data took {time.time()-start:.2f}s.")
         if not ld.combination_already_exists:
             embed = Embedder(loader=ld, **kwargs)
@@ -613,12 +657,12 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                 # (1) Dimensionality reduction stage
                 embed.run_dimensionality_reduction_pipeline()
 
-            elif embed.model.device == "cuda" and not avoid_pipelined_gpu_inference:
-                # (2) GPU path with pipelined embedding generation
+            elif not avoid_pipelined_gpu_inference:
+                # (2) pipelined embedding generation
                 embed.run_inference_pipeline_using_multithreading()
 
             else:
-                # (3) CPU path with sequential embedding generation
+                # (3) sequential embedding generation
                 embed.run_inference_pipeline_sequentially()
 
             # Finalize

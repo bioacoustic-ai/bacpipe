@@ -401,6 +401,9 @@ def plot_embedding_points(
                 "the dim_reduced_embeddings corresponding to that. Check if in your results folder "
                 "there are not multiple dim_reduced_embeddings, and if so, delete the incomplete one."
             )
+        if len(np.array(embeds['x']).shape) > 1:
+            embeds["x"] = np.array(embeds["x"])[:, 0],
+            embeds["y"] = np.array(embeds["y"])[:, 0],
         points = axes.scatter(
             # np.array(embeds["x"])[bool_labels],
             # np.array(embeds["y"])[bool_labels],
@@ -695,6 +698,9 @@ def plot_embeddings_px(
     **kwargs
 ):
     # 1. Prepare Data
+    if len(np.array(embeds['x']).shape) > 1:
+        embeds['x'] = np.array(embeds['x']).squeeze()
+        embeds['y'] = np.array(embeds['y']).squeeze()
     x_data = embeds['x']
     y_data = embeds['y']
     

@@ -14,6 +14,7 @@ from pathlib import Path
 
 import bacpipe
 from bacpipe.core.audio_processor import AudioHandler
+from bacpipe.core.experiment_manager import replace_default_kwargs_with_user_kwargs
 logger = logging.getLogger("bacpipe")
 
 
@@ -22,6 +23,7 @@ class Embedder(AudioHandler):
         self,
         model_name,
         loader, 
+        CustomModel=None,
         dim_reduction_model=False,
         **kwargs,
     ):
@@ -53,26 +55,47 @@ class Embedder(AudioHandler):
             self.model_name = dim_reduction_model
         else:
             self.model_name = model_name
-        self._init_model(dim_reduction_model=dim_reduction_model, **kwargs)
-        super().__init__(model=self.model, **kwargs)
+            
+        kwargs = replace_default_kwargs_with_user_kwargs(
+            ['audio_dir', 'models', 'dim_reduction_model'], kwargs=kwargs
+        )
+        self.nr_parallel_workers = kwargs.get('nr_parallel_workers')
+        
+        self._init_model(
+            dim_reduction_model=dim_reduction_model, 
+            CustomModel=CustomModel,
+            **kwargs
+            )
+        super().__init__(
+            model=self.model, 
+            audio_dir=loader.audio_dir, 
+            **kwargs
+            )
         if self.model.bool_classifier:
             self.classifier = Classifier(
-                self.model, model_name, **kwargs
+                self.model, 
+                model_name, 
+                audio_dir=loader.audio_dir, 
+                build_results_dir=loader.build_results_dir,
+                **kwargs
                 )
 
-    def _init_model(self, **kwargs):
+    def _init_model(self, CustomModel=None, **kwargs):
         """
         Load model specific module, instantiate model and allocate device for model.
         """
-        if self.dim_reduction_model:
-            module = importlib.import_module(
-                f"bacpipe.model_pipelines.dimensionality_reduction.{self.model_name}"
-            )
+        if self.dim_reduction_model or CustomModel is None:
+            if self.dim_reduction_model:
+                module = importlib.import_module(
+                    f"bacpipe.model_pipelines.dimensionality_reduction.{self.model_name}"
+                )
+            else:
+                module = importlib.import_module(
+                    f"bacpipe.model_pipelines.feature_extractors.{self.model_name}"
+                )
+            self.model = module.Model(model_name=self.model_name, **kwargs)
         else:
-            module = importlib.import_module(
-                f"bacpipe.model_pipelines.feature_extractors.{self.model_name}"
-            )
-        self.model = module.Model(model_name=self.model_name, **kwargs)
+            self.model = CustomModel(model_name=self.model_name, **kwargs)
         self.model.prepare_inference()
 
     def init_dataloader(self, audio):
@@ -200,8 +223,12 @@ class Embedder(AudioHandler):
         Loader object
             updated object with metadata on embedding creation session
         """
-        task_queue = queue.Queue(maxsize=4)  # small buffer to balance I/O vs compute
-
+        if not self.nr_parallel_workers:
+            from multiprocessing import cpu_count
+            available_workers = cpu_count() -1
+        else:
+            available_workers = self.nr_parallel_workers
+        task_queue = queue.Queue(maxsize=available_workers)  # small buffer to balance I/O vs compute
         # --- Producer: load + preprocess in background ---
         def producer():
             for idx, file in enumerate(self.loader.files):
@@ -263,6 +290,12 @@ class Embedder(AudioHandler):
                         "do the trick. If you simply don't have enough VRAM, you can reduce the global "
                         f"batch size in the settings file. Or just compute on the cpu. {e}"
                     )
+                except AttributeError as e:
+                    logger.warning(
+                        f"The results folder structure does not exist, therefore files can't be "
+                        "saved. Please pass the keyword build_results_dir=True."
+                    )
+                    pbar.update(1)
                 except Exception as e:
                     logger.warning(
                         f"Error generating embeddings for {file}, skipping file.\nError: {e}"
@@ -355,6 +388,7 @@ class Classifier:
         audio_dir, 
         main_results_dir, 
         classifier_threshold, 
+        build_results_dir=True, 
         **kwargs
         ):
         """
@@ -376,8 +410,9 @@ class Classifier:
         self.model = model
         self.model_name = model_name
         self.classifier_threshold = classifier_threshold
-        from bacpipe.embedding_evaluation.label_embeddings import make_set_paths_func
-        self.paths = make_set_paths_func(audio_dir, main_results_dir)(model_name)
+        if build_results_dir:
+            from bacpipe.embedding_evaluation.label_embeddings import make_set_paths_func
+            self.paths = make_set_paths_func(audio_dir, main_results_dir)(model_name)
         
         self.predictions = torch.tensor([])
         

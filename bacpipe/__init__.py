@@ -37,14 +37,18 @@ settings = SimpleNamespace(**_settings_dict)
 # --------------------------------------------------------------------
 
 from bacpipe.core.experiment_manager import Loader
+get_audio_files = Loader.get_audio_files
+
 from bacpipe.model_pipelines.runner import Embedder
 
 from bacpipe.core.workflows import (
     play,
+    generate_embeddings,
+    run_pipeline_for_single_model,
     ensure_models_exist,
     get_model_names,
     evaluation_with_settings_already_exists,
-    model_specific_embedding_creation,
+    run_pipeline_for_models,
     model_specific_evaluation,
     cross_model_evaluation,
     visualize_using_dashboard,
@@ -54,7 +58,10 @@ from bacpipe.embedding_evaluation.label_embeddings import (
     DefaultLabels, 
     get_default_labels,
     get_ground_truth, 
-    get_dt_filename
+    get_dt_filename,
+    make_set_paths_func,
+    create_default_labels,
+    ground_truth_by_model
     )
 
 from bacpipe.core.constants import (
@@ -65,3 +72,22 @@ from bacpipe.core.constants import (
     NEEDS_CHECKPOINT
     )
 
+__all__ = [
+    play,
+    ensure_models_exist,
+    get_model_names,
+    evaluation_with_settings_already_exists,
+    run_pipeline_for_models,
+    model_specific_evaluation,
+    cross_model_evaluation,
+    visualize_using_dashboard,
+    DefaultLabels, 
+    get_default_labels,
+    get_ground_truth, 
+    get_dt_filename,
+    supported_models, 
+    models_needing_checkpoint,
+    TF_MODELS,
+    EMBEDDING_DIMENSIONS,
+    NEEDS_CHECKPOINT
+]
