@@ -91,7 +91,6 @@ class Loader:
         self.audio_dir = Path(audio_dir)
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
-        self.continue_incomplete_run = False
         self.build_results_dir = build_results_dir
 
         self._initialize_path_structure(
@@ -269,8 +268,7 @@ class Loader:
                         "Ctrl + C and then remove "
                         f"the folder {d} manually.\n"
                     )
-                    self.continue_incomplete_run = True
-                    self.embed_dir = d
+                    self._handle_incomplete_run(d)
                     return d
             
             # load the metadata.yml file contained in d
@@ -355,12 +353,14 @@ class Loader:
             )
             return
         else:
-            
-            self.continue_incomplete_run = True
-            self.embed_dir = d
-            self.files = self.get_audio_files(self.audio_dir)
-            self._init_metadata_dict()
-            self._get_metadata_from_created_embeddings()
+            self._handle_incomplete_run(d)
+
+    def _handle_incomplete_run(self, directory):
+        self.continue_incomplete_run = True
+        self.embed_dir = directory
+        self.files = self.get_audio_files(self.audio_dir)
+        self._init_metadata_dict()
+        self._get_metadata_from_created_embeddings()
 
     def _get_audio_paths_and_init_embed_dir(self):
         self.files = self.get_audio_files(self.audio_dir)
