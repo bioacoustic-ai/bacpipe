@@ -10,8 +10,6 @@ Using **bacpipe** you can generate embeddings, classification predictions and cl
 
 And the best part is, it comes with a GUI for you to explore the results.
 
-**bacpipe** also ties in nicely with [acodet](https://github.com/vskode/acodet), allowing you to generate heatmaps of species activity from your datasets based on predictions of deep learning models. But keep in mind predictions are only as good as the model's you are using - they can seem confident but still be very wrong - **bacpipe**'s aim is to make model evaluations easier and let us improve them.
-
 **bacpipe** is also available on pip: `pip install bacpipe`
 
 ```python
@@ -311,14 +309,19 @@ For **Mac**
 
 Virtual environments are very important. They ensure that specific libraries that are needed for one project don't get in the way of libraries you need for another project.
 
+Create a virtual environment and install the packages with one command:
+- `uv sync`
+
+If you prefer having control over the environment name, use these commands:
+
 Create your virtual environment (all systems):
-- `uv venv --python 3.11 env_acodet`
+- `uv venv --python 3.11 env_bacpipe`
 
 For **Windows**, Activate your environment:
-- `source env_acodet/Scripts/activate`
+- `source env_bacpipe/Scripts/activate`
 
 For **Linux**/**Mac**, Activate your environment:
-- `source env_acodet/bin/activate`
+- `source env_bacpipe/bin/activate`
 
 Install the project dependencies (all systems):
 - `uv pip install -r pyproject.toml`
@@ -637,6 +640,7 @@ Models currently include:
 |   AudioProtoPNet   |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954125000901)   |   [code](https://github.com/DBD-research-group/AudioProtoPNet)    |   32 kHz|   5 s| 1024 |
 |   AvesEcho_PASST   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   32 kHz|   3 s| 768 |
 |   AVES_ESpecies        |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 768 |
+| Bat | [paper](https://arxiv.org/abs/2309.11218) | [code](https://github.com/FrankFundel/BAT-cli) | 22.05 kHz | ~1 s | 64 |
 | BEATs | [paper](https://arxiv.org/abs/2212.09058) | [code](https://github.com/microsoft/unilm/tree/master/beats) | 16 kHz | 10 s | 768 |
 |   BioLingual  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   48 kHz|   10 s| 512 |
 |   BirdAVES_ESpecies    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 1024 |
@@ -666,6 +670,7 @@ Models currently include:
 |   [AudioProtoPNet](#audioprotopnet)   |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954125000901)   |   [code](https://github.com/DBD-research-group/AudioProtoPNet)    |  sup l |   CNN | ConvNext | included|
 |   [AvesEcho_PaSST](#avesecho_passt)   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   sup l |   trafo | PaSST | [weights](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1/-/blob/main/checkpoints/best_model_passt.pt?ref_type=heads) |
 |   [AVES_ESpecies](#aves_especies)        |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   ssl|   trafo | HuBERT | [weights](https://storage.googleapis.com/esp-public-files/ported_aves/aves-base-all.torchaudio.pt)|
+| [Bat](#bat) | [paper](https://arxiv.org/abs/2309.11218) | [code](https://github.com/FrankFundel/BAT-cli) | sup l | trafo | CNN + trafo | [weights](https://github.com/FrankFundel/BAT-cli/tree/main/models) |
 | [BEATs](#beats) | [paper](https://arxiv.org/abs/2212.09058) | [code](https://github.com/microsoft/unilm/tree/master/beats) | ssl | trafo | ViT | [weights](https://1drv.ms/u/s!AqeByhGUtINrgcpoZecQbiXeaUjN8A?e=DasbeC) |
 |   [BioLingual](#biolingual)  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   ssl|   trafo| CLAP | included |
 |   [BirdAVES_ESpecies](#birdaves_especies)    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   ssl|   trafo | HuBERT | [weights](https://storage.googleapis.com/esp-public-files/birdaves/birdaves-biox-large.torchaudio.pt)|
@@ -717,6 +722,13 @@ AvesEcho_PaSST is a vision transformer trained on AudioSet and (deep) fine-tuned
 - trained on general audio
 
 AVES_ESpecies is short for Animal Vocalization Encoder based on Self-Supervision by the Earth Species Project. The model is based on the HuBERT-base architecture. The model is pretrained on unannotated audio datasets AudioSet-20K, FSD50K and the animal sounds from AudioSet and VGGSound.
+
+### Bat
+- trafo
+- supervised learning
+- bat data (Skiba et al. 2003))
+
+Bat is a hybrid CNN+transformer model used for bat classification. 
 
 ### BEATs
 - trafo
