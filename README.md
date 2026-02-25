@@ -86,6 +86,7 @@ available_models : [
     "audioprotopnet"
     "avesecho_passt"
     "aves_especies"
+    "bat"
     "beats"
     "birdaves_especies"
     "biolingual"
