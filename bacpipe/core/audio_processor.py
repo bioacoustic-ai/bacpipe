@@ -48,7 +48,7 @@ class AudioHandler:
             audio frames preprocessed with model specific preprocessing
         """
         audio = self._load_and_resample(sample)
-        audio = audio.to(self.model.device)
+        # audio = audio.to(self.model.device)
         if self.model.only_embed_annotations:
             frames = self._only_load_annotated_segments(sample, audio, **self.kwargs)
         else:
@@ -77,8 +77,10 @@ class AudioHandler:
             error = f"Audio file {path} is empty. " f"Skipping {path}."
             logger.exception(error)
             raise ValueError(error)
-        re_audio = ta.functional.resample(audio, sr, self.model.sr)
-        return re_audio
+        re_audio = lb.resample(
+            audio.numpy(), orig_sr=sr, target_sr=self.model.sr
+            )
+        return torch.tensor(re_audio)
 
     def _only_load_annotated_segments(
         self, file_path, audio, annotations_filename='annotations.csv', **_
@@ -130,5 +132,5 @@ class AudioHandler:
         frames = padded_audio.reshape([num_frames, self.model.segment_length])
         if not isinstance(frames, torch.Tensor):
             frames = torch.tensor(frames)
-        frames = frames.to(self.model.device)
+        # frames = frames.to(self.model.device)
         return frames
