@@ -9,9 +9,14 @@ import torch
 logger = logging.getLogger("bacpipe")
 
 class ModelBaseClass:    
-    def __init__(self, sr, segment_length, device, 
-                 model_base_path, global_batch_size, 
-                 model_name, dim_reduction_model=False,
+    def __init__(self, 
+                 sr, 
+                 segment_length, 
+                 model_name, 
+                 device=None, 
+                 model_base_path=None, 
+                 global_batch_size=None, 
+                 dim_reduction_model=False,
                  **kwargs):
         """
         This base class defines key methods and attributes for all feature
@@ -57,6 +62,21 @@ class ModelBaseClass:
             segment length to calculate a model-specific batch size that
             results in approximately equal batches for different models
         """
+        
+        if device is None:
+            from bacpipe import settings as bacpipe_settings
+            device = bacpipe_settings.device
+            kwargs = vars(bacpipe_settings)
+        
+        if model_base_path is None:
+            from bacpipe import settings as bacpipe_settings
+            model_base_path = bacpipe_settings.model_base_path
+
+        if global_batch_size is None:
+            from bacpipe import settings as bacpipe_settings
+            global_batch_size = bacpipe_settings.global_batch_size
+
+
         
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -110,6 +130,12 @@ class ModelBaseClass:
         except AttributeError:
             logger.error("Skipping model.eval() because model is from tensorflow.")
             pass
+        
+    def preprocessing(self, audio):
+        return audio
+    
+    def __call__(self, input):
+        return input
 
 
 def check_if_cudnn_tensorflow_compatible():
