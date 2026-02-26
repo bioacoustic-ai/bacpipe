@@ -15,8 +15,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# SPEC_COLORMAP = 'Turbo'
-SPEC_COLORMAP = 'Viridis'
+COLOR_CONTINUOUS = 'Twilight'
+# SPEC_COLORMAP = 'Viridis'
+EMBED_FIG_HEIGHT = 600
+
+COLOR_DISCRETE = px.colors.qualitative.Dark24
+
 
 matplotlib.rcParams.update(
     {
@@ -552,13 +556,13 @@ def return_rows_cols(num):
 
 def set_figsize_for_comparison(rows, cols):
     if rows == 1:
-        return (12, 5)
+        return (11, 5)
     elif rows == 2:
-        return (12, 7)
+        return (11, 7)
     elif rows == 3:
-        return (12, 8)
+        return (11, 8)
     elif rows > 3:
-        return (12, 10)
+        return (11, 10)
 
 
 def plot_comparison(
@@ -734,7 +738,7 @@ def plot_embeddings_px(
     })
 
     # 2. Setup Figure based on Label Count
-    if n_labels > 20:
+    if n_labels > 30:
         # --- HIGH CARDINALITY: Use Colorbar ---
         # We map color to 'label_id' (int) to force a continuous scale
         fig = px.scatter(
@@ -750,9 +754,9 @@ def plot_embeddings_px(
                 'end':True
                 },
             custom_data=['audiofilename', 'start', 'end', 'idx'],
-            title=f"Embedding Plot - {label_by}",
+            title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
             render_mode='webgl',
-            color_continuous_scale=SPEC_COLORMAP
+            color_continuous_scale=COLOR_CONTINUOUS
         )
 
         tick_vals = np.linspace(0, n_labels - int(n_labels//100+1), 6).astype(int).tolist()
@@ -782,32 +786,36 @@ def plot_embeddings_px(
                 'end':True
                 },
             custom_data=['audiofilename', 'start', 'end', 'idx'],
-            title=f"Embedding Plot - {label_by}",
-            render_mode='webgl'
+            title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
+            render_mode='webgl',
+            color_discrete_sequence=COLOR_DISCRETE
         )
         
         # Configure the Discrete Legend
         fig.update_layout(
             legend=dict(
-                orientation="h", 
+                orientation="v", 
                 yanchor="bottom", 
-                y=1.02, 
-                xanchor="right", 
-                x=1,
-                title_text=''
+                y=0, 
+                xanchor="left", 
+                x=1.02,
+                title_text=label_by
             )
         )
 
     
     fig.update_layout(
-        autosize=True,
+        # autosize=True,
+        height=EMBED_FIG_HEIGHT,    
         clickmode='event', 
-        height=400,
         hovermode='closest',
-        margin=dict(l=20, r=20, t=40, b=20),
+        # margin=dict(l=20, r=20, t=40, b=20),
+        margin=dict(l=0, r=40, t=40, b=0),
         # Ensure selection tools are available
         modebar=dict(add=['lasso2d', 'select2d'], remove=['autoScale2d'])
     )
+    # fig.update_xaxes(visible=False, showticklabels=True) # Hide x axis ticks 
+    # fig.update_yaxes(visible=False, showticklabels=True) # Hide y axis ticks
     
     # Improve marker appearance
     fig.update_traces(marker=dict(size=8, opacity=0.6))

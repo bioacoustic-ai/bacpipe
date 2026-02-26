@@ -224,3 +224,50 @@ class DashBoardHelper:
         notification = pn.pane.Markdown("")
 
         return pn.Column(fig_panel, pn.Row(button), notification)
+    
+    # def add_save_button(self, plot_func, **kwargs):
+    #     """Adds a save button that triggers Plotly's native camera"""
+    #     has_widgets = any(hasattr(v, 'value') for v in kwargs.values())
+        
+    #     if has_widgets:
+    #         fig_panel = pn.panel(pn.bind(plot_func, **kwargs))
+    #     else:
+    #         fig_panel = pn.panel(plot_func(**kwargs))
+        
+    #     # JavaScript to trigger camera click
+    #     trigger_camera_js = """
+    #     <script>
+    #     function triggerCamera() {
+    #         // Find the camera button in the modebar
+    #         const cameraBtn = document.querySelector('[data-title*="Download plot"]');
+    #         if (cameraBtn) {
+    #             cameraBtn.click();
+    #         }
+    #     }
+    #     </script>
+    #     <button onclick="triggerCamera()" class="bk bk-btn bk-btn-primary">Save Figure</button>
+    #     """
+        
+    #     custom_button = pn.pane.HTML(trigger_camera_js)
+        
+    #     # Configure the camera button
+    #     def get_filename():
+    #         # ... your filename logic ...
+    #         print('worked!')
+    #         pass
+        
+    #     config = {
+    #         'toImageButtonOptions': {
+    #             'format': 'png',
+    #             'filename': get_filename(),
+    #             'height': 1200,
+    #             'width': 1600,
+    #             'scale': 2
+    #         },
+    #         'displaylogo': False
+    #     }
+        
+    #     if isinstance(fig_panel, pn.pane.Plotly):
+    #         fig_panel.config = config
+        
+    #     return pn.Column(fig_panel, custom_button)

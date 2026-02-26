@@ -193,8 +193,34 @@ class Embedder(AudioHandler):
         return self.model(samples)
 
     def run_dimensionality_reduction_pipeline(self):
+        if self.loader.metadata_dict['nr_embeds_total'] > 300_000:
+            self.nr_subsampled_embeds_for_umap = 300_000
+            logger.info(
+                "Your dataset is very large, with a total of "
+                f"{self.loader.metadata_dict['nr_embeds_total']}. "
+                "Because umap requires loading all embeddings into memory to then "
+                "calculate the low dimensional manifold, this is likely to cause "
+                "memory errors. Instead bacpipe will subsample a random sample of "
+                f"{self.nr_subsampled_embeds_for_umap} embeddings from your dataset. "
+                "calculate a umap transformation based on those files and then apply "
+                "the learned transformation to your entire dataset. It will not be "
+                "super quick, but it will give you a 2d visualization for your "
+                "dataset and it should prevent you running into out-of-memory problems."
+            )
+            use_sample_of_files = True
+            sample_file_size = int(
+                self.nr_subsampled_embeds_for_umap 
+                / int(np.mean(self.loader.metadata_dict['files']['nr_embeds_per_file']))
+                )
+            sample_files = (
+                np.random.permutation(self.loader.files)[:sample_file_size]
+                )
+        else:
+            use_sample_of_files = False
+            sample_files = self.loader.files
+        
         for idx, file in enumerate(
-            tqdm(self.loader.files, desc="processing files", position=1, leave=False)
+            tqdm(sample_files, desc="loading files", position=1, leave=False)
         ):
             if idx == 0:
                 embeddings = self.loader.read_embedding_file(file)
@@ -202,8 +228,22 @@ class Embedder(AudioHandler):
                 embeddings = np.concatenate(
                     [embeddings, self.loader.read_embedding_file(file)]
                 )
-
-        dim_reduced_embeddings = self.get_embeddings_from_model(embeddings)
+        if use_sample_of_files:
+            self.get_embeddings_from_model(embeddings)
+            for idx, file in enumerate(
+                tqdm(self.loader.files, desc="processing files", position=1, leave=False)
+            ):
+                if idx == 0:
+                    dim_reduced_embeddings = self.model.model.transform(
+                        self.loader.read_embedding_file(file)
+                        )
+                else:
+                    dim_reduced_embeddings = np.concatenate(
+                        [dim_reduced_embeddings, 
+                         self.model.model.transform(self.loader.read_embedding_file(file))]
+                    )
+        else:
+            dim_reduced_embeddings = self.get_embeddings_from_model(embeddings)
         self.loader.save_embedding_file(file, dim_reduced_embeddings)
 
     def run_inference_pipeline_using_multithreading(self):
@@ -644,7 +684,9 @@ class Classifier:
         file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
         file_dest = str(file_dest) + ".json"
 
-        if self.predictions.shape[0] != len(self.model.classes):
+        if len(self.predictions.shape) == 1:
+            self.predictions = self.predictions.unsqueeze(0)
+        elif self.predictions.shape[-1] != len(self.model.classes):
             self.predictions = self.predictions.swapaxes(0, 1)
 
         if self.model.only_embed_annotations: #annotation file exists

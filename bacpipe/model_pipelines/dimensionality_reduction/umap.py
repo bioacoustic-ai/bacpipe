@@ -16,10 +16,10 @@ class Model(ModelBaseClass):
         }
 
         super().__init__(sr=None, segment_length=None, **kwargs)
-        self.model = umap.UMAP(**self.umap_config).fit_transform
+        self.model = umap.UMAP(**self.umap_config)
 
     def preprocess(self, embeddings):
         return embeddings
 
     def __call__(self, input):
-        return self.model(input)
+        return self.model.fit_transform(input)

@@ -97,7 +97,7 @@ def play(bool_save_logs=False, **kwargs):
     if bool_save_logs:
         save_logs()
 
-    config.models = get_model_names(**kwargs)
+    kwargs['models'] = get_model_names(**kwargs)
 
     if overwrite or not evaluation_with_settings_already_exists(**kwargs):
 
@@ -459,6 +459,8 @@ def model_specific_evaluation(
                     )
             except FileNotFoundError as e:
                 ground_truth = None
+            except IndexError as e:
+                ground_truth = None
 
 
 
@@ -597,8 +599,7 @@ def run_pipeline_for_single_model(
             **kwargs,
         )
         if (
-            not overwrite
-            and (paths.plot_path.joinpath("embeddings.png").exists())
+            not (paths.plot_path.joinpath("embeddings.png").exists())
             or testing
         ):
             logger.debug(
@@ -682,13 +683,11 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
     except KeyboardInterrupt:
         if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
             all_files = list(Path(ld.embed_dir).rglob('*'))
-            if len(all_files) < 25:
+            if len(all_files) < 15:
                 logger.info(f"KeyboardInterrupt: Exiting and deleting created {ld.embed_dir}.")
                 import shutil
 
                 shutil.rmtree(ld.embed_dir)
             else:
-                logger.info(f"KeyboardInterrupt: Exiting and but not deleting {ld.embed_dir}.")
+                logger.info(f"KeyboardInterrupt: Exiting but not deleting {ld.embed_dir}.")
         import sys
-
-        sys.exit()

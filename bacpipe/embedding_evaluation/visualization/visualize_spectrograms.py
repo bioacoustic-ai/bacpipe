@@ -70,12 +70,12 @@ class SpectrogramPlot:
     def update_text(self, start_s, end_s, audiofilename, label):
         self.panel_static_text.visible=True
         self.panel_static_text.value = f"""
-            model sample rate = {self.sample_rate}; 
-            model segment_length = {self.segment_length}; <br>
-            filename = {audiofilename}; <br>
-            offset = {start_s}; 
-            duration = {end_s - start_s}; 
-            label = {label}
+            <b>model sample rate</b> = {self.sample_rate} Hz; 
+            <b>model segment_length</b> = {self.segment_length} samples; <br>
+            <b>filename</b> = {audiofilename}; <br>
+            <b>offset</b> = {start_s} s;        
+            <b>duration</b> = {end_s - start_s} s;        
+            <b>label</b> = {label}
         """
     
     def create_specs(self, audio):
@@ -97,7 +97,10 @@ class SpectrogramPlot:
             labels={'x': 'time (s)', 'y': 'freq (Hz)'}, 
             color_continuous_scale=SPEC_COLORSCALE,
         )
-        fig.update_layout(autosize=True, margin=dict(l=20, r=20, t=20, b=20))
+        fig.update_layout(
+            height=SPECTROGRAM_PLOT_HEIGHT, 
+            margin=dict(l=20, r=20, t=20, b=20)
+            )
         return fig
         
     def play_audio(self, event):

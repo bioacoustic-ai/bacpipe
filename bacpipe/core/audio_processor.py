@@ -118,6 +118,35 @@ class AudioHandler:
         cumulative_segments = torch.Tensor(cumulative_segments)
         cumulative_segments = cumulative_segments.to(self.device)
         return cumulative_segments
+    
+    def _load_audio_based_on_fixed_segment_length(self, audio, segment_length, **_):
+        nr_segments = len(audio) // segment_length +1
+        starts = np.arange(nr_segments) * segment_length * self.model.sr
+        ends = np.arange(1, nr_segments+1) * segment_length * self.model.sr
+        return starts, ends
+
+    def _load_and_pad_audio_based_on_grid(self, audio, starts, ends, file_path):
+        audio = audio.cpu().squeeze()
+        for idx, (s, e) in enumerate(zip(starts, ends)):
+            s, e = int(s), int(e)
+            if s > len(audio):
+                logger.warning(
+                    f"Annotation with start {s} and end {e} is outside of "
+                    f"range of {file_path}. Skipping annotation."
+                )
+                continue
+            segments = lb.util.fix_length(
+                audio[s:e+1],
+                size=self.model.segment_length,
+                mode=self.padding
+                )
+            if idx == 0:
+                cumulative_segments = segments
+            else:
+                cumulative_segments = np.vstack([cumulative_segments, segments])
+        cumulative_segments = torch.Tensor(cumulative_segments)
+        cumulative_segments = cumulative_segments.to(self.device)
+        return cumulative_segments
 
     def _window_audio(self, audio):
         num_frames = int(np.ceil(len(audio[0]) / self.model.segment_length))

@@ -15,7 +15,7 @@ from bacpipe.embedding_evaluation.classification.train_classifier import (
     )
 
 
-
+HEATMAP_FIG_HEIGHT = 600
 
 def plot_classification_results(
     task_name,
@@ -290,12 +290,24 @@ def plot_classification_heatmap(
     # Hour labels (0-23)
     x_labels = list(range(24))
     
+    # Get unique labels (preserving order)
+    unique_labels = []
+    seen = set()
+    for label in y_labels:
+        if label not in seen:
+            unique_labels.append(label)
+            seen.add(label)
+    y_indices = list(range(len(unique_labels)))
+    if len(y_indices) > len(y_indices) / int(HEATMAP_FIG_HEIGHT / 100):
+        nr_y_ticks = int(HEATMAP_FIG_HEIGHT / 100) 
+    
     # Create heatmap
     fig = px.imshow(
         plot_data,
         labels=dict(x="Hours", y=y_axis_label, color="Binary presence per hour"),
         x=x_labels,
-        y=np.unique(y_labels),
+        # y=np.unique(y_labels),
+        y=y_indices,  # ✅ Use integer indices instead of labels
         color_continuous_scale='Viridis',
         zmin=0,  # Values below this will be white (nan handling)
         aspect="auto",
@@ -309,16 +321,22 @@ def plot_classification_heatmap(
     
     # Customize layout
     fig.update_layout(
-        autosize=True,
+        # autosize=True,
         # width=600,
-        height=500,
+        height=HEATMAP_FIG_HEIGHT,
         xaxis=dict(
             tickmode='array',
             tickvals=[0, 6, 12, 18, 23],
             ticktext=['0', '6', '12', '18', '23']
         ),
+        # yaxis=dict(
+        #     autorange='reversed'  # Optional: match seaborn orientation
+        # ),
         yaxis=dict(
-            autorange='reversed'  # Optional: match seaborn orientation
+            autorange='reversed',  # Match seaborn orientation
+            tickmode='array',
+            tickvals=y_indices[::nr_y_ticks],
+            ticktext=unique_labels[::nr_y_ticks]
         ),
         coloraxis_colorbar=dict(
             title="Binary presence per hour"
@@ -327,7 +345,8 @@ def plot_classification_heatmap(
     
     # Make NaN values appear white
     fig.update_traces(
-        hovertemplate='Hour: %{x}<br>' + y_axis_label + ': %{y}<br>Presence: %{z}<extra></extra>'
+        hovertemplate='Hour: %{x}<br>' + y_axis_label + ': %{y}<br>Presence: %{z}<extra></extra>',
+        customdata=np.array(unique_labels)[:, None]  # Add date labels to hover
     )
     
     return fig
@@ -395,6 +414,22 @@ class PredictionsLoader:
                 "If the model has a pretrained classifier, please rerun "
                 "bacpipe with the setting `run default classifier` set to `True`."
             )
+        
+        if not len(self.embed_dict['x']) == len(self.binary_presence):
+            logger.warning(
+                "There is a mismatch between the number of embeddings "
+                "and the number of predictions. Going to zero pad the "
+                "rest, but this could misalign things. "
+            )
+            self.binary_presence = np.pad(
+                self.binary_presence, 
+                (
+                    (0, len(self.embed_dict['x'])-len(self.binary_presence)), 
+                    (0, 0)
+                ), 
+                'constant')
+            
+            
         
         self.get_timestamps_per_embedding(model)
         
@@ -507,37 +542,47 @@ class PredictionsLoader:
         else:
             files = list(integrated_clfier_path.rglob('*json'))
             
-        cl_dict = {}
-        total_length = 0
-        keys2idx = {}
-        for idx, file in enumerate(files):
-            with open(file, 'r') as f:
-                d = json.load(f)
-                current_time_bins = d['head']['Time bins in this file']
-                d.pop('head')
-                
-                for k, v in d.items():
-                    cl_dict[k] = np.zeros([total_length + current_time_bins])    
-                    if not keys2idx:
-                        keys2idx[k] = 0
-                    if not k in keys2idx:
-                        keys2idx[k] = max(keys2idx.values()) + 1
-                        
-                    cl_dict[k][np.array(v['time_bins_exceeding_threshold']) + total_length] = v['classifier_predictions']
-                    # file_specific_classification[v['time_bins_exceeding_threshold'], k2idx[k]] = v['classifier_predictions']
-                for species in [
-                    k for k, v in cl_dict.items() 
-                    if len(v) < total_length + current_time_bins
-                    ]:
-                    cl_dict[species] = np.hstack([cl_dict[species], np.zeros([current_time_bins])])
-                
-                total_length += current_time_bins
-            self.progress_bar.value = int((idx+1)/len(files)*100)
-        
-        probs_array = np.array(list(cl_dict.values())).T
+        if not (integrated_clfier_path / 'as_dataframe.parquet').exists():
+            cl_dict = {}
+            total_length = 0
+            keys2idx = {}
+            for idx, file in enumerate(files):
+                with open(file, 'r') as f:
+                    d = json.load(f)
+                    current_time_bins = d['head']['Time bins in this file']
+                    d.pop('head')
+                    
+                    for k, v in d.items():
+                        cl_dict[k] = np.zeros([total_length + current_time_bins])    
+                        if not keys2idx:
+                            keys2idx[k] = 0
+                        if not k in keys2idx:
+                            keys2idx[k] = max(keys2idx.values()) + 1
+                            
+                        cl_dict[k][np.array(v['time_bins_exceeding_threshold']) + total_length] = v['classifier_predictions']
+                        # file_specific_classification[v['time_bins_exceeding_threshold'], k2idx[k]] = v['classifier_predictions']
+                    for species in [
+                        k for k, v in cl_dict.items() 
+                        if len(v) < total_length + current_time_bins
+                        ]:
+                        cl_dict[species] = np.hstack([cl_dict[species], np.zeros([current_time_bins])])
+                    
+                    total_length += current_time_bins
+                self.progress_bar.value = int((idx+1)/len(files)*100)
+            import pandas as pd
+            
+            probs_array = np.array(list(cl_dict.values())).T
+            df = pd.DataFrame(probs_array)
+            df.columns = keys2idx.keys()
+            df.to_parquet(integrated_clfier_path / 'as_dataframe.parquet')
+        else:
+            import pandas as pd
+            df = pd.read_parquet(integrated_clfier_path / 'as_dataframe.parquet')
+            keys = df.columns
+            keys2idx = {k: i for i, k in enumerate(keys)}
         # binary_classification = probs_array[probs_array > thresh]
-        binary_classification = np.zeros(probs_array.shape, dtype=np.int8)
-        binary_classification[probs_array > threshold] = 1
+        binary_classification = np.zeros(df.shape, dtype=np.int8)
+        binary_classification[df > threshold] = 1
         
         return binary_classification, keys2idx
     
@@ -584,9 +629,12 @@ class PredictionsLoader:
                     hours[month_presence_idx]==hour
                     )[0]
                 if len(hourly_presence_idx) > 0:
-                    accumulated[hour, acc_idx] = sum(
-                        species_presence[month_presence_idx[hourly_presence_idx]]
-                        )
+                    try:
+                        accumulated[hour, acc_idx] = sum(
+                            species_presence[month_presence_idx[hourly_presence_idx]]
+                            )
+                    except Exception as e:
+                        raise Exception
         return accumulated
         
     def get_timestamps_per_embedding(self, model):
@@ -595,7 +643,9 @@ class PredictionsLoader:
         
         # embed_dict = self.vis_loader.embeds[model]
         ts_within_audio_files = [dt.timedelta(seconds=ts) for ts in self.embed_dict['timestamp']]
-        ts_files = [get_dt_filename(f) for f in self.embed_dict['metadata']['audio_files']]
+        unique_audio_files = list(set(self.embed_dict['metadata']['audio_files']))
+        unique_audio_files.sort()
+        ts_files = [get_dt_filename(f) for f in unique_audio_files]
         ts_files_same_length_as_embeds = []
         [
             ts_files_same_length_as_embeds.extend([ts_file] * embed_len) 

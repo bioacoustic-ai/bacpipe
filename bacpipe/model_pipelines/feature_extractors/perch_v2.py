@@ -5,6 +5,8 @@ import pandas as pd
 import logging
 logger = logging.getLogger("bacpipe")
 
+tf.keras.backend.clear_session()
+
 from ..model_utils import ModelBaseClass
 
 SAMPLE_RATE = 32000

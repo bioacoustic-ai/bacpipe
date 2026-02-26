@@ -37,6 +37,9 @@ matplotlib.use("agg")
 pn.extension('plotly')
 from .dashboard_utils import DashBoardHelper
 
+ACCORDION_WIDTH = 780
+
+
 class DashBoard(DashBoardHelper):
     def __init__(
         self,
@@ -143,7 +146,7 @@ class DashBoard(DashBoardHelper):
                             )
         else:             
             embedding_info_dialogue = pn.widgets.StaticText(
-                    value="", width=400
+                    value="", width=600
                     )
             
             self.spec_plot_obj[widget_idx] = SpectrogramPlot(
@@ -268,7 +271,7 @@ class DashBoard(DashBoardHelper):
                 # sizing_mode="stretch_width",
                 active=[0, 1, 2],
             ),
-            width=900,
+            width=ACCORDION_WIDTH,
             # sizing_mode="stretch_both",
         )
 
@@ -344,7 +347,7 @@ class DashBoard(DashBoardHelper):
                 # sizing_mode="stretch_width",
                 active=[0, 1, 2],
             ),
-            width=1700,
+            width=2 * ACCORDION_WIDTH,
             # sizing_mode="stretch_both",
         )
 
@@ -360,7 +363,7 @@ class DashBoard(DashBoardHelper):
                 placeholder=(
                     self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
                     ).as_posix(),
-                width=800,
+                width=600,
                 max_length=800,
                 visible=False
                 )
@@ -385,7 +388,7 @@ class DashBoard(DashBoardHelper):
             value=0,
             max=100,
             bar_color='primary',
-            width=800
+            width=500
         )
         
         self.loading_test_placeholder[widget_idx] = pn.widgets.StaticText(
@@ -476,7 +479,7 @@ class DashBoard(DashBoardHelper):
                 # by default create all annotations as one big annotations file
                 # # add button to save as raven annotations
                 ),
-                width=900
+                width=ACCORDION_WIDTH
             )
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
         
@@ -510,6 +513,7 @@ class DashBoard(DashBoardHelper):
                             options=[True, False],
                             attr="RadioBoxGroup",
                             value=False,
+                            inline=True
                         )
                         if not self.ground_truth is None
                         else None
@@ -530,6 +534,7 @@ class DashBoard(DashBoardHelper):
                             options=[True, False],
                             attr="RadioBoxGroup",
                             value=False,
+                            inline=True
                         )
                         if not (
                             self.interactive_embedding_plot is None
@@ -558,6 +563,7 @@ class DashBoard(DashBoardHelper):
                         name="Integrated or linear classifier",
                         options=['Integrated', 'Linear'],
                         attr="RadioBoxGroup",
+                        inline=True,
                         value='Integrated',
                         ),
                     self.init_widget(
@@ -576,7 +582,7 @@ class DashBoard(DashBoardHelper):
                 ]
             )
 
-        return pn.Column(*widgets, width=200, margin=(10, 10))
+        return pn.Column(*widgets, width=180, margin=(10, 10))
 
     def build_layout(self):
         """

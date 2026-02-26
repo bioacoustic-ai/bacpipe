@@ -4,7 +4,7 @@ import librosa
 
 from bacpipe.model_specific_utils.bat.module import BAT
 from bacpipe.model_specific_utils.bat.prepare_data import prepareData, getSequences, slideWindow, germanBats
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 IS_EXPANDED = False
 if IS_EXPANDED:
