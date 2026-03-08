@@ -22,6 +22,8 @@ EMBEDDING_DIMENSIONS = {
     "avesecho_passt": 768,
     "aves_especies": 768,
     "bat": 64,
+    "batdetect2_mean_detections": 32,
+    "batdetect2_mean_clip": 32,
     "beats": 768,
     "birdaves_especies": 1024,
     "biolingual": 512,
@@ -40,7 +42,6 @@ EMBEDDING_DIMENSIONS = {
     "surfperch": 1280,
     "google_whale": 1280,
     "vggish": 128,
-    "batdetect2": 32,
 }
 
 NEEDS_CHECKPOINT = [
