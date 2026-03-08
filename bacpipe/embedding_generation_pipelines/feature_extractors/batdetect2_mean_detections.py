@@ -6,9 +6,7 @@ import torch
 from ..utils import ModelBaseClass
 
 SAMPLE_RATE = 256_000
-
 DEFAULT_SEGMENT_DURATION = 1
-DEFAULT_DETECTION_THRESHOLD = 0.3
 NUM_FEATURES = 32
 NUM_CLASSES = 17
 
@@ -64,5 +62,5 @@ class Model(ModelBaseClass):
         # interface, running a classifier on these aggregated features won't
         # produce the intended results.
         raise NotImplementedError(
-            "Classifier predictions are invalid for averaged multi-detection features."
+            "Classifier predictions are invalid for averaged features."
         )
