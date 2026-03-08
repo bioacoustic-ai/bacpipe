@@ -41,7 +41,7 @@ class Model(ModelBaseClass):
             samp_rate=SAMPLE_RATE,
             device=self.device,
         )
-        self.non_max_suppresion = partial(
+        self.non_max_suppression = partial(
             pp.run_nms,
             params={
                 "nms_kernel_size": self.config["nms_kernel_size"],
@@ -67,7 +67,7 @@ class Model(ModelBaseClass):
     def __call__(self, x, return_class_results=False):
         output = self.model(x)
 
-        results, features = self.non_max_suppresion(
+        results, features = self.non_max_suppression(
             output,
             sampling_rate=np.array([SAMPLE_RATE] * x.shape[0]),
         )
