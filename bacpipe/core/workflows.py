@@ -668,7 +668,13 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
 
             # Finalize
             if embed.model.bool_classifier and not embed.dim_reduction_model:
-                embed.classifier.save_annotation_table(ld)
+                try:
+                    embed.classifier.save_annotation_table(ld)
+                except Exception as e:
+                    logger.warning(
+                        "Error when trying to save classifier predictions. "
+                        f"Continuing but only embeddings will be saved. {e}"
+                    )
             ld.write_metadata_file()
             ld.update_files()
         

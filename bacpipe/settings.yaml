@@ -1,6 +1,6 @@
-######################################################
-##################   PATH SETTINGS ###################
-######################################################
+##################-------------------###################
+##################   PATH SETTINGS   ###################
+##################-------------------###################
 
 # fixed path, embeddings will be stored here, advised not to change
 # because this is also where bacpipe will look for existing embeddings
@@ -15,28 +15,9 @@ evaluations_dir :       evaluations
 model_base_path: bacpipe/model_checkpoints
 
 
-######################################################
-#########   USING YOUR ANOOTATION SETTINGS ###########
-######################################################
-
-# key corresponding to the label in the annotation.csv file, if labeled data exists
-# by default this is species, but change if needed
-label_column: 'species'
-
-# file name of the annotations file. This file needs to be located
-# in the root directory of your audio data.
-annotations_filename :  annotations.csv
-
-# If you have an annotations file in the format specified in the 
-# ReadMe file, you can choose to only create embeddings for the segments
-# corresponding to the annotations. For model's that require input segments
-# longer than an annotation, the audio will be padded according to the 
-# padding specified below (see `padding`).
-only_embed_annotations: False
-
-######################################################
-#########   EMBEDDING GENERATION SETTINGS ############
-######################################################
+#########-----------------------------------############
+#########   EMBEDDING GENERATION SETTINGS   ############
+#########-----------------------------------############
 
 # specify your device, if unsure use 'cpu', if you are working on a 
 # gpu computer use 'cuda'
@@ -72,9 +53,52 @@ padding: 'minimum'
 # to true and thereby it will always revert to a sequential operation, also on gpu's.
 avoid_pipelined_gpu_inference: False
 
-######################################################
+# If using parallel processing, by default bacpipe will find all available cpu cores
+# and subtract 1 from that number to determine the amount of available cpus. If you 
+# want to restrict this by setting a fixed number of cpus, specific the number here
+nr_parallel_workers: False
+
+
+#########------------------------------------###########
+#########   USING YOUR ANOOTATION SETTINGS   ###########
+#########------------------------------------###########
+
+# key corresponding to the label in the annotation.csv file, if labeled data exists
+# by default this is species, but change if needed
+label_column: 'species'
+
+# file name of the annotations file. This file needs to be located
+# in the root directory of your audio data.
+annotations_filename :  orig_annotations.csv
+
+# If you have an annotations file in the format specified in the 
+# ReadMe file, you can choose to only create embeddings for the segments
+# corresponding to the annotations. For model's that require input segments
+# longer than an annotation, the audio will be padded according to the 
+# padding specified below (see `padding`).
+only_embed_annotations: False
+
+##########-----------------------------#################
+##########   DEFAULT LABELS SETTINGS   #################
+##########-----------------------------#################
+
+# kinds of default labels that are created for the embeddings.
+# only modify these if you are ready to modify the 
+# corresponding code in label_embeddings.py
+default_label_keys: [
+  "time_of_day",
+  "day_of_year",
+  "continuous_timestamp",
+  "parent_directory",
+  "audio_file_name"
+  ]
+
+
 ###############   EVALUATION SETTINGS ################
-######################################################
+
+#######-------------------------------------############
+#######   INTEGRATED CLASSIFIER  SETTINGS   ############
+#######-------------------------------------############
 
 # For evaluation using classification it is necessary to have a minimum number 
 # of embeddings for each label. The remaining embeddings will be marked as noise.
@@ -86,17 +110,10 @@ min_label_occurrences: 50
 # number of occurances, set this to False.
 bool_filter_labels: True
 
-# kinds of default labels that are created for the embeddings
-default_label_keys: [
-  "time_of_day",
-  "day_of_year",
-  "continuous_timestamp",
-  "parent_directory",
-  "audio_file_name"
-  ]
 
-
-## CLASSIFICATION SETTINGS ##
+#######----------------------############
+#######   PROBING SETTINGS   ############
+#######----------------------############
 
 # if the model has a classifier that ships with the model, by default 
 # it will be used, to provide another option to colorcode embeddings
@@ -121,7 +138,9 @@ class_configs:
     dataset_csv_path: classification_dataframe.csv
 
 
-## CLUSTERING SETTINGS ##
+#######-------------------------############
+#######   CLUSTERING SETTINGS   ############
+#######-------------------------############
 
 # specify if you want to use the silhouette score to evaluate 
 # the clustering results. Can be very slow for large datasets
@@ -145,6 +164,35 @@ clust_configs:
       metric: "euclidean"
     
 
+#######------------------------############
+#######   DASHBOARD SETTINGS   ############
+#######------------------------############
+
+dashboard_port: 5006
+
+dashboard_address: localhost
+
+dashboard_websocket_origin: False
+
+
+
+
+
+
+#######-----------------------------------############
+#######     SLOW DOWN AUDIO SETTINGS      ############
+#######   FOR ULTRASONIC VOCALIZATIONS    ############
+#######-----------------------------------############
+
+
+bool_slowdown: False
+slowdown_rate: None
+
+
+
+
+
+###########################################
 
 # If set to true bacpipe will always use the same test files and save it in a 
 # directory other than the results directory. Results will also be deleted at 

@@ -92,6 +92,7 @@ class Loader:
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
         self.build_results_dir = build_results_dir
+        self.continue_incomplete_run = False
 
         self._initialize_path_structure(
             testing=testing, **kwargs
@@ -221,6 +222,12 @@ class Loader:
                 self._update_audio_file_list(
                     audio_files, corresponding_audio_file_bool
                     )
+        if len(self.files) == 0:
+            self.metadata_dict['segment_length (samples)'] = module.LENGTH_IN_SAMPLES
+            self.metadata_dict['sample_rate (Hz)'] = module.SAMPLE_RATE
+            self.write_metadata_file()
+            self.combination_already_exists = True
+
         
     def _update_audio_file_list(self, audio_files, corresponding_audio_file_bool):
         self.files.remove(

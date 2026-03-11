@@ -10,7 +10,9 @@ logger = logging.getLogger("bacpipe")
 
 
 class AudioHandler:
-    def __init__(self, model, padding, audio_dir, **kwargs):
+    def __init__(self, model, padding, audio_dir, 
+                 bool_slowdown=False, slowdown_rate=None, 
+                 **kwargs):
         """
         Helper class for all methods related to loading and padding audio. 
 
@@ -28,6 +30,8 @@ class AudioHandler:
         self.model = model
         self.padding = padding
         self.audio_dir = audio_dir
+        self.bool_slowdown = bool_slowdown
+        self.slowdown_rate = slowdown_rate
         self.kwargs = kwargs
     
     def prepare_audio(self, sample):
@@ -63,24 +67,32 @@ class AudioHandler:
     
     def _load_and_resample(self, path):
         try:
-            audio, sr = ta.load(str(path), normalize=True)
+            if not self.bool_slowdown:
+                audio, sr = lb.load(
+                    str(path), sr=self.model.sr, mono=True
+                    )
+            else:
+                #TODO Need to ensure that input length get's prolonged accordingly
+                audio, sr = lb.load(
+                    str(path), sr=None, mono=True
+                    )
+                audio = lb.resample(
+                    audio, 
+                    orig_sr=int(sr * self.slowdown_rate), 
+                    target_sr=self.model.sr
+                    )
+            audio = audio.reshape(1, -1)
         except Exception as e:
             logger.exception(
-                f"\nError loading audio with torchaudio. "
-                f"Skipping {path}."
+                f"\nError loading audio. Skipping {str(path)}."
                 f"Error: {e}"
             )
             raise e
-        if audio.shape[0] > 1:
-            audio = audio.mean(axis=0).unsqueeze(0)
-        if len(audio[0]) == 0:
+        if len(audio) == 0:
             error = f"Audio file {path} is empty. " f"Skipping {path}."
             logger.exception(error)
             raise ValueError(error)
-        re_audio = lb.resample(
-            audio.numpy(), orig_sr=sr, target_sr=self.model.sr
-            )
-        return torch.tensor(re_audio)
+        return torch.tensor(audio)
 
     def _only_load_annotated_segments(
         self, file_path, audio, annotations_filename='annotations.csv', **_

@@ -678,7 +678,13 @@ class DashBoard(DashBoardHelper):
 
             sidebar.append(close_button)
 
-def visualize_using_dashboard(models, **kwargs):
+def visualize_using_dashboard(
+    models, 
+    dashboard_port=5006,
+    dashboard_address='localhost',
+    dashboard_websocket_origin=False,
+    **kwargs
+    ):
     """
     Create and serve the dashboard for visualization.
 
@@ -716,5 +722,12 @@ def visualize_using_dashboard(models, **kwargs):
         main=[dashboard.app],
     )
     
-
-    template.show(port=5006, address="localhost")
+    if not dashboard_websocket_origin is None:
+        websocket_origin = dashboard_websocket_origin
+    else:
+        websocket_origin = None
+    template.show(
+        port=dashboard_port, 
+        address=dashboard_address, 
+        websocket_origin=websocket_origin
+        )
