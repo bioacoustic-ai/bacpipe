@@ -806,19 +806,19 @@ def plot_embeddings_px(
     
     fig.update_layout(
         # autosize=True,
+        template='plotly_white',
         height=EMBED_FIG_HEIGHT,    
         clickmode='event', 
         hovermode='closest',
         # margin=dict(l=20, r=20, t=40, b=20),
-        margin=dict(l=0, r=40, t=40, b=0),
+        margin=dict(l=0, r=80, t=40, b=0),
         # Ensure selection tools are available
-        modebar=dict(add=['lasso2d', 'select2d'], remove=['autoScale2d'])
+        modebar=dict(add=['lasso2d', 'select2d'], remove=['autoScale2d']),
     )
     # fig.update_xaxes(visible=False, showticklabels=True) # Hide x axis ticks 
     # fig.update_yaxes(visible=False, showticklabels=True) # Hide y axis ticks
     
     # Improve marker appearance
-    fig.update_traces(marker=dict(size=8, opacity=0.6))
-
+    fig.update_traces(marker_size=8, marker_opacity=0.6)
     return fig
 

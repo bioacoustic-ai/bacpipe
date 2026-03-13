@@ -107,6 +107,9 @@ class DashBoard(DashBoardHelper):
         self.class_select = dict()
         self.embed_plot = dict()
         
+        self.embed_save_button = dict()
+        self.embed_notification = dict()
+        
         self.interactive_embed_plot = dict()
         self.spectrogram_plot_panel = dict()
         self.spec_plot_obj = dict() 
@@ -146,7 +149,7 @@ class DashBoard(DashBoardHelper):
                             )
         else:             
             embedding_info_dialogue = pn.widgets.StaticText(
-                    value="", width=600
+                    value="", width=ACCORDION_WIDTH-80, 
                     )
             
             self.spec_plot_obj[widget_idx] = SpectrogramPlot(
@@ -169,6 +172,8 @@ class DashBoard(DashBoardHelper):
                     sizing_mode='stretch_width',
                     height=300
                 )
+            
+            self.init_interactive_embed_plot(widget_idx)
             
             embedding_plot = pn.bind(
                         self.update_main_plot,
@@ -208,6 +213,8 @@ class DashBoard(DashBoardHelper):
             
         return pn.Column(
             embedding_plot,
+            self.embed_save_button[widget_idx],
+            self.embed_notification[widget_idx],
             embedding_info_dialogue,
             self.spectrogram_plot_panel[widget_idx],
             save_selection_dialogue,
@@ -222,9 +229,21 @@ class DashBoard(DashBoardHelper):
 
     def single_model_page(self, widget_idx):
         sidebar = self.make_sidebar(widget_idx, model=True)
+        title_string = "Model Dashboard for {}".format
+        accordion_title = pn.bind(title_string, 
+                                  self.model_select[widget_idx]
+                                  )
     
         main_content = pn.Column(
-            pn.pane.Markdown(f"## Model Dashboard"),
+            pn.widgets.StaticText(
+                value=accordion_title,
+                styles={
+                    'font-size': '1.5em',     # Equivalent to a standard H2
+                    'font-weight': 'bold', 
+                    'margin-top': '0px',
+                    'margin-bottom': '15px'
+                }
+            ),
             pn.Accordion(
                 (
                     "2D Embedding Plot",

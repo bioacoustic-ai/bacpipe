@@ -313,7 +313,7 @@ def plot_classification_heatmap(
         aspect="auto",
         title=(
             f'Presence heatmap using {model} with '
-            f'{predictions_loader.current_clfier_type} classifier <br>'
+            f'{predictions_loader.current_clfier_type} probing <br>'
             f'for {species} '
             f'with threshold of {PredictionsLoader.verify_threshold(threshold)}.'
             )
@@ -324,6 +324,7 @@ def plot_classification_heatmap(
         # autosize=True,
         # width=600,
         height=HEATMAP_FIG_HEIGHT,
+        template='plotly_white',
         xaxis=dict(
             tickmode='array',
             tickvals=[0, 6, 12, 18, 23],

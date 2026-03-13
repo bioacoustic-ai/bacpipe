@@ -95,32 +95,80 @@ class DashBoardHelper:
             
         except Exception as e:
             logger.info(f"Error handling click: {e}")    
+
+
+    def init_interactive_embed_plot(self, widget_idx):
+        """Initialize interactive embedding plot with dummy figure"""
+        from .visualize_spectrograms import SpectrogramPlot
+        
+        # Create Plotly pane with dummy figure
+        self.interactive_embed_plot[widget_idx] = pn.pane.Plotly(
+            SpectrogramPlot.dummy_image(title='Loading...'),
+            sizing_mode='stretch_width',
+            config={'responsive': True}
+        )
+        
+        # Add event handlers
+        self.interactive_embed_plot[widget_idx].param.watch(
+            lambda x: self.handle_click(x, widget_idx), 'click_data'
+        )
+        self.interactive_embed_plot[widget_idx].param.watch(
+            lambda x: self.handle_selection(x, widget_idx), 'selected_data'
+        )
+        button = pn.widgets.Button(name="Save Figure", button_type="primary")
+        notification = pn.pane.Markdown("")
+        
+        self.embed_save_button[widget_idx] = button
+        self.embed_notification[widget_idx] = notification
+        
     
     def update_main_plot(self, p_type, plot_func, widget_idx, **kwargs):
-        """Update existing plot, handling both Plotly and matplotlib"""
+        """Update existing plot by just updating the .object"""
         plots_dict = getattr(self, f"{p_type}_plot")
         
-        # Recreate with save button
-        new_panel = self.add_save_button(plot_func, **kwargs)
-        plots_dict[widget_idx] = new_panel
-        
-        # Update the actual figure
-        if isinstance(new_panel[0], pn.pane.Plotly):
-            # Plotly plot - update object directly
-            new_panel[0].object = plot_func(**kwargs)
+        # Just update the figure object (no recreation!)
+        if p_type == "interactive_embed":
+            self.interactive_embed_plot[widget_idx].object = plot_func(**kwargs)
             
-            new_panel[0].param.watch(
-                lambda x: self.handle_click(x, widget_idx), 'click_data'
+            # add the onclick function
+            self.embed_save_button[widget_idx].on_click(
+                lambda e: self.save_embedding_plot(e, widget_idx, plot_func, **kwargs)
                 )
-            new_panel[0].param.watch(
-                lambda x: self.handle_selection(x, widget_idx), 'selected_data'
-                )   
+            
         else:
-            # Matplotlib plot wrapped in pn.panel with pn.bind
-            # It will auto-update through the binding
-            pass
+            # Other plot types
+            new_panel = self.add_save_button(plot_func, **kwargs)
+            plots_dict[widget_idx] = new_panel
+            
+            if isinstance(new_panel[0], pn.pane.Plotly):
+                new_panel[0].object = plot_func(**kwargs)
         
         return plots_dict[widget_idx]
+    
+    def save_embedding_plot(self, event, widget_idx, plot_func, **kwargs):
+        """Save the current embedding plot"""
+        
+        # Get model name for filename
+        model_name = self.model_select[widget_idx].value
+        label_by = self.label_select[widget_idx].value
+        
+        filename = f"{model_name}_embedding_{label_by}.png"
+        save_path = self.path_func(model_name).plot_path / filename
+        
+        # recreate figure:
+        fresh_fig = plot_func(**kwargs)
+        
+        # Copy zoom/pan from displayed figure
+        displayed = self.interactive_embed_plot[widget_idx].object
+        if hasattr(displayed.layout.xaxis, 'range'):
+            fresh_fig.layout.xaxis.range = displayed.layout.xaxis.range
+            fresh_fig.layout.yaxis.range = displayed.layout.yaxis.range
+        
+        try:
+            fresh_fig.write_image(save_path, width=1200, height=800)
+            self.embed_notification[widget_idx].object = f"✓ Saved to: {save_path}"
+        except Exception as e:
+            self.embed_notification[widget_idx].object = f"✗ Error: {e}"
             
             
     def init_plot(self, p_type, plot_func, widget_idx, **kwargs):
