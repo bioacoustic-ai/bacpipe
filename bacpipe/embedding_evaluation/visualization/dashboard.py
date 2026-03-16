@@ -60,10 +60,16 @@ class DashBoard(DashBoardHelper):
         )
         self.label_by = default_label_keys.copy()
         if (
-            self.path_func(model_names[0]).class_path
-            / "default_classifier_annotations.csv"
-        ).exists() and not "default_classifier" in self.label_by:
-            self.label_by += ["default_classifier"]
+            (self.path_func(model_names[0]).class_path).exists() 
+            and not "default_classifier" in self.label_by
+            ):
+            clfier_paths =  list(self.path_func(model_names[0])
+                                 .class_path
+                                 .rglob('*_classifier_annotations.csv')
+                                 )
+            if len(clfier_paths) > 0:
+                if clfier_paths[0].exists():
+                    self.label_by += ["default_classifier"]
         self.plot_path = self.path_func(model_names[0]).plot_path.parent.parent
         self.dim_reduc_parent_dir = dim_reduc_parent_dir
 

@@ -151,10 +151,11 @@ class DefaultLabels:
             )
 
     def default_classifier(self):
-        path = self.paths.class_path / "default_classifier_annotations.csv"
-        if not path.exists():
+        clfier_paths = list(self.paths.class_path.rglob("*_classifier_annotations.csv"))
+        if not (len(clfier_paths) > 0 or clfier_paths[0].exists()):
             self.default_label_keys.remove("default_classifier")
         else:
+            path = clfier_paths[0]
             df = pd.read_csv(path)
             if not len(self.parent_directory_per_embedding) == len(df):
                 df = self.fill_remaining_labels(df)
