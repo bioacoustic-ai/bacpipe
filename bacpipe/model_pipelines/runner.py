@@ -557,13 +557,13 @@ class Classifier:
         """
         classifier_annotations = pd.DataFrame()
         
-        maxes = torch.max(self.predictions, dim=0)
-        outputs_exceeding_thresh = self.predictions[:,
-            maxes.values > self.classifier_threshold
-        ]
+        maxes = torch.max(self.predictions, dim=1)
+        # outputs_exceeding_thresh = self.predictions[
+        #     maxes.values > self.classifier_threshold
+        # ]
         
         active_time_bins = np.arange(
-            self.predictions.shape[-1]
+            self.predictions.shape[0]
             )[maxes.values > self.classifier_threshold]
         
         classifier_annotations["start"] = active_time_bins * (
