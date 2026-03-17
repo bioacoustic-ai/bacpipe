@@ -74,8 +74,16 @@ from bacpipe.core.constants import (
 
 __all__ = [
     play,
+    Loader,
+    Embedder,
+    generate_embeddings,
+    run_pipeline_for_single_model,
     ensure_models_exist,
+    make_set_paths_func,
+    create_default_labels,
+    ground_truth_by_model,
     get_model_names,
+    get_audio_files,
     evaluation_with_settings_already_exists,
     run_pipeline_for_models,
     model_specific_evaluation,
