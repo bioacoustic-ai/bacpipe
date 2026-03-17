@@ -399,11 +399,9 @@ class DashBoard(DashBoardHelper):
             width=80,
             )
         
-        # from src.btn_icon import icon_str
         self.btn_run_clfier[widget_idx] = pn.widgets.Button(
             # name='Apply linear classifier', 
             name='Load predictions from integrated classifier', 
-            # icon=icon_str, 
             width=100, 
             height=30,
             )
