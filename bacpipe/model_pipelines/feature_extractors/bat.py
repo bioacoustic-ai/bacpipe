@@ -2,8 +2,8 @@ import torch
 import numpy as np
 import librosa
 
-from bacpipe.model_specific_utils.bat.module import BAT
-from bacpipe.model_specific_utils.bat.prepare_data import prepareData, getSequences, slideWindow, germanBats
+from ..model_specific_utils.bat.module import BAT
+from ..model_specific_utils.bat.prepare_data import prepareData, getSequences, slideWindow, germanBats
 from ..model_utils import ModelBaseClass
 
 IS_EXPANDED = False
