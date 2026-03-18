@@ -225,7 +225,7 @@ em.model.classifier_outputs
 If you want to produce embeddings for multiple models, bacpipe will always store them to keep your memory from overfilling. Still you can use the package to easily access the embeddings and all the metadata
 
 ```python
-loader = bacpipe.model_specific_embedding_creation(
+loader = bacpipe.run_pipeline_for_models(
   **vars(bacpipe.config), **vars(bacpipe.settings)
   )
 # this call will initiate the embedding generation process, it will check if embeddings

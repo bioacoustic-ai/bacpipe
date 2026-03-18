@@ -21,7 +21,7 @@ model_base_path: bacpipe/model_checkpoints
 
 # specify your device, if unsure use 'cpu', if you are working on a 
 # gpu computer use 'cuda'
-device: 'cuda'
+device: 'cpu'
 
 # batch size for embedding generation, modify if you have memory issues
 # or if you want to speed up the process and have enough memory available
@@ -43,7 +43,7 @@ rm_embedding_on_keyboard_interrupt: True
 # get's padded. Specify how it should get padded.
 # Choose values from the np.pad function documentation
 # (https://numpy.org/devdocs/reference/generated/numpy.pad.html).
-padding: 'minimum'
+padding: 'wrap'
 
 # To increase performance when running inference on a GPU, bacpipe will use threads
 # to load audio data in one thread and compute embeddings in another. That way audio 
@@ -69,7 +69,7 @@ label_column: 'species'
 
 # file name of the annotations file. This file needs to be located
 # in the root directory of your audio data.
-annotations_filename :  orig_annotations.csv
+annotations_filename :  annotations.csv
 
 # If you have an annotations file in the format specified in the 
 # ReadMe file, you can choose to only create embeddings for the segments

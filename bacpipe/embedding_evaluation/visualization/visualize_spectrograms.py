@@ -4,7 +4,6 @@ import plotly.express as px
 import librosa as lb
 from scipy.signal.windows import tukey
 from pathlib import Path
-import sounddevice as sd
 
 SPECTROGRAM_PLOT_HEIGHT = 300
 SPEC_COLORSCALE = 'Viridis'
@@ -104,6 +103,7 @@ class SpectrogramPlot:
         return fig
         
     def play_audio(self, event):
+        import sounddevice as sd
         if not hasattr(self, 'audio'):
             return
         if True:#self.use_tukey_filter:

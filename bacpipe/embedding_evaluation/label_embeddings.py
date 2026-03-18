@@ -320,6 +320,7 @@ def get_dt_filename(file):
         file = file.split("+")[0]
     numbs = re.findall("[0-9]+", file)
     numbs = [n for n in numbs if len(n) % 2 == 0]
+    file_date = None
 
     i, datetime = 1, ""
     while len(datetime) < 12:
@@ -348,6 +349,15 @@ def get_dt_filename(file):
             i = 1
             while len(datetime) > 12:
                 datetime = datetime[:-i]
+                
+    # add fix if file_date is never created as a datetime object                
+    if file_date is None:
+        logger.warning(
+                f"Could not find a valid datetime in the filename {file}. "
+                "Please check the filename format."
+                "Creating a default datetime corresponding to 2000, 1, 1."
+            )
+        file_date = dt.datetime.strptime("20001010000000", "%y%m%d%H%M%S")
     return file_date
 
 def model_specific_embedding_path(path, model, dim_reduction_model=None, **kwargs):
