@@ -134,7 +134,7 @@ class Model(ModelBaseClass):
         )
         self.preprocessor = self.preprocessor.to(self.device)
         class_file_path = (
-            'bacpipe/model_pipelines/model_specific_utils/avesecho_passt/list_AvesEcho.csv'
+            self.model_base_path / 'avesecho_passt/list_AvesEcho.csv'
         )
         df = pd.read_csv(class_file_path, header=None)
         self.classes = df.iloc[:, 1].values.tolist()
