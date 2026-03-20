@@ -540,7 +540,7 @@ class Loader:
             return np.vstack(list(d.values()))
         
     def predictions(self, threshold=bacpipe_settings.classifier_threshold, as_type='dict'):
-        class_path = (
+        preds_path = (
             self.evaluations_dir 
             / self.model_name 
             / 'classification'
@@ -548,12 +548,12 @@ class Loader:
             )
         import bacpipe
         self.embedder = bacpipe.Embedder(self.model_name, self)
-        if not class_path.exists():
+        if not preds_path.exists():
             logger.warning(
                 "No classifier predictions have been save yet. "
             )
             return None
-        class_files = list(class_path.rglob('*.json'))
+        class_files = list(preds_path.rglob('*.json'))
         if not class_files:
             logger.warning(
                 "No classifier predictions have been save yet. "
@@ -580,7 +580,7 @@ class Loader:
                 vals[val['time_bins_exceeding_threshold'], idx] = l2i[class_label]
             
             preds_array = fill_all_labels_array(vals, preds_array)
-            d[str(file.relative_to(class_path))] = vals
+            d[str(file.relative_to(preds_path))] = vals
             
         i2l = {v: k for k, v in l2i.items()}
         
@@ -712,7 +712,7 @@ class Loader:
         if (
             testing 
             or (
-                not paths.class_path.joinpath(
+                not paths.preds_path.joinpath(
                 "original_classifier_outputs"
                 ).exists() 
                 and run_pretrained_classifier

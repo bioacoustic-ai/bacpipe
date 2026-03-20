@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from sklearn.neighbors import KNeighborsClassifier
+from .dataset_probe import probe_dataset_loader
 
 import logging
 
@@ -22,10 +22,10 @@ class LinearClassifier(nn.Module):
             number of output dimensions (dictated by classes in ground truth)
         """
         super(LinearClassifier, self).__init__()
-        self.clfier = nn.Linear(in_dim, out_dim)
+        self.probe = nn.Linear(in_dim, out_dim)
 
     def forward(self, x):
-        return self.clfier(x)
+        return self.probe(x)
 
 
 def train_linear_classifier(
@@ -116,57 +116,6 @@ def train_linear_classifier(
     return linear_classifier
 
 
-def inference(classifier, test_dataloader, device="cuda:0", config="linear", **kwargs):
-    """
-    Perform inference using classifier.
-
-    Parameters
-    ----------
-    classifier : object
-        trained classification object
-    test_dataloader : DataLoader object
-        dataset iterator
-    device : str, optional
-        'cpu' or 'cuda', by default "cuda:0"
-    config : str, optional
-        type of classification, by default "linear"
-
-    Returns
-    -------
-    list
-        prediction values in ints corresponding to labels
-    list
-        ground truth values in ints
-    np.array
-        probabilities for each class and each embedding
-    """
-    device = torch.device(device)
-    classifier = classifier.to(device)
-
-    classifier.eval()
-    y_pred = []
-    y_true = []
-    probabilities = []
-
-    for embeddings, y in test_dataloader:
-        embeddings, y = embeddings.to(device), y.to(device)
-
-        outputs = classifier(embeddings)
-        if config == "linear":
-            # Use softmax to get probabilities
-            probs = F.softmax(outputs, dim=1).detach().cpu().numpy()
-            _, predicted = torch.max(outputs, 1)
-
-        elif config == "knn":
-            # KNN does not require softmax
-            predicted, probs = outputs
-            probs = probs.cpu().numpy().tolist()
-
-        y_pred.extend(predicted.cpu().numpy().tolist())
-        y_true.extend(y.cpu().numpy().tolist())
-        probabilities.extend(probs)
-
-    return y_pred, y_true, probabilities
 
 
 class KNN(nn.Module):
@@ -245,3 +194,47 @@ def train_knn_classifier(knn_classifier, train_dataloader, device="cpu", **kwarg
     logger.info("KNN Training Complete!")
 
     return knn_classifier
+
+
+
+def train_classifier(embeds, df, label2index, config="linear", **kwargs):
+    """
+    Classification pipeline. First the classification dataframe is loaded,
+    then a dict is created to link labels to ints, then the dataset loaders
+    are created to iterate over. Next depending of the specified config
+    a linear or KNN classification is performed. Finally the classifiers are
+    used for inference and based on that performance metrics are created.
+
+    Parameters
+    ----------
+    paths : SimpleNamespace dict
+        dictionary object containing paths for loading and saving
+    dataset_csv_path : string
+        name of classification dataframe as secified in the settings.yaml file
+    embeds : np.array
+        the embeddings
+    config : str, optional
+        type of classification, by default 'linear'
+
+    Returns
+    -------
+    dict
+        performance dictionary
+    """
+
+    # generate the loaders
+    train_gen = probe_dataset_loader("train", df, embeds, label2index, **kwargs)
+
+    embed_size = embeds[0].shape[-1]
+
+    if config == "linear":
+        probe = LinearClassifier(in_dim=embed_size, out_dim=len(df.label.unique()))
+        probe = train_linear_classifier(probe, train_gen, **kwargs)
+
+    elif config == "knn":
+        if len(df[df.predefined_set =='test']) < kwargs['n_neighbors']:
+            kwargs['n_neighbors'] = len(df[df.predefined_set =='test']) - 1
+        probe = KNN(**kwargs)
+        probe = train_knn_classifier(probe, train_gen, **kwargs)
+
+    return probe

@@ -28,11 +28,10 @@ from bacpipe.embedding_evaluation.visualization.visualize_embeddings import (
 )
 from bacpipe.embedding_evaluation.label_embeddings import (
     make_set_paths_func,
-    generate_annotations_for_classification_task,
     ground_truth_by_model,
 )
-from bacpipe.embedding_evaluation.classification.classify import (
-    classification_pipeline
+from bacpipe.embedding_evaluation.probing.probe import (
+    probing_pipeline
     )
 from bacpipe.embedding_evaluation.clustering.cluster import clustering
 
@@ -272,7 +271,7 @@ def evaluation_with_settings_already_exists(
         bool_paths = (
             paths.main_embeds_path.exists()
             and paths.dim_reduc_parent_dir.exists()
-            and paths.class_path.exists()
+            and paths.probe_path.exists()
             and paths.clust_path.exists()
         )
         if not bool_paths:
@@ -398,7 +397,7 @@ def run_pipeline_for_models(
     return loader_dict
 
 def model_specific_evaluation(
-    loader_dict, evaluation_task, class_configs, 
+    loader_dict, evaluation_task, probe_configs, 
     models, dim_reduction_model=False, **kwargs
 ):
     """
@@ -418,7 +417,7 @@ def model_specific_evaluation(
         dictionary containing the loader objects for each model
     evaluation_task : string
         name of the evaluation task to be performed.
-    class_configs : dict
+    probe_configs : dict
         dictionary containing the configuration for the
         classification tasks. The configurations are specified
         in the bacpipe/settings.yaml file.
@@ -451,7 +450,7 @@ def model_specific_evaluation(
                     loader_dict[model_name]
                     )
                 
-        if not evaluation_task in ["None", [], False]:
+        if not evaluation_task in ["None", [], None, False]:
             embeds = loader_dict[model_name].embeddings()
             try:
                 ground_truth = ground_truth_by_model(
@@ -470,32 +469,21 @@ def model_specific_evaluation(
         ############            SEE SETTINGS.YAML             ##############
         ####################################################################
         
-        if "classification" in evaluation_task and not ground_truth is None:
+        if "probing" in evaluation_task and not ground_truth is None:
             logger.info(
                 "\nTraining classifier to evaluate " f"{model_name.upper()} embeddings"
             )
-
+            
             assert len(embeds) > 1, (
                 "Too few files to evaluate embeddings with classifier. "
                 "Are you sure you have selected the right data?"
             )
 
-            generate_annotations_for_classification_task(paths, **kwargs)
-
-            class_embeds = embeds_array_without_noise(embeds, ground_truth, **kwargs)
-            for class_config in class_configs.values():
+            for class_config in probe_configs.values():
                 if class_config["bool"]:
-                    if not len(class_embeds) > 0:
-                        error = (
-                            "\nNo embeddings were found for classification task. "
-                            "Are you sure there are annotations for the data and the annotations.csv file "
-                            "has been correctly linked? If you didn't intent do do classification, "
-                            "simply remove it from the evaluation tasks list in the config.yaml file."
-                        )
-                        logger.exception(error)
-                        raise AssertionError(error)
-                    classification_pipeline(
-                        paths, class_embeds, **class_config, **kwargs
+                    probing_pipeline(
+                        ground_truth, embeds, 
+                        paths, **class_config, **kwargs
                     )
 
         ####################################################################
@@ -511,18 +499,6 @@ def model_specific_evaluation(
 
             embeds_array = np.concatenate(list(embeds.values()))
             clustering(paths, embeds_array, ground_truth, **kwargs)
-
-
-def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
-    if len(ground_truth[f"label:{label_column}"].shape) > 1:
-        bool_array = np.any(ground_truth[f"label:{label_column}"] > -1, axis=1)
-    else:
-        bool_array = ground_truth[f"label:{label_column}"] > -1
-        
-    return np.concatenate(list(embeds.values()))[
-        bool_array
-    ]
-
 
 def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwargs):
     """

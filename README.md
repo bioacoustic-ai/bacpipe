@@ -124,7 +124,7 @@ Furthermore, the embeddings can be evaluated using different metrics. The evalua
 ```yaml
 
 available_evaluation_tasks: [
-  "classification",
+  "probing",
   "clustering"
 ]
 ```
@@ -501,7 +501,7 @@ The labels can then be used to perform clustering and classification evaluation.
 
 See the file [annotations.csv](bacpipe/tests/test_data/annotations.csv) for an example of how the annotations file should look like.
 
-Once the annotations file is created, add either `classification` or `clustering` (or both) to the `evaluation_task` variable in the [config.yaml](bacpipe/config.yaml) file (use double quotes: "classification" or "clustering"). You can run the evaluation script using normal `python run_pipeline.py` command. The evaluation script will automatically use the annotations to compute the clustering and classification performance of the embeddings. The results will be saved in the `bacpipe/results/YOUR_DATASET/evaluation` directory.
+Once the annotations file is created, add either `classification` or `clustering` (or both) to the `evaluation_task` variable in the [config.yaml](bacpipe/config.yaml) file (use double quotes: "probing" or "clustering"). You can run the evaluation script using normal `python run_pipeline.py` command. The evaluation script will automatically use the annotations to compute the clustering and classification performance of the embeddings. The results will be saved in the `bacpipe/results/YOUR_DATASET/evaluation` directory.
 
 If you selected classification, a linear classifier will be trained and saved in the classification subdirectory of the evaluation folder. This .pt file can be used to generate class predictions with a model that wasn't originally trained on these classes. A tutorial will be available shortly explaining this in more detail. The .pt file can be used in the repository [acodet](https://github.com/vskode/acodet) to generate class predictions with the combination of a feature extractor and the trained linear classifier.
 

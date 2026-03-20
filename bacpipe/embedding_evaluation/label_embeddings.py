@@ -24,7 +24,7 @@ class DefaultLabels:
         self.default_label_keys = default_label_keys
         self.paths = paths
         
-        if (self.paths.class_path / "original_classifier_outputs").exists():
+        if (self.paths.preds_path / "original_classifier_outputs").exists():
             if not "default_classifier" in self.default_label_keys:
                 self.default_label_keys += ["default_classifier"]
         elif "default_classifier" in self.default_label_keys:
@@ -151,7 +151,7 @@ class DefaultLabels:
             )
 
     def default_classifier(self):
-        clfier_paths = list(self.paths.class_path.rglob("*_classifier_annotations.csv"))
+        clfier_paths = list(self.paths.preds_path.rglob("*_classifier_annotations.csv"))
         if not (len(clfier_paths) > 0 or clfier_paths[0].exists()):
             self.default_label_keys.remove("default_classifier")
         else:
@@ -226,7 +226,8 @@ def make_set_paths_func(
             "main_embeds_path": dataset_path.joinpath("embeddings"),
             "labels_path": task_path.joinpath("labels"),
             "clust_path": task_path.joinpath("clustering"),
-            "class_path": task_path.joinpath("classification"),
+            "probe_path": task_path.joinpath("probing"),
+            "preds_path": task_path.joinpath("predictions"),
             "plot_path": task_path.joinpath("plots"),
         }
 
@@ -235,7 +236,7 @@ def make_set_paths_func(
         paths.main_embeds_path.mkdir(exist_ok=True, parents=True)
         paths.labels_path.mkdir(exist_ok=True, parents=True)
         paths.clust_path.mkdir(exist_ok=True)
-        paths.class_path.mkdir(exist_ok=True)
+        paths.probe_path.mkdir(exist_ok=True)
         paths.plot_path.mkdir(exist_ok=True)
         return paths
 
@@ -938,6 +939,13 @@ def ground_truth_by_model(
             })
         np.save(paths.labels_path.joinpath("ground_truth.npy"), ground_truth_dict)
     else:
+        if not paths.labels_path.joinpath("ground_truth.npy").exists():
+            error = (
+                "\nThe ground truth label file ground_truth.npy does not exist. "
+                "Please create it first by rerunning with `overwrite=True`."
+            )
+            logger.exception(error)
+            raise ValueError(error)
         ground_truth_dict = np.load(
             paths.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
         ).item()
@@ -1069,43 +1077,47 @@ def get_files_if_no_embeds(audio_dir, model, label_df=None):
 #     return ground_truth_dict
 
 
-def generate_annotations_for_classification_task(paths, label_column, **kwargs):
-    if not paths.labels_path.joinpath("ground_truth.npy").exists():
-        error = (
-            "\nThe ground truth label file ground_truth.npy does not exist. "
-            "Please create it first by rerunning with `overwrite=True`."
-        )
-        logger.exception(error)
-        raise ValueError(error)
-    ground_truth = np.load(
-        paths.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
-    ).item()
-
-    inv = {v: k for k, v in ground_truth[f"label_dict:{label_column}"].items()}
-    labels = ground_truth[f"label:{label_column}"][
-        ground_truth[f"label:{label_column}"] > -1
-    ]
-    labs = [inv[i] for i in labels]
-    df = pd.DataFrame()
-    df["label"] = labs
-    df["predefined_set"] = "lollinger"
-    for v in inv.values():
-        l = labs.count(v)
-        ar = list(df[df.label == v].index)
-        np.random.shuffle(ar)
-        tr_ar = ar[: int(l * 0.65)]
-        te_ar = ar[int(l * 0.65) : int(l * 0.85)]
-        va_ar = ar[int(l * 0.85) :]
-        if not all([tr_ar, te_ar, va_ar]):
-            continue
-        df.loc[tr_ar, "predefined_set"] = "train"
-        df.loc[te_ar, "predefined_set"] = "test"
-        df.loc[va_ar, "predefined_set"] = "val"
-    df = df[df.predefined_set.isin(["train", "val", "test"])]
-    df.to_csv(
-        paths.labels_path.joinpath("classification_dataframe.csv"),
-        index=False,
-    )
+def generate_annotations_for_probing_task(
+    ground_truth, paths, label_column, 
+    dataset_csv_path='probe_annotations.csv', **kwargs
+    ):
+    if (
+        paths is None
+        or not Path(dataset_csv_path).exists()
+        or not paths.labels_path.joinpath(dataset_csv_path).exists()
+        ):
+        inv = {v: k for k, v in ground_truth[f"label_dict:{label_column}"].items()}
+        labels = ground_truth[f"label:{label_column}"][
+            ground_truth[f"label:{label_column}"] > -1
+        ]
+        labs = [inv[i] for i in labels]
+        df = pd.DataFrame()
+        df["label"] = labs
+        df["predefined_set"] = "lollinger"
+        for v in inv.values():
+            l = labs.count(v)
+            ar = list(df[df.label == v].index)
+            np.random.shuffle(ar)
+            tr_ar = ar[: int(l * 0.65)]
+            te_ar = ar[int(l * 0.65) : int(l * 0.85)]
+            va_ar = ar[int(l * 0.85) :]
+            if not all([tr_ar, te_ar, va_ar]):
+                continue
+            df.loc[tr_ar, "predefined_set"] = "train"
+            df.loc[te_ar, "predefined_set"] = "test"
+            df.loc[va_ar, "predefined_set"] = "val"
+        df = df[df.predefined_set.isin(["train", "val", "test"])]
+        
+        if paths is None:
+            df.to_csv(dataset_csv_path, index=False)
+        else:
+            df.to_csv(
+                paths.labels_path.joinpath("probing_dataframe.csv"),
+                index=False,
+            )
+    else:
+        df = pd.read_csv(paths.labels_path.joinpath(dataset_csv_path))
+    return df
 
 
 def turn_multilabel_into_singlelabel(df_full):

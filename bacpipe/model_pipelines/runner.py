@@ -132,7 +132,7 @@ class Embedder(AudioHandler):
                     batch = batch.cuda()
                 embeddings = self.model(batch)
                 if self.model.bool_classifier:
-                    self.classifier.classify(embeddings)
+                    self.classifier.train_classifier(embeddings)
 
             if isinstance(embeddings, torch.Tensor) and embeddings.dim() == 1:
                 embeddings = embeddings.unsqueeze(0)
@@ -528,7 +528,7 @@ class Classifier:
         }
         return cls_results
     
-    def classify(self, embeddings):
+    def train_classifier(self, embeddings):
         clfier_output = self.model.classifier_predictions(embeddings)
             
         if self.model.device == "cuda" and isinstance(clfier_output, torch.Tensor):
@@ -593,7 +593,7 @@ class Classifier:
 
     def _load_existing_clfier_outputs(self, fileloader_obj, clfier_annotations):
         clfier_dir = Path(
-            self.paths.class_path / 'original_classifier_outputs'
+            self.paths.preds_path / 'original_classifier_outputs'
             )
         existing_clfier_outputs = list(clfier_dir.rglob('*.json'))
         existing_clfier_outputs.sort()
@@ -670,14 +670,14 @@ class Classifier:
         
     def save_annotation_table(self, loader_obj):
         save_path = (
-            self.paths.class_path 
+            self.paths.preds_path 
             / f"{loader_obj.model_name}_classifier_annotations.csv"
             )
         self.cumulative_annotations.to_csv(save_path, index=False)
         
     def save_classifier_outputs(self, fileloader_obj, file):
         relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
-        results_path = self.paths.class_path.joinpath(
+        results_path = self.paths.preds_path.joinpath(
             "original_classifier_outputs"
         ).joinpath(relative_parent_path)
         results_path.mkdir(exist_ok=True, parents=True)

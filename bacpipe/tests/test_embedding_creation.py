@@ -12,11 +12,11 @@ from bacpipe.core.experiment_manager import Loader
 from bacpipe.model_pipelines.runner import Embedder
 
 from bacpipe.embedding_evaluation.label_embeddings import (
-    generate_annotations_for_classification_task,
+    generate_annotations_for_probing_task,
     make_set_paths_func,
     ground_truth_by_model,
 )
-from bacpipe.embedding_evaluation.classification.classify import classification_pipeline
+from bacpipe.embedding_evaluation.probing.probe import probing_pipeline
 from bacpipe.embedding_evaluation.clustering.cluster import clustering
 
 
@@ -98,17 +98,17 @@ def test_evaluation(model):
         "Check that you have the right test data."
     )
 
-    generate_annotations_for_classification_task(paths, **kwargs)
+    generate_annotations_for_probing_task(paths, **kwargs)
 
     class_embeds = embeds_array_without_noise(embeds, ground_truth, **kwargs)
-    for class_config in settings["class_configs"].values():
+    for class_config in settings["probe_configs"].values():
         if class_config["bool"]:
             assert len(class_embeds) > 0, (
                 f"No embeddings found for classification task ({model}). "
                 "Check that annotations.csv is linked correctly. "
                 "Remove the classification task from config.yaml if not intended."
             )
-            classification_pipeline(paths, class_embeds, **class_config, **kwargs)
+            probing_pipeline(paths, class_embeds, **class_config, **kwargs)
 
     embeds_array = np.concatenate(list(embeds.values()))
     clustering(paths, embeds_array, ground_truth, **kwargs)

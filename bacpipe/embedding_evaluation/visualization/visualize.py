@@ -47,7 +47,7 @@ def visualise_results_across_models(plot_path, task_name, model_list):
     with open(plot_path.joinpath(f"{task_name}_results.json"), "w") as f:
         json.dump(metrics, f, indent=2)
 
-    if task_name == "classification":
+    if task_name == "probing":
         iterate_through_subtasks(
             plot_per_class_metrics, plot_path, task_name, model_list, metrics
         )
@@ -282,7 +282,7 @@ def plot_overview_metrics(
             k.split("(")[0]: v["overall"] for k, v in metrics.items() if task_name in k
         }
 
-    if "classification" in task_name:
+    if "probing" in task_name:
         metrics = {k: v["overall"] for k, v in metrics.items()}
 
     fig, ax = plt.subplots(1, 1, figsize=(12, 6))
