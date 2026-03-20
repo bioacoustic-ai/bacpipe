@@ -538,6 +538,56 @@ class Loader:
             return d
         elif as_type == 'array':
             return np.vstack(list(d.values()))
+        
+    def predictions(self, threshold=bacpipe_settings.classifier_threshold, as_type='dict'):
+        class_path = (
+            self.evaluations_dir 
+            / self.model_name 
+            / 'classification'
+            / 'original_classifier_outputs'
+            )
+        import bacpipe
+        self.embedder = bacpipe.Embedder(self.model_name, self)
+        if not class_path.exists():
+            logger.warning(
+                "No classifier predictions have been save yet. "
+            )
+            return None
+        class_files = list(class_path.rglob('*.json'))
+        if not class_files:
+            logger.warning(
+                "No classifier predictions have been save yet. "
+            )
+            return None
+        d = {}
+        l2i = {label: idx for idx, label in enumerate(self.embedder.model.classes)}
+        array_label_indices = []
+        preds_array = np.array([], dtype=np.int8)
+        
+        from bacpipe.embedding_evaluation.label_embeddings import fill_all_labels_array
+        
+        for file in class_files:
+            with open(file, "r") as f:
+                preds = json.load(f)
+            vals = np.ones([
+                preds['head']['Time bins in this file'],
+                len(preds)-1
+                ]) * -1
+            preds.pop('head')
+            for idx, (class_label, val) in enumerate(preds.items()):
+                array_label_indices.append(l2i[class_label])
+                # vals[val['time_bins_exceeding_threshold'], idx] = val['classifier_predictions']
+                vals[val['time_bins_exceeding_threshold'], idx] = l2i[class_label]
+            
+            preds_array = fill_all_labels_array(vals, preds_array)
+            d[str(file.relative_to(class_path))] = vals
+            
+        i2l = {v: k for k, v in l2i.items()}
+        
+        if as_type == 'dict':
+            return d, i2l
+        elif as_type == 'array':
+            return preds_array, i2l
 
     def _write_audio_file_to_metadata(self, file, model, embeddings, file_length):
         if (

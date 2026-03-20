@@ -749,8 +749,22 @@ def visualize_using_dashboard(
         websocket_origin = dashboard_websocket_origin
     else:
         websocket_origin = None
-    template.show(
-        port=dashboard_port, 
-        address=dashboard_address, 
-        websocket_origin=websocket_origin
-        )
+    
+    port_not_available = True
+    while port_not_available:
+        try:    
+            template.show(
+                port=dashboard_port, 
+                address=dashboard_address, 
+                websocket_origin=websocket_origin
+                )
+            port_not_available = False
+        except OSError:
+            logger.warning(
+                f"The port {dashboard_port} is already in use. This "
+                "is most likely the case because you already have a "
+                "dashboard open. There is a exit button in the bottom "
+                "left of the dashboard. If this was intentional and you "
+                "want to open multiple dashboards at once, ignore this message."
+            )
+            dashboard_port += 1

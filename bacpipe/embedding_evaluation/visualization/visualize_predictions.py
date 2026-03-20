@@ -81,7 +81,7 @@ def plot_classification_results(
     # Set figure size based on number of classes and return_fig
     if return_fig:
         # For dashboard, make height adapt to number of classes
-        height = max(4, len(class_names) * 0.3)
+        height = max(4, len(class_names) * 0.22)
         fig, ax = plt.subplots(1, 1, figsize=(5, height))
         fontsize = 10
     else:
@@ -108,7 +108,7 @@ def plot_classification_results(
 
     fig.suptitle(
         f"Classwise accuracy for {task_name} "
-        f"classification with {model_name.upper()} embeddings\n"
+        f"probe with {model_name.upper()}\n"
         f"{metrics_string}",
         fontsize=fontsize,
     )
@@ -312,7 +312,7 @@ def plot_classification_heatmap(
         zmin=0,  # Values below this will be white (nan handling)
         aspect="auto",
         title=(
-            f'Presence heatmap using {model} with '
+            f'Presence heatmap using {model.upper()} with '
             f'{predictions_loader.current_clfier_type} probing <br>'
             f'for {species} '
             f'with threshold of {PredictionsLoader.verify_threshold(threshold)}.'
@@ -340,8 +340,21 @@ def plot_classification_heatmap(
             ticktext=unique_labels[::nr_y_ticks]
         ),
         coloraxis_colorbar=dict(
-            title="Binary presence per hour"
-        )
+            title="",
+        ),
+        annotations=[
+            dict(
+                text="Binary presence per hour",
+                textangle=-90,     # This is the magic 90-degree rotation
+                xref="paper",      # Position relative to the whole figure
+                yref="paper",
+                x=1.2,            # Adjust this to move it left/right of the colorbar
+                y=0.5,             # Center it vertically
+                showarrow=False,
+                font=dict(size=14)
+            )
+        ],
+        margin=dict(r=100)
     )
     
     # Make NaN values appear white
