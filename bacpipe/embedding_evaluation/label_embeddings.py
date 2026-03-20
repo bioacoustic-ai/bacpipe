@@ -173,8 +173,8 @@ class DefaultLabels:
         }
         for file, nr_embeds in zip(self.metadata['files']['audio_files'], self.metadata['files']['nr_embeds_per_file']):
             df_part = df[df.audiofilename == file]
-            all_time_bins = (np.arange(nr_embeds) * seg_len).tolist()
-            [all_time_bins.remove(l) for l in df_part.start]
+            all_time_bins = np.round(np.arange(nr_embeds) * seg_len, 4).tolist()
+            [all_time_bins.remove(l) for l in np.round(df_part.start, 4)]
             df_new['start'].extend(all_time_bins)
             df_new['end'].extend((np.array(all_time_bins) + seg_len).tolist())
             df_new['audiofilename'].extend([file] * len(all_time_bins))
