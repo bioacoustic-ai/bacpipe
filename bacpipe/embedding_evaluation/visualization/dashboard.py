@@ -27,16 +27,14 @@ from .visualize_predictions import (
     )
     
 import bacpipe.embedding_evaluation.label_embeddings as le
-from bacpipe.embedding_evaluation.probing.train_probe import LinearClassifier
-
-sns.set_theme(style="whitegrid")
-
-matplotlib.use("agg")
-
-# Enable Panel
-pn.extension('plotly')
 from .dashboard_utils import DashBoardHelper
 
+
+
+### plotting settings
+sns.set_theme(style="whitegrid")
+matplotlib.use("agg")
+pn.extension('plotly')
 ACCORDION_WIDTH = 780
 
 

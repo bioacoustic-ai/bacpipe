@@ -86,7 +86,7 @@ if False:
     # process all audio files in directory
     
     # create a new loader and model embedder object
-    loader_obj = bacpipe.Loader('bacpipe/tests/test_data', 'birdnet', build_results_dir=True)
+    loader_obj = bacpipe.Loader('bacpipe/tests/test_data', 'birdnet', use_folder_structure=True)
     embed_obj = bacpipe.Embedder('birdnet', loader_obj)
     # this will now generate embeddings and classification predictions for all the 
     # audio files in the specified directory
@@ -253,13 +253,27 @@ print('hi')
 
 # ensure model exists, if not download
 
-from .benchmark import benchmark
+from bacpipe.embedding_evaluation.benchmark import benchmark
 
 from bacpipe.embedding_evaluation.probing.probe import probing_pipeline
 
 
-gt = bacpipe.get_ground_truth('birdnet')
-embeds = bacpipe.Loader(bacpipe.config.audio_dir, 'birdnet').embeddings(as_type='array')
-probing_pipeline(gt, embeds)
+gt = bacpipe.ground_truth_by_model(
+    'birdnet', 
+    bacpipe.config.audio_dir, 
+    annotations_filename='annotations.csv',
+    single_label=False,
+    overwrite=False
+    )
+embeds = bacpipe.Loader(
+    bacpipe.config.audio_dir, 
+    'birdnet',
+    use_folder_structure=True
+    ).embeddings(as_type='array')
+probe, metrics = probing_pipeline(gt, embeds, **vars(bacpipe.settings))
+print(type(probe))
+print(metrics)
+from bacpipe.embedding_evaluation.probing.inference_probe import *
+run_probe_inference('birdnet', probe, 0.5, embeds, device='cuda', return_binary_presence=False)
 
 print('hi')

@@ -276,7 +276,7 @@ def plot_overview_metrics(
     # doesn't know the current model and this should be caught
     if not metrics:
         res_path = path_func(model_list[0]).plot_path.parent.parent.joinpath("overview")
-        with open(res_path.joinpath(f"classification_results.json"), "r") as f:
+        with open(res_path.joinpath(f"probing_results.json"), "r") as f:
             metrics = json.load(f)
         metrics = {
             k.split("(")[0]: v["overall"] for k, v in metrics.items() if task_name in k

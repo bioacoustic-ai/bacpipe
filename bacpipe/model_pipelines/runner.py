@@ -76,7 +76,7 @@ class Embedder(AudioHandler):
                 self.model, 
                 model_name, 
                 audio_dir=loader.audio_dir, 
-                build_results_dir=loader.build_results_dir,
+                use_folder_structure=loader.use_folder_structure,
                 **kwargs
                 )
 
@@ -333,7 +333,7 @@ class Embedder(AudioHandler):
                 except AttributeError as e:
                     logger.warning(
                         f"The results folder structure does not exist, therefore files can't be "
-                        "saved. Please pass the keyword build_results_dir=True."
+                        "saved. Please pass the keyword use_folder_structure=True."
                     )
                     pbar.update(1)
                 except Exception as e:
@@ -428,7 +428,7 @@ class Classifier:
         audio_dir, 
         main_results_dir, 
         classifier_threshold, 
-        build_results_dir=True, 
+        use_folder_structure=True, 
         **kwargs
         ):
         """
@@ -450,7 +450,7 @@ class Classifier:
         self.model = model
         self.model_name = model_name
         self.classifier_threshold = classifier_threshold
-        if build_results_dir:
+        if use_folder_structure:
             from bacpipe.embedding_evaluation.label_embeddings import make_set_paths_func
             self.paths = make_set_paths_func(audio_dir, main_results_dir)(model_name)
         

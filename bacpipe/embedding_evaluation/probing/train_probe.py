@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from sklearn.neighbors import KNeighborsClassifier
 from .dataset_probe import probe_dataset_loader
+import bacpipe
 
 import logging
 
@@ -28,7 +29,7 @@ class LinearClassifier(nn.Module):
         return self.probe(x)
 
 
-def train_linear_classifier(
+def train_linear_probe(
     linear_classifier,
     train_dataloader,
     learning_rate,
@@ -64,7 +65,7 @@ def train_linear_classifier(
     except RuntimeError:
         logger.error('Traceback', exc_info=True)
         logger.info(
-            "This problem is likely cause by tensorflow being a pain in the ****. "
+            "This problem is likely caused by tensorflow hogging all the gpu vram. "
             "The best fix for this is to simply restart bacpipe with the same settings, "
             "that way the GPU should be available for pytorch. Alternatively select "
             "`cpu` for device in the settings.yaml file."
@@ -156,7 +157,7 @@ class KNN(nn.Module):
         return preds_tensor, probs_tensor
 
 
-def train_knn_classifier(knn_classifier, train_dataloader, device="cpu", **kwargs):
+def train_knn_probe(knn_classifier, train_dataloader, device="cpu", **kwargs):
     """
     Pipeline for knn classifier training.
 
@@ -197,7 +198,13 @@ def train_knn_classifier(knn_classifier, train_dataloader, device="cpu", **kwarg
 
 
 
-def train_classifier(embeds, df, label2index, config="linear", **kwargs):
+def train_classifier(
+    embeds, df, label2index, 
+    config="linear", 
+    learning_rate=None,
+    num_epochs=None,
+    n_neighbors=None,
+    **kwargs):
     """
     Classification pipeline. First the classification dataframe is loaded,
     then a dict is created to link labels to ints, then the dataset loaders
@@ -221,6 +228,7 @@ def train_classifier(embeds, df, label2index, config="linear", **kwargs):
     dict
         performance dictionary
     """
+    
 
     # generate the loaders
     train_gen = probe_dataset_loader("train", df, embeds, label2index, **kwargs)
@@ -228,13 +236,23 @@ def train_classifier(embeds, df, label2index, config="linear", **kwargs):
     embed_size = embeds[0].shape[-1]
 
     if config == "linear":
+        if learning_rate is None:
+            learning_rate = bacpipe.settings.probe_configs['config_1']['learning_rate']
+        if num_epochs is None:
+            num_epochs = bacpipe.settings.probe_configs['config_1']['num_epochs']
         probe = LinearClassifier(in_dim=embed_size, out_dim=len(df.label.unique()))
-        probe = train_linear_classifier(probe, train_gen, **kwargs)
+        probe = train_linear_probe(
+            probe, train_gen, 
+            learning_rate=learning_rate, num_epochs=num_epochs, 
+            **kwargs
+            )
 
     elif config == "knn":
-        if len(df[df.predefined_set =='test']) < kwargs['n_neighbors']:
+        if n_neighbors is None:
+            n_neighbors = bacpipe.settings.probe_configs['config_2']['n_neighbors']
+        if len(df[df.predefined_set =='test']) < n_neighbors:
             kwargs['n_neighbors'] = len(df[df.predefined_set =='test']) - 1
         probe = KNN(**kwargs)
-        probe = train_knn_classifier(probe, train_gen, **kwargs)
+        probe = train_knn_probe(probe, train_gen, **kwargs)
 
     return probe

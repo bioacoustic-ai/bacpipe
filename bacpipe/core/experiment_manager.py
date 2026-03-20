@@ -61,7 +61,7 @@ class Loader:
         model_name=None,
         check_if_combination_exists=True,
         dim_reduction_model=False,
-        build_results_dir=False, 
+        use_folder_structure=False, 
         testing=False,
         **kwargs,
     ):
@@ -91,7 +91,7 @@ class Loader:
         self.audio_dir = Path(audio_dir)
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
-        self.build_results_dir = build_results_dir
+        self.use_folder_structure = use_folder_structure
         self.continue_incomplete_run = False
 
         self._initialize_path_structure(
@@ -117,7 +117,7 @@ class Loader:
             self._get_audio_paths_and_init_embed_dir()
             self._init_metadata_dict()
 
-        if not self.build_results_dir:
+        if not self.use_folder_structure:
             logger.info(
                 "No model_name is passed, therefore no directory "
                 "structure will be created."
@@ -138,7 +138,7 @@ class Loader:
         # if testing:
         #     kwargs["main_results_dir"] = "bacpipe/tests/results_files"
         
-        if self.build_results_dir:
+        if self.use_folder_structure:
             from bacpipe import settings
             kwargs = {**vars(settings)}
 

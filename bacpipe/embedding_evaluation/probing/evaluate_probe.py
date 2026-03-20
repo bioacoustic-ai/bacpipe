@@ -5,7 +5,12 @@ import torch.nn.functional as F
 import sklearn.metrics as metrics
 import numpy as np
 from pathlib import Path
-from .train_probe import probe_dataset_loader, LinearClassifier
+from .train_probe import probe_dataset_loader
+
+from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
+    plot_classification_results,
+)
+
 
 
 #  accuracy per class
@@ -145,7 +150,10 @@ def save_probe_results(paths, config, metrics, **kwargs):
 
 
 
-def eval_probe(probe, embeds, df, label2index, device="cuda:0", config="linear", **kwargs):
+def eval_probe(
+    probe, embeds, df, label2index, 
+    device="cuda:0", config="linear", 
+    paths=None, save_probe=False, **kwargs):
     """
     Perform inference using probe.
 
@@ -200,67 +208,17 @@ def eval_probe(probe, embeds, df, label2index, device="cuda:0", config="linear",
         probabilities.extend(probs)
 
     metrics = compute_task_metrics(y_pred, y_true, probabilities, label2index)
+    
+    
+    if save_probe and not paths is None:
+        state_dict = probe.state_dict()
+        torch.save(state_dict, paths.probe_path / f"{config}_probe.pt")
+        with open(paths.probe_path / "label2index.json", "w") as f:
+            json.dump(label2index, f, indent=1)
+        save_probe_results(paths, config, metrics, **kwargs)
+        plot_classification_results(paths=paths, task_name=config, metrics=metrics)
+        
+    
     return metrics
 
         
-    
-def prepare_inference(model, probe_path=''):
-    from bacpipe import config, settings
-    if probe_path == '':
-        import bacpipe.embedding_evaluation.label_embeddings as le
-        path_func = le.make_set_paths_func(
-            config.audio_dir, 
-            settings.main_results_dir, 
-            settings.dim_reduc_parent_dir
-        )
-        probe_path = (
-            path_func(model).probe_path / 'linear_probe.pt'
-            ).as_posix()
-    
-    with open(Path(probe_path).parent / 'label2index.json', 'r') as f:
-        label2index = json.load(f)
-        
-    probe_weights = torch.load(probe_path, map_location=settings.device)
-    probe = LinearClassifier(
-        probe_weights['probe.weight'].shape[-1], 
-        len(label2index)
-        )
-    probe.load_state_dict(probe_weights)
-    probe.to(settings.device)
-    
-    return probe, label2index
-
-
-def run_inference(
-    model, linear_probe, threshold, 
-    embeds=None, return_binary_presence=True, callbacks=None
-    ):
-    if embeds is None:
-        from bacpipe.core.experiment_manager import Loader
-        from bacpipe import config, settings
-        
-        ld = Loader(
-            audio_dir=config.audio_dir, 
-            model_name=model,
-            **vars(settings)
-            )
-        embeds = torch.Tensor(ld.embeddings(as_type='array')).to(settings.device)
-    
-    import torch.nn.functional as F
-    return_values = []
-    for idx, batch in enumerate(embeds):
-        logits = linear_probe(batch)
-        probabilities = F.softmax(logits, dim=0).detach().cpu().numpy()
-        if return_binary_presence:
-            binary_presence = np.zeros(probabilities.shape, dtype=np.int8)
-            binary_presence[probabilities > threshold] = 1
-            return_values.append(binary_presence.tolist())
-            return_dtype = np.int8
-        else:
-            return_values.append(probabilities.tolist())
-            return_dtype = np.float32
-        
-        if isinstance(callbacks, dict) and hasattr(callbacks, 'progress_bar'):
-            callbacks.progress_bar.value = int((idx+1)/len(embeds)*100)
-    
-    return np.array(return_values, dtype=return_dtype)

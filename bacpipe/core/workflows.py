@@ -625,7 +625,7 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
         raise ValueError(error)
     try:
         start = time.time()
-        ld = Loader(build_results_dir=True, **kwargs)
+        ld = Loader(use_folder_structure=True, **kwargs)
         logger.debug(f"Loading the data took {time.time()-start:.2f}s.")
         if not ld.combination_already_exists:
             embed = Embedder(loader=ld, **kwargs)

@@ -10,8 +10,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 from pathlib import Path
-from bacpipe.embedding_evaluation.probing.evaluate_probe import (
-    prepare_inference, run_inference
+from bacpipe.embedding_evaluation.probing.inference_probe import (
+    prepare_probe_inference, run_probe_inference
     )
 
 
@@ -412,13 +412,13 @@ class PredictionsLoader:
         
         if clfier_type == 'Linear':
             self.loading_pane.value = 'Loading embeddings for classification'
-            linear_probe, self.class_dict = prepare_inference(
+            linear_probe, self.class_dict = prepare_probe_inference(
                 model, probe_path
             )
             self.loading_pane.value = 'Running linear probe'
             threshold = self.verify_threshold(threshold)
             
-            self.binary_presence = run_inference(
+            self.binary_presence = run_probe_inference(
                 model, linear_probe, threshold, 
                 return_binary_presence=True, 
                 callbacks={'progress_bar': self.progress_bar}
@@ -435,12 +435,14 @@ class PredictionsLoader:
         self.embed_dict = self.vis_loader.embeds[model]
         
         if self.binary_presence is None:
-            raise FileNotFoundError(
+            warning_string = (
                 "It seems like the classifier hasn't been run yet, or "
                 f"that {model} doesn't have a pretrained classifier. "
                 "If the model has a pretrained classifier, please rerun "
                 "bacpipe with the setting `run default classifier` set to `True`."
             )
+            self.loading_pane.value = warning_string
+            raise FileNotFoundError(warning_string)
         
         if not len(self.embed_dict['x']) == len(self.binary_presence):
             logger.warning(
