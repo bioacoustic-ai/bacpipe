@@ -171,7 +171,10 @@ class DefaultLabels:
             'audiofilename': [],
             'label:default_classifier': []
         }
-        for file, nr_embeds in zip(self.metadata['files']['audio_files'], self.metadata['files']['nr_embeds_per_file']):
+        for file, nr_embeds in zip(
+            self.metadata['files']['audio_files'], 
+            self.metadata['files']['nr_embeds_per_file']
+            ):
             df_part = df[df.audiofilename == file]
             all_time_bins = np.round(np.arange(nr_embeds) * seg_len, 4).tolist()
             [all_time_bins.remove(l) for l in np.round(df_part.start, 4)]
@@ -181,6 +184,10 @@ class DefaultLabels:
             df_new['label:default_classifier'].extend(['below_thresh'] * len(all_time_bins))
             
         df = pd.concat([df, pd.DataFrame(df_new)], ignore_index=True)
+        if not len(df) == self.metadata['nr_embeds_total']:
+            raise AssertionError(
+                "The number of points does not match the total number of embeddings."
+            )
         return df.sort_values(['audiofilename', 'start'])
 
 def make_set_paths_func(

@@ -721,7 +721,24 @@ class Classifier:
                     [self.predictions, torch.Tensor(clfier_output)]
                 )
 
-            self.save_classifier_outputs(loader, loader.audio_dir / f_name)
+            f_name_stem = f_name.split(f'_{self.model_name}')[0]
+            try:
+                audiofile = [
+                    f for f 
+                    in loader.metadata_dict['files']['audio_files']
+                    if f_name_stem in f
+                    ][0]
+            except:
+                raise AssertionError(
+                    f"{f_name} has no corresponding audio file. "
+                    "Something is wrong in the metadata file. "
+                    "Please either inspect manually or rerun bacpipe "
+                    "and remove the existing embeddings folder."
+                )
+            
+            self.save_classifier_outputs(loader, loader.audio_dir / audiofile)
+            
+        self.save_annotation_table(loader)
         
         if loader.model_name in bacpipe.TF_MODELS:
             import tensorflow as tf
