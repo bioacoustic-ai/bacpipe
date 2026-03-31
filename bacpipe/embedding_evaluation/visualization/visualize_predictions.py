@@ -10,8 +10,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 from pathlib import Path
-from bacpipe.embedding_evaluation.classification.train_classifier import (
-    LinearClassifier
+from bacpipe.embedding_evaluation.probing.inference_probe import (
+    prepare_probe_inference, run_probe_inference
     )
 
 
@@ -52,10 +52,10 @@ def plot_classification_results(
     if path_func and model_name:
         paths = path_func(model_name)
     if not metrics:
-        class_path = paths.class_path / f"class_results_{task_name}.json"
-        if not class_path.exists():
+        probe_path = paths.probe_path / f"probe_results_{task_name}.json"
+        if not probe_path.exists():
             error = (
-                f"\nThe classification file {class_path} does not exist. Perhaps it was not "
+                f"\nThe classification file {probe_path} does not exist. Perhaps it was not "
                 "created yet. To avoid getting this error, make sure you have not "
                 " included 'classification' in the 'evaluation_tasks'. If you want to compute "
                 "classification, make sure to set `overwrite=True`."
@@ -63,7 +63,7 @@ def plot_classification_results(
             logger.exception(error)
             raise AssertionError(error)
 
-        with open(paths.class_path / f"class_results_{task_name}.json", "r") as f:
+        with open(paths.probe_path / f"probe_results_{task_name}.json", "r") as f:
             metrics = json.load(f)
 
     # Filter overall metrics if needed
@@ -138,7 +138,7 @@ def plot_classification_results(
 
     path = paths.plot_path
     fig.savefig(
-        path.joinpath(f"class_results_{task_name}_{model_name}.png"),
+        path.joinpath(f"probe_results_{task_name}_{model_name}.png"),
         dpi=300,
     )
     plt.close(fig)
@@ -166,8 +166,12 @@ def load_results(path_func, task, model_list):
     metrics = {}
     for model_name in model_list:
         paths = path_func(model_name)
-        for file in getattr(paths, f"{task[:5]}_path").rglob("*results*.json"):
-            if task == "classification":
+        if task == 'clustering':
+            key = "clust_path"
+        elif task == 'probing':
+            key = "probe_path"
+        for file in getattr(paths, key).rglob("*results*.json"):
+            if task == "probing":
                 subtask = file.stem.split("_")[-1]
                 metrics[f"{model_name}({subtask})"] = json.load(open(file, "r"))
             else:
@@ -382,7 +386,7 @@ class PredictionsLoader:
     
     def get_data(
         self, model, threshold, 
-        clfier_type=None, clfier_path='', **kwargs
+        clfier_type=None, probe_path='', **kwargs
         ):
         threshold = self.verify_threshold(threshold)
         if hasattr(self, 'binary_presence'):
@@ -402,15 +406,24 @@ class PredictionsLoader:
             
         
         if not (
-            self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
+            self.path_func(self.models[0]).probe_path / 'linear_probe.pt'
             ).exists():
             clfier_type = 'Integrated'
         
         if clfier_type == 'Linear':
             self.loading_pane.value = 'Loading embeddings for classification'
-            self.binary_presence, self.class_dict = self.classify_embeddings(
-                model, threshold, clfier_path
+            linear_probe, self.class_dict = prepare_probe_inference(
+                model, probe_path
             )
+            self.loading_pane.value = 'Running linear probe'
+            threshold = self.verify_threshold(threshold)
+            
+            self.binary_presence = run_probe_inference(
+                model, linear_probe, threshold, 
+                return_binary_presence=True, 
+                callbacks={'progress_bar': self.progress_bar}
+            )
+            
         elif clfier_type == 'Integrated':
             self.loading_pane.name = 'Preparing heatmap'
             self.loading_pane.value = 'Loading precomputed embeddings'
@@ -422,12 +435,14 @@ class PredictionsLoader:
         self.embed_dict = self.vis_loader.embeds[model]
         
         if self.binary_presence is None:
-            raise FileNotFoundError(
+            warning_string = (
                 "It seems like the classifier hasn't been run yet, or "
                 f"that {model} doesn't have a pretrained classifier. "
                 "If the model has a pretrained classifier, please rerun "
                 "bacpipe with the setting `run default classifier` set to `True`."
             )
+            self.loading_pane.value = warning_string
+            raise FileNotFoundError(warning_string)
         
         if not len(self.embed_dict['x']) == len(self.binary_presence):
             logger.warning(
@@ -461,27 +476,7 @@ class PredictionsLoader:
         self.panel_selection.options = list(self.class_dict.keys())        
     
     
-    def collect_all_embeddings(self, model, Loader, config, settings):
-        ld = Loader(
-            audio_dir=config.audio_dir, 
-            model_name=model,
-            **vars(settings)
-            )
-        
-        embeds = ld.embeddings(as_type='array')
-        return embeds
-    
-    def run_classifier(self, embeds, linear_clfier, threshold):
-        import torch.nn.functional as F
-        probs = []
-        for idx, batch in enumerate(embeds):
-            logits = linear_clfier(batch)
-            probabilities = F.softmax(logits, dim=0).detach().cpu().numpy()
-            binary_classification = np.zeros(probabilities.shape, dtype=np.int8)
-            binary_classification[probabilities > threshold] = 1
-            probs.append(binary_classification.tolist())
-            self.progress_bar.value = int((idx+1)/len(embeds)*100)
-        return np.array(probs, dtype=np.int8)
+
             
     @staticmethod
     def verify_threshold(threshold):
@@ -490,38 +485,7 @@ class PredictionsLoader:
         else:
             threshold = float(threshold)
         return threshold
-        
-    
-    def classify_embeddings(self, model, threshold, clfier_path):
-        import torch
-        from bacpipe.core.experiment_manager import Loader
-        from bacpipe import config, settings
-        if clfier_path == '':
-            clfier_path = (
-                self.path_func(model).class_path / 'linear_classifier.pt'
-                ).as_posix()
-        threshold = self.verify_threshold(threshold)
-        
-        embeds = self.collect_all_embeddings(model, Loader, config, settings)
-        
-        embeds = torch.Tensor(embeds).to(settings.device)
-        
-        self.loading_pane.value = 'Running classifier'
-        
-        with open(Path(clfier_path).parent / 'label2index.json', 'r') as f:
-            label2index = json.load(f)
-            
-        clfier_weights = torch.load(clfier_path, map_location=settings.device)
-        clfier = LinearClassifier(
-            clfier_weights['clfier.weight'].shape[-1], 
-            len(label2index)
-            )
-        clfier.load_state_dict(clfier_weights)
-        clfier.to(settings.device)
-        
-        probs = self.run_classifier(embeds, clfier, threshold)
-        
-        return probs, label2index
+
     
     @staticmethod
     def reorder_by_most_occurrance(probs, label2index):
@@ -537,7 +501,7 @@ class PredictionsLoader:
     def get_classes(self, path):
         if path == '':
             path = (
-                self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
+                self.path_func(self.models[0]).probe_path / 'linear_probe.pt'
                 )
         if path.exists():
             with open(Path(path).parent / 'label2index.json', 'r') as f:
@@ -549,7 +513,7 @@ class PredictionsLoader:
     def load_classification(self, model, threshold):
         integrated_clfier_path = (
             self.path_func(model)
-            .class_path.joinpath('original_classifier_outputs')
+            .preds_path.joinpath('original_classifier_outputs')
         )
         if not integrated_clfier_path.exists():
             return None, None

@@ -22,7 +22,7 @@ class Embedder(AudioHandler):
     def __init__(
         self,
         model_name,
-        loader, 
+        loader=None, 
         CustomModel=None,
         dim_reduction_model=False,
         **kwargs,
@@ -68,15 +68,15 @@ class Embedder(AudioHandler):
             )
         super().__init__(
             model=self.model, 
-            audio_dir=loader.audio_dir, 
+            audio_dir=loader.audio_dir if loader else None, 
             **kwargs
             )
         if self.model.bool_classifier:
             self.classifier = Classifier(
                 self.model, 
                 model_name, 
-                audio_dir=loader.audio_dir, 
-                build_results_dir=loader.build_results_dir,
+                audio_dir=loader.audio_dir if loader else None, 
+                use_folder_structure=loader.use_folder_structure if loader else False,
                 **kwargs
                 )
 
@@ -132,7 +132,7 @@ class Embedder(AudioHandler):
                     batch = batch.cuda()
                 embeddings = self.model(batch)
                 if self.model.bool_classifier:
-                    self.classifier.classify(embeddings)
+                    self.classifier.train_classifier(embeddings)
 
             if isinstance(embeddings, torch.Tensor) and embeddings.dim() == 1:
                 embeddings = embeddings.unsqueeze(0)
@@ -246,6 +246,102 @@ class Embedder(AudioHandler):
             dim_reduced_embeddings = self.get_embeddings_from_model(embeddings)
         self.loader.save_embedding_file(file, dim_reduced_embeddings)
 
+    def embeddings_using_multithreading(self, array_of_audios):
+        """
+        Generate embeddings for all files in a pipelined manner:
+        - Producer thread loads and preprocesses audio
+        - Consumer (main thread) embeds audio while producer prepares next batch
+        Ensures metadata and embeddings are written exactly like in the sequential version.
+
+        Parameters
+        ----------
+        fileloader_obj : Loader object
+            contains all metadata of a model specific embedding creation session
+
+        Returns
+        -------
+        Loader object
+            updated object with metadata on embedding creation session
+        """
+        array_of_audios = torch.tensor(array_of_audios).unsqueeze(1)
+        if not self.nr_parallel_workers:
+            from multiprocessing import cpu_count
+            available_workers = cpu_count() -1
+        else:
+            available_workers = self.nr_parallel_workers
+        task_queue = queue.Queue(maxsize=available_workers)  # small buffer to balance I/O vs compute
+        # --- Producer: load + preprocess in background ---
+        def producer():
+            for idx, audio in enumerate(array_of_audios):
+                try:
+                    preprocessed = self.model.preprocess(audio)
+                    task_queue.put((idx, preprocessed))
+                                    
+                except torch.cuda.OutOfMemoryError:
+                    logger.error(
+                        "\nCuda device is out of memory. Your Vram doesn't seem to be "
+                        "large enough for this process. Try setting the variable "
+                        "`avoid_pipelined_gpu_inference` to `True`. That way data "
+                        "will be processed in series instead of parallel which will "
+                        "reduce memory requirements. If that also fails use `cpu` "
+                        "instead of `cuda`."
+                    )
+                    os._exit(1) 
+                except Exception as e:
+                    task_queue.put((idx, e))
+            task_queue.put(None)  # sentinel = done
+
+        threading.Thread(target=producer, daemon=True).start()
+
+        # --- Consumer: embed + save metadata/embeddings ---
+        embeddings = []
+        with tqdm(
+            total=len(array_of_audios),
+            desc="processing audio",
+            position=1,
+            leave=False,
+        ) as pbar:
+            while True:
+                item = task_queue.get()
+                if item is None:
+                    break
+
+                idx, data = item
+                if isinstance(data, Exception):
+                    logger.warning(
+                        f"Error preprocessing audio, skipping file.\nError: {data}"
+                    )
+                    pbar.update(1)
+                    continue
+
+                try:
+                    embeddings.extend(self.get_embeddings_for_audio(data))
+            
+                except torch.cuda.OutOfMemoryError as e:
+                    logger.exception(
+                        "You're out of memory unfortunately. This can happend because you are "
+                        "running a tensorflow model first and then a pytorch model and tensorflow "
+                        "grabs all the VRAM and subsequently pytorch doesn't have enough. If this "
+                        "is the case, simply rerunning bacpipe without the tensorflow model should "
+                        "do the trick. If you simply don't have enough VRAM, you can reduce the global "
+                        f"batch size in the settings file. Or just compute on the cpu. {e}"
+                    )
+                except AttributeError as e:
+                    logger.warning(
+                        f"The results folder structure does not exist, therefore files can't be "
+                        "saved. Please pass the keyword use_folder_structure=True."
+                    )
+                    pbar.update(1)
+                except Exception as e:
+                    logger.warning(
+                        f"Error generating embeddings for audio, skipping file.\nError: {e}"
+                    )
+                    pbar.update(1)
+                    continue
+
+                pbar.update(1)
+        return embeddings
+
     def run_inference_pipeline_using_multithreading(self):
         """
         Generate embeddings for all files in a pipelined manner:
@@ -333,7 +429,7 @@ class Embedder(AudioHandler):
                 except AttributeError as e:
                     logger.warning(
                         f"The results folder structure does not exist, therefore files can't be "
-                        "saved. Please pass the keyword build_results_dir=True."
+                        "saved. Please pass the keyword use_folder_structure=True."
                     )
                     pbar.update(1)
                 except Exception as e:
@@ -428,7 +524,7 @@ class Classifier:
         audio_dir, 
         main_results_dir, 
         classifier_threshold, 
-        build_results_dir=True, 
+        use_folder_structure=True, 
         **kwargs
         ):
         """
@@ -450,7 +546,7 @@ class Classifier:
         self.model = model
         self.model_name = model_name
         self.classifier_threshold = classifier_threshold
-        if build_results_dir:
+        if use_folder_structure:
             from bacpipe.embedding_evaluation.label_embeddings import make_set_paths_func
             self.paths = make_set_paths_func(audio_dir, main_results_dir)(model_name)
         
@@ -528,7 +624,7 @@ class Classifier:
         }
         return cls_results
     
-    def classify(self, embeddings):
+    def train_classifier(self, embeddings):
         clfier_output = self.model.classifier_predictions(embeddings)
             
         if self.model.device == "cuda" and isinstance(clfier_output, torch.Tensor):
@@ -593,7 +689,7 @@ class Classifier:
 
     def _load_existing_clfier_outputs(self, fileloader_obj, clfier_annotations):
         clfier_dir = Path(
-            self.paths.class_path / 'original_classifier_outputs'
+            self.paths.preds_path / 'original_classifier_outputs'
             )
         existing_clfier_outputs = list(clfier_dir.rglob('*.json'))
         existing_clfier_outputs.sort()
@@ -670,14 +766,14 @@ class Classifier:
         
     def save_annotation_table(self, loader_obj):
         save_path = (
-            self.paths.class_path 
+            self.paths.preds_path 
             / f"{loader_obj.model_name}_classifier_annotations.csv"
             )
         self.cumulative_annotations.to_csv(save_path, index=False)
         
     def save_classifier_outputs(self, fileloader_obj, file):
         relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
-        results_path = self.paths.class_path.joinpath(
+        results_path = self.paths.preds_path.joinpath(
             "original_classifier_outputs"
         ).joinpath(relative_parent_path)
         results_path.mkdir(exist_ok=True, parents=True)
@@ -721,7 +817,24 @@ class Classifier:
                     [self.predictions, torch.Tensor(clfier_output)]
                 )
 
-            self.save_classifier_outputs(loader, loader.audio_dir / f_name)
+            f_name_stem = f_name.split(f'_{self.model_name}')[0]
+            try:
+                audiofile = [
+                    f for f 
+                    in loader.metadata_dict['files']['audio_files']
+                    if f_name_stem in f
+                    ][0]
+            except:
+                raise AssertionError(
+                    f"{f_name} has no corresponding audio file. "
+                    "Something is wrong in the metadata file. "
+                    "Please either inspect manually or rerun bacpipe "
+                    "and remove the existing embeddings folder."
+                )
+            
+            self.save_classifier_outputs(loader, loader.audio_dir / audiofile)
+            
+        self.save_annotation_table(loader)
         
         if loader.model_name in bacpipe.TF_MODELS:
             import tensorflow as tf

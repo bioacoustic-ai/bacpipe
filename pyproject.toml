@@ -1,6 +1,6 @@
 [project]
 name = "bacpipe"
-version = "1.2.0"
+version = "1.3.0.dev4"
 description = "Use bacpipe to streamline the process of generating embeddings and analysing your PAM datasets."
 readme = "README.md"
 authors = [
@@ -86,7 +86,7 @@ dependencies = [
     "nest-asyncio==1.6.0",
     "networkx==3.5",
     "numba==0.61.2",
-    "numpy==1.26.4",
+    "numpy>=1.26.4",
     "oauthlib==3.3.1",
     "objsize==0.7.1",
     "opt-einsum==3.4.0",
@@ -99,6 +99,7 @@ dependencies = [
     "param==2.2.1",
     "pillow==11.3.0",
     "platformdirs==4.4.0",
+    "plotly==6.6.0",
     "pluggy==1.6.0",
     "pooch==1.8.2",
     "proto-plus==1.26.1",
@@ -188,12 +189,12 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["bacpipe*"]
 
 [tool.setuptools.package-data]
 "bacpipe" = ["*.yaml", "*.png"]
-
-
-# Add this to include your package
-packages = ["bacpipe"]
+"*" = ["*.txt", "*.csv"]

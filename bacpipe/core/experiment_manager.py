@@ -61,7 +61,7 @@ class Loader:
         model_name=None,
         check_if_combination_exists=True,
         dim_reduction_model=False,
-        build_results_dir=False, 
+        use_folder_structure=False, 
         testing=False,
         **kwargs,
     ):
@@ -91,7 +91,7 @@ class Loader:
         self.audio_dir = Path(audio_dir)
         self.dim_reduction_model = dim_reduction_model
         self.testing = testing
-        self.build_results_dir = build_results_dir
+        self.use_folder_structure = use_folder_structure
         self.continue_incomplete_run = False
 
         self._initialize_path_structure(
@@ -117,7 +117,7 @@ class Loader:
             self._get_audio_paths_and_init_embed_dir()
             self._init_metadata_dict()
 
-        if not self.build_results_dir:
+        if not self.use_folder_structure:
             logger.info(
                 "No model_name is passed, therefore no directory "
                 "structure will be created."
@@ -138,7 +138,7 @@ class Loader:
         # if testing:
         #     kwargs["main_results_dir"] = "bacpipe/tests/results_files"
         
-        if self.build_results_dir:
+        if self.use_folder_structure:
             from bacpipe import settings
             kwargs = {**vars(settings)}
 
@@ -540,7 +540,7 @@ class Loader:
             return np.vstack(list(d.values()))
         
     def predictions(self, threshold=bacpipe_settings.classifier_threshold, as_type='dict'):
-        class_path = (
+        preds_path = (
             self.evaluations_dir 
             / self.model_name 
             / 'classification'
@@ -548,12 +548,12 @@ class Loader:
             )
         import bacpipe
         self.embedder = bacpipe.Embedder(self.model_name, self)
-        if not class_path.exists():
+        if not preds_path.exists():
             logger.warning(
                 "No classifier predictions have been save yet. "
             )
             return None
-        class_files = list(class_path.rglob('*.json'))
+        class_files = list(preds_path.rglob('*.json'))
         if not class_files:
             logger.warning(
                 "No classifier predictions have been save yet. "
@@ -580,7 +580,7 @@ class Loader:
                 vals[val['time_bins_exceeding_threshold'], idx] = l2i[class_label]
             
             preds_array = fill_all_labels_array(vals, preds_array)
-            d[str(file.relative_to(class_path))] = vals
+            d[str(file.relative_to(preds_path))] = vals
             
         i2l = {v: k for k, v in l2i.items()}
         
@@ -712,7 +712,7 @@ class Loader:
         if (
             testing 
             or (
-                not paths.class_path.joinpath(
+                not paths.preds_path.joinpath(
                 "original_classifier_outputs"
                 ).exists() 
                 and run_pretrained_classifier

@@ -121,22 +121,28 @@ bool_filter_labels: True
 run_pretrained_classifier: True
 classifier_threshold: 0.5
 
+train_ratio: 0.65
+test_ratio: 0.2
+# the rest will be val_ratio = 1 - (train_ratio + test_ratio)
 
-class_configs:
+probe_configs:
   config_1:
     bool: True
     name: "linear"
-    learning_rate: 0.001
+    learning_rate: 0.0005
     batch_size: 64
-    num_epochs: 10
-    dataset_csv_path: classification_dataframe.csv
-    shuffle: False
+    num_epochs: 20
+    dataset_csv_path: probing_dataframe.csv
+    shuffle: True
   config_2:
     bool: True
     name: "knn"
     n_neighbors: 15
-    dataset_csv_path: classification_dataframe.csv
+    dataset_csv_path: probing_dataframe.csv
 
+# by default the trained linear probe will be saved
+# along with the performance results and plots of the results
+save_probe: True
 
 #######-------------------------############
 #######   CLUSTERING SETTINGS   ############

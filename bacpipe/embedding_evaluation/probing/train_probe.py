@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from sklearn.neighbors import KNeighborsClassifier
+from .dataset_probe import probe_dataset_loader
+import bacpipe
 
 import logging
 
@@ -22,13 +23,13 @@ class LinearClassifier(nn.Module):
             number of output dimensions (dictated by classes in ground truth)
         """
         super(LinearClassifier, self).__init__()
-        self.clfier = nn.Linear(in_dim, out_dim)
+        self.probe = nn.Linear(in_dim, out_dim)
 
     def forward(self, x):
-        return self.clfier(x)
+        return self.probe(x)
 
 
-def train_linear_classifier(
+def train_linear_probe(
     linear_classifier,
     train_dataloader,
     learning_rate,
@@ -64,7 +65,7 @@ def train_linear_classifier(
     except RuntimeError:
         logger.error('Traceback', exc_info=True)
         logger.info(
-            "This problem is likely cause by tensorflow being a pain in the ****. "
+            "This problem is likely caused by tensorflow hogging all the gpu vram. "
             "The best fix for this is to simply restart bacpipe with the same settings, "
             "that way the GPU should be available for pytorch. Alternatively select "
             "`cpu` for device in the settings.yaml file."
@@ -116,57 +117,6 @@ def train_linear_classifier(
     return linear_classifier
 
 
-def inference(classifier, test_dataloader, device="cuda:0", config="linear", **kwargs):
-    """
-    Perform inference using classifier.
-
-    Parameters
-    ----------
-    classifier : object
-        trained classification object
-    test_dataloader : DataLoader object
-        dataset iterator
-    device : str, optional
-        'cpu' or 'cuda', by default "cuda:0"
-    config : str, optional
-        type of classification, by default "linear"
-
-    Returns
-    -------
-    list
-        prediction values in ints corresponding to labels
-    list
-        ground truth values in ints
-    np.array
-        probabilities for each class and each embedding
-    """
-    device = torch.device(device)
-    classifier = classifier.to(device)
-
-    classifier.eval()
-    y_pred = []
-    y_true = []
-    probabilities = []
-
-    for embeddings, y in test_dataloader:
-        embeddings, y = embeddings.to(device), y.to(device)
-
-        outputs = classifier(embeddings)
-        if config == "linear":
-            # Use softmax to get probabilities
-            probs = F.softmax(outputs, dim=1).detach().cpu().numpy()
-            _, predicted = torch.max(outputs, 1)
-
-        elif config == "knn":
-            # KNN does not require softmax
-            predicted, probs = outputs
-            probs = probs.cpu().numpy().tolist()
-
-        y_pred.extend(predicted.cpu().numpy().tolist())
-        y_true.extend(y.cpu().numpy().tolist())
-        probabilities.extend(probs)
-
-    return y_pred, y_true, probabilities
 
 
 class KNN(nn.Module):
@@ -207,7 +157,7 @@ class KNN(nn.Module):
         return preds_tensor, probs_tensor
 
 
-def train_knn_classifier(knn_classifier, train_dataloader, device="cpu", **kwargs):
+def train_knn_probe(knn_classifier, train_dataloader, device="cpu", **kwargs):
     """
     Pipeline for knn classifier training.
 
@@ -245,3 +195,64 @@ def train_knn_classifier(knn_classifier, train_dataloader, device="cpu", **kwarg
     logger.info("KNN Training Complete!")
 
     return knn_classifier
+
+
+
+def train_classifier(
+    embeds, df, label2index, 
+    config="linear", 
+    learning_rate=None,
+    num_epochs=None,
+    n_neighbors=None,
+    **kwargs):
+    """
+    Classification pipeline. First the classification dataframe is loaded,
+    then a dict is created to link labels to ints, then the dataset loaders
+    are created to iterate over. Next depending of the specified config
+    a linear or KNN classification is performed. Finally the classifiers are
+    used for inference and based on that performance metrics are created.
+
+    Parameters
+    ----------
+    paths : SimpleNamespace dict
+        dictionary object containing paths for loading and saving
+    dataset_csv_path : string
+        name of classification dataframe as secified in the settings.yaml file
+    embeds : np.array
+        the embeddings
+    config : str, optional
+        type of classification, by default 'linear'
+
+    Returns
+    -------
+    dict
+        performance dictionary
+    """
+    
+
+    # generate the loaders
+    train_gen = probe_dataset_loader("train", df, embeds, label2index, **kwargs)
+
+    embed_size = embeds[0].shape[-1]
+
+    if config == "linear":
+        if learning_rate is None:
+            learning_rate = bacpipe.settings.probe_configs['config_1']['learning_rate']
+        if num_epochs is None:
+            num_epochs = bacpipe.settings.probe_configs['config_1']['num_epochs']
+        probe = LinearClassifier(in_dim=embed_size, out_dim=len(df.label.unique()))
+        probe = train_linear_probe(
+            probe, train_gen, 
+            learning_rate=learning_rate, num_epochs=num_epochs, 
+            **kwargs
+            )
+
+    elif config == "knn":
+        if n_neighbors is None:
+            n_neighbors = bacpipe.settings.probe_configs['config_2']['n_neighbors']
+        if len(df[df.predefined_set =='test']) < n_neighbors:
+            kwargs['n_neighbors'] = len(df[df.predefined_set =='test']) - 1
+        probe = KNN(**kwargs)
+        probe = train_knn_probe(probe, train_gen, **kwargs)
+
+    return probe

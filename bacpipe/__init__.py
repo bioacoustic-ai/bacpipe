@@ -118,8 +118,6 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
 =======
 >>>>>>> origin/v1.3.0
 
-
-
 # --------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------
@@ -172,12 +170,17 @@ from bacpipe.core.workflows import (
 from bacpipe.embedding_evaluation.label_embeddings import (
     DefaultLabels, 
     get_default_labels,
-    get_ground_truth, 
     get_dt_filename,
     make_set_paths_func,
     create_default_labels,
     ground_truth_by_model
     )
+
+from bacpipe.embedding_evaluation.probing.probe import probing_pipeline
+from bacpipe.embedding_evaluation.probing.inference_probe import (
+    run_probe_inference,
+    prepare_probe_inference
+)
 
 from bacpipe.core.constants import (
     supported_models, 
@@ -188,26 +191,46 @@ from bacpipe.core.constants import (
     )
 
 __all__ = [
+    ## pipelines
     play,
+    run_pipeline_for_single_model,
+    run_pipeline_for_models,
+    generate_embeddings,
+    
+    ## loader and embedder class for 
+    ## loading files and computing embeddings
     Loader,
     Embedder,
-    generate_embeddings,
-    run_pipeline_for_single_model,
-    ensure_models_exist,
-    make_set_paths_func,
+    
+    ## return audio files in specified dir
+    get_audio_files,
+    
+    ## automatic creation of labels and ground truth
+    DefaultLabels, 
     create_default_labels,
     ground_truth_by_model,
-    get_model_names,
-    get_audio_files,
-    evaluation_with_settings_already_exists,
-    run_pipeline_for_models,
+    get_default_labels,
+    get_dt_filename,
+    
+    ## probing functions
+    probing_pipeline,
+    run_probe_inference,
+    prepare_probe_inference,
+    
+    ## evaluation pipelines
     model_specific_evaluation,
     cross_model_evaluation,
+    
+    ## experiment managing functions
+    ensure_models_exist,
+    evaluation_with_settings_already_exists,
+    get_model_names,
+    make_set_paths_func,
+    
+    ## visualization function to start dashboard
     visualize_using_dashboard,
-    DefaultLabels, 
-    get_default_labels,
-    get_ground_truth, 
-    get_dt_filename,
+    
+    ## constants
     supported_models, 
     models_needing_checkpoint,
     TF_MODELS,

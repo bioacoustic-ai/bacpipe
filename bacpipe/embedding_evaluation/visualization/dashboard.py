@@ -27,16 +27,14 @@ from .visualize_predictions import (
     )
     
 import bacpipe.embedding_evaluation.label_embeddings as le
-from bacpipe.embedding_evaluation.classification.train_classifier import LinearClassifier
-
-sns.set_theme(style="whitegrid")
-
-matplotlib.use("agg")
-
-# Enable Panel
-pn.extension('plotly')
 from .dashboard_utils import DashBoardHelper
 
+
+
+### plotting settings
+sns.set_theme(style="whitegrid")
+matplotlib.use("agg")
+pn.extension('plotly')
 ACCORDION_WIDTH = 780
 
 
@@ -60,11 +58,11 @@ class DashBoard(DashBoardHelper):
         )
         self.label_by = default_label_keys.copy()
         if (
-            (self.path_func(model_names[0]).class_path).exists() 
+            (self.path_func(model_names[0]).preds_path).exists() 
             and not "default_classifier" in self.label_by
             ):
             clfier_paths =  list(self.path_func(model_names[0])
-                                 .class_path
+                                 .preds_path
                                  .rglob('*_classifier_annotations.csv')
                                  )
             if len(clfier_paths) > 0:
@@ -286,7 +284,7 @@ class DashBoard(DashBoardHelper):
                             model_name=self.model_select[widget_idx],
                             return_fig=True,
                         )
-                        if "classification" in self.evaluation_task
+                        if "probing" in self.evaluation_task
                         else pn.pane.Markdown(
                             "No classification task specified. "
                             "Please check the config file."
@@ -362,7 +360,7 @@ class DashBoard(DashBoardHelper):
                             model_list=self.models,
                             return_fig=True,
                         )
-                        if "classification" in self.evaluation_task
+                        if "probing" in self.evaluation_task
                         else pn.pane.Markdown(
                             "No classification task specified. "
                             "Please check the config file."
@@ -386,7 +384,7 @@ class DashBoard(DashBoardHelper):
         self.clfier_path[widget_idx] = pn.widgets.TextInput(
                 name='Path to Linear Classifier', 
                 placeholder=(
-                    self.path_func(self.models[0]).class_path / 'linear_classifier.pt'
+                    self.path_func(self.models[0]).probe_path / 'linear_probe.pt'
                     ).as_posix(),
                 width=600,
                 max_length=800,
@@ -572,7 +570,7 @@ class DashBoard(DashBoardHelper):
                             name="Classification Type",
                             options=["knn", "linear"],
                         )
-                        if "classification" in self.evaluation_task
+                        if "probing" in self.evaluation_task
                         else None
                     ),
                 ]
