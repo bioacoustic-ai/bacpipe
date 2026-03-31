@@ -198,7 +198,7 @@ def train_knn_probe(knn_classifier, train_dataloader, device="cpu", **kwargs):
 
 
 
-def train_classifier(
+def train_probe(
     embeds, df, label2index, 
     config="linear", 
     learning_rate=None,

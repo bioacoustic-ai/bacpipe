@@ -4,7 +4,7 @@ import bacpipe
 def print_output(var):
     print(f'\n{var=}\n')
 
-if False:
+if True:
 
     ### load configurations
     print(bacpipe.config)
@@ -248,32 +248,50 @@ if False:
 
 # get probing from model
 
+    print('hi')
+    # get clustering from model 
+
+    # ensure model exists, if not download
+
+    from bacpipe.embedding_evaluation.benchmark import benchmark
+
+    from bacpipe.embedding_evaluation.probing.probe import probing_pipeline
+
+
+    gt = bacpipe.ground_truth_by_model(
+        'birdnet', 
+        bacpipe.config.audio_dir, 
+        annotations_filename='annotations.csv',
+        single_label=False,
+        overwrite=False
+        )
+    embeds = bacpipe.Loader(
+        bacpipe.config.audio_dir, 
+        'birdnet',
+        use_folder_structure=True
+        ).embeddings(as_type='array')
+    probe, metrics = probing_pipeline(gt, embeds, **vars(bacpipe.settings))
+    print(type(probe))
+    print(metrics)
+    from bacpipe.embedding_evaluation.probing.inference_probe import *
+    run_probe_inference('birdnet', probe, 0.5, embeds, device='cuda', return_binary_presence=False)
+
+import librosa as lb
+aud_files = bacpipe.get_audio_files('bacpipe/tests/test_data')
+aud, _ = lb.load(aud_files[0], sr=48_000)
+
+aud60 = aud[:60*48_000]
+import soundfile as sf
+from pathlib import Path
+sf.write('test60.wav', aud60, 48_000)
+import torch
+
+embedder = bacpipe.Embedder('birdnet')
+# embeds = embedder.get_embeddings_from_model(aud_files[0])
+embeds = embedder.get_embeddings_from_model(Path('test60.wav'))
+embeds_arr = embedder.get_embeddings_for_audio(torch.tensor(aud60.reshape(1, -1)))
+
+# make a function that works with already loaded audio
+
 print('hi')
-# get clustering from model 
 
-# ensure model exists, if not download
-
-from bacpipe.embedding_evaluation.benchmark import benchmark
-
-from bacpipe.embedding_evaluation.probing.probe import probing_pipeline
-
-
-gt = bacpipe.ground_truth_by_model(
-    'birdnet', 
-    bacpipe.config.audio_dir, 
-    annotations_filename='annotations.csv',
-    single_label=False,
-    overwrite=False
-    )
-embeds = bacpipe.Loader(
-    bacpipe.config.audio_dir, 
-    'birdnet',
-    use_folder_structure=True
-    ).embeddings(as_type='array')
-probe, metrics = probing_pipeline(gt, embeds, **vars(bacpipe.settings))
-print(type(probe))
-print(metrics)
-from bacpipe.embedding_evaluation.probing.inference_probe import *
-run_probe_inference('birdnet', probe, 0.5, embeds, device='cuda', return_binary_presence=False)
-
-print('hi')

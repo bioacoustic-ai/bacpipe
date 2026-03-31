@@ -132,7 +132,7 @@ class Embedder(AudioHandler):
                     batch = batch.cuda()
                 embeddings = self.model(batch)
                 if self.model.bool_classifier:
-                    self.classifier.train_classifier(embeddings)
+                    self.classifier.classify(embeddings)
 
             if isinstance(embeddings, torch.Tensor) and embeddings.dim() == 1:
                 embeddings = embeddings.unsqueeze(0)
@@ -501,6 +501,7 @@ class Embedder(AudioHandler):
         else:
             if not isinstance(sample, Path):
                 sample = Path(sample)
+                # TODO might not know audio_suffixes
                 if not sample.suffix in self.audio_suffixes:
                     error = (
                         "\nThe provided path does not lead to a supported audio file with the ending"
@@ -624,7 +625,7 @@ class Classifier:
         }
         return cls_results
     
-    def train_classifier(self, embeddings):
+    def classify(self, embeddings):
         clfier_output = self.model.classifier_predictions(embeddings)
             
         if self.model.device == "cuda" and isinstance(clfier_output, torch.Tensor):

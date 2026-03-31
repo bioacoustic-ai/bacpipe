@@ -8,7 +8,7 @@ from pathlib import Path
 import bacpipe
 logger = logging.getLogger(__name__)
 
-from .train_probe import train_classifier, LinearClassifier
+from .train_probe import train_probe, LinearClassifier
 from .evaluate_probe import eval_probe
 from .dataset_probe import generate_annotations_for_probing_task
 
@@ -75,7 +75,7 @@ def probing_pipeline(
 
         label2index = {label: i for i, label in enumerate(df.label.unique())}
 
-        probe = train_classifier(embeds, df, label2index, config=name, **kwargs)
+        probe = train_probe(embeds, df, label2index, config=name, **kwargs)
         
         metrics = eval_probe(
             probe, embeds, df, label2index, config=name, **kwargs
