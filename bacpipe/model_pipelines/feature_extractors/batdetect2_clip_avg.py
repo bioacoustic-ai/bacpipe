@@ -3,7 +3,7 @@ from functools import partial
 import numpy as np
 import torch
 
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 SAMPLE_RATE = 256_000
 DEFAULT_SEGMENT_DURATION = 1
@@ -39,28 +39,22 @@ class Model(ModelBaseClass):
     def preprocess(self, audio):
         segments = audio.numpy()
         # NOTE: Need to pre-process each segment separately
-        spectrograms = [self.generate_spectrogram(segment) for segment in segments]
-        return torch.from_numpy(np.concatenate(spectrograms, axis=0))
+        spectrograms = torch.stack(
+            [self.generate_spectrogram(segment) for segment in segments]
+            )
+        if len(spectrograms.shape) > 4:
+            spectrograms = spectrograms.squeeze(1)
+        return spectrograms
 
     @torch.no_grad()
-    def __call__(self, x, return_class_results=False):
-        output = self.model(x)
+    def __call__(self, x):
+        self.output = self.model(x)
 
-        features = output.features.mean(dim=(-2, -1))
-
-        # NOTE: Last element is the background class
-        class_scores = output.pred_class.amax(dim=(-2, -1))[:, :-1]
-
-        if return_class_results:
-            return features, class_scores
+        features = self.output.features.mean(dim=(-2, -1))
 
         return features
 
-    def classifier_predictions(self, inference_results):
-        # NOTE: This method is left unimplemented. Since 'inference_results'
-        # are averaged across the whole audio clip to map to the single-feature
-        # interface, running a classifier on these aggregated features won't
-        # produce the intended results.
-        raise NotImplementedError(
-            "Classifier predictions are invalid for averaged features."
-        )
+    def classifier_predictions(self, embeddings):
+        # NOTE: Last element is the background class
+        class_scores = self.output.pred_class.amax(dim=(-2, -1))[:, :-1]
+        return class_scores

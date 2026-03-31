@@ -51,14 +51,17 @@ class AudioHandler:
         torch.Tensor
             audio frames preprocessed with model specific preprocessing
         """
-        audio = self._load_and_resample(sample)
+        audio, sr = self._load_and_resample(sample)
         # audio = audio.to(self.model.device)
         if self.model.only_embed_annotations:
             frames = self._only_load_annotated_segments(sample, audio, **self.kwargs)
         else:
             frames = self._window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
-        self.file_length[sample.stem] = len(audio[0]) / self.model.sr
+        if not self.bool_slowdown:
+            self.file_length[sample.stem] = len(audio[0]) / self.model.sr
+        else:
+            self.file_length[sample.stem] = len(audio[0]) / sr
         self.preprocessed_shape = tuple(preprocessed_frames.shape)
         if self.model.device == 'cuda':
             del audio, frames
@@ -76,9 +79,13 @@ class AudioHandler:
                 audio, sr = lb.load(
                     str(path), sr=None, mono=True
                     )
+                if 'batdetect2' in self.model_name:
+                    fake_original_sr = self.model.sr
+                else:
+                    fake_original_sr = int(sr * self.slowdown_rate)
                 audio = lb.resample(
                     audio, 
-                    orig_sr=int(sr * self.slowdown_rate), 
+                    orig_sr=fake_original_sr, 
                     target_sr=self.model.sr
                     )
             audio = audio.reshape(1, -1)
@@ -92,7 +99,7 @@ class AudioHandler:
             error = f"Audio file {path} is empty. " f"Skipping {path}."
             logger.exception(error)
             raise ValueError(error)
-        return torch.tensor(audio)
+        return torch.tensor(audio), sr
 
     def _only_load_annotated_segments(
         self, file_path, audio, annotations_filename='annotations.csv', **_

@@ -3,7 +3,7 @@ from functools import partial
 import numpy as np
 import torch
 
-from ..utils import ModelBaseClass
+from ..model_utils import ModelBaseClass
 
 SAMPLE_RATE = 256_000
 DEFAULT_SEGMENT_DURATION = 1
