@@ -136,8 +136,6 @@ def save_classification(paths, config, metrics, **kwargs):
     metrics["config"] = kwargs
 
     save_path = paths.class_path.joinpath(f"class_results_{config}.json")
-    
-    
 
     with open(save_path, "w") as f:
         json.dump(metrics, f, indent=2)

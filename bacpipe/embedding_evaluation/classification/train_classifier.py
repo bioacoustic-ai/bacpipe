@@ -4,6 +4,10 @@ import torch.nn.functional as F
 
 from sklearn.neighbors import KNeighborsClassifier
 
+import logging
+
+logger = logging.getLogger("bacpipe")
+
 
 class LinearClassifier(nn.Module):
     def __init__(self, in_dim, out_dim):
@@ -52,10 +56,21 @@ def train_linear_classifier(
     Returns
     -------
     object
-        trained linear classificaion object
+        trained linear classification object
     """
     device = torch.device(device)
-    linear_classifier = linear_classifier.to(device)
+    try:
+        linear_classifier = linear_classifier.to(device)
+    except RuntimeError:
+        logger.error('Traceback', exc_info=True)
+        logger.info(
+            "This problem is likely cause by tensorflow being a pain in the ****. "
+            "The best fix for this is to simply restart bacpipe with the same settings, "
+            "that way the GPU should be available for pytorch. Alternatively select "
+            "`cpu` for device in the settings.yaml file."
+        )
+        import sys
+        sys.exit(0)
 
     # Define optimizer and loss function
     optimizer = torch.optim.Adam(linear_classifier.parameters(), lr=learning_rate)
@@ -64,7 +79,7 @@ def train_linear_classifier(
     # Training loop
     for epoch in range(num_epochs):
         linear_classifier.train()
-        print(f"Epoch {epoch+1}/{num_epochs}")
+        logger.info(f"Epoch {epoch+1}/{num_epochs}")
         running_loss = 0.0
         correct_train = 0
         total_train = 0
@@ -92,9 +107,9 @@ def train_linear_classifier(
         train_loss = running_loss / len(train_dataloader.dataset)
         train_accuracy = 100 * correct_train / total_train
 
-        # print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss}, Accuracy: {train_accuracy}")
+        # logger.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss}, Accuracy: {train_accuracy}")
 
-        print(
+        logger.info(
             f"Epoch [{epoch+1}/{num_epochs}], Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.2f}%"
         )
 
@@ -178,7 +193,9 @@ class KNN(nn.Module):
     def forward(self, x):
         """Predict using KNN (only after it's trained)"""
         if not self.is_trained:
-            raise ValueError("KNN model is not trained. Call `fit()` first.")
+            error = ("\nKNN model is not trained. Call `fit()` first.")
+            logger.exception(error)
+            raise ValueError(error)
 
         x_np = x.cpu().detach().numpy()
         preds = self.knn.predict(x_np)  # Predict labels
@@ -225,6 +242,6 @@ def train_knn_classifier(knn_classifier, train_dataloader, device="cpu", **kwarg
 
     # Train KNN
     knn_classifier.fit(all_embeddings, all_labels)
-    print("KNN Training Complete!")
+    logger.info("KNN Training Complete!")
 
     return knn_classifier

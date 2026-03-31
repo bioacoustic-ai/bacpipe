@@ -11,7 +11,7 @@ Submodules
    classification
    clustering
    visualization
-   embedding_generation_pipelines
+   model_pipelines
    test_embedding_creation
 
 --------------------------------------------------
@@ -82,10 +82,10 @@ visualization
     :undoc-members:
     :show-inheritance:
 
-embedding_generation_pipelines
+model_pipelines
 ---------
 
-.. automodule:: bacpipe.embedding_generation_pipelines.utils
+.. automodule:: bacpipe.model_pipelines.utils
     :members:
     :undoc-members:
     :show-inheritance:

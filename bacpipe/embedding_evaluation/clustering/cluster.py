@@ -184,7 +184,9 @@ def clustering(paths, embeds, ground_truth, label_column, overwrite=False, **kwa
         whether to overwrite exisiting clustering files, by default False
     """
     if overwrite or not len(list(paths.clust_path.glob("*.json"))) > 0:
-
+        
+        if "audio_dir" in kwargs: kwargs.pop("audio_dir")
+        
         if ground_truth:
             labels = ground_truth[f"label:{label_column}"]
         else:
@@ -195,7 +197,7 @@ def clustering(paths, embeds, ground_truth, label_column, overwrite=False, **kwa
         cluster_configs = get_clustering_models(clust_params)
 
         default_labels = le.create_default_labels(
-            paths, paths.clust_path.parent.stem, **kwargs
+            paths.audio_dir, paths.clust_path.parent.stem, paths, **kwargs
         )
 
         metrics, clusterings = compute_clusterings(

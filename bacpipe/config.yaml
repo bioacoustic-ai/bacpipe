@@ -29,7 +29,7 @@ dashboard: True
 # embedding model name
 models: [
       "birdnet",
-      "perch_bird",
+      "batdetect2_mean_clip",
   ]
 
   # if already_computed is True, the embeddings will be loaded from the
