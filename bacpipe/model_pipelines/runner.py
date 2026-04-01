@@ -150,7 +150,9 @@ class Embedder(AudioHandler):
             return torch.cat(embeds, axis=0)
         else:
             import tensorflow as tf
-            return_embeds = tf.concat(embeds, axis=0).numpy().squeeze()
+            return_embeds = tf.concat(embeds, axis=0).numpy()
+            if len(return_embeds.shape) > 2:
+                return_embeds = return_embeds.squeeze()
             return return_embeds
 
     def get_embeddings_for_audio(self, sample):
@@ -630,6 +632,7 @@ class Classifier:
             
         if self.model.device == "cuda" and isinstance(clfier_output, torch.Tensor):
             self.predictions = self.predictions.cuda()
+            clfier_output = clfier_output.cuda()
 
         if isinstance(clfier_output, torch.Tensor):
             self.predictions = torch.cat(

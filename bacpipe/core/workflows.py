@@ -450,16 +450,16 @@ def model_specific_evaluation(
                     loader_dict[model_name]
                     )
                 
-        if not evaluation_task in ["None", [], None, False]:
-            embeds = loader_dict[model_name].embeddings()
-            try:
-                ground_truth = ground_truth_by_model(
-                    model_name, paths=paths, single_label=True, **kwargs
-                    )
-            except FileNotFoundError as e:
-                ground_truth = None
-            except IndexError as e:
-                ground_truth = None
+        # if not evaluation_task in ["None", [], None, False]:
+        embeds = loader_dict[model_name].embeddings()
+        try:
+            ground_truth = ground_truth_by_model(
+                model_name, paths=paths, single_label=True, **kwargs
+                )
+        except FileNotFoundError as e:
+            ground_truth = None
+        except IndexError as e:
+            ground_truth = None
 
 
 
@@ -471,11 +471,11 @@ def model_specific_evaluation(
         
         if "probing" in evaluation_task and not ground_truth is None:
             logger.info(
-                "\nTraining classifier to evaluate " f"{model_name.upper()} embeddings"
+                "\nTraining probe to evaluate " f"{model_name.upper()} embeddings"
             )
             
             assert len(embeds) > 1, (
-                "Too few files to evaluate embeddings with classifier. "
+                "Too few files to evaluate embeddings with probing. "
                 "Are you sure you have selected the right data?"
             )
 
@@ -561,11 +561,6 @@ def run_pipeline_for_single_model(
 
     if not dim_reduction_model in ["None", False]:
 
-        assert len(loader_embeddings.files) > 1, logger.exception(
-            "Too few files to perform dimensionality reduction. "
-            "Are you sure you have selected the right data? "
-            f"Will continue without {model_name}."
-        )
         loader_dim_reduced = generate_embeddings(
             model_name=model_name,
             dim_reduction_model=dim_reduction_model,
