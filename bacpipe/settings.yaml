@@ -180,8 +180,13 @@ dashboard_address: localhost
 
 dashboard_websocket_origin: False
 
+embed_fig_height: 700
+spectrogram_plot_height: 550
+heatmap_fig_height: 600
 
-
+spec_colorscale: 'Viridis'
+accordion_width: 780
+color_continuous: 'Twilight'
 
 
 

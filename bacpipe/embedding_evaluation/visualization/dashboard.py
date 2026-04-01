@@ -35,7 +35,6 @@ from .dashboard_utils import DashBoardHelper
 sns.set_theme(style="whitegrid")
 matplotlib.use("agg")
 pn.extension('plotly')
-ACCORDION_WIDTH = 780
 
 
 class DashBoard(DashBoardHelper):
@@ -151,31 +150,7 @@ class DashBoard(DashBoardHelper):
                                 dashboard=True,
                                 dashboard_idx=widget_idx,
                             )
-        else:             
-            embedding_info_dialogue = pn.widgets.StaticText(
-                    value="", width=ACCORDION_WIDTH-80, 
-                    )
-            
-            self.spec_plot_obj[widget_idx] = SpectrogramPlot(
-                self.audio_dir, self.vis_loader, 
-                self.model_select[widget_idx], 
-                embedding_info_dialogue,
-                **self.kwargs
-                )
-            
-            self._trigger_spec_obj_update[widget_idx] = pn.bind(
-                (
-                    self.spec_plot_obj[widget_idx]._update_spec_obj
-                ),
-                self.model_select[widget_idx],
-                self.autoplay_audio_select[widget_idx]
-            )
-            
-            self.spectrogram_plot_panel[widget_idx] = pn.pane.Plotly(
-                    SpectrogramPlot.dummy_image(title=''), 
-                    sizing_mode='stretch_width',
-                    height=300
-                )
+        else:
             
             self.init_interactive_embed_plot(widget_idx)
             
@@ -197,46 +172,146 @@ class DashBoard(DashBoardHelper):
                         dashboard=True,
                         dashboard_idx=widget_idx,
                         )        
-            
-            play_audio_button = pn.widgets.Button(name="Play audio", button_type="primary")
-            play_audio_button.on_click(self.spec_plot_obj[widget_idx].play_audio)
-            save_selection_dialogue = pn.widgets.StaticText(
-                    value="", width=400
-                    )
-            
-            save_selection_button = pn.widgets.Button(
-                name="Save selection to file", button_type="primary"
+        return (
+                "2D Embedding Plot",
+                pn.Column(
+                    embedding_plot,
+                    self.embed_save_button[widget_idx],
+                    self.embed_notification[widget_idx],
                 )
-            save_selection_button.on_click(
-                lambda x: self.save_selected_points(
-                    x, save_selection_dialogue, widget_idx
-                    )
-                )
-            save_selection_dialogue.visible = False
-            
-            
-        return pn.Column(
-            embedding_plot,
-            self.embed_save_button[widget_idx],
-            self.embed_notification[widget_idx],
-            embedding_info_dialogue,
-            self.spectrogram_plot_panel[widget_idx],
-            save_selection_dialogue,
-            pn.Row(
-                play_audio_button,
-                save_selection_button
-            ),
-            pn.widgets.StaticText(value="", height=80)
-        )
+            )
     
+    def spectrogram_panel(self, widget_idx=0):
+            
+        self.spectrogram_plot_panel[widget_idx] = pn.pane.Plotly(
+                SpectrogramPlot.dummy_image(title=''), 
+                sizing_mode='stretch_width',
+                height=self.kwargs.get('spectrogram_plot_height')
+            )
+        
+        embedding_info_dialogue = pn.widgets.StaticText(
+                value="", width=self.kwargs.get('accordion_width')-80, 
+                )
+        
+        self.spec_plot_obj[widget_idx] = SpectrogramPlot(
+            self.audio_dir, self.vis_loader, 
+            self.model_select[widget_idx], 
+            embedding_info_dialogue,
+            **self.kwargs
+            )
+        
+        self._trigger_spec_obj_update[widget_idx] = pn.bind(
+            (
+                self.spec_plot_obj[widget_idx]._update_spec_obj
+            ),
+            self.model_select[widget_idx],
+            self.autoplay_audio_select[widget_idx]
+        )
+        
+        play_audio_button = pn.widgets.Button(name="Play audio", button_type="primary")
+        play_audio_button.on_click(self.spec_plot_obj[widget_idx].play_audio)
+        save_selection_dialogue = pn.widgets.StaticText(
+                value="", width=400
+                )
+        
+        save_selection_button = pn.widgets.Button(
+            name="Save selection to file", button_type="primary"
+            )
+        save_selection_button.on_click(
+            lambda x: self.save_selected_points(
+                x, save_selection_dialogue, widget_idx
+                )
+            )
+        save_selection_dialogue.visible = False
+        
+        return (
+            "Spectrogram",
+            pn.Column(
+                embedding_info_dialogue,
+                self.spectrogram_plot_panel[widget_idx],
+                save_selection_dialogue,
+                pn.Row(
+                    play_audio_button,
+                    save_selection_button
+                ),
+                pn.widgets.StaticText(value="", height=80)
+            )
+        )
 
 
-    def single_model_page(self, widget_idx):
+    def clustering_panel(self, widget_idx):
+        return (
+            "Clustering Results",
+            (
+                self.plot_widget(
+                    plot_clusterings,
+                    path_func=self.path_func,
+                    model_name=self.model_select[widget_idx],
+                    label_by=self.label_select[widget_idx],
+                    no_noise=(
+                        self.noise_select[widget_idx]
+                        if len(self.noise_select.keys()) > 0
+                        else False
+                    ),
+                )
+                if "clustering" in self.evaluation_task
+                else pn.pane.Markdown(
+                    "No clustering task specified. "
+                    "Please check the config file."
+                )
+            )
+        )
+        
+    def probing_panel(self, widget_idx):
+        return (
+            "Probing Performance",
+            (
+                self.plot_widget(
+                    plot_classification_results,
+                    path_func=self.path_func,
+                    task_name=self.class_select[widget_idx],
+                    model_name=self.model_select[widget_idx],
+                    return_fig=True,
+                )
+                if "probing" in self.evaluation_task
+                else pn.pane.Markdown(
+                    "No probing task specified. "
+                    "Please check the config file."
+                )
+            )
+        )
+        
+
+    def model_page(self, widget_idx, single_model=False):
         sidebar = self.make_sidebar(widget_idx, model=True)
         title_string = "Model Dashboard for {}".format
         accordion_title = pn.bind(title_string, 
                                   self.model_select[widget_idx]
                                   )
+        if single_model:
+            data_panels = pn.Row(
+                pn.Accordion(
+                    self.embedding_panel(widget_idx),
+                    active=[0],
+                    width=self.kwargs.get('accordion_width'),
+                    ),
+                
+                pn.Accordion(
+                        self.spectrogram_panel(widget_idx),
+                        self.clustering_panel(widget_idx),
+                        self.probing_panel(widget_idx),
+                    active=[0, 1, 2],
+                )
+            )
+        else:
+            data_panels = pn.Accordion(
+                        self.embedding_panel(widget_idx),
+                        self.spectrogram_panel(widget_idx),
+                        self.clustering_panel(widget_idx),
+                        self.probing_panel(widget_idx),
+                    active=[0, 1, 2, 3],
+                    width=self.kwargs.get('accordion_width'),
+                )
     
         main_content = pn.Column(
             pn.widgets.StaticText(
@@ -248,53 +323,8 @@ class DashBoard(DashBoardHelper):
                     'margin-bottom': '15px'
                 }
             ),
-            pn.Accordion(
-                (
-                    "2D Embedding Plot",
-                    self.embedding_panel(widget_idx)
-                ),
-                (
-                    "Clustering Results",
-                    (
-                        self.plot_widget(
-                            plot_clusterings,
-                            path_func=self.path_func,
-                            model_name=self.model_select[widget_idx],
-                            label_by=self.label_select[widget_idx],
-                            no_noise=(
-                                self.noise_select[widget_idx]
-                                if len(self.noise_select.keys()) > 0
-                                else False
-                            ),
-                        )
-                        if "clustering" in self.evaluation_task
-                        else pn.pane.Markdown(
-                            "No clustering task specified. "
-                            "Please check the config file."
-                        )
-                    ),
-                ),
-                (
-                    "Classification Performance",
-                    (
-                        self.plot_widget(
-                            plot_classification_results,
-                            path_func=self.path_func,
-                            task_name=self.class_select[widget_idx],
-                            model_name=self.model_select[widget_idx],
-                            return_fig=True,
-                        )
-                        if "probing" in self.evaluation_task
-                        else pn.pane.Markdown(
-                            "No classification task specified. "
-                            "Please check the config file."
-                        )
-                    ),
-                ),
-                # sizing_mode="stretch_width",
-                active=[0, 1, 2],
-            ),
-            width=ACCORDION_WIDTH,
+            data_panels,
+            # width=self.kwargs.get('accordion_width'),
             # sizing_mode="stretch_both",
         )
 
@@ -349,7 +379,7 @@ class DashBoard(DashBoardHelper):
                     ),
                 ),
                 (
-                    "Classification Metrics",
+                    "Probing Metrics",
                     (
                         self.plot_widget(
                             plot_overview_metrics,
@@ -362,7 +392,7 @@ class DashBoard(DashBoardHelper):
                         )
                         if "probing" in self.evaluation_task
                         else pn.pane.Markdown(
-                            "No classification task specified. "
+                            "No probing task specified. "
                             "Please check the config file."
                         )
                     ),
@@ -370,7 +400,7 @@ class DashBoard(DashBoardHelper):
                 # sizing_mode="stretch_width",
                 active=[0, 1, 2],
             ),
-            width=2 * ACCORDION_WIDTH,
+            width=2 * self.kwargs.get('accordion_width'),
             # sizing_mode="stretch_both",
         )
 
@@ -382,7 +412,7 @@ class DashBoard(DashBoardHelper):
         
         # input box where i can input the path to the linear classifier
         self.clfier_path[widget_idx] = pn.widgets.TextInput(
-                name='Path to Linear Classifier', 
+                name='Path to Linear Probe', 
                 placeholder=(
                     self.path_func(self.models[0]).probe_path / 'linear_probe.pt'
                     ).as_posix(),
@@ -500,7 +530,7 @@ class DashBoard(DashBoardHelper):
                 # by default create all annotations as one big annotations file
                 # # add button to save as raven annotations
                 ),
-                width=ACCORDION_WIDTH
+                width=self.kwargs.get('accordion_width')
             )
         return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
         
@@ -615,8 +645,9 @@ class DashBoard(DashBoardHelper):
         
         
         # Build both model pages to initialize widgets
-        model0_page = self.single_model_page(0)
-        model1_page = self.single_model_page(1)
+        model0_page = self.model_page(0, single_model=True)
+        model1_page = self.model_page(1)
+        model2_page = self.model_page(2)
         model_all_page = self.all_models_page(1)
         apply_classifier0_page = self.apply_clfier_page(0)
         apply_classifier1_page = self.apply_clfier_page(1)
@@ -624,8 +655,9 @@ class DashBoard(DashBoardHelper):
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
         sidebar1, content1 = model1_page.objects
-        sidebar2, content2 = apply_classifier0_page.objects
-        sidebar3, content3 = apply_classifier1_page.objects
+        sidebar2, content2 = model2_page.objects
+        sidebar3, content3 = apply_classifier0_page.objects
+        sidebar4, content4 = apply_classifier1_page.objects
 
         # Wrap sidebars with titles
         sidebar0 = pn.Column(
@@ -636,12 +668,12 @@ class DashBoard(DashBoardHelper):
         )
 
         self.app = pn.Tabs(
-            ("Single model", model1_page),
+            ("Single model", model0_page),
             (
                 "Two models",
                 pn.Row(
-                    pn.Column(sidebar0, sidebar1),
-                    pn.Row(content0, content1),
+                    pn.Column(sidebar1, sidebar2),
+                    pn.Row(content1, content2),
                     sizing_mode="stretch_both",
                 ),
             ),
@@ -650,15 +682,15 @@ class DashBoard(DashBoardHelper):
             (
                 "Two classifiers",
                 pn.Row(
-                    pn.Column(sidebar2, sidebar3),
-                    pn.Row(content2, content3),
+                    pn.Column(sidebar3, sidebar4),
+                    pn.Row(content3, content4),
                     sizing_mode="stretch_both",
                 ),
             ),
             
         )
         
-        self.add_styling(model1_page, model_all_page, apply_classifier1_page)
+        self.add_styling(model0_page, model_all_page, apply_classifier1_page)
         
     def add_styling(self, *pages):
         with pkg_resources.path(bacpipe.imgs, 'bacpipe_unlabelled.png') as p:

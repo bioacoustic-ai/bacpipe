@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.express as px
 
 import bacpipe.embedding_evaluation.label_embeddings as le
+from bacpipe import settings
 # from bacpipe.embedding_evaluation.visualization.visualize_spectrograms import SpectrogramPlot
 import matplotlib
 
@@ -15,9 +16,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-COLOR_CONTINUOUS = 'Twilight'
-# SPEC_COLORMAP = 'Viridis'
-EMBED_FIG_HEIGHT = 600
 
 COLOR_DISCRETE = px.colors.qualitative.Dark24
 
@@ -738,7 +736,8 @@ def plot_embeddings_px(
     })
 
     # 2. Setup Figure based on Label Count
-    if n_labels > 30:
+    if n_labels > 50:
+    # if label_by in ['time_of_day', 'continuous_timestamp', 'day_of_year']:
         # --- HIGH CARDINALITY: Use Colorbar ---
         # We map color to 'label_id' (int) to force a continuous scale
         fig = px.scatter(
@@ -756,7 +755,7 @@ def plot_embeddings_px(
             custom_data=['audiofilename', 'start', 'end', 'idx'],
             title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
             render_mode='webgl',
-            color_continuous_scale=COLOR_CONTINUOUS
+            color_continuous_scale=kwargs.get('color_continuous')
         )
 
         tick_vals = np.linspace(0, n_labels - int(n_labels//100+1), 6).astype(int).tolist()
@@ -807,7 +806,7 @@ def plot_embeddings_px(
     fig.update_layout(
         # autosize=True,
         template='plotly_white',
-        height=EMBED_FIG_HEIGHT,    
+        height=settings.embed_fig_height,    
         clickmode='event', 
         hovermode='closest',
         # margin=dict(l=20, r=20, t=40, b=20),

@@ -4,9 +4,7 @@ import plotly.express as px
 import librosa as lb
 from scipy.signal.windows import tukey
 from pathlib import Path
-
-SPECTROGRAM_PLOT_HEIGHT = 300
-SPEC_COLORSCALE = 'Viridis'
+from bacpipe import settings
 
 class SpectrogramPlot:
     def __init__(self, audio_dir, loader, model_name, panel_static_text, **kwargs):
@@ -37,7 +35,7 @@ class SpectrogramPlot:
         fig.update_layout(
             title=title, 
             margin=dict(l=20, r=20, t=40, b=20),
-            height=SPECTROGRAM_PLOT_HEIGHT,
+            height=settings.spectrogram_plot_height,
             xaxis={'visible': False}, 
             yaxis={'visible': False}
         )
@@ -94,10 +92,10 @@ class SpectrogramPlot:
                 S_dB.shape[1]
                 ),
             labels={'x': 'time (s)', 'y': 'freq (Hz)'}, 
-            color_continuous_scale=SPEC_COLORSCALE,
+            color_continuous_scale=self.kwargs.get('spec_colorscale'),
         )
         fig.update_layout(
-            height=SPECTROGRAM_PLOT_HEIGHT, 
+            height=self.kwargs.get('spectrogram_plot_height'), 
             margin=dict(l=20, r=20, t=20, b=20)
             )
         return fig
@@ -106,29 +104,43 @@ class SpectrogramPlot:
         import sounddevice as sd
         if not hasattr(self, 'audio'):
             return
-        if True:#self.use_tukey_filter:
-            audio = tukey(len(self.audio), alpha=0.01) * self.audio
-        else:
-            audio = self.audio
-        sd.play(audio, self.sample_rate)
+        audio = tukey(len(self.audio), alpha=0.01) * self.audio
+        
+        sd.play(audio, self.sample_rate)#int(self.orig_sr / self.kwargs.get('slowdown_rate')))
         
     def load_audio(self, start, end, filename):
         path = Path(self.audio_dir) / filename
-        audio, sr = lb.load(
-            path, 
-            sr=self.sample_rate, 
-            offset=float(start), 
-            duration=float(end)-float(start)
+        if not self.kwargs.get('bool_slowdown'):
+            audio, self.orig_sr = lb.load(
+                path, 
+                sr=self.sample_rate, 
+                offset=float(start), 
+                duration=float(end)-float(start)
+                )
+        else:
+            audio, self.orig_sr = lb.load(
+                path, 
+                sr=None, 
+                offset=float(start / self.kwargs.get('slowdown_rate')), 
+                duration=(
+                    float(end / self.kwargs.get('slowdown_rate'))
+                    - float(start / self.kwargs.get('slowdown_rate'))
+                    )
+                )
+            audio = lb.resample(
+                audio, 
+                orig_sr=int(self.orig_sr / self.kwargs.get('slowdown_rate')),
+                # orig_sr=int(self.orig_sr / (self.sample_rate / self.orig_sr)),
+                target_sr=self.sample_rate
             )
+            
         if (
-            (float(end)-float(start))
-            / self.sample_rate < self.segment_length
+            (float(end)-float(start)) * self.sample_rate < self.segment_length
             ):
-            if True:#self.use_tukey_filter:
-                audio = tukey(len(audio), alpha=0.01) * audio
+            audio = tukey(len(audio), alpha=0.01) * audio
             return_audio = lb.util.fix_length(
                 audio, 
-                size=int((end - start) * sr), 
+                size=int((end - start) * self.orig_sr), 
                 mode=self.kwargs['padding']
                 )
         else:

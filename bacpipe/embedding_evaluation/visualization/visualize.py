@@ -9,6 +9,8 @@ from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
 )
 import matplotlib
 
+from matplotlib.figure import Figure
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -112,7 +114,8 @@ def clustering_overview(
     plt.plot object
         figure handle
     """
-    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    fig = Figure(figsize=(12, 8))
+    ax = fig.subplots()
     fig.subplots_adjust(bottom=0.25, right=0.9)
     flat_metrics = dict()
     for model_name in model_list:
@@ -185,7 +188,8 @@ def plot_clusterings(
         metrics = json.load(f)
 
     if not fig and not ax:
-        fig, ax = plt.subplots(figsize=(5, 4))
+        fig = Figure(figsize=(5, 4))
+        ax = fig.subplots()
         fig.subplots_adjust(left=0.4, bottom=0.25)
 
     keys = [
@@ -285,7 +289,8 @@ def plot_overview_metrics(
     if "probing" in task_name:
         metrics = {k: v["overall"] for k, v in metrics.items()}
 
-    fig, ax = plt.subplots(1, 1, figsize=(12, 6))
+    fig = Figure(figsize=(12, 6))
+    ax = fig.subplots()
     if len(model_list) == 1 and model_list[0] not in metrics:
         error = (
             "\nIt seems like you have selected a single model in a folder where previously "

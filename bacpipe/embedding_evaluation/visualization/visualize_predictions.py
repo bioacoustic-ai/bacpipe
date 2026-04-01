@@ -14,9 +14,6 @@ from bacpipe.embedding_evaluation.probing.inference_probe import (
     prepare_probe_inference, run_probe_inference
     )
 
-
-HEATMAP_FIG_HEIGHT = 600
-
 def plot_classification_results(
     task_name,
     paths=None,
@@ -302,8 +299,8 @@ def plot_classification_heatmap(
             unique_labels.append(label)
             seen.add(label)
     y_indices = list(range(len(unique_labels)))
-    if len(y_indices) > len(y_indices) / int(HEATMAP_FIG_HEIGHT / 100):
-        nr_y_ticks = int(HEATMAP_FIG_HEIGHT / 100) 
+    if len(y_indices) > len(y_indices) / int(kwargs.get('heatmap_fig_height') / 100):
+        nr_y_ticks = int(kwargs.get('heatmap_fig_height') / 100) 
     
     # Create heatmap
     fig = px.imshow(
@@ -327,7 +324,7 @@ def plot_classification_heatmap(
     fig.update_layout(
         # autosize=True,
         # width=600,
-        height=HEATMAP_FIG_HEIGHT,
+        height=kwargs.get('heatmap_fig_height'),
         template='plotly_white',
         xaxis=dict(
             tickmode='array',
