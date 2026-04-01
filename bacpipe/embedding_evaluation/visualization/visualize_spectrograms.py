@@ -106,11 +106,11 @@ class SpectrogramPlot:
             return
         audio = tukey(len(self.audio), alpha=0.01) * self.audio
         
-        sd.play(audio, self.sample_rate)#int(self.orig_sr / self.kwargs.get('slowdown_rate')))
+        sd.play(audio, self.sample_rate)#int(self.orig_sr / self.kwargs.get('new_speed')))
         
     def load_audio(self, start, end, filename):
         path = Path(self.audio_dir) / filename
-        if not self.kwargs.get('bool_slowdown'):
+        if not self.kwargs.get('bool_change_speed') and not 'batdetect2' in self.model_name:
             audio, self.orig_sr = lb.load(
                 path, 
                 sr=self.sample_rate, 
@@ -118,19 +118,26 @@ class SpectrogramPlot:
                 duration=float(end)-float(start)
                 )
         else:
+            if 'batdetect2' in self.model_name:
+                new_speed = 5.33#(self.sample_rate / self.orig_sr)
+            else:
+                new_speed = self.kwargs.get('new_speed')
             audio, self.orig_sr = lb.load(
                 path, 
                 sr=None, 
-                offset=float(start / self.kwargs.get('slowdown_rate')), 
+                offset=float(start * new_speed), 
                 duration=(
-                    float(end / self.kwargs.get('slowdown_rate'))
-                    - float(start / self.kwargs.get('slowdown_rate'))
+                    float(end * new_speed)
+                    - float(start * new_speed)
                     )
                 )
+            if 'batdetect2' in self.model_name:
+                fake_orig_sr = self.sample_rate
+            else:
+                fake_orig_sr = int(self.orig_sr * self.kwargs.get('new_speed'))
             audio = lb.resample(
                 audio, 
-                orig_sr=int(self.orig_sr / self.kwargs.get('slowdown_rate')),
-                # orig_sr=int(self.orig_sr / (self.sample_rate / self.orig_sr)),
+                orig_sr=fake_orig_sr,
                 target_sr=self.sample_rate
             )
             

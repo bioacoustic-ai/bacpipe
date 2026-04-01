@@ -387,12 +387,7 @@ def plot_embedding_points(
     if len(c_label_dict.keys()) > 20:
         import matplotlib.cm as cm
 
-        cmap = cm.viridis  # or 'plasma', 'inferno', 'magma', etc.
-        # if remove_noise:
-        #     bool_labels = np.array(labels) != "noise"
-        #     labels = np.array(labels)[bool_labels]
-        # else:
-        #     bool_labels = [True] * len(labels)
+        cmap = cm.viridis
 
         num_labels = np.array([c_label_dict[lab] for lab in labels])
         if not len(labels) == len(embeds['x']):
@@ -407,8 +402,6 @@ def plot_embedding_points(
             embeds["x"] = np.array(embeds["x"])[:, 0],
             embeds["y"] = np.array(embeds["y"])[:, 0],
         points = axes.scatter(
-            # np.array(embeds["x"])[bool_labels],
-            # np.array(embeds["y"])[bool_labels],
             np.array(embeds["x"]),
             np.array(embeds["y"]),
             c=num_labels,

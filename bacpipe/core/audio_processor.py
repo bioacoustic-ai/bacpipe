@@ -11,7 +11,7 @@ logger = logging.getLogger("bacpipe")
 
 class AudioHandler:
     def __init__(self, model, padding, audio_dir, 
-                 bool_slowdown=False, slowdown_rate=None, 
+                 bool_change_speed=False, new_speed=None, 
                  **kwargs):
         """
         Helper class for all methods related to loading and padding audio. 
@@ -30,8 +30,8 @@ class AudioHandler:
         self.model = model
         self.padding = padding
         self.audio_dir = audio_dir
-        self.bool_slowdown = bool_slowdown
-        self.slowdown_rate = slowdown_rate
+        self.bool_change_speed = bool_change_speed
+        self.new_speed = new_speed
         self.kwargs = kwargs
     
     def prepare_audio(self, sample):
@@ -52,16 +52,17 @@ class AudioHandler:
             audio frames preprocessed with model specific preprocessing
         """
         audio, sr = self._load_and_resample(sample)
-        # audio = audio.to(self.model.device)
         if self.model.only_embed_annotations:
             frames = self._only_load_annotated_segments(sample, audio, **self.kwargs)
         else:
             frames = self._window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
-        if not self.bool_slowdown:
+        if not self.bool_change_speed and not 'batdetect2' in self.model_name:
             self.file_length[sample.stem] = len(audio[0]) / self.model.sr
+        elif 'batdetect2' in self.model_name:
+            self.file_length[sample.stem] = len(audio[0]) / (sr / (self.model.sr / sr))
         else:
-            self.file_length[sample.stem] = len(audio[0]) / sr
+            self.file_length[sample.stem] = len(audio[0]) / (sr / self.new_speed)
         self.preprocessed_shape = tuple(preprocessed_frames.shape)
         if self.model.device == 'cuda':
             del audio, frames
@@ -70,19 +71,19 @@ class AudioHandler:
     
     def _load_and_resample(self, path):
         try:
-            if not self.bool_slowdown:
+            if not self.bool_change_speed and not 'batdetect2' in self.model_name:
                 audio, sr = lb.load(
                     str(path), sr=self.model.sr, mono=True
                     )
             else:
-                #TODO Need to ensure that input length get's prolonged accordingly
                 audio, sr = lb.load(
                     str(path), sr=None, mono=True
                     )
                 if 'batdetect2' in self.model_name:
-                    fake_original_sr = self.model.sr
+                    # fake_original_sr = self.model.sr
+                    fake_original_sr = int(self.model.sr * (sr / self.model.sr))
                 else:
-                    fake_original_sr = int(sr * self.slowdown_rate)
+                    fake_original_sr = int(sr * self.new_speed)
                 audio = lb.resample(
                     audio, 
                     orig_sr=fake_original_sr, 
@@ -104,6 +105,7 @@ class AudioHandler:
     def _only_load_annotated_segments(
         self, file_path, audio, annotations_filename='annotations.csv', **_
         ):
+        # TODO: not implemented for bats and slowdown
         import pandas as pd
         annots = pd.read_csv(Path(self.audio_dir) / annotations_filename)
         # filter current file
@@ -135,7 +137,7 @@ class AudioHandler:
             else:
                 cumulative_segments = np.vstack([cumulative_segments, segments])
         cumulative_segments = torch.Tensor(cumulative_segments)
-        cumulative_segments = cumulative_segments.to(self.device)
+        cumulative_segments = cumulative_segments.to(self.model.device)
         return cumulative_segments
     
     def _load_audio_based_on_fixed_segment_length(self, audio, segment_length, **_):

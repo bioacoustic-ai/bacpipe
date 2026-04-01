@@ -6,8 +6,8 @@ from ..model_specific_utils.bat.module import BAT
 from ..model_specific_utils.bat.prepare_data import prepareData, getSequences, slideWindow, germanBats
 from ..model_utils import ModelBaseClass
 
-IS_EXPANDED = False
-if IS_EXPANDED:
+AUDIO_FILES_ARE_EXPANDED = False
+if AUDIO_FILES_ARE_EXPANDED:
     SAMPLE_RATE = 22050
     LENGTH_IN_SAMPLES = int(0.78 * SAMPLE_RATE * 10)
 else:

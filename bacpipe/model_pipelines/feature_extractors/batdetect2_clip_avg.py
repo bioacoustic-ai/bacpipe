@@ -15,6 +15,7 @@ class Model(ModelBaseClass):
     def __init__(
         self,
         segment_duration=DEFAULT_SEGMENT_DURATION,
+        use_detections=False,
         **kwargs,
     ):
         super().__init__(
@@ -25,7 +26,31 @@ class Model(ModelBaseClass):
 
         from batdetect2 import api
 
-        self.config = api.get_config()
+        if not use_detections:
+            self.config = api.get_config()
+        else:
+            import batdetect2.detector.post_process as pp
+            self.detection_threshold = self.classifier_threshold
+            self.top_k_detections = None
+            self.config = api.get_config(
+                detection_threshold=self.detection_threshold
+                )
+            
+            self.non_max_suppression = partial(
+                pp.run_nms,
+                params={
+                    "nms_kernel_size": self.config["nms_kernel_size"],
+                    "max_freq": self.config["max_freq"],
+                    "min_freq": self.config["min_freq"],
+                    "fft_win_length": self.config["fft_win_length"],
+                    "fft_overlap": self.config["fft_overlap"],
+                    "resize_factor": self.config["resize_factor"],
+                    "nms_top_k_per_sec": self.config["nms_top_k_per_sec"],
+                    "detection_threshold": self.detection_threshold,
+                },
+            )
+
+        
         self.model, _ = api.load_model(device=self.device)  # type: ignore
 
         self.generate_spectrogram = partial(
