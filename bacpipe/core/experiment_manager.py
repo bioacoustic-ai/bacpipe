@@ -352,7 +352,7 @@ class Loader:
             return
         elif (
             # allow 1 % deviation
-            np.round(num_files / num_audio_files, 2) >= 0.7#0.99
+            np.round(num_files / num_audio_files, 2) >= 0.99
             and num_files > 100
         ):
             self.combination_already_exists = True
@@ -663,14 +663,11 @@ class Loader:
         }
         
         embedding_dimensions = self.metadata_dict["files"]["embedding_dimensions"]
-        # if len(embedding_dimensions.shape) > 2:
-        #     logger.exception(
-        #         "Only embeddings with dimensions of "
-        #     )
+
         for num_segments, *_ in embedding_dimensions:
             [
-                t_stamps.append(t) 
-                for t in np.arange(0, num_segments * input_len, input_len)
+                t_stamps.append(np.round(t, 4)) 
+                for t in np.arange(0, num_segments) * input_len
             ]
             
         d["timestamp"] = t_stamps

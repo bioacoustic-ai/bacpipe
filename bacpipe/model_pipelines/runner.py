@@ -444,8 +444,6 @@ class Embedder(AudioHandler):
                 pbar.update(1)
 
     def run_inference_pipeline_sequentially(self):
-        if self.model_name in bacpipe.TF_MODELS:
-            import tensorflow as tf
         for idx, file in enumerate(
             tqdm(self.loader.files, desc="processing files", position=1, leave=False)
         ):
@@ -458,14 +456,6 @@ class Embedder(AudioHandler):
                         f"Error: {e}"
                     )
                     continue
-                except tf.errors.ResourceExhaustedError: # TODO this needs fixing
-                                            
-                    logger.error(
-                        "\nGPU device is out of memory. Your Vram doesn't seem to be "
-                        "large enough for this process. This could be down to the "
-                        "size of the audio files. Use `cpu` instead of `cuda`."
-                    )
-                    os._exit(1) 
             except Exception as e:
                 logger.warning(
                     f"\n Error generating embeddings, skipping file. \n"
