@@ -66,6 +66,7 @@ def loader_fn():
 # -------------------------------------------------------------------------
 def test_embedding_generation(model, device):
     settings['device'] = device
+    bacpipe.ensure_models_exist(bacpipe.settings.model_base_path, model_names=[model])
     embeddings[model] = run_pipeline_for_single_model(
         model_name=model,
         check_if_already_processed=False,
