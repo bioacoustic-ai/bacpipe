@@ -473,7 +473,8 @@ class DashBoard(DashBoardHelper):
                 species=self.species_select[widget_idx],
                 threshold=self.clfier_thresh[widget_idx],
                 clfier_path=self.clfier_path[widget_idx],
-                clfier_type=self.clfier_select[widget_idx]
+                clfier_type=self.clfier_select[widget_idx],
+                **self.kwargs
             )
         )
         
@@ -522,7 +523,8 @@ class DashBoard(DashBoardHelper):
                         model=self.model_select[widget_idx], 
                         accumulate_by=self.accumulate_select[widget_idx], 
                         species=self.species_select[widget_idx],
-                        threshold=self.clfier_thresh[widget_idx]
+                        threshold=self.clfier_thresh[widget_idx],
+                        **self.kwargs
                         )
                     
                 ),
@@ -678,9 +680,9 @@ class DashBoard(DashBoardHelper):
                 ),
             ),
             ("All models", model_all_page),
-            ("Apply Classifer", apply_classifier1_page),
+            ("Single Model Predictions", apply_classifier1_page),
             (
-                "Two classifiers",
+                "Two Model Predictions",
                 pn.Row(
                     pn.Column(sidebar3, sidebar4),
                     pn.Row(content3, content4),
@@ -690,7 +692,7 @@ class DashBoard(DashBoardHelper):
             
         )
         
-        self.add_styling(model0_page, model_all_page, apply_classifier1_page)
+        self.add_styling(model0_page, model2_page, model_all_page, apply_classifier1_page)
         
     def add_styling(self, *pages):
         with pkg_resources.path(bacpipe.imgs, 'bacpipe_unlabelled.png') as p:
@@ -739,7 +741,10 @@ def visualize_using_dashboard(
     **kwargs
     ):
     """
-    Create and serve the dashboard for visualization.
+    Create and serve the dashboard for visualization. To colorcode embeddings
+    by other labels than the default ones, create an annotations file with timestamps. 
+    An example file can be found in 'bacpipe/tests/test_data/annotations.csv'.
+    Multiple dashboards can be opened, the port will simply increment.
 
     Parameters
     ----------

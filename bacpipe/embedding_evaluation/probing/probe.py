@@ -8,7 +8,7 @@ from pathlib import Path
 import bacpipe
 logger = logging.getLogger(__name__)
 
-from .train_probe import train_probe, LinearClassifier
+from .train_probe import train_probe, LinearProbe
 from .evaluate_probe import eval_probe
 from .dataset_probe import generate_annotations_for_probing_task
 
@@ -27,14 +27,15 @@ def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
     ]
 
 def probing_pipeline(
+    model_name,
     ground_truth, embeds, 
     paths=None, name='linear', 
-    overwrite=True, save_probe=False, 
+    overwrite=True, 
     label_column=bacpipe.settings.label_column, 
     **kwargs
 ):
     """
-    Classification pipeline consisting of building the classifier,
+    Probing pipeline consisting of building the classifier,
     evaluating it and saving metrics and plots of performance.
 
     Parameters
@@ -44,20 +45,32 @@ def probing_pipeline(
     embeds : np.array
         embeddings
     name : string
-        Type of classification
+        Type of Probing
     dataset_csv_path : string
-        name of classification dataframe as specified in settings.yaml
+        name of Probing dataframe as specified in settings.yaml
     overwrite : bool
-        overwrite existing classification?, defaults to False
+        overwrite existing Probing?, defaults to False
     """
+    if not kwargs:
+        kwargs = {**vars(bacpipe.settings)}
+        kwargs.pop('label_column')
+    if not paths:
+        get_paths_func = bacpipe.make_set_paths_func(
+            bacpipe.config.audio_dir, bacpipe.settings.main_results_dir
+        )
+        paths = get_paths_func(model_name)
     if (
         overwrite
-        or paths is None
         or not paths.probe_path.joinpath(f"probe_results_{name}.json").exists()
     ):
         df = generate_annotations_for_probing_task(
             ground_truth, paths, label_column=label_column, **kwargs
             )
+        if len(df) == 0:
+            logger.exception(
+                "Not enough data in annotations to perform probing task"
+            )
+            return None
 
         embeds = embeds_array_without_noise(
             embeds, ground_truth, label_column=label_column, **kwargs
@@ -78,16 +91,31 @@ def probing_pipeline(
         probe = train_probe(embeds, df, label2index, config=name, **kwargs)
         
         metrics = eval_probe(
-            probe, embeds, df, label2index, config=name, **kwargs
+            probe, embeds, df, label2index, config=name, paths=paths, **kwargs
             )
 
-        return probe, metrics
     else:
         logger.info(
             f"Classification file probe_results_{name}.json already exists and"
             " so is not computed. If you want to overwrite existing results, "
             "set overwrite to True in config.yaml."
         )
+        from bacpipe.embedding_evaluation.probing.train_probe import LinearProbe
+        state_dict = torch.load(paths.probe_path / f"{name}_probe.pt")
+        probe = LinearProbe(
+            in_dim=embeds.shape[-1], 
+            out_dim=list(state_dict.values())[-1].shape[0], 
+            **kwargs
+            )
+        probe.load_state_dict(state_dict=state_dict)
+        with open(paths.probe_path / "label2index.json", "r") as f:
+            label2index = json.load(f)
+            
+        load_path = paths.probe_path.joinpath(f"probe_results_{name}.json")
+        with open(load_path, "r") as f:
+            metrics = json.load(f)
+            
+    return probe, label2index, metrics
 
     
 def prepare_probe_inference(model, probe_path=''):
@@ -107,7 +135,7 @@ def prepare_probe_inference(model, probe_path=''):
         label2index = json.load(f)
         
     probe_weights = torch.load(probe_path, map_location=settings.device)
-    probe = LinearClassifier(
+    probe = LinearProbe(
         probe_weights['probe.weight'].shape[-1], 
         len(label2index)
         )
@@ -130,7 +158,7 @@ def run_probe_inference(
             model_name=model,
             **vars(settings)
             )
-        embeds = torch.Tensor(ld.embeddings(as_type='array')).to(settings.device)
+        embeds = torch.Tensor(ld.embeddings(return_type='array')).to(settings.device)
     
     import torch.nn.functional as F
     return_values = []

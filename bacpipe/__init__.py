@@ -52,6 +52,8 @@ from bacpipe.core.workflows import (
     visualize_using_dashboard,
 )
 
+from bacpipe.embedding_evaluation.benchmark import benchmark
+
 from bacpipe.embedding_evaluation.label_embeddings import (
     DefaultLabels, 
     get_default_labels,
@@ -65,6 +67,12 @@ from bacpipe.embedding_evaluation.probing.probe import probing_pipeline
 from bacpipe.embedding_evaluation.probing.inference_probe import (
     run_probe_inference,
     prepare_probe_inference
+)
+from bacpipe.embedding_evaluation.clustering.cluster import (
+    clustering_pipeline,
+    run_clustering,
+    eval_clustering,
+    eval_with_silhouette
 )
 
 from bacpipe.core.constants import (
@@ -102,7 +110,14 @@ __all__ = [
     run_probe_inference,
     prepare_probe_inference,
     
+    ## clustering functions
+    clustering_pipeline,
+    run_clustering,
+    eval_clustering,
+    eval_with_silhouette,
+    
     ## evaluation pipelines
+    benchmark,
     model_specific_evaluation,
     cross_model_evaluation,
     

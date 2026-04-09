@@ -33,7 +33,7 @@ from bacpipe.embedding_evaluation.label_embeddings import (
 from bacpipe.embedding_evaluation.probing.probe import (
     probing_pipeline
     )
-from bacpipe.embedding_evaluation.clustering.cluster import clustering
+from bacpipe.embedding_evaluation.clustering.cluster import clustering_pipeline
 
 from bacpipe.core.constants import TF_MODELS, NEEDS_CHECKPOINT
 from bacpipe import config, settings
@@ -45,14 +45,11 @@ def play(bool_save_logs=False, **kwargs):
     Play the bacpipe! The pipeline will run using the models specified in
     bacpipe.config.models and generate results in the directory
     bacpipe.settings.results_dir. For more details see the ReadMe file on the
-    repository page https://github.com/bioacoustic-ai/bacpipe.
+    repository page https://github.com/bioacoustic-ai/bacpipe or the documentation
+    under https://bacpipe.readthedocs.io/en/latest/.
 
     Parameters
     ----------
-    config : dict, optional
-        configurations for pipeline execution, by default config
-    settings : dict, optional
-        settings for pipeline execution, by default settings
     bool_save_logs : bool, optional
         Save logs, config and settings file. This is important if you get a bug,
         sharing this will be very helpful to find the source of
@@ -125,6 +122,11 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
         list of models to run
     repo_id : str, optional
         Hugging Face Hub repo ID, by default "vinikay/bacpipe_models"
+
+    Returns
+    -------
+    str
+        path to saved models
     """
     model_base_path = Path(model_base_path)
     model_base_path.parent.mkdir(exist_ok=True, parents=True)
@@ -183,7 +185,7 @@ def get_model_names(
     **kwargs,
 ):
     """
-    Get the names of the models used for embedding. This is either done
+    Get the names of the models used for processing. This is either done
     by using already computed embeddings or by using the selected models
     from the config file. If already computed embeddings are used, the
     model names are extracted from the directory structure.
@@ -245,7 +247,7 @@ def evaluation_with_settings_already_exists(
     """
     Check if the evaluation with the specified settings already exists.
     The function checks if the embeddings, dimensionality reduction,
-    classification and clustering evaluation results
+    probing and clustering evaluation results
     already exist in the specified directory. If any of these
     results do not exist, the function returns False. Otherwise,
     it returns True.
@@ -302,12 +304,16 @@ def run_pipeline_for_models(
     in the directory specified by the audio_dir parameter. The
     function returns a dictionary containing the loader objects
     for each model, by which metadata and paths are stored.
+    kwargs that are not specifically passed will be taken from 
+    bacpipe.config and bacpipe.settings.
     
         
     code example:
     ```
     loader = bacpipe.run_pipeline_for_models(
-    **vars(bacpipe.config), **vars(bacpipe.settings)
+        models=['birdnet', 'naturebeats'],
+        audio_dir='bacpipe/tests/test_data',
+        dim_reduction_model='umap'
     )
 
     # this call will initiate the embedding generation process, it will check if embeddings
@@ -335,14 +341,14 @@ def run_pipeline_for_models(
 
     Parameters
     ----------
+    models : list
+        embedding models
     audio_dir : string
         full path to audio files
     dim_reduction_model : string
         name of the dimensionality reduction model to be used
         for the embeddings. If "None" is selected, no
         dimensionality reduction is performed.
-    models : list
-        embedding models
 
     Returns
     -------
@@ -403,13 +409,11 @@ def model_specific_evaluation(
     """
     Perform evaluation of the embeddings using the specified
     evaluation task. The evaluation task can be either
-    classification or clustering.
+    probing or clustering.
     The evaluation is performed using the functions from
-    the classification and clustering modules.
+    the probing and clustering modules.
     The results of the evaluation are saved in the directory
-    specified by the audio_dir parameter. The function
-    returns a dictionary containing the paths for the
-    results of the evaluation.
+    specified by the audio_dir parameter. 
 
     Parameters
     ----------
@@ -419,7 +423,7 @@ def model_specific_evaluation(
         name of the evaluation task to be performed.
     probe_configs : dict
         dictionary containing the configuration for the
-        classification tasks. The configurations are specified
+        probing tasks. The configurations are specified
         in the bacpipe/settings.yaml file.
     models : list
         embedding models
@@ -457,8 +461,14 @@ def model_specific_evaluation(
                 model_name, paths=paths, single_label=True, **kwargs
                 )
         except FileNotFoundError as e:
+            logger.exception(
+                f"unable to process ground truth, {e}"
+            )
             ground_truth = None
         except IndexError as e:
+            logger.exception(
+                f"unable to process ground truth, {e}"
+            )
             ground_truth = None
 
 
@@ -482,6 +492,7 @@ def model_specific_evaluation(
             for class_config in probe_configs.values():
                 if class_config["bool"]:
                     probing_pipeline(
+                        model_name, 
                         ground_truth, embeds, 
                         paths, **class_config, **kwargs
                     )
@@ -498,7 +509,7 @@ def model_specific_evaluation(
             )
 
             embeds_array = np.concatenate(list(embeds.values()))
-            clustering(paths, embeds_array, ground_truth, **kwargs)
+            clustering_pipeline(model_name, ground_truth, embeds_array, paths, **kwargs)
 
 def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwargs):
     """
@@ -536,12 +547,46 @@ def run_pipeline_for_single_model(
     model_name,
     audio_dir,
     dim_reduction_model="None",
-    check_if_primary_combination_exists=True,
-    check_if_secondary_combination_exists=True,
+    check_if_already_processed=True,
+    check_if_already_dim_reduced=True,
     overwrite=False,
     testing=False,
     **kwargs,
 ):
+    """
+    Run the bacpipe pipeline, including embedding generation, classification
+    using the pretrained classifier (if included), dimensionality reduction (if passed),
+    and plotting of visualization to files. 
+    All of this will be done for one model. The predefined folder structure will be created
+    so that subsequent processing runs will be very fast, as they then only load the data. 
+    kwargs that are not specifically passed will be taken from 
+    bacpipe.config and bacpipe.settings.
+
+    Parameters
+    ----------
+    model_name : string
+        model name
+    audio_dir : str
+        path to audio data
+    dim_reduction_model : str, optional
+        name of dimensionality reduction model, by default "None"
+    check_if_already_processed : bool, optional
+        set to False if you want to force recomputing 
+        of embeddings, by default True
+    check_if_already_dim_reduced : bool, optional
+        set to False if you want to force recomputing of 
+        dimensionality reduced embeddings, by default True
+    overwrite : bool, optional
+        set to True if you want default labels and 
+        ground truth labels to be processed again, by default False
+    testing : bool, optional
+        set to True for testing, by default False
+
+    Returns
+    -------
+    bacpipe.Loader
+        object to processed embeddings and classifier predictions
+    """
     kwargs = replace_default_kwargs_with_user_kwargs(
         remove_keys=['audio_dir', 'dim_reduction_model', 'testing'], 
         **kwargs
@@ -553,7 +598,7 @@ def run_pipeline_for_single_model(
     loader_embeddings = generate_embeddings(
         model_name=model_name,
         audio_dir=audio_dir,
-        check_if_combination_exists=check_if_primary_combination_exists,
+        check_if_combination_exists=check_if_already_processed,
         paths=paths,
         testing=testing,
         **kwargs,
@@ -565,7 +610,7 @@ def run_pipeline_for_single_model(
             model_name=model_name,
             dim_reduction_model=dim_reduction_model,
             audio_dir=audio_dir,
-            check_if_combination_exists=check_if_secondary_combination_exists,
+            check_if_combination_exists=check_if_already_dim_reduced,
             testing=testing,
             **kwargs,
         )
@@ -606,6 +651,30 @@ def run_pipeline_for_single_model(
 
 
 def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
+    """
+    Run the embedding generation pipeline including classification
+    using the pretrained classifier (if included).
+    All of this will be done for one model. The predefined folder structure will be created
+    so that subsequent processing runs will be very fast, as they then only load the data. 
+    kwargs that are not specifically passed will be taken from 
+    bacpipe.config and bacpipe.settings.
+
+
+    Parameters
+    ----------
+    avoid_pipelined_gpu_inference : bool, optional
+        set to True to avoid multiprocessing, by default False
+
+    Returns
+    -------
+    bacpipe.Loader
+        loader object to access embeddings and classifier predictions
+
+    Raises
+    ------
+    ValueError
+        if not model name is provided
+    """
     if "dim_reduction_model" in kwargs:
         logger.info(
             f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"
@@ -655,7 +724,11 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
             if kwargs['model_name'] in TF_MODELS:
                 import tensorflow as tf
                 tf.keras.backend.clear_session()
-            
+                
+        elif hasattr(kwargs, 'paths') and ld.classifier_should_be_run(**kwargs):
+            embed = Embedder(loader=ld, **kwargs)
+            if hasattr(embed.model, 'classifier_predictions'):
+                embed.classifier.run_default_classifier(ld)
         return ld
     except KeyboardInterrupt:
         if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:

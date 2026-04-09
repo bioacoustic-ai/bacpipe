@@ -5,18 +5,16 @@ import importlib.resources as pkg_resources
 from pathlib import Path
 
 import bacpipe
-from bacpipe import EMBEDDING_DIMENSIONS
-from bacpipe.core.workflows import run_pipeline_for_single_model
-
-from bacpipe.core.experiment_manager import Loader
-from bacpipe.model_pipelines.runner import Embedder
-
-from bacpipe.embedding_evaluation.label_embeddings import (
+from bacpipe import (
     make_set_paths_func,
     ground_truth_by_model,
+    probing_pipeline,
+    clustering_pipeline,
+    EMBEDDING_DIMENSIONS,
+    run_pipeline_for_single_model,
+    Loader,
+    Embedder
 )
-from bacpipe.embedding_evaluation.probing.probe import probing_pipeline
-from bacpipe.embedding_evaluation.clustering.cluster import clustering
 
 
 # -------------------------------------------------------------------------
@@ -70,8 +68,8 @@ def test_embedding_generation(model, device):
     settings['device'] = device
     embeddings[model] = run_pipeline_for_single_model(
         model_name=model,
-        check_if_primary_combination_exists=False,
-        check_if_secondary_combination_exists=False,
+        check_if_already_processed=False,
+        check_if_already_dim_reduced=False,
         **kwargs,
     )
     assert embeddings[model].files, f"No embeddings generated for {model}"
@@ -84,11 +82,11 @@ def test_embedding_dimensions(model):
 
 
 def test_evaluation(model):
-    embeds = embeddings[model].embeddings()
+    embeds = embeddings[model].embeddings(return_type='array')
     paths = get_paths(model)
 
     try:
-        ground_truth = ground_truth_by_model(model, paths=paths, **kwargs)
+        ground_truth = ground_truth_by_model(model, single_label=False, **kwargs)
     except FileNotFoundError:
         ground_truth = None
 
@@ -97,17 +95,14 @@ def test_evaluation(model):
         "Check that you have the right test data."
     )
 
-    
-    # generate_annotations_for_probing_task(paths, **kwargs)
-
-    # class_embeds = embeds_array_without_noise(embeds, ground_truth, **kwargs)
     for class_config in settings["probe_configs"].values():
         if class_config["bool"]:
             probing_pipeline(
+                model,
                 ground_truth, embeds, 
-                paths, **class_config, **kwargs
+                paths, single_label=False,
+                **class_config,
+                **kwargs
                 )
-            # probing_pipeline(paths, class_embeds, **class_config, **kwargs)
 
-    embeds_array = np.concatenate(list(embeds.values()))
-    clustering(paths, embeds_array, ground_truth, **kwargs)
+    clustering_pipeline(model, ground_truth, embeds, paths, **kwargs)

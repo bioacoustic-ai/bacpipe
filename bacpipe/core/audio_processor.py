@@ -10,6 +10,9 @@ logger = logging.getLogger("bacpipe")
 
 
 class AudioHandler:
+    """
+    Helper class for all methods related to loading and padding audio. 
+    """
     def __init__(self, model, padding, audio_dir, 
                  bool_change_speed=False, new_speed=None, 
                  **kwargs):

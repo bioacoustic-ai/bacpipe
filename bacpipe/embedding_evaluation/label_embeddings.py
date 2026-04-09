@@ -20,6 +20,24 @@ logger = logging.getLogger("bacpipe")
 
 class DefaultLabels:
     def __init__(self, paths, model, default_label_keys, **kwargs):
+        """
+        Class to generate default labels based on audio files and 
+        number of generated embeddings per file. 
+
+        Parameters
+        ----------
+        paths : SimpleNamespace
+            convenient object for path handling
+        model : str
+            model name
+        default_label_keys : list
+            list of default labels, see settings.yaml
+
+        Raises
+        ------
+        ValueError
+            if no embeddings were found
+        """
         self.model = model
         self.default_label_keys = default_label_keys
         self.paths = paths
@@ -92,6 +110,7 @@ class DefaultLabels:
         self.time_of_day_per_embedding = []
         for file_idx, (file, time_of_day) in enumerate(time_of_day_per_file.items()):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
+                # TODO: if only annotate annots
                 timestamp = (
                     (time_of_day + index_of_embedding * segment_s_dt)
                     .time()
@@ -152,7 +171,7 @@ class DefaultLabels:
 
     def default_classifier(self):
         clfier_paths = list(self.paths.preds_path.rglob("*_classifier_annotations.csv"))
-        if not (len(clfier_paths) > 0 or clfier_paths[0].exists()):
+        if len(clfier_paths) == 0:
             self.default_label_keys.remove("default_classifier")
         else:
             path = clfier_paths[0]
@@ -197,9 +216,6 @@ def make_set_paths_func(
     testing=False,
     **kwargs,
 ):
-    # if testing:
-    #     main_results_dir = Path("bacpipe/tests/results_files")
-    #     dim_reduc_parent_dir = "dim_reduced_embeddings"
     global get_paths
 
     def get_paths(model_name):
@@ -426,6 +442,27 @@ def model_specific_embedding_path(path, model, dim_reduction_model=None, **kwarg
 def create_default_labels(
     audio_dir=None, model=None, paths=None, overwrite=True, **kwargs
     ):
+    """
+    Create default labels based on audio files and model timestamps to 
+    match the number of embeddings created per file for visualization 
+    and clustering purposes. 
+
+    Parameters
+    ----------
+    audio_dir : str, optional
+        path to audio data, by default None
+    model : str, optional
+        model name, by default None
+    paths : SimpleNamespace, optional
+        convenient object for path handling, by default None
+    overwrite : bool, optional
+        if True labels are overwritten, by default True
+
+    Returns
+    -------
+    dict
+        dictionary with default labels
+    """
     if paths is None:
         assign_global_get_paths_function(audio_dir)
         paths = get_paths(model)
@@ -569,13 +606,13 @@ def load_labels_and_build_dict(
             > min_label_occurrences
         ]
         if not filtered_labels:
-            logger.debug(
-                "By filtering the annotations.csv file using the "
+            logger.info(
+                "\nBy filtering the annotations.csv file using the "
                 f"{min_label_occurrences=}, no labels are left. In "
                 "case you are just testing, the labels will not be filtered"
                 f" and {bool_filter_labels=} will be ignored. If this "
-                "a serious classification task, you will need more annotations. "
-                "This might cause the classification or clustering to crash."
+                "a serious probing task, you will need more annotations. "
+                "This might cause the probing or clustering to crash.\n"
             )
         else:
             label_df = label_df[label_df[main_label_column].isin(filtered_labels)]
@@ -610,7 +647,7 @@ def fit_labels_to_embedding_timestamps(
 
     for _, row in df.iterrows():
         em_start = np.where(embed_timestamps - row.start <= 0)[0][-1]
-        em_end = np.where(embed_timestamps - row.end > 0)[0]
+        em_end = np.where(embed_timestamps - row.end >= 0)[0]
         if len(em_end) > 0:
             em_end = em_end[0]
         else:
@@ -664,7 +701,10 @@ def fit_labels_to_embedding_timestamps(
             else:
                 file_labels[em_start:em_end, 0] = label_idx_dict[row[f"label:{label_column}"]]
                 
-    file_labels = file_labels.squeeze()
+    if len(file_labels.shape) > 1 and (
+        file_labels.shape[0] > 1 or file_labels.shape[-1] > 1
+        ):
+        file_labels = file_labels.squeeze()
             
     if single_label:
         file_labels[~np.array(single_label_arr)] = -2
@@ -707,14 +747,20 @@ def build_ground_truth_labels_by_file(
             )
         return all_labels
 
-    file_labels = fit_labels_to_embedding_timestamps(
-        df, label_idx_dict, num_embeds, segment_s, 
-        label_column=label_column, **kwargs
-    )
+    if kwargs.get('only_embed_annotations'):
+        values = df[f'label:{label_column}']
+        file_labels = np.array([label_idx_dict[v] for v in values])
+    else:
+        file_labels = fit_labels_to_embedding_timestamps(
+            df, label_idx_dict, num_embeds, segment_s, 
+            label_column=label_column, **kwargs
+        )
+    
+        
     
     all_labels = fill_all_labels_array(file_labels, all_labels)
 
-    if np.unique(file_labels).shape[0] > 2:
+    if np.unique(file_labels).shape[0] > 2 and kwargs.get('testing'):
         raven_tables_sanity_check(
             num_embeds, segment_s, paths, audio_file, 
             label_df, label_idx_dict, label_column, file_labels
@@ -804,12 +850,12 @@ def create_Raven_annotation_table(df, label_column):
     raven_df = pd.DataFrame()
     raven_df["Selection"] = df.index
     raven_df.index = np.arange(1, len(df) + 1)
-    raven_df["View"] = 1
+    raven_df["View"] = 'Spectrogram 1'
     raven_df["Channel"] = 1
     raven_df["Begin Time (s)"] = df.start
     raven_df["End Time (s)"] = df.end
-    raven_df["High Freq (Hz)"] = 1000
     raven_df["Low Freq (Hz)"] = 0
+    raven_df["High Freq (Hz)"] = 1000
     raven_df["Label"] = df[f"label:{label_column}"]
     return raven_df
 
@@ -833,8 +879,13 @@ def collect_ground_truth_labels(
             f"File names do not match for {file} and "
             f"{metadata['files']['audio_files'][ind]}"
         )
-
-        num_embeds = metadata["files"]["nr_embeds_per_file"][ind]
+        if kwargs.get('only_embed_annotations'):
+            num_embeds = int(
+                metadata["files"]["file_lengths (s)"][ind] 
+                / (metadata['segment_length (samples)'] / metadata['sample_rate (Hz)'])
+                )
+        else:
+            num_embeds = metadata["files"]["nr_embeds_per_file"][ind]
         ground_truth = build_ground_truth_labels_by_file(
             paths,
             ind,
@@ -869,6 +920,66 @@ def ground_truth_by_model(
     bool_filter_labels=False,
     **kwargs,
 ):
+    """
+    Generate ground truth labels that are mapped onto the 
+    timestamps of a model, based on the model-specific 
+    input lengths. This way the embeddings and ground truth
+    labels have the same lengths, and can be used for downstream
+    evaluation like probing or clustering. 
+    This function supports single or multi-label generation
+    of ground truth labels. 
+    A dictionary is created with a numpy array for the labels
+    and a dictionary to associate the int values with the 
+    corresponding label class. 
+    The labels are processed based on a single annotation file
+    which requires predefined column names:
+    `audiofilename`, `start`, `end`, `label:species` (species
+    can be replaced with other things but the `label:` needs to
+    be consistent). See 'bacpipe/tests/test_data/annotations.csv'
+    for an example.
+    After processing the ground truth, the dictionary is saved
+    as a numpy file and upon reexecution is simply loaded for 
+    shorter runtime. 
+
+    Parameters
+    ----------
+    model : str
+        model name
+    audio_dir : str
+        path to audio data
+    label_df : pandas.DataFrame, optional
+        ground truth annotations in specified format, by default None
+    label_idx_dict : dict, optional
+        link between int values and class labels
+        can be auto generated, by default None
+    label_column : str, optional
+        name of column in annotation file, by default 'label:species'
+    paths : SimpleNamespace, optional
+        convenient object for path handling, by default None
+    annotations_filename : str, optional
+        path to annotations csv file, by default "annotations.csv"
+    overwrite : bool, optional
+        If True, the dict will be generated again and saved
+        rather than loaded from a file if already
+        processed, by default True
+    single_label : bool, optional
+        set False if you want multi-label, by default True
+    bool_filter_labels : bool, optional
+        set to True, if you want a minimum number of occurrence
+        for labels to be included in the ground truth. See
+        settings file for more options and descriptions, by default False
+
+    Returns
+    -------
+    dict
+        dictionary of ground truth labels with numpy array
+        and dict to link int values to class labels
+
+    Raises
+    ------
+    ValueError
+        if gorund truth file is not found
+    """
     if paths is None:
         assign_global_get_paths_function(audio_dir)
         paths = get_paths(model)
@@ -1030,182 +1141,3 @@ def get_files_if_no_embeds(audio_dir, model, label_df=None):
     files = [Path(f'{Path(d).stem}_{model}') for d in matching_audio_files]
     
     return files, segment_s, metadata
-
-# def ground_truth_by_model(
-#     paths,
-#     model,
-#     label_column,
-#     annotations_filename="annotations.csv",
-#     overwrite=False,
-#     single_label=True,
-#     **kwargs,
-# ):
-#     if overwrite or not paths.labels_path.joinpath("ground_truth.npy").exists():
-
-#         path = model_specific_embedding_path(paths.main_embeds_path, model)
-
-#         label_df, label_idx_dict = load_labels_and_build_dict(
-#             paths, annotations_filename, main_label_column=label_column, **kwargs
-#         )
-
-#         files = list(path.rglob("*.npy"))
-#         files.sort()
-
-#         metadata = yaml.safe_load(open(path.joinpath("metadata.yml"), "r"))
-#         segment_s = metadata["segment_length (samples)"] / metadata["sample_rate (Hz)"]
-
-#         label_columns = [col for col in label_df.columns if "label:" in col]
-#         ground_truth_dict = {}
-#         for label_col in label_columns:
-#             labels = label_col.split("label:")[-1]
-#             ground_truth = collect_ground_truth_labels(
-#                 paths,
-#                 files,
-#                 model,
-#                 segment_s,
-#                 metadata,
-#                 label_df,
-#                 label_idx_dict[label_col],
-#                 single_label=single_label,
-#                 label_column=labels,
-#                 **kwargs,
-#             )
-
-#             ground_truth_dict.update({
-#                 f"label:{labels}": ground_truth,
-#                 f"label_dict:{labels}": label_idx_dict[label_col],
-#             })
-#         np.save(paths.labels_path.joinpath("ground_truth.npy"), ground_truth_dict)
-#     else:
-#         ground_truth_dict = np.load(
-#             paths.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
-#         ).item()
-#     return ground_truth_dict
-
-
-def turn_multilabel_into_singlelabel(df_full):
-
-    df = pd.DataFrame()
-    for file in tqdm(
-        df_full.audiofilename.unique(),
-        desc="Removing multi-labels",
-        total=len(df_full.audiofilename.unique()),
-        leave=False,
-    ):
-        dff = df_full[df_full.audiofilename == file]
-        if len(dff.label.unique()) > 1:
-            for _ in range(len(dff)):
-                dff = dff.sort_values("start")
-                dff.index = range(len(dff))
-                number_of_changes = 0
-
-                one_overarching_sound = 0
-                for idx in range(len(dff)):
-                    if idx in dff.index:
-                        row = dff.loc[idx]
-                    else:
-                        continue
-
-                    begins_within = (
-                        (dff.start > row.start)
-                        & (dff.start < row.end)
-                        & (dff.end > row.end)
-                    )
-                    ends_within = (
-                        (dff.end > row.start)
-                        & (dff.end < row.end)
-                        & (dff.start < row.start)
-                    )
-                    complete_within = (
-                        (dff.start >= row.start)
-                        & (dff.end <= row.end)
-                        & (dff.index != idx)
-                    )
-
-                    new_ends = dict()
-                    new_starts = dict()
-
-                    if all(
-                        complete_within[dff.index != idx]
-                    ):  # strict case, meaning as soon as there is a sound going from beg to end we skip
-                        one_overarching_sound += 1
-                        if one_overarching_sound > 1:
-                            break
-
-                    if any(begins_within.values):
-                        new_ends["begins_within"] = dff[
-                            begins_within
-                        ].start.values.tolist()
-
-                    if any(ends_within.values):
-                        new_starts["ends_within"] = dff[ends_within].end.values.tolist()
-
-                    if any(complete_within.values):
-                        new_starts["complete_within"] = dff[
-                            complete_within
-                        ].end.values.tolist()
-                        new_ends["complete_within"] = dff[
-                            complete_within
-                        ].start.values.tolist()
-                        new_starts["complete_within"].insert(0, row.start)
-                        new_ends["complete_within"].append(row.end)
-
-                    if "ends_within" in new_starts.keys():
-                        max_ind = dff.index.max()
-                        for i in range(len(new_starts["ends_within"])):
-                            row.name = max_ind + i + 1
-                            dff = pd.concat([dff, pd.DataFrame(row).T])
-                            index = dff.index[-1]
-                            dff.loc[index, "start"] = new_starts["ends_within"][i]
-
-                    if "begins_within" in new_ends.keys():
-                        max_ind = dff.index.max()
-                        for i in range(len(new_ends["begins_within"])):
-                            row.name = max_ind + i + 1
-                            dff = pd.concat([dff, pd.DataFrame(row).T])
-                            index = dff.index[-1]
-                            dff.loc[index, "end"] = new_ends["begins_within"][i]
-
-                    if "complete_within" in new_starts.keys():
-                        max_ind = dff.index.max()
-                        for i in range(len(new_starts["complete_within"])):
-                            if (
-                                new_starts["complete_within"][i]
-                                >= new_ends["complete_within"][i]
-                            ):
-                                continue
-                                # this is the case if two overlapping sounds start exactly the same time
-                            row.name = max_ind + i + 1
-                            dff = pd.concat([dff, pd.DataFrame(row).T])
-                            # index = max_ind + i
-                            dff.loc[row.name, "start"] = new_starts["complete_within"][
-                                i
-                            ]
-                            dff.loc[row.name, "end"] = new_ends["complete_within"][i]
-                    bool_combination = begins_within ^ complete_within ^ ends_within
-                    dff.drop(
-                        dff.loc[bool_combination.index][bool_combination].index,
-                        inplace=True,
-                    )
-                    if any(bool_combination):
-                        number_of_changes += 1
-
-                    if (
-                        any(begins_within.values)
-                        or any(ends_within.values)
-                        or any(complete_within.values)
-                    ):
-                        dff.drop(idx, inplace=True)
-                dff = dff[
-                    dff.end - dff.start > 0.2
-                ]  # minimum of 0.2 seconds vocalization
-                if number_of_changes == 0:
-                    break
-                # dff.drop_duplicates(inplace=True)
-
-        dff = dff.sort_values("start")
-        if dff.isna().sum().sum() > 0:
-            logger.info(dff)
-            logger.info("NA values in the dataframe")
-        df = pd.concat([df, dff], ignore_index=True)
-    return df

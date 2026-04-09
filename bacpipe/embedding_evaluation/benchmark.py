@@ -1,127 +1,158 @@
 import bacpipe
+import numpy as np
+import re
 
+from sklearn.metrics import classification_report
 
-def benchmark(model, dataset, annotations_file=None):
-    model_name = 'audioprotopnet'
+def benchmark(
+    model, dataset, 
+    annotations_file=None, 
+    CustomModel=None,
+    check_if_already_processed=True,
+    **kwargs
+    ):
+    """
+    Benchmark a model's classifier performance for a dataset.
+    The dataset requires an annotation file that is located in
+    the root directory of the dataset. This annotation file has
+    needs to have the column names: `start`, `end`, 
+    `audiofilename`, `label:species` so that the ground truth
+    can be extracted. 
+    Ground truth is mapped to the timestamps so that predictions
+    and ground_truth have the same shape. 
+    If predictions have already been produced this function runs
+    very quickly as it uses the saved data.
+    
+    Finally the sklearn.metrics.classification_report function 
+    is used to quantify the performance. The results are printed
+    as a report and returned as a dictionary.
+    This function expects a threshold. Threshold-independent
+    performance evaluation is currently not supported.
 
-    fnc = bacpipe.core.workflows.make_set_paths_func(bacpipe.config.audio_dir, **vars(bacpipe.settings))
-    paths = fnc(model_name)
-            
-    from bacpipe.embedding_evaluation.label_embeddings import ground_truth_by_model
-    gt = ground_truth_by_model(
-        model_name, 
-        audio_dir=bacpipe.config.audio_dir,
-        annotations_filename='annotations.csv',
-        single_label=False,
-        min_annotation_length=0.05
-        )
+    Parameters
+    ----------
+    model : string
+        model name
+    dataset : string
+        path to audio dataset
+    annotations_file : string, optional
+        file name of annotations, by default None
+    CustomModel : class, optional
+        Custom model to use for the predictions, by default None
+    check_if_already_processed : bool, optional
+        if you want to force embeddings to be generated again, 
+        set to True, defaults to True
 
-
-    per_file_classifications_folder = paths.preds_path / 'original_classifier_outputs'
-    annots = per_file_classifications_folder.rglob('*.json')
-    import json
-    preds = {}
-    for annot in annots:
-        with open(annot, 'r') as a:
-            key = annot.relative_to(paths.preds_path / 'original_classifier_outputs')
-            preds[key] = json.load(a)
-            
-    p = list(preds.values())[0]
-    pp = p
-    pp.pop('head')
-    model_length = 3
-    import pandas as pd
-    import numpy as np
-    df = pd.DataFrame()
-    start = []
-    end = []
-    audiofilename = []
-    species = []
-    for file, values in preds.items():
-        for k, v in pp.items():
-            if k == 'head':
-                continue
-            start.extend(np.array(v['time_bins_exceeding_threshold']) * model_length)
-            end.extend((np.array(v['time_bins_exceeding_threshold']) + 1) * model_length)
-            audiofilename.extend(
-                [file] * len(v['time_bins_exceeding_threshold'])
-                )
-            species.extend([k] * len(v['time_bins_exceeding_threshold']))
-    df['start'] = start
-    df['end'] = end
-    df['audiofilename'] = audiofilename
-    df['label:species'] = species
-    l2i = {v: k for k, v in enumerate(df['label:species'].unique())}
-    meta_dict = {'label:species': l2i}
-
-    pred = ground_truth_by_model(
-        model_name, 
-        label_df = df,
-        label_idx_dict=meta_dict,
-        audio_dir=bacpipe.config.audio_dir,
-        annotations_filename='annotations.csv',
-        single_label=False,
-        min_annotation_length=0.05
-        )
-
-    from bacpipe.embedding_evaluation.label_embeddings import get_ground_truth
-    gt = get_ground_truth(model_name)
-
-
-
-
-
-
-
-
+    Returns
+    -------
+    dict
+        dictionary containing report results, ground truth 
+        array, predictions array, index to label dict and a list
+        of the species that weren't found in the classifier 
+        class list
+    """
+    print('Fetching ground truth and mapping it to model timestamps.\n')
     gt = bacpipe.ground_truth_by_model(
-        'birdnet', 
-        audio_dir='bacpipe/tests/test_data',
-        annotations_filename='annotations.csv',
-        single_label=False
-        )
-
-    # print_output(gt)
-
-    loader_obj = bacpipe.run_pipeline_for_single_model(
-        model_name='birdnet',
-        audio_dir='bacpipe/tests/test_data'
+        model,
+        audio_dir=dataset,
+        annotations_filename=annotations_file,
+        single_label=False,
+        bool_filter_labels=False,
+        overwrite=True
     )
 
-    # loader_obj.embeddings(as_type='array')
-    preds, idx2label = loader_obj.predictions(threshold=0.5, as_type='array')
-    l2i = {v: k for k, v in idx2label.items()}
-    # benchmark HSN dataset using birdnet
+    loader_obj = bacpipe.run_pipeline_for_single_model(
+        model_name=model,
+        audio_dir=dataset,
+        CustomModel=CustomModel,
+        check_if_already_processed=check_if_already_processed,
+        **kwargs
+    )
+    
+    print('\nFetching model predictions.\n')
+    preds, label2idx = loader_obj.predictions(return_type='array')
+    
+    # Align ground truth labels to predicted label indices
     ground_truth_array = gt['label:species']
-    for label, idx in gt['label_dict:species'].items():
-        if label == 'Eurasian Kestrel':
-            label = 'Common Kestrel'
-        ground_truth_array[gt['label:species']==idx] = l2i[label]
-    import numpy as np
-    ground_truth_classes = np.unique(ground_truth_array[ground_truth_array>-1])
+    not_found = []
 
-    gl_tp, gl_fp, gl_tn, gl_fn = [[]] * 4
-    tp, fp, tn, fn = [], [], [], []
-    for ts, (pr, gt) in enumerate(zip(preds, ground_truth_array)):
-        if set(pr) == {-1} and not set(gt) == {-1}:
-            fn.append(ts)
-        elif set(pr) == {-1} and set(gt) == {-1}:
-            tn.append(ts)
+    print(
+        'The following species were found in the ground truth '
+        'and the predictions:'
+        )
+    for label, idx in gt['label_dict:species'].items():
+        if label in label2idx:
+            print(label)
+            ground_truth_array[gt['label:species'] == idx] = label2idx[label]
         else:
-            for pr_class in pr:
-                if pr_class == -1:
-                    continue
-                if pr_class in gt:
-                    tp.append(pr_class)
-                elif not pr_class in gt:
-                    fp.append(pr_class)
-    overall_accuracy = len(tp) / ts
-    classwise_accuracy = {}
-    p_classes, p_counts = np.unique(tp, return_counts=True)
-    gt_classes, gt_counts = np.unique(ground_truth_array[ground_truth_array>-1], return_counts=True)
-    classwise_groundtrurh = {cls: cnt for cls, cnt in zip(gt_classes, gt_counts)}
-    for p_class, p_count in zip(p_classes, p_counts):
-        if not p_class in classwise_groundtrurh:
-            continue
-        gt_cnt = classwise_groundtrurh[p_class]
-        classwise_accuracy[p_class] = p_count / gt_cnt
+            not_found.append(label)
+    
+    if not_found:
+        print(
+            '\nThese species were found in the ground truth but '
+            'NOT in the predictions:',
+            not_found
+            )
+        l2i_regex = {re.sub(r'[-\s]', '', label).lower(): i for label, i in label2idx.items()}
+        for label in not_found:
+            label_regex = re.sub(r'[-\s]', '', label).lower()
+            if label_regex in l2i_regex:
+                print('With regex we found', label)
+                ground_truth_array[gt['label:species'] == idx] = l2i_regex[label_regex]
+                not_found.remove(label)
+        print('With regex we still did not find:', not_found)
+                
+                
+    # Build binary matrices using l2i as column ordering
+    n_timestamps = len(preds)
+    n_classes = len(label2idx)
+
+    gt_binary = np.zeros((n_timestamps, n_classes), dtype=int)
+    pred_binary = preds
+    pred_binary[pred_binary > 0] = 1
+
+    for label, col_idx in label2idx.items():
+        gt_binary[np.any(ground_truth_array == col_idx, axis=1), col_idx] = 1
+
+    # Filter to columns that appear in ground truth
+    gt_classes = set(ground_truth_array[ground_truth_array > -1].astype(int))
+    pred_classes = set(label2idx.values())
+    all_classes = gt_classes.intersection(pred_classes)
+    
+    gt_binary = gt_binary[:, list(all_classes)]
+    pred_binary = pred_binary[:, list(all_classes)]
+
+    # Filter out unannotated timestamps
+    annotated_mask = gt_binary.sum(axis=1) > 0
+    gt_binary = gt_binary[annotated_mask]
+    pred_binary = pred_binary[annotated_mask]
+
+    print(f"annotated timestamps: {annotated_mask.sum()} of {n_timestamps}")
+
+    # Evaluate performance
+    idx2label = {v: k for k, v in label2idx.items()}
+    target_names = [idx2label[i] for i in all_classes]
+
+    report = classification_report(
+        gt_binary,
+        pred_binary,
+        target_names=target_names,
+        zero_division=0,
+        output_dict=True
+    )
+    print("\n--- Overall Report ---")
+    print(classification_report(
+        gt_binary,
+        pred_binary,
+        target_names=target_names,
+        zero_division=0
+    ))
+
+    return {
+        'report': report,
+        'gt_binary': gt_binary,
+        'pred_binary': pred_binary,
+        'label2idx': label2idx,
+        'not_found': not_found
+    }
+
