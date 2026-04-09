@@ -70,8 +70,8 @@ def test_embedding_generation(model, device):
     settings['device'] = device
     embeddings[model] = run_pipeline_for_single_model(
         model_name=model,
-        check_if_primary_combination_exists=False,
-        check_if_secondary_combination_exists=False,
+        check_if_already_processed=False,
+        check_if_already_dim_reduced=False,
         **kwargs,
     )
     assert embeddings[model].files, f"No embeddings generated for {model}"

@@ -536,8 +536,8 @@ def run_pipeline_for_single_model(
     model_name,
     audio_dir,
     dim_reduction_model="None",
-    check_if_primary_combination_exists=True,
-    check_if_secondary_combination_exists=True,
+    check_if_already_processed=True,
+    check_if_already_dim_reduced=True,
     overwrite=False,
     testing=False,
     **kwargs,
@@ -553,7 +553,7 @@ def run_pipeline_for_single_model(
     loader_embeddings = generate_embeddings(
         model_name=model_name,
         audio_dir=audio_dir,
-        check_if_combination_exists=check_if_primary_combination_exists,
+        check_if_combination_exists=check_if_already_processed,
         paths=paths,
         testing=testing,
         **kwargs,
@@ -565,7 +565,7 @@ def run_pipeline_for_single_model(
             model_name=model_name,
             dim_reduction_model=dim_reduction_model,
             audio_dir=audio_dir,
-            check_if_combination_exists=check_if_secondary_combination_exists,
+            check_if_combination_exists=check_if_already_dim_reduced,
             testing=testing,
             **kwargs,
         )

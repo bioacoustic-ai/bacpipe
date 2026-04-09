@@ -8,7 +8,7 @@ def benchmark(
     model, dataset, 
     annotations_file=None, 
     threshold=0.5, CustomModel=None,
-    check_if_primary_combination_exists=True,
+    check_if_already_processed=True,
     **kwargs
     ):
     """
@@ -64,7 +64,7 @@ def benchmark(
         model_name=model,
         audio_dir=dataset,
         CustomModel=CustomModel,
-        check_if_primary_combination_exists=check_if_primary_combination_exists,
+        check_if_already_processed=check_if_already_processed,
         **kwargs
     )
     
