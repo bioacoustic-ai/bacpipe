@@ -126,6 +126,23 @@ def eval_clustering(
     return metrics
 
 def eval_with_silhouette(embeds, ground_truth, metrics=None):
+    """
+    Evaluate clustering using Silhouette Score. 
+
+    Parameters
+    ----------
+    embeds : np.ndarray
+        embeddings
+    ground_truth : list
+        ground truth array
+    metrics : dict, optional
+        already generated evaluation metrics, if any, by default None
+
+    Returns
+    -------
+    dict
+        evaluation metrics including Silhouette score
+    """
     if not metrics:
         metrics = dict()
     metrics["SS"] = SS(embeds, ground_truth)
@@ -199,18 +216,24 @@ def clustering_pipeline(
     **kwargs
     ):
     """
-    Clustering pipeline.
+    Clustering pipeline, generating clusterings based on the 
+    settings file. Clusterings are then evaluated and a dictionary 
+    with the evaluation scores is saved and returned
 
     Parameters
     ----------
-    paths : SimpleNamespace object
-        dict with path attributs for saving and loading
-    embeds : np.array
-        embeddings
+    model_name : str
+        name of model backbone
     ground_truth : dict
         ground truth labels and a label2dict dictionary
+    embeds : np.array
+        embeddings
+    paths : SimpleNamespace object
+        dict with path attributs for saving and loading
     overwrite : bool, optional
         whether to overwrite exisiting clustering files, by default False
+    label_column : str, optional
+        name of column in annotations file, defaults to bacpipe.settings.label_column
     """
     if not kwargs:
         kwargs = {**vars(bacpipe.settings)}
@@ -229,6 +252,13 @@ def clustering_pipeline(
         
         if ground_truth:
             ground_truth = ground_truth[f"label:{label_column}"]
+            if len(ground_truth.shape) > 1:
+                logger.warning(
+                    "You have passed a multi-label ground truth array. "
+                    "However bacpipe only supports single label clustering "
+                    "and will therefore only take one species for each timestamp."
+                )
+                ground_truth = ground_truth[:, 0]
         else:
             ground_truth = []
 

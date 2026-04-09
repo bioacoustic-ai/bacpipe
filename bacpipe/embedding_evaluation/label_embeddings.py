@@ -20,6 +20,24 @@ logger = logging.getLogger("bacpipe")
 
 class DefaultLabels:
     def __init__(self, paths, model, default_label_keys, **kwargs):
+        """
+        Class to generate default labels based on audio files and 
+        number of generated embeddings per file. 
+
+        Parameters
+        ----------
+        paths : SimpleNamespace
+            convenient object for path handling
+        model : str
+            model name
+        default_label_keys : list
+            list of default labels, see settings.yaml
+
+        Raises
+        ------
+        ValueError
+            if no embeddings were found
+        """
         self.model = model
         self.default_label_keys = default_label_keys
         self.paths = paths
@@ -198,9 +216,6 @@ def make_set_paths_func(
     testing=False,
     **kwargs,
 ):
-    # if testing:
-    #     main_results_dir = Path("bacpipe/tests/results_files")
-    #     dim_reduc_parent_dir = "dim_reduced_embeddings"
     global get_paths
 
     def get_paths(model_name):
@@ -427,6 +442,27 @@ def model_specific_embedding_path(path, model, dim_reduction_model=None, **kwarg
 def create_default_labels(
     audio_dir=None, model=None, paths=None, overwrite=True, **kwargs
     ):
+    """
+    Create default labels based on audio files and model timestamps to 
+    match the number of embeddings created per file for visualization 
+    and clustering purposes. 
+
+    Parameters
+    ----------
+    audio_dir : str, optional
+        path to audio data, by default None
+    model : str, optional
+        model name, by default None
+    paths : SimpleNamespace, optional
+        convenient object for path handling, by default None
+    overwrite : bool, optional
+        if True labels are overwritten, by default True
+
+    Returns
+    -------
+    dict
+        dictionary with default labels
+    """
     if paths is None:
         assign_global_get_paths_function(audio_dir)
         paths = get_paths(model)
@@ -611,7 +647,7 @@ def fit_labels_to_embedding_timestamps(
 
     for _, row in df.iterrows():
         em_start = np.where(embed_timestamps - row.start <= 0)[0][-1]
-        em_end = np.where(embed_timestamps - row.end > 0)[0]
+        em_end = np.where(embed_timestamps - row.end >= 0)[0]
         if len(em_end) > 0:
             em_end = em_end[0]
         else:
@@ -665,7 +701,10 @@ def fit_labels_to_embedding_timestamps(
             else:
                 file_labels[em_start:em_end, 0] = label_idx_dict[row[f"label:{label_column}"]]
                 
-    file_labels = file_labels.squeeze()
+    if len(file_labels.shape) > 1 and (
+        file_labels.shape[0] > 1 or file_labels.shape[-1] > 1
+        ):
+        file_labels = file_labels.squeeze()
             
     if single_label:
         file_labels[~np.array(single_label_arr)] = -2
@@ -881,6 +920,66 @@ def ground_truth_by_model(
     bool_filter_labels=False,
     **kwargs,
 ):
+    """
+    Generate ground truth labels that are mapped onto the 
+    timestamps of a model, based on the model-specific 
+    input lengths. This way the embeddings and ground truth
+    labels have the same lengths, and can be used for downstream
+    evaluation like probing or clustering. 
+    This function supports single or multi-label generation
+    of ground truth labels. 
+    A dictionary is created with a numpy array for the labels
+    and a dictionary to associate the int values with the 
+    corresponding label class. 
+    The labels are processed based on a single annotation file
+    which requires predefined column names:
+    `audiofilename`, `start`, `end`, `label:species` (species
+    can be replaced with other things but the `label:` needs to
+    be consistent). See 'bacpipe/tests/test_data/annotations.csv'
+    for an example.
+    After processing the ground truth, the dictionary is saved
+    as a numpy file and upon reexecution is simply loaded for 
+    shorter runtime. 
+
+    Parameters
+    ----------
+    model : str
+        model name
+    audio_dir : str
+        path to audio data
+    label_df : pandas.DataFrame, optional
+        ground truth annotations in specified format, by default None
+    label_idx_dict : dict, optional
+        link between int values and class labels
+        can be auto generated, by default None
+    label_column : str, optional
+        name of column in annotation file, by default 'label:species'
+    paths : SimpleNamespace, optional
+        convenient object for path handling, by default None
+    annotations_filename : str, optional
+        path to annotations csv file, by default "annotations.csv"
+    overwrite : bool, optional
+        If True, the dict will be generated again and saved
+        rather than loaded from a file if already
+        processed, by default True
+    single_label : bool, optional
+        set False if you want multi-label, by default True
+    bool_filter_labels : bool, optional
+        set to True, if you want a minimum number of occurrence
+        for labels to be included in the ground truth. See
+        settings file for more options and descriptions, by default False
+
+    Returns
+    -------
+    dict
+        dictionary of ground truth labels with numpy array
+        and dict to link int values to class labels
+
+    Raises
+    ------
+    ValueError
+        if gorund truth file is not found
+    """
     if paths is None:
         assign_global_get_paths_function(audio_dir)
         paths = get_paths(model)

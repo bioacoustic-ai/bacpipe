@@ -39,6 +39,9 @@ def benchmark(
         file name of annotations, by default None
     CustomModel : class, optional
         Custom model to use for the predictions, by default None
+    check_if_already_processed : bool, optional
+        if you want to force embeddings to be generated again, 
+        set to True, defaults to True
 
     Returns
     -------

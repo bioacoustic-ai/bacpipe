@@ -31,11 +31,6 @@ global_batch_size: 8
 # supported formats of audio files
 audio_suffixes: ['.wav', '.WAV', '.aif', '.mp3', '.MP3', '.flac', '.ogg']
 
-
-# To avoid creating embeddings when configurations are still being tested, this is set to True. 
-# Set to False if you want to keep embeddings even if the process is interrupted.
-rm_embedding_on_keyboard_interrupt: True
-
 # Specify the padding strategy for the models. This will be used
 # both if only annotated segments are embedded or if audio get's 
 # imported and windowed and the last frame might end up not being 
@@ -58,6 +53,9 @@ avoid_pipelined_gpu_inference: False
 # want to restrict this by setting a fixed number of cpus, specific the number here
 nr_parallel_workers: False
 
+# To avoid creating embeddings when configurations are still being tested, this is set to True. 
+# Set to False if you want to keep embeddings even if the process is interrupted.
+rm_embedding_on_keyboard_interrupt: True
 
 #########------------------------------------###########
 #########   USING YOUR ANOOTATION SETTINGS   ###########
@@ -110,23 +108,26 @@ min_label_occurrences: 50
 # number of occurances, set this to False.
 bool_filter_labels: False
 
+# if the model has a classifier that ships with the model, by default 
+# it will be used, to provide another option to colorcode embeddings
+# and visualize differences between embeddings. 
 run_pretrained_classifier: True
+classifier_threshold: 0.5
 
+# By default all default classifier predictions will also be saved
+# as raven tables. If you do not want this, set this to False. 
 save_raven_tables: True
 
 #######----------------------############
 #######   PROBING SETTINGS   ############
 #######----------------------############
 
-# if the model has a classifier that ships with the model, by default 
-# it will be used, to provide another option to colorcode embeddings
-# and visualize differences between embeddings. 
-classifier_threshold: 0.5
-
+# train/test/validation ratio for linear probe training
 train_ratio: 0.65
 test_ratio: 0.2
 # the rest will be val_ratio = 1 - (train_ratio + test_ratio)
 
+# configurations for the probing, feel free to add more configurations
 probe_configs:
   config_1:
     bool: True
@@ -155,6 +156,8 @@ save_probe: True
 # and is not recommended for datasets with a large number of clusters.
 evaluate_with_silhouette: False
 
+# configurations for clustering, use the bool flag to enable/disable
+# a configuration and feel free to add or modify the existing ones
 clust_configs: 
   config_1: 
     bool: True
@@ -165,7 +168,7 @@ clust_configs:
       n_clusters: 18
   config_2:
     bool: False
-    name: "hdbscan"
+    name: "hdbscan" # not that this will require installing the hdbscan package
     params:
       min_cluster_size: 10
       min_samples: 5
@@ -176,18 +179,24 @@ clust_configs:
 #######   DASHBOARD SETTINGS   ############
 #######------------------------############
 
+# port for dashboard
 dashboard_port: 5006
 
+# address for dashboard
 dashboard_address: localhost
 
+# if this is True, you can embed the dashboard
+# into an existing html website
 dashboard_websocket_origin: False
 
+# figure height specifications for dashboard
 embed_fig_height: 700
 spectrogram_plot_height: 550
 heatmap_fig_height: 600
-
-spec_colorscale: 'Viridis'
 accordion_width: 780
+
+# color scales used in dashboard
+spec_colorscale: 'Viridis'
 color_continuous: 'Twilight'
 
 
@@ -197,12 +206,12 @@ color_continuous: 'Twilight'
 #######   FOR ULTRASONIC VOCALIZATIONS    ############
 #######-----------------------------------############
 
-
+# this is still in testing, but the goal is 
+# to slow down or speed up audio so that ultrasonic
+# recordings can be reduced in apparent frequency and
+# models like birdnet can process ultrasonic recordings
 bool_change_speed: False
 new_speed: 0.1
-
-
-
 
 
 ###########################################

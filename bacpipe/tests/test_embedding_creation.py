@@ -86,7 +86,7 @@ def test_evaluation(model):
     paths = get_paths(model)
 
     try:
-        ground_truth = ground_truth_by_model(model, paths=paths, **kwargs)
+        ground_truth = ground_truth_by_model(model, single_label=False, **kwargs)
     except FileNotFoundError:
         ground_truth = None
 
@@ -100,7 +100,9 @@ def test_evaluation(model):
             probing_pipeline(
                 model,
                 ground_truth, embeds, 
-                paths, **class_config, **kwargs
+                paths, single_label=False,
+                **class_config,
+                **kwargs
                 )
 
     clustering_pipeline(model, ground_truth, embeds, paths, **kwargs)

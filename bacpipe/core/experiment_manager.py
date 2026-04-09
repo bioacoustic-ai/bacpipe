@@ -56,6 +56,14 @@ def save_logs():
     logger.info("Saved config, settings, and logs to %s", log_dir)
 
 class Loader:
+    """
+    Initiate the generation of embedding by creating a Loader object.
+    This object will handles paths for loading and saving data.
+    During this process it collects metadata which can be accessed
+    as an attribute and will be saved after the successful run.
+    kwargs that are not specifically passed will be taken from 
+    bacpipe.config and bacpipe.settings.
+    """
     def __init__(
         self,
         audio_dir,
@@ -67,11 +75,12 @@ class Loader:
         **kwargs,
     ):
         """
-        Run the embedding generation pipeline, check if embeddings for this
-        dataset have already been processed, if so load them, if not generate them. 
-        During this process collect metadata and return a dictionary of model-
-        specific loader objects that can be used to access the embeddings 
-        and view metadata. 
+        Initiate the generation of embedding by creating a Loader object.
+        This object will handles paths for loading and saving data.
+        During this process it collects metadata which can be accessed
+        as an attribute and will be saved after the successful run.
+        kwargs that are not specifically passed will be taken from 
+        bacpipe.config and bacpipe.settings.
 
         Parameters
         ----------
@@ -85,6 +94,9 @@ class Loader:
             Either false if primary embeddings are created or the name of
             the dimensionaliry reduction model if dim reduction should be 
             performed, by default False
+        use_folder_structure : bool, optional
+            If True data will be saved and the output folder structure 
+            will be created, by default False
         testing : bool, optional
             Testing yes or no?, by default False
         """
@@ -409,6 +421,27 @@ class Loader:
         audio_suffixes=settings.audio_suffixes,
         return_as='pathlib.Path'
         ):
+        """
+        Collect all audio files in a given directory that have
+        file endings that can be processed by bacpipe. 
+
+        Parameters
+        ----------
+        audio_dir : str
+            path to audio data
+        audio_suffixes : list, optional
+            list of audio suffixes, by default settings.audio_suffixes
+        return_as : str, optional
+            specify if list should be returned as list
+            of strings or list of pathlib.Path objects
+            which comes in handy for some downstream 
+            processing, by default 'pathlib.Path'
+
+        Returns
+        -------
+        list
+            list of audio files
+        """
         audio_dir = Path(audio_dir)
         files_list = []
         [
@@ -639,7 +672,6 @@ class Loader:
                     cl_dict[k] = np.hstack([cl_dict[k], np.zeros([current_time_bins])])
                     
                 cl_dict[k][idx_interval] = v['classifier_predictions']
-                # file_specific_classification[v['time_bins_exceeding_threshold'], k2idx[k]] = v['classifier_predictions']
             for species in [
                 k for k, v in cl_dict.items() 
                 if len(v) < total_length + current_time_bins

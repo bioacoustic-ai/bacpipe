@@ -741,7 +741,10 @@ def visualize_using_dashboard(
     **kwargs
     ):
     """
-    Create and serve the dashboard for visualization.
+    Create and serve the dashboard for visualization. To colorcode embeddings
+    by other labels than the default ones, create an annotations file with timestamps. 
+    An example file can be found in 'bacpipe/tests/test_data/annotations.csv'.
+    Multiple dashboards can be opened, the port will simply increment.
 
     Parameters
     ----------

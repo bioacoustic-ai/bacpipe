@@ -19,6 +19,21 @@ logger = logging.getLogger("bacpipe")
 
 
 class Embedder(AudioHandler):
+    """
+    This class takes care of loading the specified model and using it
+    to process the audio data to create embeddings.
+    This class is also used to create dimensinoality reductions from
+    embeddings.
+    At the end if instantiation, the selected model is loaded and the 
+    model is associated with the specified device.
+    kwargs that are not specifically passed will be taken from 
+    bacpipe.config and bacpipe.settings.
+
+    Parameters
+    ----------
+    AudioHandler : class
+        Helper class that handles loading of audio
+    """
     def __init__(
         self,
         model_name,
@@ -28,10 +43,14 @@ class Embedder(AudioHandler):
         **kwargs,
     ):
         """
-        This class defines all the entry points to generate embedding files. 
-        Parameters are kept minimal, to accomodate as many cases as possible.
+        This class takes care of loading the specified model and using it
+        to process the audio data to create embeddings.
+        This class is also used to create dimensinoality reductions from
+        embeddings.
         At the end if instantiation, the selected model is loaded and the 
-        model is associated with the device specified.
+        model is associated with the specified device.
+        kwargs that are not specifically passed will be taken from 
+        bacpipe.config and bacpipe.settings.
 
         Parameters
         ----------
@@ -40,11 +59,11 @@ class Embedder(AudioHandler):
         loader : Loader object
             Object that has all the necessary path information and methods
             to load and save all the processed data
+        CustomModel : class, optional
+            custom model class to use for processing, by default None
         dim_reduction_model : bool, optional
             Can be bool or the string corresponding to the 
             dimensionality reduction model, by default False
-        testing : bool, optional
-            _description_, by default False
         """
         self.file_length = {}
         self.loader = loader
@@ -713,6 +732,7 @@ class Classifier:
             )
         
     def save_annotation_table(self, loader_obj: bacpipe.Loader):
+        self.paths.preds_path.mkdir(exist_ok=True, parents=True)
         loader_obj.get_annotations_parquet()
         save_path = (
             self.paths.preds_path 

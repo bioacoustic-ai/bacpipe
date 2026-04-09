@@ -35,7 +35,7 @@ def probing_pipeline(
     **kwargs
 ):
     """
-    Classification pipeline consisting of building the classifier,
+    Probing pipeline consisting of building the classifier,
     evaluating it and saving metrics and plots of performance.
 
     Parameters
@@ -45,11 +45,11 @@ def probing_pipeline(
     embeds : np.array
         embeddings
     name : string
-        Type of classification
+        Type of Probing
     dataset_csv_path : string
-        name of classification dataframe as specified in settings.yaml
+        name of Probing dataframe as specified in settings.yaml
     overwrite : bool
-        overwrite existing classification?, defaults to False
+        overwrite existing Probing?, defaults to False
     """
     if not kwargs:
         kwargs = {**vars(bacpipe.settings)}
@@ -66,6 +66,11 @@ def probing_pipeline(
         df = generate_annotations_for_probing_task(
             ground_truth, paths, label_column=label_column, **kwargs
             )
+        if len(df) == 0:
+            logger.exception(
+                "Not enough data in annotations to perform probing task"
+            )
+            return None
 
         embeds = embeds_array_without_noise(
             embeds, ground_truth, label_column=label_column, **kwargs
