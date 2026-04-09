@@ -135,7 +135,7 @@ class AudioHandler:
             else:
                 cumulative_segments = np.vstack([cumulative_segments, segments])
         cumulative_segments = torch.Tensor(cumulative_segments)
-        cumulative_segments = cumulative_segments.to(self.device)
+        cumulative_segments = cumulative_segments.to(self.model.device)
         return cumulative_segments
     
     def _load_audio_based_on_fixed_segment_length(self, audio, segment_length, **_):

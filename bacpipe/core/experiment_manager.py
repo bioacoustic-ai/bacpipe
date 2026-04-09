@@ -621,7 +621,7 @@ class Loader:
                 outputs = json.load(f)
             current_time_bins = outputs['head']['Time bins in this file']
             if not current_time_bins == self.metadata_dict['files']['nr_embeds_per_file'][idx]:
-                print('wtf')
+                print('Length mismatch between time_bins')
             outputs.pop('head')
             
             for k, v in outputs.items():

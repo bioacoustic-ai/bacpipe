@@ -457,8 +457,14 @@ def model_specific_evaluation(
                 model_name, paths=paths, single_label=True, **kwargs
                 )
         except FileNotFoundError as e:
+            logger.exception(
+                f"unable to process ground truth, {e}"
+            )
             ground_truth = None
         except IndexError as e:
+            logger.exception(
+                f"unable to process ground truth, {e}"
+            )
             ground_truth = None
 
 
