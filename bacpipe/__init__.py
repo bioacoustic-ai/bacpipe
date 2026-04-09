@@ -52,6 +52,8 @@ from bacpipe.core.workflows import (
     visualize_using_dashboard,
 )
 
+from bacpipe.embedding_evaluation.benchmark import benchmark
+
 from bacpipe.embedding_evaluation.label_embeddings import (
     DefaultLabels, 
     get_default_labels,
@@ -103,6 +105,7 @@ __all__ = [
     prepare_probe_inference,
     
     ## evaluation pipelines
+    benchmark,
     model_specific_evaluation,
     cross_model_evaluation,
     

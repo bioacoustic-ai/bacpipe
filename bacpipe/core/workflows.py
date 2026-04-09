@@ -655,7 +655,11 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
             if kwargs['model_name'] in TF_MODELS:
                 import tensorflow as tf
                 tf.keras.backend.clear_session()
-            
+                
+        elif hasattr(kwargs, 'paths') and ld.classifier_should_be_run(**kwargs):
+            embed = Embedder(loader=ld, **kwargs)
+            if hasattr(embed.model, 'classifier_predictions'):
+                embed.classifier.run_default_classifier(ld)
         return ld
     except KeyboardInterrupt:
         if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:

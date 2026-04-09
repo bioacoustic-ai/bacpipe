@@ -265,7 +265,10 @@ class Embedder(AudioHandler):
         Loader object
             updated object with metadata on embedding creation session
         """
-        array_of_audios = torch.tensor(array_of_audios).unsqueeze(1)
+        if len(array_of_audios.shape) == 1:
+            array_of_audios = torch.tensor(array_of_audios).unsqueeze(0)
+        windowed_audios = self._window_audio(array_of_audios)
+        windowed_audios = torch.tensor(windowed_audios).unsqueeze(1)
         if not self.nr_parallel_workers:
             from multiprocessing import cpu_count
             available_workers = cpu_count() -1
@@ -274,7 +277,7 @@ class Embedder(AudioHandler):
         task_queue = queue.Queue(maxsize=available_workers)  # small buffer to balance I/O vs compute
         # --- Producer: load + preprocess in background ---
         def producer():
-            for idx, audio in enumerate(array_of_audios):
+            for idx, audio in enumerate(windowed_audios):
                 try:
                     preprocessed = self.model.preprocess(audio)
                     task_queue.put((idx, preprocessed))
@@ -298,7 +301,7 @@ class Embedder(AudioHandler):
         # --- Consumer: embed + save metadata/embeddings ---
         embeddings = []
         with tqdm(
-            total=len(array_of_audios),
+            total=len(windowed_audios),
             desc="processing audio",
             position=1,
             leave=False,
@@ -366,6 +369,8 @@ class Embedder(AudioHandler):
             available_workers = cpu_count() -1
         else:
             available_workers = self.nr_parallel_workers
+        if self.loader.combination_already_exists:
+            return
         task_queue = queue.Queue(maxsize=available_workers)  # small buffer to balance I/O vs compute
         # --- Producer: load + preprocess in background ---
         def producer():
@@ -518,6 +523,7 @@ class Classifier:
         main_results_dir, 
         classifier_threshold, 
         use_folder_structure=True, 
+        save_raven_tables=False,
         **kwargs
         ):
         """
@@ -539,6 +545,7 @@ class Classifier:
         self.model = model
         self.model_name = model_name
         self.classifier_threshold = classifier_threshold
+        self.save_raven_tables = save_raven_tables
         if use_folder_structure:
             from bacpipe.embedding_evaluation.label_embeddings import make_set_paths_func
             self.paths = make_set_paths_func(audio_dir, main_results_dir)(model_name)
@@ -681,84 +688,31 @@ class Classifier:
                 ignore_index=True
             )
 
-    def _load_existing_clfier_outputs(self, fileloader_obj, clfier_annotations):
-        clfier_dir = Path(
-            self.paths.preds_path / 'original_classifier_outputs'
-            )
-        existing_clfier_outputs = list(clfier_dir.rglob('*.json'))
-        existing_clfier_outputs.sort()
-        
-        seg_len = self.model.segment_length / self.model.sr
-        
-        relative_audio = np.array(
-            # we omit the last item assuming that it's just been processed
-            # and corresponds to the clfier_annotations contents
-            [
-                f.split('.')
-                for f in 
-                fileloader_obj.metadata_dict['files']['audio_files'][:-1]
-                ]
-            )
-        relative_audio_stems = relative_audio[:, 0]
-        relative_audio_suffixes = relative_audio[:, 1]
-        
-        
+    def _load_existing_clfier_outputs(self, fileloader_obj: bacpipe.Loader, clfier_annotations=None):
         df_dict = {
             'start': [],
             'end': [],
             'audiofilename': [],
             'label:default_classifier': []
             }
-        for file in existing_clfier_outputs:
-            corresponding_audio_file_bool = (
-                relative_audio_stems==str(
-                    file.relative_to(clfier_dir)
-                    ).replace(f'_{fileloader_obj.model_name}.json', '')
-            )
-            with open(file, 'r') as f:
-                outputs = json.load(f)
-            outputs.pop('head')
-            if len(outputs) == 0:
-                continue
-            all_active_time_bins = []
-            clfier_preds = []
-            species = []
-            for k, v in outputs.items():
-                all_active_time_bins.append(v['time_bins_exceeding_threshold'])
-                clfier_preds.append(v['classifier_predictions'])
-                species.append(k)
-                
-            width = max(max(a) for a in all_active_time_bins) + 1 
-            clfier_preds_np = np.zeros([len(clfier_preds), width])
-            for i, (j,pred) in enumerate(zip(all_active_time_bins, clfier_preds)):
-                clfier_preds_np[i][j] = pred
-            
-            active_time_bins = np.where(np.max(clfier_preds_np, axis=0))[0]
-            active_species = np.array(species)[
-                np.argmax(clfier_preds_np, axis=0)[active_time_bins]
-                ].tolist()
-            
-            df_dict['start'].extend(
-                (active_time_bins * seg_len).tolist()
-            )
-            df_dict['end'].extend(
-                ((active_time_bins * seg_len) + seg_len).tolist()
-            )
-            df_dict['audiofilename'].extend(
-                [
-                    relative_audio_stems[corresponding_audio_file_bool][0] 
-                    + '.' 
-                    +relative_audio_suffixes[corresponding_audio_file_bool][0]
-                    ] * len(active_species)
-            )
-            df_dict['label:default_classifier'].extend(active_species)
+        
+        df = fileloader_obj.predictions(return_type='dataframe')
+        df_dict = df[['audiofilename', 'start', 'end']]
+        cols = df.iloc[:, 4:].columns
+        maxes = np.argmax(np.array(df.iloc[:, 4:]), axis=1)
+        highest_prob_species = [cols[i] for i in maxes]
+
+        df.iloc[:, 4:].max(axis=1)
+        df_dict['label:default_classifier'] = highest_prob_species
+
         self.cumulative_annotations = pd.DataFrame(df_dict)
         self.cumulative_annotations = pd.concat(
                 [self.cumulative_annotations, clfier_annotations], 
                 ignore_index=True
             )
         
-    def save_annotation_table(self, loader_obj):
+    def save_annotation_table(self, loader_obj: bacpipe.Loader):
+        loader_obj.get_annotations_parquet()
         save_path = (
             self.paths.preds_path 
             / f"{loader_obj.model_name}_classifier_annotations.csv"
@@ -766,6 +720,12 @@ class Classifier:
         self.cumulative_annotations.to_csv(save_path, index=False)
         
     def save_classifier_outputs(self, fileloader_obj, file):
+        if len(self.predictions.shape) == 1:
+            self.predictions = self.predictions.unsqueeze(0)
+        elif self.predictions.shape[-1] != len(self.model.classes):
+            self.predictions = self.predictions.swapaxes(0, 1)
+            
+            
         relative_parent_path = Path(file).relative_to(fileloader_obj.audio_dir).parent
         results_path = self.paths.preds_path.joinpath(
             "original_classifier_outputs"
@@ -774,10 +734,6 @@ class Classifier:
         file_dest = results_path.joinpath(file.stem + "_" + self.model_name)
         file_dest = str(file_dest) + ".json"
 
-        if len(self.predictions.shape) == 1:
-            self.predictions = self.predictions.unsqueeze(0)
-        elif self.predictions.shape[-1] != len(self.model.classes):
-            self.predictions = self.predictions.swapaxes(0, 1)
 
         if self.model.only_embed_annotations: #annotation file exists
             np.save(file_dest.replace('.json', '.npy'), self.predictions)
@@ -790,11 +746,42 @@ class Classifier:
 
         with open(file_dest, "w") as f:
             json.dump(cls_results, f, indent=2)
+            
+        if self.save_raven_tables:
+            self.save_Raven_table(file, relative_parent_path)
+            
         self.predictions = torch.tensor([])
         
+    def save_Raven_table(self, file, relative_parent_path):
+        raven_results_path = self.paths.preds_path.joinpath(
+                "raven_tables"
+            ).joinpath(relative_parent_path)
+        raven_results_path.mkdir(exist_ok=True, parents=True)
+        raven_file_dest = raven_results_path.joinpath(file.stem + "_" + self.model_name)
+        raven_file_dest = str(raven_file_dest) + ".selection.table.txt"
+        
+        timestamps, species = np.where(
+            self.predictions > self.classifier_threshold
+            )
+        probs = [
+            np.array(self.predictions)[ts, sp] 
+            for ts, sp in zip(timestamps, species)
+            ]
+        specs = [self.model.classes[sp] for sp in species]
+        
+        df = pd.DataFrame()
+        df['label:species'] = specs
+        df['start'] = timestamps * (self.model.segment_length / self.model.sr)
+        df['end'] = df.start + (self.model.segment_length / self.model.sr)
+        from bacpipe.embedding_evaluation.label_embeddings import create_Raven_annotation_table
+        raven_df = create_Raven_annotation_table(df, 'species')
+        raven_df['Confidence'] = probs
+        raven_df["Begin Path"] = relative_parent_path / (file.stem + file.suffix)
+        raven_df["File Offset (s)"] = df.start
+        raven_df.to_csv(raven_file_dest, sep='\t', index=False)
+    
     def run_default_classifier(self, loader):
         all_embeds = loader.embeddings()
-        
         for f_name, embeddings in tqdm(
             all_embeds.items(),
             desc='Running pretrained classifier',

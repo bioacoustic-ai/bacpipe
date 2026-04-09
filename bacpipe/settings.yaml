@@ -110,6 +110,9 @@ min_label_occurrences: 50
 # number of occurances, set this to False.
 bool_filter_labels: False
 
+run_pretrained_classifier: True
+
+save_raven_tables: True
 
 #######----------------------############
 #######   PROBING SETTINGS   ############
@@ -118,7 +121,6 @@ bool_filter_labels: False
 # if the model has a classifier that ships with the model, by default 
 # it will be used, to provide another option to colorcode embeddings
 # and visualize differences between embeddings. 
-run_pretrained_classifier: True
 classifier_threshold: 0.5
 
 train_ratio: 0.65
@@ -196,7 +198,7 @@ color_continuous: 'Twilight'
 #######-----------------------------------############
 
 
-bool_change_speed: True
+bool_change_speed: False
 new_speed: 0.1
 
 

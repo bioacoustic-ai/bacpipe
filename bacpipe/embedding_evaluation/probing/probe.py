@@ -8,7 +8,7 @@ from pathlib import Path
 import bacpipe
 logger = logging.getLogger(__name__)
 
-from .train_probe import train_probe, LinearClassifier
+from .train_probe import train_probe, LinearProbe
 from .evaluate_probe import eval_probe
 from .dataset_probe import generate_annotations_for_probing_task
 
@@ -107,7 +107,7 @@ def prepare_probe_inference(model, probe_path=''):
         label2index = json.load(f)
         
     probe_weights = torch.load(probe_path, map_location=settings.device)
-    probe = LinearClassifier(
+    probe = LinearProbe(
         probe_weights['probe.weight'].shape[-1], 
         len(label2index)
         )
@@ -130,7 +130,7 @@ def run_probe_inference(
             model_name=model,
             **vars(settings)
             )
-        embeds = torch.Tensor(ld.embeddings(as_type='array')).to(settings.device)
+        embeds = torch.Tensor(ld.embeddings(return_type='array')).to(settings.device)
     
     import torch.nn.functional as F
     return_values = []

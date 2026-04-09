@@ -10,8 +10,8 @@ import logging
 logger = logging.getLogger("bacpipe")
 
 
-class LinearClassifier(nn.Module):
-    def __init__(self, in_dim, out_dim):
+class LinearProbe(nn.Module):
+    def __init__(self, in_dim, out_dim, device='cpu', **kwargs):
         """
         Linear classification layer.
 
@@ -22,8 +22,9 @@ class LinearClassifier(nn.Module):
         out_dim : int
             number of output dimensions (dictated by classes in ground truth)
         """
-        super(LinearClassifier, self).__init__()
+        super(LinearProbe, self).__init__()
         self.probe = nn.Linear(in_dim, out_dim)
+        self.probe.to(device)
 
     def forward(self, x):
         return self.probe(x)
@@ -119,7 +120,7 @@ def train_linear_probe(
 
 
 
-class KNN(nn.Module):
+class KNNProbe(nn.Module):
     def __init__(self, n_neighbors=15, testing=False, **kwargs):
         """
         K-nearest neighbor classifier.
@@ -129,7 +130,7 @@ class KNN(nn.Module):
         n_neighbors : int, optional
             hyperparameter specified in settings.yaml file, by default 15
         """
-        super(KNN, self).__init__()
+        super(KNNProbe, self).__init__()
         self.knn = KNeighborsClassifier(n_neighbors=n_neighbors)
         self.is_trained = False  # Flag to track if KNN is trained
 
@@ -240,7 +241,9 @@ def train_probe(
             learning_rate = bacpipe.settings.probe_configs['config_1']['learning_rate']
         if num_epochs is None:
             num_epochs = bacpipe.settings.probe_configs['config_1']['num_epochs']
-        probe = LinearClassifier(in_dim=embed_size, out_dim=len(df.label.unique()))
+        probe = LinearProbe(
+            in_dim=embed_size, out_dim=len(df.label.unique()), **kwargs
+            )
         probe = train_linear_probe(
             probe, train_gen, 
             learning_rate=learning_rate, num_epochs=num_epochs, 
@@ -252,7 +255,7 @@ def train_probe(
             n_neighbors = bacpipe.settings.probe_configs['config_2']['n_neighbors']
         if len(df[df.predefined_set =='test']) < n_neighbors:
             kwargs['n_neighbors'] = len(df[df.predefined_set =='test']) - 1
-        probe = KNN(**kwargs)
+        probe = KNNProbe(**kwargs)
         probe = train_knn_probe(probe, train_gen, **kwargs)
 
     return probe

@@ -7,7 +7,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-from .train_probe import LinearClassifier
+from .train_probe import LinearProbe
 
 
 
@@ -28,7 +28,7 @@ def prepare_probe_inference(model, probe_path=''):
         label2index = json.load(f)
         
     probe_weights = torch.load(probe_path, map_location=settings.device)
-    probe = LinearClassifier(
+    probe = LinearProbe(
         probe_weights['probe.weight'].shape[-1], 
         len(label2index)
         )
@@ -52,7 +52,7 @@ def run_probe_inference(
             model_name=model,
             **vars(settings)
             )
-        embeds = torch.Tensor(ld.embeddings(as_type='array')).to(settings.device)
+        embeds = torch.Tensor(ld.embeddings(return_type='array')).to(settings.device)
     elif isinstance(embeds, np.ndarray):
         embeds = torch.Tensor(embeds)
     

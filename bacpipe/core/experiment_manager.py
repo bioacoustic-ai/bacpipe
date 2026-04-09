@@ -5,16 +5,17 @@ import time
 import logging
 import importlib
 import numpy as np
+import pandas as pd
 from pathlib import Path
 
-from bacpipe import settings as bacpipe_settings
+from bacpipe import config, settings
+from bacpipe.embedding_evaluation.label_embeddings import make_set_paths_func
 logger = logging.getLogger("bacpipe")
 
 
 def save_logs():
     import datetime
     import json
-    from bacpipe import config, settings
     
     log_dir = Path(settings.main_results_dir) / Path(config.audio_dir).stem / f"logs"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -122,15 +123,21 @@ class Loader:
                 "No model_name is passed, therefore no directory "
                 "structure will be created."
             )
-        elif not self.combination_already_exists:
-            self.embed_dir.mkdir(exist_ok=True, parents=True)
         else:
-            logger.debug(
-                "Combination of {} and {} already "
-                "exists -> using saved embeddings in {}".format(
-                    self.model_name, Path(self.audio_dir).stem, str(self.embed_dir)
+            if not model_name is None:
+                get_paths = make_set_paths_func(
+                    audio_dir, settings.main_results_dir
+                    )
+                self.paths = get_paths(model_name)
+            if not self.combination_already_exists:
+                self.embed_dir.mkdir(exist_ok=True, parents=True)
+            else:
+                logger.debug(
+                    "Combination of {} and {} already "
+                    "exists -> using saved embeddings in {}".format(
+                        self.model_name, Path(self.audio_dir).stem, str(self.embed_dir)
+                    )
                 )
-            )
 
     def _initialize_path_structure(
         self, testing=False, **kwargs
@@ -381,8 +388,8 @@ class Loader:
         self.files = self.get_audio_files(self.audio_dir)
         self.files.sort()
         if not hasattr(self, 'embed_parent_dir'):
-            from bacpipe import settings as bacpipe_settings
-            self.embed_parent_dir = bacpipe_settings.embed_parent_dir
+            from bacpipe import settings as settings
+            self.embed_parent_dir = settings.embed_parent_dir
         self.embed_dir = (
             Path(self.embed_parent_dir)
             .joinpath(self._get_timestamp_dir())
@@ -399,7 +406,7 @@ class Loader:
     @staticmethod
     def get_audio_files(
         audio_dir, 
-        audio_suffixes=bacpipe_settings.audio_suffixes,
+        audio_suffixes=settings.audio_suffixes,
         return_as='pathlib.Path'
         ):
         audio_dir = Path(audio_dir)
@@ -521,7 +528,28 @@ class Loader:
         self.metadata_dict["files"]["embedding_dimensions"].append(embeds.shape)
         return embeds
 
-    def embeddings(self, as_type='dict'):
+    def embeddings(self, return_type='dict'):
+        """
+        Load and return processed embeddings. This method can 
+        only be used to return already computed embeddings.
+        Embeddings can be returned as np.array (`array`) or 
+        as dictionary (`dict`) in which case the keys will 
+        correspond to the corresponding embedding file name. 
+        In case of the array, all embeddings are concatenated so that
+        the first dimension corresponds to the timestamp and the 
+        second dimension to the embedding dimension.  
+        
+
+        Parameters
+        ----------
+        return_type : str, optional
+            return type either `array` or `dict`, by default 'dict'
+
+        Returns
+        -------
+        array or dict
+            depending on `return_type` argument
+        """
         d = {}
         if not self.files[0].suffix == self.embed_suffix:
             self.files = list(self.embed_dir.rglob(f'*{self.embed_suffix}'))
@@ -534,60 +562,191 @@ class Loader:
                     embeds = json.load(f)
                 embeds = np.array(embeds)
             d[str(file.relative_to(self.embed_dir))] = embeds
-        if as_type == 'dict':
+        if return_type == 'dict':
             return d
-        elif as_type == 'array':
+        elif return_type == 'array':
             return np.vstack(list(d.values()))
         
-    def predictions(self, threshold=bacpipe_settings.classifier_threshold, as_type='dict'):
+
+    def get_preds_array(self, return_type='dict'):
         preds_path = (
-            self.evaluations_dir 
-            / self.model_name 
-            / 'classification'
+            self.paths.preds_path
             / 'original_classifier_outputs'
             )
-        import bacpipe
-        self.embedder = bacpipe.Embedder(self.model_name, self)
         if not preds_path.exists():
             logger.warning(
                 "No classifier predictions have been save yet. "
             )
             return None
-        class_files = list(preds_path.rglob('*.json'))
-        if not class_files:
-            logger.warning(
-                "No classifier predictions have been save yet. "
+        files = list(preds_path.rglob('*json'))
+        files.sort()
+        
+        relative_audio = np.array(
+            [
+                f.split('.')
+                for f in 
+                self.metadata_dict['files']['audio_files']
+                ]
             )
-            return None
-        d = {}
-        l2i = {label: idx for idx, label in enumerate(self.embedder.model.classes)}
-        array_label_indices = []
-        preds_array = np.array([], dtype=np.int8)
-        
-        from bacpipe.embedding_evaluation.label_embeddings import fill_all_labels_array
-        
-        for file in class_files:
-            with open(file, "r") as f:
-                preds = json.load(f)
-            vals = np.ones([
-                preds['head']['Time bins in this file'],
-                len(preds)-1
-                ]) * -1
-            preds.pop('head')
-            for idx, (class_label, val) in enumerate(preds.items()):
-                array_label_indices.append(l2i[class_label])
-                # vals[val['time_bins_exceeding_threshold'], idx] = val['classifier_predictions']
-                vals[val['time_bins_exceeding_threshold'], idx] = l2i[class_label]
+        if hasattr(self, 'continue_failed_run') and self.continue_failed_run:
+            # we omit the last item assuming that it's just been processed
+            # and corresponds to the clfier_annotations contents
+            relative_audio = relative_audio[:-1]
             
-            preds_array = fill_all_labels_array(vals, preds_array)
-            d[str(file.relative_to(preds_path))] = vals
-            
-        i2l = {v: k for k, v in l2i.items()}
+        relative_audio_stems = relative_audio[:, 0]
+        relative_audio_suffixes = relative_audio[:, 1]
         
-        if as_type == 'dict':
-            return d, i2l
-        elif as_type == 'array':
-            return preds_array, i2l
+
+        seg_len = (
+            self.metadata_dict['segment_length (samples)'] 
+            / self.metadata_dict['sample_rate (Hz)']
+            )
+        
+        cl_dict = {}
+        total_length = 0
+        keys2idx = {}
+        df_dict = dict(
+            end = [],
+            start = [],
+            audiofilename = [],
+            active_time_bins = []
+            )
+        for idx, file in enumerate(files):
+            corresponding_audio_file_bool = (
+                relative_audio_stems==str(
+                    file.relative_to(preds_path)
+                    ).replace(f'_{self.model_name}.json', '')
+            )
+            with open(file, 'r') as f:
+                outputs = json.load(f)
+            current_time_bins = outputs['head']['Time bins in this file']
+            if not current_time_bins == self.metadata_dict['files']['nr_embeds_per_file'][idx]:
+                print('wtf')
+            outputs.pop('head')
+            
+            for k, v in outputs.items():
+                if not keys2idx:
+                    keys2idx[k] = 0
+                if not k in keys2idx:
+                    keys2idx[k] = max(keys2idx.values()) + 1
+                    
+                idx_interval = (
+                    np.array(v['time_bins_exceeding_threshold']) + total_length
+                    )
+                if not k in cl_dict:
+                    cl_dict[k] = np.zeros([total_length + current_time_bins])    
+                else:
+                    cl_dict[k] = np.hstack([cl_dict[k], np.zeros([current_time_bins])])
+                    
+                cl_dict[k][idx_interval] = v['classifier_predictions']
+                # file_specific_classification[v['time_bins_exceeding_threshold'], k2idx[k]] = v['classifier_predictions']
+            for species in [
+                k for k, v in cl_dict.items() 
+                if len(v) < total_length + current_time_bins
+                ]:
+                cl_dict[species] = np.hstack(
+                    [cl_dict[species], np.zeros([current_time_bins])]
+                    )
+        
+            df_dict['active_time_bins'].append(np.where(
+                np.max(
+                    np.vstack(list(cl_dict.values()))[:, -current_time_bins:], 
+                    axis=0
+                    )
+                )[0])
+            df_dict['start'].extend(
+                (df_dict['active_time_bins'][-1] * seg_len).tolist()
+            )
+            df_dict['end'].extend(
+                
+                ((df_dict['active_time_bins'][-1] * seg_len) + seg_len).tolist()
+            )
+            df_dict['audiofilename'].extend(
+                [
+                    relative_audio_stems[corresponding_audio_file_bool][0] 
+                    + '.' 
+                    +relative_audio_suffixes[corresponding_audio_file_bool][0]
+                    ] * len(df_dict['active_time_bins'][-1])
+            )
+            total_length += current_time_bins
+        
+        cl_array = np.array(list(cl_dict.values()))
+        
+        if return_type == 'dict':
+            return_dict = {}
+            offset = 0
+            tup = np.unique(df_dict['audiofilename'], return_counts=True)
+            for filename, counts in list(zip(tup[0], tup[1])):
+                return_dict[filename] = cl_array[:, offset:offset+counts]
+                offset += counts
+            return return_dict, keys2idx
+        elif return_type == 'dataframe':
+            df = pd.DataFrame(cl_dict)
+            df = df[df.sum(axis=1)>0]
+            df['species_richness'] = df.astype(bool).sum(axis=1)
+            
+            df_dict.pop('active_time_bins')
+            for k, v in df_dict.items():
+                df[k] = v
+            cols = list(df.columns)
+            cols.reverse()
+            df = df[cols]
+            return df
+        else:
+            return cl_array.T, keys2idx
+    
+    def get_annotations_parquet(self):
+        file_name = self.model_name + '_all_predictions'
+        all_prediction_files = [f.stem for f in self.paths.preds_path.iterdir()]
+        if (
+            config.overwrite
+            or not file_name in all_prediction_files
+            ):
+            df = self.get_preds_array(return_type='dataframe')
+            if len(df) * len(df.T) > 3_000_000:
+                df.to_parquet(self.paths.preds_path / (file_name + '.parquet'))
+            else:
+                df.to_csv(self.paths.preds_path / (file_name + '.csv'))
+        else:
+            try:
+                df = pd.read_csv(self.paths.preds_path / (file_name + '.csv'))
+            except:
+                df = pd.read_parquet(self.paths.preds_path / (file_name + '.parquet'))
+        return df
+        
+    def predictions(self, return_type='dict'):
+        """
+        Load and return classifier predictions. This method
+        can only be used for already processed predictions. 
+        Predictions that have been processed will be returned 
+        based on the specified return_type: 
+        `array` for np.array, in which case all predictions are 
+        concatenated and a dictionary is passed referencing the 
+        index to the corresponding label. 
+        `dict` for a dictionary, in which case the keys 
+        correspond to the audio file name corresponding to the
+        annotation and the values are np.arrays with all annotations
+        of that file
+        `dataframe` for a dataframe with columns for each 
+        species that was active and columns for filename, start
+        and end times. 
+
+        Parameters
+        ----------
+        return_type : str, optional
+            return either `array`, `dict` or `dataframe`, by default 'dict'
+
+        Returns
+        -------
+        tuple or pd.DataFrame
+            either tuples of (np.array, dict) for `array`
+            or tuple of (dict, dict) for `dict`
+            or pd.DataFrame
+        """
+        if return_type == 'dataframe':
+            return self.get_annotations_parquet()
+        else:
+            return self.get_preds_array(return_type=return_type)
 
     def _write_audio_file_to_metadata(self, file, model, embeddings, file_length):
         if (

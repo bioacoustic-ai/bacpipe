@@ -473,7 +473,8 @@ class DashBoard(DashBoardHelper):
                 species=self.species_select[widget_idx],
                 threshold=self.clfier_thresh[widget_idx],
                 clfier_path=self.clfier_path[widget_idx],
-                clfier_type=self.clfier_select[widget_idx]
+                clfier_type=self.clfier_select[widget_idx],
+                **self.kwargs
             )
         )
         
@@ -522,7 +523,8 @@ class DashBoard(DashBoardHelper):
                         model=self.model_select[widget_idx], 
                         accumulate_by=self.accumulate_select[widget_idx], 
                         species=self.species_select[widget_idx],
-                        threshold=self.clfier_thresh[widget_idx]
+                        threshold=self.clfier_thresh[widget_idx],
+                        **self.kwargs
                         )
                     
                 ),
