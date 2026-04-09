@@ -8,6 +8,7 @@ from sklearn.metrics import adjusted_rand_score as ARI
 from sklearn.metrics import adjusted_mutual_info_score as AMI
 
 import bacpipe.embedding_evaluation.label_embeddings as le
+import bacpipe
 
 logger = logging.getLogger(__name__)
 
@@ -44,70 +45,91 @@ def save_clustering_performance(paths, clusterings, metrics, label_column):
         with open(paths.clust_path.joinpath(f"clust_results.json"), "w") as f:
             json.dump(metrics, f, default=convert_numpy_types, indent=2)
 
-
-def compute_clusterings(
-    embeds,
-    labels,
-    cluster_configs,
-    default_labels,
-    label_column,
-    evaluate_with_silhouette=False,
-    **kwargs,
-):
+def run_clustering(
+    embeds, cluster_configs, 
+    label_column=None, ground_truth=[]
+    ):
     """
-    Run clustering algorithms.
+    Fit clustering algorithms to embeddings.
 
     Parameters
     ----------
     embeds : np.array
         embeddings
-    labels : list
-        ground truth labels
     cluster_configs : dict
         clustering algorithm objects
+    label_column : string
+        label type defined in annotations.csv file
+    ground_truth : list
+        ground truth labels
+
+    Returns
+    -------
+    dict
+        labels accordings to clustering algorithms
+    """
+    clusterings = {}
+    for name, clusterer in cluster_configs.items():
+        clusterings[name] = clusterer.fit_predict(embeds)
+        if len(ground_truth) > 0:
+            clusterings[name + "_no_noise"] = clusterer.fit_predict(
+                embeds[ground_truth != -1]
+            )
+    if len(ground_truth) > 0 and label_column:
+        clusterings[label_column] = ground_truth
+        clusterings[f"{label_column}_no_noise"] = ground_truth[ground_truth != -1]
+    return clusterings
+
+def eval_clustering(
+    clusterings, ground_truth=[],
+    default_labels=None, 
+    label_column=None, 
+    **kwargs
+    ):
+    """
+    Evaluate clustering performance.
+
+    Parameters
+    ----------
+    clusterings : dict
+        dictionary with clusterings
+    ground_truth : list
+        ground truth labels
     default_labels : dict
         default labels for the dataset
     label_column : string
         label type defined in annotations.csv file
-    evaluate_with_silhouette : bool, optional
-        whether to evaluate with silhouette score, by default False
 
     Returns
     -------
     dict
         performance metrics
-    dict
-        labels accordings to clustering algorithms
     """
-    metrics = {"SS": dict(), "AMI": dict(), "ARI": dict()}
-    clusterings = {}
-    for name, clusterer in cluster_configs.items():
-        clusterings[name] = clusterer.fit_predict(embeds)
-        if len(labels) > 0:
-            clusterings[name + "_no_noise"] = clusterer.fit_predict(
-                embeds[labels != -1]
-            )
-    if len(labels) > 0:
-        clusterings[label_column] = labels
-        clusterings[f"{label_column}_no_noise"] = labels[labels != -1]
-        default_labels["kmeans"] = clusterings["kmeans"]
-
+    metrics = {"AMI": dict(), "ARI": dict()}
     for cl_name, cl_labels in clusterings.items():
         if cl_name == f"{label_column}_no_noise":
-            if -1 in labels:
-                embeds = embeds[labels != -1]
-                cl_labels = labels[labels != -1]
+            if -1 in ground_truth:
+                embeds = embeds[ground_truth != -1]
+                cl_labels = ground_truth[ground_truth != -1]
+            
+        if hasattr(default_labels, 'kmeans'):
+            default_labels["kmeans"] = clusterings["kmeans"]
+        if not default_labels:
+            metrics[f"AMI"][f"{cl_name}-ground_truth"] = AMI(ground_truth, cl_labels)
+            metrics[f"ARI"][f"{cl_name}-ground_truth"] = ARI(ground_truth, cl_labels)
+        else:
+            for def_name, def_labels in default_labels.items():
+                if "no_noise" in cl_name:
+                    def_labels = np.array(def_labels)[ground_truth != -1]
+                metrics[f"AMI"][f"{cl_name}-{def_name}"] = AMI(def_labels, cl_labels)
+                metrics[f"ARI"][f"{cl_name}-{def_name}"] = ARI(def_labels, cl_labels)
+    return metrics
 
-        if evaluate_with_silhouette:
-            metrics["SS"][cl_name] = SS(embeds, cl_labels)
-        for def_name, def_labels in default_labels.items():
-            if "no_noise" in cl_name:
-                def_labels = np.array(def_labels)[labels != -1]
-            metrics[f"AMI"][f"{cl_name}-{def_name}"] = AMI(def_labels, cl_labels)
-            metrics[f"ARI"][f"{cl_name}-{def_name}"] = ARI(def_labels, cl_labels)
-
-    return metrics, clusterings
-
+def eval_with_silhouette(embeds, ground_truth, metrics=None):
+    if not metrics:
+        metrics = dict()
+    metrics["SS"] = SS(embeds, ground_truth)
+    return metrics
 
 def get_clustering_models(clust_params):
     """
@@ -168,7 +190,14 @@ def get_nr_of_clusters(labels, clust_configs, **kwargs):
     return clust_params
 
 
-def clustering(paths, embeds, ground_truth, label_column, overwrite=False, **kwargs):
+def clustering_pipeline(
+    model_name,
+    ground_truth, embeds, 
+    paths=None, 
+    overwrite=True, 
+    label_column=bacpipe.settings.label_column, 
+    **kwargs
+    ):
     """
     Clustering pipeline.
 
@@ -183,31 +212,56 @@ def clustering(paths, embeds, ground_truth, label_column, overwrite=False, **kwa
     overwrite : bool, optional
         whether to overwrite exisiting clustering files, by default False
     """
-    if overwrite or not len(list(paths.clust_path.glob("*.json"))) > 0:
+    if not kwargs:
+        kwargs = {**vars(bacpipe.settings)}
+        kwargs.pop('label_column')
+    if not paths:
+        get_paths_func = bacpipe.make_set_paths_func(
+            bacpipe.config.audio_dir, bacpipe.settings.main_results_dir
+        )
+        paths = get_paths_func(model_name)
+    if (
+        overwrite
+        or not len(list(paths.clust_path.glob("*.json"))) > 0
+    ):
         
         if "audio_dir" in kwargs: kwargs.pop("audio_dir")
         
         if ground_truth:
-            labels = ground_truth[f"label:{label_column}"]
+            ground_truth = ground_truth[f"label:{label_column}"]
         else:
-            labels = []
+            ground_truth = []
 
-        clust_params = get_nr_of_clusters(labels, **kwargs)
+        clust_params = get_nr_of_clusters(ground_truth, **kwargs)
 
         cluster_configs = get_clustering_models(clust_params)
 
         default_labels = le.create_default_labels(
             paths.audio_dir, paths.clust_path.parent.stem, paths, **kwargs
         )
-
-        metrics, clusterings = compute_clusterings(
-            embeds, labels, cluster_configs, default_labels, label_column
+        
+        clusterings = run_clustering(
+            embeds, cluster_configs, label_column, ground_truth
+            )
+        metrics = eval_clustering(
+            clusterings, ground_truth, default_labels, label_column, **kwargs
         )
+        if kwargs.get('evaluate_with_silhouette'):
+            metrics = eval_with_silhouette(embeds, clusterings, metrics)
 
         save_clustering_performance(paths, clusterings, metrics, label_column)
+        
     else:
         logger.info(
             "Clustering file cluster_metrics.json already exists and"
             " so is not computed. If you want to overwrite existing results, "
             "set overwrite to True in settings.yaml."
         )
+        clusterings = np.load(
+            paths.clust_path.joinpath(f"clust_labels.npy"), 
+            allow_pickle=True
+            ).item()
+        with open(paths.clust_path.joinpath(f"clust_results.json"), "r") as f:
+            metrics = json.load(f)
+            
+    return clusterings, metrics

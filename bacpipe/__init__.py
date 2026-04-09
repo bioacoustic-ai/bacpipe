@@ -68,6 +68,12 @@ from bacpipe.embedding_evaluation.probing.inference_probe import (
     run_probe_inference,
     prepare_probe_inference
 )
+from bacpipe.embedding_evaluation.clustering.cluster import (
+    clustering_pipeline,
+    run_clustering,
+    eval_clustering,
+    eval_with_silhouette
+)
 
 from bacpipe.core.constants import (
     supported_models, 
@@ -103,6 +109,12 @@ __all__ = [
     probing_pipeline,
     run_probe_inference,
     prepare_probe_inference,
+    
+    ## clustering functions
+    clustering_pipeline,
+    run_clustering,
+    eval_clustering,
+    eval_with_silhouette,
     
     ## evaluation pipelines
     benchmark,

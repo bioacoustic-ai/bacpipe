@@ -647,13 +647,16 @@ class Loader:
                 cl_dict[species] = np.hstack(
                     [cl_dict[species], np.zeros([current_time_bins])]
                     )
-        
-            df_dict['active_time_bins'].append(np.where(
-                np.max(
-                    np.vstack(list(cl_dict.values()))[:, -current_time_bins:], 
-                    axis=0
-                    )
-                )[0])
+
+            if not cl_dict:
+                df_dict['active_time_bins'].append(np.array([]))
+            else:
+                df_dict['active_time_bins'].append(np.where(
+                    np.max(
+                        np.vstack(list(cl_dict.values()))[:, -current_time_bins:], 
+                        axis=0
+                        )
+                    )[0])
             df_dict['start'].extend(
                 (df_dict['active_time_bins'][-1] * seg_len).tolist()
             )

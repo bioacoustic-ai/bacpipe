@@ -104,10 +104,11 @@ def test_evaluation(model):
     for class_config in settings["probe_configs"].values():
         if class_config["bool"]:
             probing_pipeline(
+                model,
                 ground_truth, embeds, 
                 paths, **class_config, **kwargs
                 )
             # probing_pipeline(paths, class_embeds, **class_config, **kwargs)
 
     embeds_array = np.concatenate(list(embeds.values()))
-    clustering(paths, embeds_array, ground_truth, **kwargs)
+    bacpipe.clustering_pipeline(model, ground_truth, embeds_array, paths, **kwargs)

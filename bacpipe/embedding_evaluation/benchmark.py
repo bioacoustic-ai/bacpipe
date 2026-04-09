@@ -7,7 +7,7 @@ from sklearn.metrics import classification_report
 def benchmark(
     model, dataset, 
     annotations_file=None, 
-    threshold=0.5, CustomModel=None,
+    CustomModel=None,
     check_if_already_processed=True,
     **kwargs
     ):
@@ -37,8 +37,6 @@ def benchmark(
         path to audio dataset
     annotations_file : string, optional
         file name of annotations, by default None
-    threshold : float, optional
-        threshold value, by default 0.5
     CustomModel : class, optional
         Custom model to use for the predictions, by default None
 

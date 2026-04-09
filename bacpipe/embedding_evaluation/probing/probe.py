@@ -27,6 +27,7 @@ def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
     ]
 
 def probing_pipeline(
+    model_name,
     ground_truth, embeds, 
     paths=None, name='linear', 
     overwrite=True, 
@@ -50,9 +51,16 @@ def probing_pipeline(
     overwrite : bool
         overwrite existing classification?, defaults to False
     """
+    if not kwargs:
+        kwargs = {**vars(bacpipe.settings)}
+        kwargs.pop('label_column')
+    if not paths:
+        get_paths_func = bacpipe.make_set_paths_func(
+            bacpipe.config.audio_dir, bacpipe.settings.main_results_dir
+        )
+        paths = get_paths_func(model_name)
     if (
         overwrite
-        or paths is None
         or not paths.probe_path.joinpath(f"probe_results_{name}.json").exists()
     ):
         df = generate_annotations_for_probing_task(
@@ -81,13 +89,28 @@ def probing_pipeline(
             probe, embeds, df, label2index, config=name, paths=paths, **kwargs
             )
 
-        return probe, metrics
     else:
         logger.info(
             f"Classification file probe_results_{name}.json already exists and"
             " so is not computed. If you want to overwrite existing results, "
             "set overwrite to True in config.yaml."
         )
+        from bacpipe.embedding_evaluation.probing.train_probe import LinearProbe
+        state_dict = torch.load(paths.probe_path / f"{name}_probe.pt")
+        probe = LinearProbe(
+            in_dim=embeds.shape[-1], 
+            out_dim=list(state_dict.values())[-1].shape[0], 
+            **kwargs
+            )
+        probe.load_state_dict(state_dict=state_dict)
+        with open(paths.probe_path / "label2index.json", "r") as f:
+            label2index = json.load(f)
+            
+        load_path = paths.probe_path.joinpath(f"probe_results_{name}.json")
+        with open(load_path, "r") as f:
+            metrics = json.load(f)
+            
+    return probe, label2index, metrics
 
     
 def prepare_probe_inference(model, probe_path=''):

@@ -33,7 +33,7 @@ from bacpipe.embedding_evaluation.label_embeddings import (
 from bacpipe.embedding_evaluation.probing.probe import (
     probing_pipeline
     )
-from bacpipe.embedding_evaluation.clustering.cluster import clustering
+from bacpipe.embedding_evaluation.clustering.cluster import clustering_pipeline
 
 from bacpipe.core.constants import TF_MODELS, NEEDS_CHECKPOINT
 from bacpipe import config, settings
@@ -482,6 +482,7 @@ def model_specific_evaluation(
             for class_config in probe_configs.values():
                 if class_config["bool"]:
                     probing_pipeline(
+                        model_name, 
                         ground_truth, embeds, 
                         paths, **class_config, **kwargs
                     )
@@ -498,7 +499,7 @@ def model_specific_evaluation(
             )
 
             embeds_array = np.concatenate(list(embeds.values()))
-            clustering(paths, embeds_array, ground_truth, **kwargs)
+            clustering_pipeline(model_name, ground_truth, embeds_array, paths, **kwargs)
 
 def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwargs):
     """

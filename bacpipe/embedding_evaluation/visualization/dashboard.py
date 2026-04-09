@@ -692,7 +692,7 @@ class DashBoard(DashBoardHelper):
             
         )
         
-        self.add_styling(model0_page, model_all_page, apply_classifier1_page)
+        self.add_styling(model0_page, model2_page, model_all_page, apply_classifier1_page)
         
     def add_styling(self, *pages):
         with pkg_resources.path(bacpipe.imgs, 'bacpipe_unlabelled.png') as p:
