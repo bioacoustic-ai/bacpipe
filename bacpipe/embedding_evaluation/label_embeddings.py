@@ -708,14 +708,20 @@ def build_ground_truth_labels_by_file(
             )
         return all_labels
 
-    file_labels = fit_labels_to_embedding_timestamps(
-        df, label_idx_dict, num_embeds, segment_s, 
-        label_column=label_column, **kwargs
-    )
+    if kwargs.get('only_embed_annotations'):
+        values = df[f'label:{label_column}']
+        file_labels = np.array([label_idx_dict[v] for v in values])
+    else:
+        file_labels = fit_labels_to_embedding_timestamps(
+            df, label_idx_dict, num_embeds, segment_s, 
+            label_column=label_column, **kwargs
+        )
+    
+        
     
     all_labels = fill_all_labels_array(file_labels, all_labels)
 
-    if np.unique(file_labels).shape[0] > 2:
+    if np.unique(file_labels).shape[0] > 2 and kwargs.get('testing'):
         raven_tables_sanity_check(
             num_embeds, segment_s, paths, audio_file, 
             label_df, label_idx_dict, label_column, file_labels
@@ -834,8 +840,13 @@ def collect_ground_truth_labels(
             f"File names do not match for {file} and "
             f"{metadata['files']['audio_files'][ind]}"
         )
-
-        num_embeds = metadata["files"]["nr_embeds_per_file"][ind]
+        if kwargs.get('only_embed_annotations'):
+            num_embeds = int(
+                metadata["files"]["file_lengths (s)"][ind] 
+                / (metadata['segment_length (samples)'] / metadata['sample_rate (Hz)'])
+                )
+        else:
+            num_embeds = metadata["files"]["nr_embeds_per_file"][ind]
         ground_truth = build_ground_truth_labels_by_file(
             paths,
             ind,
