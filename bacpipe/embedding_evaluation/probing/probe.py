@@ -29,7 +29,7 @@ def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
 def probing_pipeline(
     ground_truth, embeds, 
     paths=None, name='linear', 
-    overwrite=True, save_probe=False, 
+    overwrite=True, 
     label_column=bacpipe.settings.label_column, 
     **kwargs
 ):
@@ -78,7 +78,7 @@ def probing_pipeline(
         probe = train_probe(embeds, df, label2index, config=name, **kwargs)
         
         metrics = eval_probe(
-            probe, embeds, df, label2index, config=name, **kwargs
+            probe, embeds, df, label2index, config=name, paths=paths, **kwargs
             )
 
         return probe, metrics

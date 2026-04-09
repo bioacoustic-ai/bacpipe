@@ -680,9 +680,9 @@ class DashBoard(DashBoardHelper):
                 ),
             ),
             ("All models", model_all_page),
-            ("Apply Classifer", apply_classifier1_page),
+            ("Single Model Predictions", apply_classifier1_page),
             (
-                "Two classifiers",
+                "Two Model Predictions",
                 pn.Row(
                     pn.Column(sidebar3, sidebar4),
                     pn.Row(content3, content4),
