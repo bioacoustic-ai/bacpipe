@@ -9,6 +9,7 @@ TF_MODELS = [
     'vggish',
     'hbdet', 
 ]
+"""list[str]: models that were built using tensorflow"""
 
 EMBEDDING_DIMENSIONS = {
     "audiomae": 768,
@@ -35,6 +36,7 @@ EMBEDDING_DIMENSIONS = {
     "google_whale": 1280,
     "vggish": 128,
 }
+"""dict: model names with their corresponding embedding size"""
 
 NEEDS_CHECKPOINT = [
     "audiomae",
@@ -52,6 +54,7 @@ NEEDS_CHECKPOINT = [
     "protoclr",
     "rcl_fs_bsed"
 ]
+"""list[str]: models that require a checkpoint to be downloaded to be run"""
 
 
 supported_models = list(EMBEDDING_DIMENSIONS.keys())
