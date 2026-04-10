@@ -82,6 +82,7 @@ def run_clustering(
 
 def eval_clustering(
     clusterings, ground_truth=[],
+    embeds=None,
     default_labels=None, 
     label_column=None, 
     **kwargs
@@ -112,7 +113,7 @@ def eval_clustering(
                 embeds = embeds[ground_truth != -1]
                 cl_labels = ground_truth[ground_truth != -1]
             
-        if hasattr(default_labels, 'kmeans'):
+        if default_labels and not hasattr(default_labels, 'kmeans'):
             default_labels["kmeans"] = clusterings["kmeans"]
         if not default_labels:
             metrics[f"AMI"][f"{cl_name}-ground_truth"] = AMI(ground_truth, cl_labels)
@@ -274,7 +275,7 @@ def clustering_pipeline(
             embeds, cluster_configs, label_column, ground_truth
             )
         metrics = eval_clustering(
-            clusterings, ground_truth, default_labels, label_column, **kwargs
+            clusterings, ground_truth, embeds, default_labels, label_column, **kwargs
         )
         if kwargs.get('evaluate_with_silhouette'):
             metrics = eval_with_silhouette(embeds, clusterings, metrics)
