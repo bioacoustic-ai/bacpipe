@@ -6,9 +6,9 @@
 image by Nicole Allison
 
 **bacpipe** makes using deep learning models for bioacoustics easy!
-Using **bacpipe** you can generate embeddings, classification predictions and clusters. All you need is your audio data and to customize the settings.
+Using **bacpipe** you can generate embeddings and classifier predictions and evaluate them using probing, clustering and benchmarking. All you need is your audio data!.
 
-And the best part is, it comes with a GUI for you to explore the results.
+And the best part is, it comes with an interactive GUI for you to explore your data organized by the state-of-the-art deep learning models for bioacoustics. 
 
 **bacpipe** is also available on pip: `pip install bacpipe`
 
@@ -21,20 +21,21 @@ import bacpipe
 
 bacpipe.play()
 ```
-A more detailed description of the API can be found under [API](#api). Full documentation can be found at [https://bacpipe.readthedocs.io](https://bacpipe.readthedocs.io).
+A more detailed description of the API can be found under [API](#api). In `bacpipe/examples` you can find 3 jupyter notebooks demonstrating different use cases of the API. Full documentation can be found at [https://bacpipe.readthedocs.io](https://bacpipe.readthedocs.io). The github repository can be found at [https://github.com/bioacoustic-ai/bacpipe](https://github.com/bioacoustic-ai/bacpipe).
 
 There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) available on youtube to install and run bacpipe.
 
 ## 📚 Table of Contents
 
 - [How it works](#how-it-works)
+- [Dashboard visualization](#dashboard-visualization)
+- [Available models](#available-models)
 - [API](#api)
     - [Use bacpipe immediately on the integrated test data](#use-bacpipe-immediately-on-the-integrated-test-data)
     - [Modify configurations and settings as attributs](#modify-configurations-and-settings-as-attributs)
     - [Modify audio source path, models, device](#modify-audio-source-path-models-device)
     - [Use bacpipe in an existing pipeline](#use-bacpipe-in-an-existing-pipeline)
     - [Produce embeddings for multiple models in your own pipeline](#produce-embeddings-for-multiple-models-in-your-own-pipeline)
-- [Dashboard visualization](#dashboard-visualization)
 - [Installation](#installation)
     - [Install prerequisites](#install-prerequisites)
     - [Clone the git repository](#clone-the-git-repository)
@@ -54,7 +55,6 @@ There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) availab
         - [Dimensionality reduced embedding folders](#dimensionality-reduced-embedding-folders)
         - [Evaluation folders](#evaluation-folders)
         - [Example result files structure](#example-result-files-structure)
-- [Available models](#available-models)
 - [Contribute](#contribute)
 - [Known issues](#known-issues)
 - [Citation](#citation)
@@ -82,28 +82,28 @@ Currently these bioacoustic models are supported (more details below):
 ```yaml
 
 available_models : [
-    "audiomae"
-    "audioprotopnet"
-    "avesecho_passt"
-    "aves_especies"
-    "bat"
-    "beats"
-    "birdaves_especies"
-    "biolingual"
-    "birdnet"
-    "birdmae"
-    "convnext_birdset"
-    "hbdet"
-    "insect66"
-    "insect459"
-    "mix2"
-    "naturebeats"
-    "perch_bird"
-    "perch_v2"
-    "protoclr"
-    "rcl_fs_bsed"
-    "surfperch"
-    "google_whale"
+    "audiomae",
+    "audioprotopnet",
+    "avesecho_passt",
+    "aves_especies",
+    "bat",
+    "beats",
+    "birdaves_especies",
+    "biolingual",
+    "birdnet",
+    "birdmae",
+    "convnext_birdset",
+    "hbdet",
+    "insect66",
+    "insect459",
+    "mix2",
+    "naturebeats",
+    "perch_bird",
+    "perch_v2",
+    "protoclr",
+    "rcl_fs_bsed",
+    "surfperch",
+    "google_whale",
     "vggish"
   ]
 ```
@@ -119,20 +119,20 @@ available_reduction_models: [
 ]
 ```
 
-Furthermore, the embeddings can be evaluated using different metrics. The evaluation is done using the `evaluate.py` script, which takes the generated embeddings and computes various metrics such as clustering performance and classification performance. The evaluation results are saved in the `bacpipe/results` directory.
+Furthermore, the embeddings can be evaluated using different downstream tasks. These currently include clustering and probing. The evaluation results are saved in the `bacpipe_results` directory using a standardized folder structure. 
 
 ```yaml
 
 available_evaluation_tasks: [
-  "classification",
+  "probing",
   "clustering"
 ]
 ```
 
+## Interactive dashboard to explore data visually and aurally
+The repository also includes a panel dashboard for visualizing the generated embeddings. The `dashboard` variable in the [settings.yaml](bacpipe/settings.yaml) file controls is, and by default is set to `True`. The dashboard will automatically open in your browser creating embeddings and classifier predictions. The dashboard is interactive and thus let's you explore the embeddings and even listen to the audio.
 
-The repository also includes a panel dashboard for visualizing the generated embeddings. To enable the dashboard, simply set the `dashboard` variable to `True` in the [settings.yaml](bacpipe/settings.yaml) file. The dashboard will automatically open in your browser (at `http://localhost:8050`) after running the `run_dashboard.py` script.
-
-The pipeline is designed to be modular, so you can easily add or remove models as needed. The models are organized into pipelines, which are defined in the `bacpipe/embedding_generation_pipelines/feature_extractors` directory. If you want to add a different dimensionality reduction model, you do so by adding new pipeline to the `bacpipe/embedding_generation_pipelines/dimensionality_reduction` directory.
+The pipeline is designed to be modular, so you can easily add or remove models as needed. The models are organized into pipelines, which are defined in the `bacpipe/model_pipelines/feature_extractors` directory. If you want to add a different dimensionality reduction model, you do so by adding a new pipeline to the `bacpipe/model_pipelines/dimensionality_reduction` directory.
 
 ## Using annotations for evaluation
 
@@ -140,19 +140,88 @@ If you have annotations for your dataset, you can use them to evaluate the gener
 
 To use the annotations for evaluation, create a file called `annotations.csv` in the directory specified in the `audio_dir` variable in the [config.yaml](bacpipe/config.yaml) file. The file should contain the following columns:
 ```csv
-audiofilename,start,end,label
+audiofilename,start,end,label:species
 ```
-Where `audiofilename` is the name of the audio file, `start` and `end` are the start and end times of the annotation in seconds, and `label` is the label of the annotation.
+Where `audiofilename` is the name of the audio file, `start` and `end` are the start and end times of the annotation in seconds, and `label:species` is the label of the annotation.
 
 For reference see the [example annotations file](bacpipe/tests/test_data/annotations.csv).
 
 If this file exists, the evaluation script will automatically use the annotations to compute the clustering and classification performance of the embeddings. The labels will also be used to color the points in the dashboard visualization showing the embeddings.
+
+
+# Dashboard visualization
+
+### bacpipe includes a dashboard visualization by default allowing you to easily explore the generated embeddings
+
+Once embeddings are generated, they can be easily visualized using a dashboard (built using `panel`) by simply setting the `dashboard` setting in the [config.yaml](bacpipe/config.yaml) file to `True`.
+
+Below you can see a gif showing the basic usage of the dashboard.
+
+![](src/bacpipe_demo.gif)
+
+The dashboard has 5 main sections:
+1. Single model
+2. Two models
+3. All models
+4. Single model predictions
+5. Two model predictions
+
+In the single model section, you can select a model and visualize the embeddings generated by that model. The embeddings can be colored by :
+- metadata extracted from the files (date and time information, and file and parent directory) 
+- the labels specified in the `annotations.csv` file
+- the cluster labels generated by the clustering algorithm (kmeans)
+
+In the dashboard sidebar you can select the model, by which to label the embeddings, whether to remove noise, and the type of classification task to show the results for. 
+
+The noise removal is done by removing the embeddings that do not correspond to annotated sections of the audio files. This is useful if you want to focus on the annotated sections of the audio files and disregard the rest of the data. 
+
+The visualizations can be saved as png files by clicking the save button in the bottom right corner of the plot.
+
+__Try it out__ and (__please__) feel free to give feedback and ask questions (or suggestions for improvements) - or in case something does not work raise issues.
+
+
+
+
+# Available models
+
+The models all have their model specific code to ensure inference runs smoothly. 
+
+Models currently include:
+
+|   Name|   ref paper|   ref code|   sampling rate|   input length| embedding dimension |
+|---|---|---|---|---|---|
+|   AudioMAE    |   [paper](https://proceedings.neurips.cc/paper_files/paper/2022/hash/b89d5e209990b19e33b418e14f323998-Abstract-Conference.html)   |   [code](https://github.com/facebookresearch/AudioMAE)    |   16 kHz|   10 s| 768 |
+|   AudioProtoPNet   |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954125000901)   |   [code](https://github.com/DBD-research-group/AudioProtoPNet)    |   32 kHz|   5 s| 1024 |
+|   AvesEcho_PASST   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   32 kHz|   3 s| 768 |
+|   AVES_ESpecies        |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 768 |
+| Bat | [paper](https://arxiv.org/abs/2309.11218) | [code](https://github.com/FrankFundel/BAT-cli) | 22.05 kHz | ~1 s | 64 |
+| BEATs | [paper](https://arxiv.org/abs/2212.09058) | [code](https://github.com/microsoft/unilm/tree/master/beats) | 16 kHz | 10 s | 768 |
+|   BioLingual  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   48 kHz|   10 s| 512 |
+|   BirdAVES_ESpecies    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 1024 |
+|   BirdMAE    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   32 kHz|   10 s| 1280 |
+|   BirdNET     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s| 1024 |
+|   ConveNeXT_BirdSet   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |   32 kHz|   5 s| 1024 |
+|   Google_Whale       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   24 kHz|   5 s| 1280 |
+|   hbdet |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s| 2048|
+|   Insect66NET |   [paper](https://doi.org/10.1371/journal.pcbi.1011541)   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   44.1 kHz|   5.5 s| 1280 |
+|   Insect459NET |   [paper](https://arxiv.org/pdf/2503.15074)   |   pending    |   44.1 kHz|   5.5 s| 1280 |
+|   Mix2        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   16 kHz|   3 s| 960 |
+|   NatureBEATs        |   [paper](https://arxiv.org/abs/2411.07186)   |   [code](https://github.com/earthspecies/NatureLM-audio)    |   16 kHz|   10 s| 768 |
+|   Perch_Bird       |   [paper](https://www.nature.com/articles/s41598-023-49989-z.epdf)   |   [code](https://github.com/google-research/perch)    |   32 kHz|   5 s| 1280 |
+|   Perch_V2       |   [paper](https://arxiv.org/abs/2508.04665)   |   [code](https://github.com/google-research/perch_hoplite)    |   32 kHz|   5 s| 1536 |
+|   ProtoCLR     |   [paper](https://arxiv.org/pdf/2409.08589)   |   [code](https://github.com/ilyassmoummad/ProtoCLR)    |   16 kHz|   6 s| 384 |
+|   RCL_FS_BSED     |   [paper](https://arxiv.org/abs/2309.08971)   |   [code](https://github.com/ilyassmoummad/RCL_FS_BSED)    |   22.05 kHz|   0.2 s| 2048 |
+|   SurfPerch       |   [paper](https://arxiv.org/abs/2404.16436)   |   [code](https://www.kaggle.com/models/google/surfperch)    |   32 kHz|   5 s| 1280 |
+|   VGGish      |   [paper](https://ieeexplore.ieee.org/document/7952132)   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   16 kHz|   0.96 s| 128 |
+
 
 # API
 
 **bacpipe** can be used as a package and installed from pip
 
 `pip install bacpipe`
+
+There are `jupyter` notebooks available in the `bacpipe/examples` directory to show you how to use the API. Below you can find a quick overview of some of the API capabilities. 
 
 ## Use bacpipe immediately on the integrated test data
 
@@ -205,8 +274,7 @@ bacpipe.play(save_logs=True)
 If you just want to run models and get embeddings returned without saving them and don't want the dashboard and all of that, define an embedder object and pass it the model name and the settings you modified.
 
 ```python
-em = bacpipe.Embedder('perch_bird', **vars(bacpipe.settings)) 
-# the vars part is important!
+em = bacpipe.Embedder('perch_bird') 
 
 audio_file = '/path/to/all/the/audio/file'
 embeddings = em.get_embeddings_from_model(audio_file)
@@ -225,17 +293,24 @@ em.model.classifier_outputs
 If you want to produce embeddings for multiple models, bacpipe will always store them to keep your memory from overfilling. Still you can use the package to easily access the embeddings and all the metadata
 
 ```python
-loader = bacpipe.model_specific_embedding_creation(
-  **vars(bacpipe.config), **vars(bacpipe.settings)
-  )
+loader = bacpipe.run_pipeline_for_models(
+    models=['birdnet', 'perch_bird'], 
+    audio_dir='/path/to/your/audio/dir', 
+    device='cuda'
+)
 # this call will initiate the embedding generation process, it will check if embeddings
 # already exist for the combination of each model and the dataset and if so it will
 # be ready to load them. The loader keys will be the model name and the values will
 # be the loader objects for each model. Each object contains all the information
 # on the generated embeddings. To name access them:
-loader['birdnet'].embedding_dict() 
+embeds = loader['birdnet'].embeddings() 
 # this will give you a dictionary with the keys corresponding to embedding files
 # and the values corresponding to the embeddings as numpy arrays
+
+predictions, label2index = loader['birdnet'].predictions() 
+# this will give you a dictionary with the keys corresponding to audio files
+# and the values corresponding to the predictions as numpy arrays
+# the label2index dict associates the columns of the numpy array with the class label
 
 loader['birdnet'].metadata_dict
 # This will give you a dictionary overview of:
@@ -250,36 +325,6 @@ loader['birdnet'].metadata_dict
 # - and the total length of the processed dataset in seconds
 # Thic dictionary is also saved as a yaml file in the directory of the embeddings
 ```
-
-
-# Dashboard visualization
-
-### bacpipe includes a dashboard visualization by default allowing you to easily explore the generated embeddings
-
-Once embeddings are generated, they can be easily visualized using a dashboard (built using `panel`) by simply setting the `dashboard` setting in the [config.yaml](bacpipe/config.yaml) file to `True`.
-
-Below you can see a gif showing the basic usage of the dashboard.
-
-![](src/bacpipe_demo.gif)
-
-The dashboard has 3 main sections:
-1. Single model
-2. Two models
-3. All models
-
-In the single model section, you can select a model and visualize the embeddings generated by that model. The embeddings can be colored by :
-- metadata extracted from the files (date and time information, and file and parent directory) 
-- the labels specified in the `annotations.csv` file
-- the cluster labels generated by the clustering algorithm (kmeans)
-
-In the dashboard sidebar you can select the model, by which to label the embeddings, whether to remove noise, and the type of classification task to show the results for. 
-
-The noise removal is done by removing the embeddings that do not correspond to annotated sections of the audio files. This is useful if you want to focus on the annotated sections of the audio files and disregard the rest of the data. 
-
-The visualizations can be saved as png files by clicking the save button in the bottom right corner of the plot.
-
-__Try it out__ and (__please__) feel free to give feedback and ask questions (or suggestions for improvements) - or in case something does not work raise issues.
-
 
 
 
@@ -306,26 +351,6 @@ For **Mac**
 - install git: `brew install git`
 
 
-### Create a virtual environment for this project
-
-Virtual environments are very important. They ensure that specific libraries that are needed for one project don't get in the way of libraries you need for another project.
-
-Create a virtual environment and install the packages with one command:
-- `uv sync`
-
-If you prefer having control over the environment name, use these commands:
-
-Create your virtual environment (all systems):
-- `uv venv --python 3.11 env_bacpipe`
-
-For **Windows**, Activate your environment:
-- `source env_bacpipe/Scripts/activate`
-
-For **Linux**/**Mac**, Activate your environment:
-- `source env_bacpipe/bin/activate`
-
-Install the project dependencies (all systems):
-- `uv pip install -r pyproject.toml`
 
 
 ## Install `uv` (recommended) or `poetry`
@@ -373,7 +398,35 @@ For all systems:
 - run `git clone https://github.com/bioacoustic-ai/bacpipe`
 
 
-## Install the dependencies once the prerequisites are satisfied.
+## Create a virtual environment for this project
+
+Virtual environments are very important. They ensure that specific libraries that are needed for one project don't get in the way of libraries you need for another project.
+
+Create a virtual environment and install the packages with one command:
+- `uv sync` (if it's causing trouble, try using `python -m uv sync` instead)
+
+---
+
+<details>
+<summary> Click here if you prefer to have control about the environment name <b>(click to expand)</b> </summary> 
+
+
+If you prefer having control over the environment name, use these commands:
+
+Create your virtual environment (all systems):
+- `uv venv --python 3.11 env_bacpipe`
+
+For **Windows**, Activate your environment:
+- `source env_bacpipe/Scripts/activate`
+
+For **Linux**/**Mac**, Activate your environment:
+- `source env_bacpipe/bin/activate`
+
+Install the project dependencies (all systems):
+- `uv pip install -r pyproject.toml`
+
+
+### Install the dependencies once the prerequisites are satisfied.
 
 `uv pip install -r pyproject.toml`
 
@@ -387,8 +440,9 @@ For `poetry`:
 
 If you do not have admin rights and encounter a `permission denied` error when using `pip install`, use `python -m pip install ...` instead.
 
+</details>
 
-### Install gpu support for tensorflow
+## Install gpu support for tensorflow
 
 Because of the requirements of `torch==2.6` the cuda versions have to be installed corresponding to what pytorch supports. However, I have tested that you are able to install different cuda dependencies to also support tensorflow gpus once the environment is set up. Once you have installed the requirements. Install the following dependencies using 
 `uv pip install -r requirements_tf_gpu.txt`.
@@ -431,7 +485,7 @@ By doing so you will also ensure that the directory structure for the model chec
 
 The tests could take a while, so to run a small test, you can also pass the model you would like to test:
 
-`pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py --models=birdnet,perch`
+`pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py --models=birdnet,perch_bird`
 
 (keep in mind you have to have the checkpoints locally for the models that require it)
 
@@ -497,13 +551,13 @@ Using the settings attribute `only_embed_annotations`, you can also decide to on
 
 `species` is a placeholder here and can be replaced with any label description. So if you have labelled call types, change it to `label:call_type`. But it's important that there are no spaces and that it contains `label:`. By doing this you will be able to visualize your data based on all of these label columns.
 
-The labels can then be used to perform clustering and classification evaluation. This can be done only in regard to one label, so specify the main label column in the `label_column` variable in [settings.yaml](bacpipe/settings.yaml). This defaults to `species`. Only labels that exceed the `min_label_occurrences` value will be used. This is to make sure you have enough data to train linear classifiers and do meaningful evaluations. If you have enough labeled data, feel free to increase this. 
+The labels can then be used to perform clustering and probing evaluation. This can be done only in regard to one label, so specify the main label column in the `label_column` variable in [settings.yaml](bacpipe/settings.yaml). This defaults to `species`. Only labels that exceed the `min_label_occurrences` value will be used. This is to make sure you have enough data to train linear classifiers and do meaningful evaluations. If you have enough labeled data, feel free to increase this. 
 
 See the file [annotations.csv](bacpipe/tests/test_data/annotations.csv) for an example of how the annotations file should look like.
 
-Once the annotations file is created, add either `classification` or `clustering` (or both) to the `evaluation_task` variable in the [config.yaml](bacpipe/config.yaml) file (use double quotes: "classification" or "clustering"). You can run the evaluation script using normal `python run_pipeline.py` command. The evaluation script will automatically use the annotations to compute the clustering and classification performance of the embeddings. The results will be saved in the `bacpipe/results/YOUR_DATASET/evaluation` directory.
+Once the annotations file is created, add either `probing` or `clustering` (or both) to the `evaluation_task` variable in the [config.yaml](bacpipe/config.yaml) file (use double quotes: "probing" or "clustering"). You can run the evaluation script using normal `python run_pipeline.py` command. The evaluation script will automatically use the annotations to compute the clustering and probing performance of the embeddings. The results will be saved in the `bacpipe/results/YOUR_DATASET/evaluation` directory.
 
-If you selected classification, a linear classifier will be trained and saved in the classification subdirectory of the evaluation folder. This .pt file can be used to generate class predictions with a model that wasn't originally trained on these classes. A tutorial will be available shortly explaining this in more detail. The .pt file can be used in the repository [acodet](https://github.com/vskode/acodet) to generate class predictions with the combination of a feature extractor and the trained linear classifier.
+If you selected probing, a linear probe will be trained and saved in the probing subdirectory of the evaluation folder. This .pt file can be used to generate class predictions with a model that wasn't originally trained on these classes. A tutorial will be available shortly explaining this in more detail. The .pt file can be used in the repository [acodet](https://github.com/vskode/acodet) to generate class predictions with the combination of a feature extractor and the trained linear classifier.
 
 ## Models with classifiers
 
@@ -516,7 +570,7 @@ Models that already contain classification heads, are the following:
 - ConvNeXT_birdset
 - google_whale
 
-With all of these models, you only need to set `run_pretrained_classifier` to True and then the model will save the classification outputs in the `classification/original_classifier_outputs` folder. Only predictions exceeding the `classifier_threshold` value will be saved. A csv file in the shape of the annotations.csv file is also saved corresponding to the class predictions. The dashboard will also contain an extra `label_by` option `default_classifier`.
+With all of these models, you only need to set `run_pretrained_classifier` to True and then the model will save the classification outputs in the `predictions/original_classifier_outputs` folder. Only predictions exceeding the `classifier_threshold` value will be saved. A csv file in the shape of the annotations.csv file is also saved corresponding to the class predictions. The dashboard will also contain an extra `label_by` option `default_classifier`.
 
 ## Generated Files
 
@@ -570,7 +624,7 @@ It is important that the name of this directory remains unchanged, so that it ca
 
 ### Evaluation folders
 
-Within the `evaluations_dir` folder, you will find the following folders: `classification`, `clustering`, `distances`, `labels` and `plots`. These folders will be filled with results if the corresponding evaluation tasks are selected. `distanctes` is currently not supported and therefore only a place-holder. `label` will contain a `.npy` file containing the auto-generated labels from the metadata and if available ground_truth.
+Within the `evaluations_dir` folder, you will find the following folders: `predictions`, `probing`, `clustering`, `labels` and `plots`. These folders will be filled with results if the corresponding evaluation tasks are selected. `distanctes` is currently not supported and therefore only a place-holder. `label` will contain a `.npy` file containing the auto-generated labels from the metadata and if available ground_truth.
 
 ### Pretrained classifier annotations
 
@@ -606,63 +660,29 @@ This is the resulting folder structure:
 │           └── UrbanSoundscape
 └── evaluations
     ├── birdnet
-    │   ├── classification
+    │   ├── predictions
     │   │   └── original_classifier_outputs
     │   │       └── audio
     │   │           ├── FewShot
     │   │           └── UrbanSoundscape
     │   ├── clustering
-    │   ├── distances
     │   ├── labels
+    │   ├── probing
     │   └── plots
     ├── overview
     └── perch_bird
-        ├── classification
+        ├── predictions
         │   └── original_classifier_outputs
         │       └── audio
         │           ├── FewShot
         │           └── UrbanSoundscape
         ├── clustering
-        ├── distances
         ├── labels
+        ├── probing
         └── plots
 ```
 
-
-# Available models
-
-The models all have their model specific code to ensure inference runs smoothly. More info on the models and their pipelines can be found [here](bacpipe/pipelines/README.md).
-
-Models currently include:
-
-|   Name|   ref paper|   ref code|   sampling rate|   input length| embedding dimension |
-|---|---|---|---|---|---|
-|   AudioMAE    |   [paper](https://proceedings.neurips.cc/paper_files/paper/2022/hash/b89d5e209990b19e33b418e14f323998-Abstract-Conference.html)   |   [code](https://github.com/facebookresearch/AudioMAE)    |   16 kHz|   10 s| 768 |
-|   AudioProtoPNet   |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954125000901)   |   [code](https://github.com/DBD-research-group/AudioProtoPNet)    |   32 kHz|   5 s| 1024 |
-|   AvesEcho_PASST   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   32 kHz|   3 s| 768 |
-|   AVES_ESpecies        |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 768 |
-| Bat | [paper](https://arxiv.org/abs/2309.11218) | [code](https://github.com/FrankFundel/BAT-cli) | 22.05 kHz | ~1 s | 64 |
-| BEATs | [paper](https://arxiv.org/abs/2212.09058) | [code](https://github.com/microsoft/unilm/tree/master/beats) | 16 kHz | 10 s | 768 |
-|   BioLingual  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   48 kHz|   10 s| 512 |
-|   BirdAVES_ESpecies    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 1024 |
-|   BirdMAE    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   32 kHz|   10 s| 1280 |
-|   BirdNET     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s| 1024 |
-|   ConveNeXT_BirdSet   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |   32 kHz|   5 s| 1024 |
-|   Google_Whale       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   24 kHz|   5 s| 1280 |
-|   HumpbackNET |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s| 2048|
-|   Insect66NET |   [paper](https://doi.org/10.1371/journal.pcbi.1011541)   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   44.1 kHz|   5.5 s| 1280 |
-|   Insect459NET |   [paper](https://arxiv.org/pdf/2503.15074)   |   pending    |   44.1 kHz|   5.5 s| 1280 |
-|   Mix2        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   16 kHz|   3 s| 960 |
-|   NatureBEATs        |   [paper](https://arxiv.org/abs/2411.07186)   |   [code](https://github.com/earthspecies/NatureLM-audio)    |   16 kHz|   10 s| 768 |
-|   Perch_Bird       |   [paper](https://www.nature.com/articles/s41598-023-49989-z.epdf)   |   [code](https://github.com/google-research/perch)    |   32 kHz|   5 s| 1280 |
-|   Perch_V2       |   [paper](https://arxiv.org/abs/2508.04665)   |   [code](https://github.com/google-research/perch_hoplite)    |   32 kHz|   5 s| 1536 |
-|   ProtoCLR     |   [paper](https://arxiv.org/pdf/2409.08589)   |   [code](https://github.com/ilyassmoummad/ProtoCLR)    |   16 kHz|   6 s| 384 |
-|   RCL_FS_BSED     |   [paper](https://arxiv.org/abs/2309.08971)   |   [code](https://github.com/ilyassmoummad/RCL_FS_BSED)    |   22.05 kHz|   0.2 s| 2048 |
-|   SurfPerch       |   [paper](https://arxiv.org/abs/2404.16436)   |   [code](https://www.kaggle.com/models/google/surfperch)    |   32 kHz|   5 s| 1280 |
-|   VGGish      |   [paper](https://ieeexplore.ieee.org/document/7952132)   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   16 kHz|   0.96 s| 128 |
-
-<details>
-<summary>Click to see more details on the models</summary>
+## More detailed model information
 
 
 |   Name|   paper|   code|   training|   CNN/Trafo| architecture | checkpoint link |
@@ -679,7 +699,7 @@ Models currently include:
 |   [BirdNET](#birdnet)     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   sup l|   CNN | EffNetB0 | [weights](https://github.com/kahst/BirdNET-Analyzer/tree/main/birdnet_analyzer/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model)|
 |   [ConvNeXT_BirdSet](#convnext_birdset)   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |  sup l |   CNN | ConvNext | included|
 |   [Google_Whale](#google_whale)       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   sup l|   CNN| EffNetb0 | included|
-|   [HumpbackNET](#humpbacknet) |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   sup l |   CNN | ResNet50| [weights](https://github.com/vskode/acodet/blob/main/acodet/src/models/Humpback_20221130.zip)|
+|   [hbdet](#hbdet) |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   sup l |   CNN | ResNet50| [weights](https://github.com/vskode/acodet/blob/main/acodet/src/models/Humpback_20221130.zip)|
 |   [Insect66NET](#insect66net) |   paper   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   sup l|   CNN | EffNetv2s | [weights](https://gitlab.com/arise-biodiversity/DSI/algorithms/cricket-cicada-detector-capgemini/-/blob/main/src/model_traced.pt?ref_type=heads)|
 |   [Insect459NET](#insect459net) |   paper   |   pending    |   sup l|   CNN | EffNetv2s | pending |
 |   [Mix2](#mix2)        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   sup l|   CNN| MobNetv3 | release pending|
@@ -786,12 +806,12 @@ The ConvNeXT_birdset model is a ConvNeXT CNN trained on the BirdSet dataset (whi
 Google_Whale (multispecies_whale) is a EFficientNet B0 model trained on whale vocalizations and other marine sounds.
 
 
-### HumpbackNET
+### hbdet
 - CNN
 - supervised training model
 - trained on humpback whale song
 
-HumpbackNET is a binary classifier based on a ResNet-50 model trained on humpback whale data from different parts in the North Atlantic. 
+hbdet is a binary classifier based on a ResNet-50 model trained on humpback whale data from different parts in the North Atlantic. 
 
 ### Insect66NET
 - CNN
@@ -881,13 +901,7 @@ To evaluate the generated embeddings a number of dimensionality reduction models
 
 
 
-
-</details>
-
----
-
-<details>
-<summary><b style="font-size: 2em;">Add a new model</b></summary>
+# Add a new model
 
 To add a new model, simply add a pipeline with the name of your model. Make sure your model follows the following criteria:
 
@@ -902,7 +916,7 @@ Here is an example:
 
 ```python 
 import torch
-from bacpipe.model_specific_utils.newmodel.module import MyClass
+from bacpipe.model_pipelines.model_specific_utils.newmodel.module import MyClass
 
 SAMPLE_RATE = 12345
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)

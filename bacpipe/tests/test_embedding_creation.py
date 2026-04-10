@@ -5,16 +5,16 @@ import importlib.resources as pkg_resources
 from pathlib import Path
 
 import bacpipe
-from bacpipe import EMBEDDING_DIMENSIONS
-from bacpipe.main import get_embeddings, embeds_array_without_noise
-from bacpipe.generate_embeddings import Loader, Embedder
-from bacpipe.embedding_evaluation.label_embeddings import (
-    generate_annotations_for_classification_task,
+from bacpipe import (
     make_set_paths_func,
     ground_truth_by_model,
+    probing_pipeline,
+    clustering_pipeline,
+    EMBEDDING_DIMENSIONS,
+    run_pipeline_for_single_model,
+    Loader,
+    Embedder
 )
-from bacpipe.embedding_evaluation.classification.classify import classification_pipeline
-from bacpipe.embedding_evaluation.clustering.cluster import clustering
 
 
 # -------------------------------------------------------------------------
@@ -37,24 +37,26 @@ kwargs = {**config, **settings}
 
 
 embeddings = {}
-with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
+# with pkg_resources.path(__package__ + ".test_data", "") as audio_dir:
+#     audio_dir = Path(audio_dir)
+with pkg_resources.path(bacpipe.tests, "test_data") as audio_dir:
     audio_dir = Path(audio_dir)
-config["audio_dir"] = audio_dir
+kwargs["audio_dir"] = audio_dir
 get_paths = make_set_paths_func(**kwargs)
-
+print(audio_dir)
 
 # -------------------------------------------------------------------------
 # Helper functions
 # -------------------------------------------------------------------------
 def embedder_fn(loader, model_name):
     """Return embeddings from a single model using the test loader."""
-    embedder = Embedder(model_name, **kwargs)
+    embedder = Embedder(model_name, loader=loader, **kwargs)
     return embedder.get_embeddings_from_model(loader.files[0])
 
 
 def loader_fn():
     """Return a Loader for the test audio directory."""
-    loader = Loader(check_if_combination_exists=False, model_name="aves", **kwargs)
+    loader = Loader(use_folder_structure=True, check_if_combination_exists=False, model_name="aves", **kwargs)
     assert loader.files, "No audio files found in test data directory"
     return loader
 
@@ -64,10 +66,11 @@ def loader_fn():
 # -------------------------------------------------------------------------
 def test_embedding_generation(model, device):
     settings['device'] = device
-    embeddings[model] = get_embeddings(
+    bacpipe.ensure_models_exist(bacpipe.settings.model_base_path, model_names=[model])
+    embeddings[model] = run_pipeline_for_single_model(
         model_name=model,
-        check_if_primary_combination_exists=False,
-        check_if_secondary_combination_exists=False,
+        check_if_already_processed=False,
+        check_if_already_dim_reduced=False,
         **kwargs,
     )
     assert embeddings[model].files, f"No embeddings generated for {model}"
@@ -80,11 +83,11 @@ def test_embedding_dimensions(model):
 
 
 def test_evaluation(model):
-    embeds = embeddings[model].embedding_dict()
+    embeds = embeddings[model].embeddings(return_type='array')
     paths = get_paths(model)
 
     try:
-        ground_truth = ground_truth_by_model(paths, model, **kwargs)
+        ground_truth = ground_truth_by_model(model, single_label=False, **kwargs)
     except FileNotFoundError:
         ground_truth = None
 
@@ -93,17 +96,14 @@ def test_evaluation(model):
         "Check that you have the right test data."
     )
 
-    generate_annotations_for_classification_task(paths, **kwargs)
-
-    class_embeds = embeds_array_without_noise(embeds, ground_truth, **kwargs)
-    for class_config in settings["class_configs"].values():
+    for class_config in settings["probe_configs"].values():
         if class_config["bool"]:
-            assert len(class_embeds) > 0, (
-                f"No embeddings found for classification task ({model}). "
-                "Check that annotations.csv is linked correctly. "
-                "Remove the classification task from config.yaml if not intended."
-            )
-            classification_pipeline(paths, class_embeds, **class_config, **kwargs)
+            probing_pipeline(
+                model,
+                ground_truth, embeds, 
+                paths, single_label=False,
+                **class_config,
+                **kwargs
+                )
 
-    embeds_array = np.concatenate(list(embeds.values()))
-    clustering(paths, embeds_array, ground_truth, **kwargs)
+    clustering_pipeline(model, ground_truth, embeds, paths, **kwargs)
