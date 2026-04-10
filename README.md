@@ -21,7 +21,7 @@ import bacpipe
 
 bacpipe.play()
 ```
-A more detailed description of the API can be found under [API](#api). Full documentation can be found at [https://bacpipe.readthedocs.io](https://bacpipe.readthedocs.io). The github repository can be found at [https://github.com/bioacoustic-ai/bacpipe](https://github.com/bioacoustic-ai/bacpipe).
+A more detailed description of the API can be found under [API](#api). In `bacpipe/examples` you can find 3 jupyter notebooks demonstrating different use cases of the API. Full documentation can be found at [https://bacpipe.readthedocs.io](https://bacpipe.readthedocs.io). The github repository can be found at [https://github.com/bioacoustic-ai/bacpipe](https://github.com/bioacoustic-ai/bacpipe).
 
 There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) available on youtube to install and run bacpipe.
 
