@@ -107,3 +107,11 @@ def test_evaluation(model):
                 )
 
     clustering_pipeline(model, ground_truth, embeds, paths, **kwargs)
+
+def test_benchmarking():
+    results = bacpipe.benchmark(
+        'birdnet',
+        'bacpipe/tests/test_data',
+        annotations_file='annotations.csv'
+    )
+    assert isinstance(results, dict)
