@@ -440,6 +440,8 @@ def model_specific_evaluation(
         CustomModels = kwargs.pop('CustomModels')
     else:
         CustomModels = [None] * len(models)
+    ensure_models_exist(settings.model_base_path, models)
+    
     for idx, model_name in enumerate(models):
         paths = get_paths(model_name)
         if loader_dict[model_name].classifier_should_be_run(paths, **kwargs):

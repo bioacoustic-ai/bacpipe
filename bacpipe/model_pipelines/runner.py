@@ -644,7 +644,10 @@ class Classifier:
         return cls_results
     
     def classify(self, embeddings):
-        clfier_output = self.model.classifier_predictions(embeddings)
+        try:
+            clfier_output = self.model.classifier_predictions(torch.tensor(embeddings))
+        except:
+            clfier_output = self.model.classifier_predictions(embeddings)
             
         if self.model.device == "cuda" and isinstance(clfier_output, torch.Tensor):
             self.predictions = self.predictions.cuda()
@@ -809,7 +812,11 @@ class Classifier:
             total=len(all_embeds)
             ):        
             
-            clfier_output = self.model.classifier_predictions(embeddings)
+            try:
+                clfier_output = self.model.classifier_predictions(torch.tensor(embeddings))
+            except:
+                clfier_output = self.model.classifier_predictions(embeddings)
+
             if isinstance(clfier_output, torch.Tensor):
                 self.predictions = torch.cat(
                     [self.predictions, clfier_output.clone().detach()]
