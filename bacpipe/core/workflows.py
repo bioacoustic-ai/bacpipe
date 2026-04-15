@@ -130,8 +130,6 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
     """
     if isinstance(model_names, str):
         model_names = [model_names]
-    else:
-        model_names = list(model_names)
 
     model_base_path = Path(model_base_path)
     model_base_path.parent.mkdir(exist_ok=True, parents=True)
