@@ -1,6 +1,6 @@
 clustering = """
-The clustering validation methods proposed in bacpipe are external 
-validation methods (https://doi.org/10.1016/j.neucom.2024.128198), 
+The clustering evaluation method proposed in bacpipe are external 
+evaluation methods (https://doi.org/10.1016/j.neucom.2024.128198), 
 meaning that they are based on ground truth. 
 However, in the absence of other ground truth, 
 validation's measurements like 
@@ -20,3 +20,14 @@ exploratory method as this is a fast and effective way to explore relations
 between metadata and embedding's structure. However, appropriate steps should 
 be taken for further analysis into the strucutre.
 """
+
+probing = """
+The probing evaluation method requires ground truth annotations to be 
+present in a specific form: a .csv file saved in the root directory 
+of your audio files with the columns: `audiofilename`, `start`, `end`, 
+`label:species` (also specified in the ReadMe file). That data is separated
+into train, validation and test and using that a linear and knn probe is 
+trained and fitted. The results below show the classwise performance 
+of the probe.
+"""
+

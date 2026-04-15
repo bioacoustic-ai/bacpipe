@@ -302,6 +302,11 @@ def plot_classification_heatmap(
     if len(y_indices) > len(y_indices) / int(kwargs.get('heatmap_fig_height') / 100):
         nr_y_ticks = int(kwargs.get('heatmap_fig_height') / 100) 
     
+    clfier_type = (
+        f'{predictions_loader.current_clfier_type} probing' 
+        if not predictions_loader.current_clfier_type == 'Integrated' 
+        else 'integrated classifier'
+        )
     # Create heatmap
     fig = px.imshow(
         plot_data,
@@ -314,7 +319,7 @@ def plot_classification_heatmap(
         aspect="auto",
         title=(
             f'Presence heatmap using {model.upper()} with '
-            f'{predictions_loader.current_clfier_type} probing <br>'
+            f'{clfier_type} <br>'
             f'for {species} '
             f'with threshold of {PredictionsLoader.verify_threshold(threshold)}.'
             )
@@ -387,14 +392,15 @@ class PredictionsLoader:
         ):
         threshold = self.verify_threshold(threshold)
         if hasattr(self, 'binary_presence'):
-            if (
-                self.current_model == model
-                and self.current_threshold == threshold
-                and (
+            if all([
+                self.current_model == model,
+                self.current_threshold == threshold,
+                not self.class_dict is None,
+                (
                     self.current_clfier_type == clfier_type
                     or clfier_type is None
                     )
-                ):
+                ]):
                 return
             
         self.current_model = model
@@ -433,9 +439,9 @@ class PredictionsLoader:
         
         if self.binary_presence is None:
             warning_string = (
-                "It seems like the classifier hasn't been run yet, or "
-                f"that {model} doesn't have a pretrained classifier. "
-                "If the model has a pretrained classifier, please rerun "
+                "It seems like the classifier hasn't been run yet, or <br>"
+                f"that {model} doesn't have a pretrained classifier. <br>"
+                "If the model has a pretrained classifier, please rerun <br>"
                 "bacpipe with the setting `run default classifier` set to `True`."
             )
             self.loading_pane.value = warning_string

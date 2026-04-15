@@ -270,17 +270,20 @@ class DashBoard(DashBoardHelper):
         return (
             "Probing Performance",
             (
-                self.plot_widget(
-                    plot_classification_results,
-                    path_func=self.path_func,
-                    task_name=self.class_select[widget_idx],
-                    model_name=self.model_select[widget_idx],
-                    return_fig=True,
-                )
-                if "probing" in self.evaluation_task
-                else pn.pane.Markdown(
-                    "No probing task specified. "
-                    "Please check the config file."
+                pn.Column(
+                    pn.widgets.TooltipIcon(value=tooltips.probing),
+                    self.plot_widget(
+                        plot_classification_results,
+                        path_func=self.path_func,
+                        task_name=self.class_select[widget_idx],
+                        model_name=self.model_select[widget_idx],
+                        return_fig=True,
+                    )
+                    if "probing" in self.evaluation_task
+                    else pn.pane.Markdown(
+                        "No probing task specified. "
+                        "Please check the config file."
+                    )
                 )
             )
         )
@@ -531,6 +534,7 @@ class DashBoard(DashBoardHelper):
                         accumulate_by=self.accumulate_select[widget_idx], 
                         species=self.species_select[widget_idx],
                         threshold=self.clfier_thresh[widget_idx],
+                        clfier_type=self.clfier_select[widget_idx],
                         **self.kwargs
                         )
                     
