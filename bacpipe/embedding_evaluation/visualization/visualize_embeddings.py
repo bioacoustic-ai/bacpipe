@@ -244,28 +244,12 @@ def plot_embeddings(
     if return_axes:
         return axes, c_label_dict, points
     elif dashboard:
-        if True:
-            # return plotly_mutual_information(
-            return plot_embeddings_px(
-                embeds, 
-                labels,
-                c_label_dict,
-                label_by=label_by
-            )
-        else:
-            fig.set_size_inches(6, 5)
-            fig.set_dpi(300)
-            fig.tight_layout()
-            set_colorbar_or_legend(
-                fig,
-                axes,
-                points,
-                c_label_dict,
-                dashboard=dashboard,
-                label_by=label_by,
-                **kwargs,
-            )
-            return fig
+        return plot_embeddings_px(
+            embeds, 
+            labels,
+            c_label_dict,
+            label_by=label_by
+        )
     else:
         set_colorbar_or_legend(
             fig, axes, points, c_label_dict, label_by=label_by, **kwargs

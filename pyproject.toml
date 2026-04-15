@@ -69,7 +69,7 @@ dependencies = [
     "kiwisolver==1.4.9",
     "lazy-loader==0.4",
     "libclang==18.1.1",
-    "librosa==0.10.2.post1",
+    "librosa>=0.10.2.post1",
     "linkify-it-py==2.0.3",
     "llvmlite==0.44.0",
     "markdown==3.9",

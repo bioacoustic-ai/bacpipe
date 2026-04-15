@@ -419,7 +419,7 @@ class Loader:
     def get_audio_files(
         audio_dir, 
         audio_suffixes=settings.audio_suffixes,
-        return_as='pathlib.Path'
+        return_type='pathlib.Path'
         ):
         """
         Collect all audio files in a given directory that have
@@ -431,7 +431,7 @@ class Loader:
             path to audio data
         audio_suffixes : list, optional
             list of audio suffixes, by default settings.audio_suffixes
-        return_as : str, optional
+        return_type : str, optional
             specify if list should be returned as list
             of strings or list of pathlib.Path objects
             which comes in handy for some downstream 
@@ -450,9 +450,9 @@ class Loader:
         ]
         files_list = np.unique(files_list).tolist()
         assert len(files_list) > 0, "No audio files found in audio_dir."
-        if return_as == 'pathlib.Path':
+        if return_type == 'pathlib.Path':
             return files_list
-        elif return_as == 'str':
+        elif return_type == 'str':
             return [str(f) for f in files_list]
         
 

@@ -206,7 +206,7 @@ Models currently include:
 |   Insect66NET |   [paper](https://doi.org/10.1371/journal.pcbi.1011541)   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   44.1 kHz|   5.5 s| 1280 |
 |   Insect459NET |   [paper](https://arxiv.org/pdf/2503.15074)   |   pending    |   44.1 kHz|   5.5 s| 1280 |
 |   Mix2        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   16 kHz|   3 s| 960 |
-|   NatureBEATs        |   [paper](https://arxiv.org/abs/2411.07186)   |   [code](https://github.com/earthspecies/NatureLM-audio)    |   16 kHz|   10 s| 768 |
+|   NatureBEATs        |   [paper](https://arxiv.org/abs/2411.07186)   |   [code](https://github.com/earthspecies/NatureLM-audio)    |   16 kHz|   5 s| 768 |
 |   Perch_Bird       |   [paper](https://www.nature.com/articles/s41598-023-49989-z.epdf)   |   [code](https://github.com/google-research/perch)    |   32 kHz|   5 s| 1280 |
 |   Perch_V2       |   [paper](https://arxiv.org/abs/2508.04665)   |   [code](https://github.com/google-research/perch_hoplite)    |   32 kHz|   5 s| 1536 |
 |   ProtoCLR     |   [paper](https://arxiv.org/pdf/2409.08589)   |   [code](https://github.com/ilyassmoummad/ProtoCLR)    |   16 kHz|   6 s| 384 |
@@ -988,17 +988,17 @@ Previous versions of **bacpipe** included models like animal2vec, but the requir
 A lot of work has gone into creating these bioacoustic models, both by data collectors and by machine learning practitioners, please cite the authors of the respective models (all models are referenced in the table above).
 
 
-This work is first described in a conference paper. If you use **bacpipe** for your research, please include the following reference:
+This work now has a paper associated with it. The manuscript is currently under review. A preprint is available on arXiv. If you use **bacpipe** for your research, please include the following reference:
 
 ```bibtex
-@misc{kather2025clusteringnovelclassrecognition,
-      title={Clustering and novel class recognition: evaluating bioacoustic deep learning feature extractors}, 
-      author={Vincent S. Kather and Burooj Ghani and Dan Stowell},
-      year={2025},
-      eprint={2504.06710},
+@misc{kather2026bacpipepythonpackagemake,
+      title={bacpipe: a Python package to make bioacoustic deep learning models accessible}, 
+      author={Vincent S. Kather and Sylvain Haupert and Burooj Ghani and Dan Stowell},
+      year={2026},
+      eprint={2604.11560},
       archivePrefix={arXiv},
       primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2504.06710}, 
+      url={https://arxiv.org/abs/2604.11560}, 
 }
 ```
 

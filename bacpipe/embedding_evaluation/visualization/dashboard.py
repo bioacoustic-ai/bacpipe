@@ -14,6 +14,7 @@ from .visualize_embeddings import (
     plot_comparison,
     EmbedAndLabelLoader,
 )
+from . import tooltips
 from .visualize import (
     plot_clusterings,
     clustering_overview,
@@ -243,21 +244,24 @@ class DashBoard(DashBoardHelper):
         return (
             "Clustering Results",
             (
-                self.plot_widget(
-                    plot_clusterings,
-                    path_func=self.path_func,
-                    model_name=self.model_select[widget_idx],
-                    label_by=self.label_select[widget_idx],
-                    no_noise=(
-                        self.noise_select[widget_idx]
-                        if len(self.noise_select.keys()) > 0
-                        else False
-                    ),
-                )
-                if "clustering" in self.evaluation_task
-                else pn.pane.Markdown(
-                    "No clustering task specified. "
-                    "Please check the config file."
+                pn.Column(
+                    pn.widgets.TooltipIcon(value=tooltips.clustering),
+                    self.plot_widget(
+                        plot_clusterings,
+                        path_func=self.path_func,
+                        model_name=self.model_select[widget_idx],
+                        label_by=self.label_select[widget_idx],
+                        no_noise=(
+                            self.noise_select[widget_idx]
+                            if len(self.noise_select.keys()) > 0
+                            else False
+                        ),
+                    )
+                    if "clustering" in self.evaluation_task
+                    else pn.pane.Markdown(
+                        "No clustering task specified. "
+                        "Please check the config file."
+                    )
                 )
             )
         )
@@ -359,22 +363,25 @@ class DashBoard(DashBoardHelper):
                 (
                     "Clustering Overview",
                     (
-                        self.plot_widget(
-                            clustering_overview,
-                            path_func=self.path_func,
-                            model_list=self.models,
-                            label_by=self.label_select[widget_idx],
-                            no_noise=(
-                                self.noise_select[widget_idx]
-                                if len(self.noise_select.keys()) > 0
-                                else False
-                            ),
-                            **self.kwargs
-                        )
-                        if "clustering" in self.evaluation_task
-                        else pn.pane.Markdown(
-                            "No clustering task specified. "
-                            "Please check the config file."
+                        pn.Column(
+                            pn.widgets.TooltipIcon(value=tooltips.clustering),
+                            self.plot_widget(
+                                clustering_overview,
+                                path_func=self.path_func,
+                                model_list=self.models,
+                                label_by=self.label_select[widget_idx],
+                                no_noise=(
+                                    self.noise_select[widget_idx]
+                                    if len(self.noise_select.keys()) > 0
+                                    else False
+                                ),
+                                **self.kwargs
+                            )
+                            if "clustering" in self.evaluation_task
+                            else pn.pane.Markdown(
+                                "No clustering task specified. "
+                                "Please check the config file."
+                            )
                         )
                     ),
                 ),

@@ -118,8 +118,8 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
     ----------
     model_base_path : Path
         Local base directory where the checkpoints should be stored.
-    model_names : list
-        list of models to run
+    model_names : str or list
+        Model name or list of model names to run
     repo_id : str, optional
         Hugging Face Hub repo ID, by default "vinikay/bacpipe_models"
 
@@ -128,6 +128,9 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
     str
         path to saved models
     """
+    if isinstance(model_names, str):
+        model_names = [model_names]
+
     model_base_path = Path(model_base_path)
     model_base_path.parent.mkdir(exist_ok=True, parents=True)
     
@@ -440,6 +443,8 @@ def model_specific_evaluation(
         CustomModels = kwargs.pop('CustomModels')
     else:
         CustomModels = [None] * len(models)
+    ensure_models_exist(settings.model_base_path, models)
+    
     for idx, model_name in enumerate(models):
         paths = get_paths(model_name)
         if loader_dict[model_name].classifier_should_be_run(paths, **kwargs):
