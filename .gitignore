@@ -33,3 +33,6 @@ bacpipe/tests/results_files/*
 exploration/*
 !exploration/explore_embeds.py
 !exploration/explore_dashboard.py
+
+# ignore notebooks output
+*.ipynb_checkpoints
