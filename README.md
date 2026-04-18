@@ -1,6 +1,9 @@
 # Welcome to **bacpipe** (**B**io**A**coustic **C**ollection **Pipe**line)
 
 [![Documentation Status](https://readthedocs.org/projects/bacpipe/badge/?version=latest)](https://bacpipe.readthedocs.io/en/latest/?badge=latest)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/bacpipe?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/bacpipe)
+[![PyPI version](https://badge.fury.io/py/bacpipe.svg?icon=si%3Apython&icon_color=%23f66151)](https://badge.fury.io/py/bacpipe)
+[![arXiv](https://img.shields.io/badge/arXiv-2604.11560-b31b1b.svg)](https://arxiv.org/abs/2604.11560)
 
 ![](src/bacpipe_logo.png)
 image by Nicole Allison
