@@ -140,7 +140,8 @@ class SpectrogramPlot:
             audio = tukey(len(audio), alpha=0.01) * audio
             return_audio = lb.util.fix_length(
                 audio, 
-                size=int((end - start) * self.orig_sr), 
+                # size=int((end - start) * self.orig_sr), 
+                size=self.segment_length, 
                 mode=self.kwargs['padding']
                 )
         else:

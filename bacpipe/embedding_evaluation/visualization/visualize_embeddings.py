@@ -693,11 +693,18 @@ def plot_embeddings_px(
     audiofilenames = embeds['metadata']['audio_files']
     
     starts = embeds['timestamp']
-    ends = np.array(starts) + (
-        embeds['metadata']['segment_length (samples)'] 
-        / embeds['metadata']['sample_rate (Hz)']
-        )
-    ends = ends.tolist()
+    
+    if embeds.get('durations'):
+        ends = np.array(embeds.get('durations')) + np.array(starts)
+        ends = ends.tolist()
+    else:
+        ends = np.array(starts) + (
+            embeds['metadata']['segment_length (samples)'] 
+            / embeds['metadata']['sample_rate (Hz)']
+            )
+        ends = ends.tolist()
+    
+    starts, ends = np.round(starts, 4), np.round(ends, 4)
     
     # Calculate unique labels to decide on Legend vs Colorbar
     unique_labels = np.unique(labels)

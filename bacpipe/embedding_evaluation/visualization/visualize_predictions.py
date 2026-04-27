@@ -52,10 +52,10 @@ def plot_classification_results(
         probe_path = paths.probe_path / f"probe_results_{task_name}.json"
         if not probe_path.exists():
             error = (
-                f"\nThe classification file {probe_path} does not exist. Perhaps it was not "
+                f"\nThe probing file {probe_path} does not exist. Perhaps it was not "
                 "created yet. To avoid getting this error, make sure you have not "
-                " included 'classification' in the 'evaluation_tasks'. If you want to compute "
-                "classification, make sure to set `overwrite=True`."
+                " included 'probing' in the 'evaluation_tasks'. If you want to compute "
+                "probing, make sure to set `overwrite=True`."
             )
             logger.exception(error)
             raise AssertionError(error)

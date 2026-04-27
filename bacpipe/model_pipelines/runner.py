@@ -264,7 +264,19 @@ class Embedder(AudioHandler):
                          self.model.model.transform(self.loader.read_embedding_file(file))]
                     )
         else:
-            dim_reduced_embeddings = self.get_embeddings_from_model(embeddings)
+            try:
+                dim_reduced_embeddings = self.get_embeddings_from_model(embeddings)
+            except NameError as e:
+                error_string = (
+                    "\n No embeddings found to process dimensionality reduction. It seems like "
+                    "there was an error when initially calculating embeddings. See the error "
+                    "logs in the `logs` directory or previous error messages in the terminal. \n"
+                )
+                logger.exception(
+                    f"error_string {e}"
+                )
+                raise NameError(error_string)
+            
         self.loader.save_embedding_file(file, dim_reduced_embeddings)
 
     def embeddings_using_multithreading(self, array_of_audios):
@@ -571,6 +583,24 @@ class Classifier:
         
         self.predictions = torch.tensor([])
         
+        if kwargs.get('only_embed_annotations'):
+            self.only_embed_annotations = True
+            from bacpipe.embedding_evaluation.label_embeddings import (
+                load_labels_and_build_dict, 
+                assign_global_get_paths_function, 
+                get_paths
+                )
+            assign_global_get_paths_function(audio_dir)
+            paths = get_paths(self.model_name)
+            self.df, _ = load_labels_and_build_dict(
+                paths, 
+                kwargs.get('annotations_filename'),
+                audio_dir,
+                bool_filter_labels=False
+            )
+            self.start_timestamps = self.df.start.values
+            self.end_timestamps = self.df.end.values
+        
     @staticmethod
     def filter_top_k_classifications(probabilities, class_names,
                                      class_indices, class_time_bins, 
@@ -644,9 +674,9 @@ class Classifier:
         return cls_results
     
     def classify(self, embeddings):
-        try:
+        if not isinstance(embeddings, torch.Tensor):
             clfier_output = self.model.classifier_predictions(torch.tensor(embeddings))
-        except:
+        else:
             clfier_output = self.model.classifier_predictions(embeddings)
             
         if self.model.device == "cuda" and isinstance(clfier_output, torch.Tensor):
@@ -677,20 +707,29 @@ class Classifier:
         classifier_annotations = pd.DataFrame()
         
         maxes = torch.max(self.predictions, dim=1)
-        # outputs_exceeding_thresh = self.predictions[
-        #     maxes.values > self.classifier_threshold
-        # ]
         
-        active_time_bins = np.arange(
-            self.predictions.shape[0]
-            )[maxes.values > self.classifier_threshold]
-        
-        classifier_annotations["start"] = active_time_bins * (
-            self.model.segment_length / self.model.sr
-        )
-        classifier_annotations["end"] = classifier_annotations["start"] + (
-            self.model.segment_length / self.model.sr
-        )
+        if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
+            classifier_annotations["start"] = (
+                self.start_timestamps[maxes.values > self.classifier_threshold]
+            )
+            classifier_annotations["end"] = (
+                self.end_timestamps[maxes.values > self.classifier_threshold]
+            )
+        else:
+            time_bins = np.arange(self.predictions.shape[0])
+            self.start_timestamps = time_bins * (
+                self.model.segment_length / self.model.sr
+            )
+            self.end_timestamps = self.start_timestamps + (
+                self.model.segment_length / self.model.sr
+            )
+            classifier_annotations["start"] = self.start_timestamps[
+                maxes.values > self.classifier_threshold
+                ]
+            classifier_annotations["end"] = self.end_timestamps[
+                maxes.values > self.classifier_threshold
+                ]
+            
         classifier_annotations["audiofilename"] = str(
             file.relative_to(fileloader_obj.audio_dir)
         )
@@ -736,7 +775,7 @@ class Classifier:
         
     def save_annotation_table(self, loader_obj: bacpipe.Loader):
         self.paths.preds_path.mkdir(exist_ok=True, parents=True)
-        loader_obj.get_annotations_parquet()
+        loader_obj.get_annotations_parquet(starts=self.start_timestamps, ends=self.end_timestamps)
         save_path = (
             self.paths.preds_path 
             / f"{loader_obj.model_name}_classifier_annotations.csv"
@@ -795,10 +834,12 @@ class Classifier:
         
         df = pd.DataFrame()
         df['label:species'] = specs
-        df['start'] = timestamps * (self.model.segment_length / self.model.sr)
-        df['end'] = df.start + (self.model.segment_length / self.model.sr)
+        df['start'] = self.start_timestamps[timestamps]
+        df['end'] = self.end_timestamps[timestamps]
         from bacpipe.embedding_evaluation.label_embeddings import create_Raven_annotation_table
-        raven_df = create_Raven_annotation_table(df, 'species')
+        raven_df = create_Raven_annotation_table(
+            df, 'species', high_freq=self.model.sr*np.array(probs)
+            )
         raven_df['Confidence'] = probs
         raven_df["Begin Path"] = relative_parent_path / (file.stem + file.suffix)
         raven_df["File Offset (s)"] = df.start
@@ -812,9 +853,9 @@ class Classifier:
             total=len(all_embeds)
             ):        
             
-            try:
+            if not isinstance(embeddings, torch.Tensor):
                 clfier_output = self.model.classifier_predictions(torch.tensor(embeddings))
-            except:
+            else:
                 clfier_output = self.model.classifier_predictions(embeddings)
 
             if isinstance(clfier_output, torch.Tensor):

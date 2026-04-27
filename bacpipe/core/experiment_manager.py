@@ -241,9 +241,9 @@ class Loader:
                 self._update_audio_file_list(
                     audio_files, corresponding_audio_file_bool
                     )
+        self.metadata_dict['segment_length (samples)'] = module.LENGTH_IN_SAMPLES
+        self.metadata_dict['sample_rate (Hz)'] = module.SAMPLE_RATE
         if len(self.files) == 0:
-            self.metadata_dict['segment_length (samples)'] = module.LENGTH_IN_SAMPLES
-            self.metadata_dict['sample_rate (Hz)'] = module.SAMPLE_RATE
             self.write_metadata_file()
             self.combination_already_exists = True
 
@@ -387,7 +387,23 @@ class Loader:
             )
             return
         else:
-            self._handle_incomplete_run(d)
+            if self.only_embed_annotations:
+                self._get_metadata_dict(d)
+                logger.info(
+                    "\n### Embeddings already exist. "
+                    f"The number of audio files ({num_audio_files}) "
+                    f"and the number of embeddings files ({num_files}) don't "
+                    "exactly match. Since you selected to only compute embeddings "
+                    "from annotated segments this check might always cause problems "
+                    "if you have a lot of audio files but only some of them are annoateted. "
+                    "To avoid this causing a recomputing, move the audio files that are "
+                    "not annotated to a different folder please. \n\n"
+                    f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
+                )
+                # self._handle_incomplete_run(d)
+                self.combination_already_exists = True
+            else:
+                self._handle_incomplete_run(d)
 
     def _handle_incomplete_run(self, directory):
         self.continue_incomplete_run = True
@@ -601,7 +617,7 @@ class Loader:
             return np.vstack(list(d.values()))
         
 
-    def get_preds_array(self, return_type='dict'):
+    def get_preds_array(self, return_type='dict', **kwargs):
         preds_path = (
             self.paths.preds_path
             / 'original_classifier_outputs'
@@ -689,13 +705,27 @@ class Loader:
                         axis=0
                         )
                     )[0])
-            df_dict['start'].extend(
-                (df_dict['active_time_bins'][-1] * seg_len).tolist()
-            )
-            df_dict['end'].extend(
                 
-                ((df_dict['active_time_bins'][-1] * seg_len) + seg_len).tolist()
-            )
+            if (
+                self.only_embed_annotations
+                and not kwargs.get('starts') is None
+                and not kwargs.get('ends') is None
+                ):
+                starts = kwargs.get('starts')
+                ends = kwargs.get('ends')
+                df_dict['start'].extend(
+                    (starts[df_dict['active_time_bins'][-1]]).tolist()
+                )
+                df_dict['end'].extend(
+                    (ends[df_dict['active_time_bins'][-1]]).tolist()
+                )
+            else:
+                df_dict['start'].extend(
+                    (df_dict['active_time_bins'][-1] * seg_len).tolist()
+                )
+                df_dict['end'].extend(
+                    ((df_dict['active_time_bins'][-1] * seg_len) + seg_len).tolist()
+                )
             df_dict['audiofilename'].extend(
                 [
                     relative_audio_stems[corresponding_audio_file_bool][0] 
@@ -730,14 +760,14 @@ class Loader:
         else:
             return cl_array.T, keys2idx
     
-    def get_annotations_parquet(self):
+    def get_annotations_parquet(self, **kwargs):
         file_name = self.model_name + '_all_predictions'
         all_prediction_files = [f.stem for f in self.paths.preds_path.iterdir()]
         if (
             config.overwrite
             or not file_name in all_prediction_files
             ):
-            df = self.get_preds_array(return_type='dataframe')
+            df = self.get_preds_array(return_type='dataframe', **kwargs)
             if len(df) * len(df.T) > 3_000_000:
                 df.to_parquet(self.paths.preds_path / (file_name + '.parquet'))
             else:
@@ -856,13 +886,31 @@ class Loader:
             for i, var in zip(range(embeds.shape[1]), ["x", "y"])
         }
         
-        embedding_dimensions = self.metadata_dict["files"]["embedding_dimensions"]
+        if self.only_embed_annotations:
+            from bacpipe.embedding_evaluation.label_embeddings import (
+                load_labels_and_build_dict, 
+                assign_global_get_paths_function, 
+                get_paths
+                )
+            assign_global_get_paths_function(self.audio_dir)
+            paths = get_paths(self.model_name)
+            df, _ = load_labels_and_build_dict(
+                paths, 
+                self.annotations_filename,
+                self.audio_dir,
+                bool_filter_labels=False
+            )
+            t_stamps = df.start.values.tolist()
+            durations = df.end - df.start
+            d["durations"] = durations.values.tolist()
+        else:
+            embedding_dimensions = self.metadata_dict["files"]["embedding_dimensions"]
 
-        for num_segments, *_ in embedding_dimensions:
-            [
-                t_stamps.append(np.round(t, 4)) 
-                for t in np.arange(0, num_segments) * input_len
-            ]
+            for num_segments, *_ in embedding_dimensions:
+                [
+                    t_stamps.append(np.round(t, 4)) 
+                    for t in np.arange(0, num_segments) * input_len
+                ]
             
         d["timestamp"] = t_stamps
 
