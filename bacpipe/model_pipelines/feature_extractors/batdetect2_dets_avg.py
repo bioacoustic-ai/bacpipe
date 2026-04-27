@@ -6,6 +6,7 @@ import torch
 from ..model_utils import ModelBaseClass
 
 SAMPLE_RATE = 256_000
+LENGTH_IN_SAMPLES = 256_000
 DEFAULT_SEGMENT_DURATION = 1
 DEFAULT_DETECTION_THRESHOLD = 0.3
 NUM_FEATURES = 32
@@ -61,10 +62,12 @@ class Model(ModelBaseClass):
         segments = audio.numpy()
         # NOTE: Need to pre-process each segment separately
         spectrograms = [self.generate_spectrogram(segment) for segment in segments]
-        return torch.from_numpy(np.concatenate(spectrograms, axis=0))
+        return torch.stack(spectrograms, axis=0).squeeze()
+        # return torch.from_numpy(np.concatenate(spectrograms, axis=0))
 
     @torch.no_grad()
     def __call__(self, x, return_class_results=False):
+        x = x.unsqueeze(1)
         output = self.model(x)
 
         results, features = self.non_max_suppression(
@@ -93,14 +96,14 @@ class Model(ModelBaseClass):
 
         return output_features
 
-    def classifier_predictions(self, inference_results):
-        # NOTE: This method is left unimplemented. Since 'inference_results'
-        # are averaged across several detections to map to the single-feature
-        # interface, running a classifier on these aggregated features won't
-        # produce the intended results.
-        raise NotImplementedError(
-            "Classifier predictions are invalid for averaged features."
-        )
+    # def classifier_predictions(self, inference_results):
+    #     # NOTE: This method is left unimplemented. Since 'inference_results'
+    #     # are averaged across several detections to map to the single-feature
+    #     # interface, running a classifier on these aggregated features won't
+    #     # produce the intended results.
+    #     raise NotImplementedError(
+    #         "Classifier predictions are invalid for averaged features."
+    #     )
 
 
 def get_mean_detection_features(
