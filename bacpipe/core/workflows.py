@@ -736,13 +736,17 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                 embed.classifier.run_default_classifier(ld)
         return ld
     except KeyboardInterrupt:
-        if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
-            all_files = list(Path(ld.embed_dir).rglob('*'))
-            if len(all_files) < 15:
-                logger.info(f"KeyboardInterrupt: Exiting and deleting created {ld.embed_dir}.")
-                import shutil
+        try:
+            if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
+                all_files = list(Path(ld.embed_dir).rglob('*'))
+                if len(all_files) < 15:
+                    logger.info(f"KeyboardInterrupt: Exiting and deleting created {ld.embed_dir}.")
+                    import shutil
 
-                shutil.rmtree(ld.embed_dir)
-            else:
-                logger.info(f"KeyboardInterrupt: Exiting but not deleting {ld.embed_dir}.")
+                    shutil.rmtree(ld.embed_dir)
+                else:
+                    logger.info(f"KeyboardInterrupt: Exiting but not deleting {ld.embed_dir}.")
+        except NameError:
+            logger.info("Bacpipe exiting.")
         import sys
+        sys.exit()

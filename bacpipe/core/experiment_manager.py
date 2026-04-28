@@ -2,6 +2,7 @@
 import json
 import yaml
 import time
+from tqdm import tqdm
 import logging
 import importlib
 import numpy as np
@@ -211,7 +212,11 @@ class Loader:
              ])
         audio_files = np.array(self.files)
         audio_suffixes = np.array([f.suffix for f in self.files])
-        for file in already_processed_files:
+        for file in tqdm(
+            already_processed_files, 
+            "Loading already processed files to update the metadata",
+            total=len(already_processed_files)
+            ):
             with open(file, 'rb') as f:
                 corresponding_audio_file_bool = (
                     relative_audio_stems==str(
@@ -445,10 +450,14 @@ class Loader:
         audio_dir = Path(audio_dir)
         files_list = []
         [
-            [files_list.append(ll) for ll in audio_dir.rglob(f"*{string}")]
-            for string in audio_suffixes
+            # [files_list.append(ll) for ll in audio_dir.rglob(f"*{string}")]
+            # for string in audio_suffixes
+            files_list.append(file) 
+            for file in tqdm(audio_dir.rglob("*"), 'finding audio files')
+            if file.suffix in audio_suffixes
         ]
-        files_list = np.unique(files_list).tolist()
+        files_list = list(set(files_list))
+        files_list.sort()
         assert len(files_list) > 0, "No audio files found in audio_dir."
         if return_type == 'pathlib.Path':
             return files_list
@@ -644,7 +653,11 @@ class Loader:
             audiofilename = [],
             active_time_bins = []
             )
-        for idx, file in enumerate(files):
+        for idx, file in tqdm(
+            enumerate(files), 
+            'Collecting already processed predictions',
+            total=len(files)
+            ):
             corresponding_audio_file_bool = (
                 relative_audio_stems==str(
                     file.relative_to(preds_path)
