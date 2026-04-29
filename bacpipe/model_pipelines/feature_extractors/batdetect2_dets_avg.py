@@ -59,7 +59,10 @@ class Model(ModelBaseClass):
         self.classes = self.config["class_names"]
 
     def preprocess(self, audio):
-        segments = audio.numpy()
+        if audio.device.type == 'cuda':
+            segments = audio.cpu().numpy()
+        else:
+            segments = audio.numpy()
         # NOTE: Need to pre-process each segment separately
         spectrograms = [self.generate_spectrogram(segment) for segment in segments]
         return torch.stack(spectrograms, axis=0).squeeze()
