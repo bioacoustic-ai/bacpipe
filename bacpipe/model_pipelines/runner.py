@@ -240,29 +240,33 @@ class Embedder(AudioHandler):
             use_sample_of_files = False
             sample_files = self.loader.files
         
-        for idx, file in enumerate(
-            tqdm(sample_files, desc="loading files", position=1, leave=False)
-        ):
-            if idx == 0:
-                embeddings = self.loader.read_embedding_file(file)
-            else:
-                embeddings = np.concatenate(
-                    [embeddings, self.loader.read_embedding_file(file)]
-                )
+        embeddings_list = []
+        for file in tqdm(
+            sample_files, 
+            desc="loading files", 
+            position=1, 
+            leave=False
+            ):
+            embeddings_list.append(self.loader.read_embedding_file(file))
+
+        embeddings = np.concatenate(embeddings_list, axis=0)
+        
         if use_sample_of_files:
             self.get_embeddings_from_model(embeddings)
-            for idx, file in enumerate(
-                tqdm(self.loader.files, desc="processing files", position=1, leave=False)
-            ):
-                if idx == 0:
-                    dim_reduced_embeddings = self.model.model.transform(
+            dim_reduced_embeddings_list = []
+            for file in tqdm(
+                self.loader.files, 
+                desc="processing files", 
+                position=1, 
+                leave=False
+                ):
+                dim_reduced_embeddings_list.append(
+                    self.model.model.transform(
                         self.loader.read_embedding_file(file)
                         )
-                else:
-                    dim_reduced_embeddings = np.concatenate(
-                        [dim_reduced_embeddings, 
-                         self.model.model.transform(self.loader.read_embedding_file(file))]
                     )
+
+            dim_reduced_embeddings = np.concatenate(dim_reduced_embeddings_list, axis=0)
         else:
             try:
                 dim_reduced_embeddings = self.get_embeddings_from_model(embeddings)
