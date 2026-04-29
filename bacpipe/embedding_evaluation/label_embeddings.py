@@ -791,8 +791,9 @@ def build_ground_truth_labels_by_file(
 
     if np.unique(file_labels).shape[0] > 2 and kwargs.get('testing'):
         raven_tables_sanity_check(
-            df.start, segment_s, paths, audio_file, 
-            label_df, label_idx_dict, label_column, file_labels
+            df.start if kwargs.get('only_embed_annotations') else num_embeds, 
+            segment_s, paths, audio_file, 
+            label_df, label_idx_dict, label_column, file_labels, **kwargs
         )
     return all_labels
 
@@ -845,11 +846,13 @@ def fill_all_labels_array(file_labels, all_labels):
 
 def raven_tables_sanity_check(
     embed_timestamps, segment_s, paths, audio_file, 
-    label_df, label_idx_dict, label_column, file_labels
+    label_df, label_idx_dict, label_column, file_labels,
+    **kwargs
     ):
     if len(file_labels.shape) > 1:
         file_labels = file_labels[:, 0]
-    # embed_timestamps = np.arange(num_embeds) * segment_s
+    if not kwargs.get('only_embed_annotations'):
+        embed_timestamps = np.arange(embed_timestamps) * segment_s
     path = paths.labels_path.joinpath("raven_tables_for_sanity_check")
     path.mkdir(exist_ok=True, parents=True)
     if (
