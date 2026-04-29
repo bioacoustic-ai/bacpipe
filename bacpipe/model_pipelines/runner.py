@@ -713,11 +713,16 @@ class Classifier:
         maxes = torch.max(self.predictions, dim=1)
         
         if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
+            starts = self.start_timestamps[self.df.audiofilename == str(file.relative_to(fileloader_obj.audio_dir))]
+            ends = self.end_timestamps[self.df.audiofilename == str(file.relative_to(fileloader_obj.audio_dir))]
+            starts, ends = list(set(starts)), list(set(ends))
+            starts.sort(), ends.sort()
+            starts, ends = np.array(starts), np.array(ends)
             classifier_annotations["start"] = (
-                self.start_timestamps[maxes.values > self.classifier_threshold]
+                starts[maxes.values > self.classifier_threshold]
             )
             classifier_annotations["end"] = (
-                self.end_timestamps[maxes.values > self.classifier_threshold]
+                ends[maxes.values > self.classifier_threshold]
             )
         else:
             time_bins = np.arange(self.predictions.shape[0])
@@ -740,6 +745,10 @@ class Classifier:
         classifier_annotations["label:default_classifier"] = np.array(
             self.model.classes
         )[maxes.indices[maxes.values > self.classifier_threshold]].tolist()
+        
+        classifier_annotations["label:confidence"] = np.array(
+            maxes.values[maxes.values > self.classifier_threshold].tolist()
+        )
 
         if not hasattr(self, "cumulative_annotations"):
             if fileloader_obj.continue_incomplete_run:
@@ -777,9 +786,13 @@ class Classifier:
                 ignore_index=True
             )
         
-    def save_annotation_table(self, loader_obj: bacpipe.Loader):
+    def save_annotation_table(self, loader_obj: bacpipe.Loader, **kwargs):
         self.paths.preds_path.mkdir(exist_ok=True, parents=True)
-        loader_obj.get_annotations_parquet(starts=self.start_timestamps, ends=self.end_timestamps)
+        loader_obj.get_annotations_parquet(
+            starts=self.start_timestamps, 
+            ends=self.end_timestamps,
+            **kwargs
+            )
         save_path = (
             self.paths.preds_path 
             / f"{loader_obj.model_name}_classifier_annotations.csv"
@@ -802,8 +815,8 @@ class Classifier:
         file_dest = str(file_dest) + ".json"
 
 
-        if self.model.only_embed_annotations: #annotation file exists
-            np.save(file_dest.replace('.json', '.npy'), self.predictions)
+        # if self.model.only_embed_annotations: #annotation file exists
+        #     np.save(file_dest.replace('.json', '.npy'), self.predictions)
         
         self._fill_dataframe_with_classiefier_results(fileloader_obj, file)
         

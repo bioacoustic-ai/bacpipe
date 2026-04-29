@@ -466,8 +466,6 @@ class Loader:
         audio_dir = Path(audio_dir)
         files_list = []
         [
-            # [files_list.append(ll) for ll in audio_dir.rglob(f"*{string}")]
-            # for string in audio_suffixes
             files_list.append(file) 
             for file in tqdm(audio_dir.rglob("*"), 'finding audio files')
             if file.suffix in audio_suffixes
@@ -698,6 +696,10 @@ class Loader:
                 cl_array[row, col_indices] = v['classifier_predictions']
 
             total_length += current_time_bins
+        
+        
+        if return_type == 'array':
+            return cl_array.T, keys2idx
             
         # after the loop, cl_array is shape (n_species, total_bins)
         active_bins_global = np.where(cl_array.max(axis=0) > 0)[0]
@@ -755,14 +757,12 @@ class Loader:
             cols.reverse()
             df = df[cols]
             return df
-        else:
-            return cl_array.T, keys2idx
     
     def get_annotations_parquet(self, **kwargs):
         file_name = self.model_name + '_all_predictions'
         all_prediction_files = [f.stem for f in self.paths.preds_path.iterdir()]
         if (
-            config.overwrite
+            kwargs.get('overwrite')
             or not file_name in all_prediction_files
             ):
             df = self.get_preds_array(return_type='dataframe', **kwargs)

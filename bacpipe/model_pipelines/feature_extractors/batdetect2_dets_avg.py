@@ -63,7 +63,6 @@ class Model(ModelBaseClass):
         # NOTE: Need to pre-process each segment separately
         spectrograms = [self.generate_spectrogram(segment) for segment in segments]
         return torch.stack(spectrograms, axis=0).squeeze()
-        # return torch.from_numpy(np.concatenate(spectrograms, axis=0))
 
     @torch.no_grad()
     def __call__(self, x, return_class_results=False):

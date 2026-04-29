@@ -554,7 +554,6 @@ def run_pipeline_for_single_model(
     dim_reduction_model="None",
     check_if_already_processed=True,
     check_if_already_dim_reduced=True,
-    overwrite=False,
     testing=False,
     **kwargs,
 ):
@@ -714,7 +713,7 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
             # Finalize
             if embed.model.bool_classifier and not embed.dim_reduction_model:
                 try:
-                    embed.classifier.save_annotation_table(ld)
+                    embed.classifier.save_annotation_table(ld, **kwargs)
                 except Exception as e:
                     logger.warning(
                         "Error when trying to save classifier predictions. "

@@ -121,8 +121,8 @@ class AudioHandler:
                 "Continuing with next file."
             )
         
-        starts = np.array(file_annots.start, dtype=np.float32)*self.model.sr
-        ends = np.array(file_annots.end, dtype=np.float32)*self.model.sr
+        starts = np.array(file_annots.start.unique(), dtype=np.float32)*self.model.sr
+        ends = np.array(file_annots.end.unique(), dtype=np.float32)*self.model.sr
 
         audio = audio.cpu().squeeze()
         for idx, (s, e) in enumerate(zip(starts, ends)):

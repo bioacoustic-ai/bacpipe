@@ -102,7 +102,7 @@ class DefaultLabels:
             self.metadata["segment_length (samples)"]
             / self.metadata["sample_rate (Hz)"]
         )
-        segment_s_dt = dt.timedelta(seconds=segment_s)
+        segment_s_dt = dt.timedelta(seconds=float(segment_s))
         time_of_day_per_file = {}
         for file, datetime_of_file in self.timestamp_per_file.items():
             timeofday = dt.datetime(
@@ -120,8 +120,9 @@ class DefaultLabels:
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
                 
                 if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
+                    starts = self.df.start.values[self.df.audiofilename == file]
                     timestamp = (
-                        (time_of_day + dt.timedelta(seconds=self.df.start[index_of_embedding]))
+                        (time_of_day + dt.timedelta(seconds=float(starts[index_of_embedding])))
                         .time()
                         .replace(microsecond=0)
                     )
@@ -165,8 +166,9 @@ class DefaultLabels:
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
                 
                 if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
+                    starts = self.df.start.values[self.df.audiofilename == file]
                     timestamp = (
-                        (datetime_per_file + dt.timedelta(seconds=self.df.start[index_of_embedding]))
+                        (datetime_per_file + dt.timedelta(seconds=float(starts[index_of_embedding])))
                         .time()
                         .replace(microsecond=0)
                     )
@@ -219,7 +221,8 @@ class DefaultLabels:
             ):
             df_part = df[df.audiofilename == file]
             if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
-                all_time_bins = np.round(self.df.start.values, 4).tolist()
+                starts = self.df.start[self.df.audiofilename == file]
+                all_time_bins = np.round(starts.values, 4).tolist()
             else:
                 all_time_bins = np.round(np.arange(nr_embeds) * seg_len, 4).tolist()
             [all_time_bins.remove(l) for l in np.round(df_part.start, 4)]
@@ -788,7 +791,7 @@ def build_ground_truth_labels_by_file(
 
     if np.unique(file_labels).shape[0] > 2 and kwargs.get('testing'):
         raven_tables_sanity_check(
-            num_embeds, segment_s, paths, audio_file, 
+            df.start, segment_s, paths, audio_file, 
             label_df, label_idx_dict, label_column, file_labels
         )
     return all_labels
@@ -841,12 +844,12 @@ def fill_all_labels_array(file_labels, all_labels):
     return all_labels
 
 def raven_tables_sanity_check(
-    num_embeds, segment_s, paths, audio_file, 
+    embed_timestamps, segment_s, paths, audio_file, 
     label_df, label_idx_dict, label_column, file_labels
     ):
     if len(file_labels.shape) > 1:
         file_labels = file_labels[:, 0]
-    embed_timestamps = np.arange(num_embeds) * segment_s
+    # embed_timestamps = np.arange(num_embeds) * segment_s
     path = paths.labels_path.joinpath("raven_tables_for_sanity_check")
     path.mkdir(exist_ok=True, parents=True)
     if (
