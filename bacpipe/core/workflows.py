@@ -467,7 +467,7 @@ def model_specific_evaluation(
                 )
         except FileNotFoundError as e:
             logger.exception(
-                f"unable to process ground truth, {e}"
+                f"unable to process ground truth, no annotations file found."
             )
             ground_truth = None
         except IndexError as e:
