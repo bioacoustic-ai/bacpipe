@@ -467,7 +467,7 @@ def model_specific_evaluation(
                 )
         except FileNotFoundError as e:
             logger.exception(
-                f"unable to process ground truth, {e}"
+                f"unable to process ground truth, no annotations file found."
             )
             ground_truth = None
         except IndexError as e:
@@ -554,7 +554,6 @@ def run_pipeline_for_single_model(
     dim_reduction_model="None",
     check_if_already_processed=True,
     check_if_already_dim_reduced=True,
-    overwrite=False,
     testing=False,
     **kwargs,
 ):
@@ -714,7 +713,7 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
             # Finalize
             if embed.model.bool_classifier and not embed.dim_reduction_model:
                 try:
-                    embed.classifier.save_annotation_table(ld)
+                    embed.classifier.save_annotation_table(ld, **kwargs)
                 except Exception as e:
                     logger.warning(
                         "Error when trying to save classifier predictions. "
@@ -736,13 +735,17 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                 embed.classifier.run_default_classifier(ld)
         return ld
     except KeyboardInterrupt:
-        if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
-            all_files = list(Path(ld.embed_dir).rglob('*'))
-            if len(all_files) < 15:
-                logger.info(f"KeyboardInterrupt: Exiting and deleting created {ld.embed_dir}.")
-                import shutil
+        try:
+            if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
+                all_files = list(Path(ld.embed_dir).rglob('*'))
+                if len(all_files) < 15:
+                    logger.info(f"KeyboardInterrupt: Exiting and deleting created {ld.embed_dir}.")
+                    import shutil
 
-                shutil.rmtree(ld.embed_dir)
-            else:
-                logger.info(f"KeyboardInterrupt: Exiting but not deleting {ld.embed_dir}.")
+                    shutil.rmtree(ld.embed_dir)
+                else:
+                    logger.info(f"KeyboardInterrupt: Exiting but not deleting {ld.embed_dir}.")
+        except NameError:
+            logger.info("Bacpipe exiting.")
         import sys
+        sys.exit()

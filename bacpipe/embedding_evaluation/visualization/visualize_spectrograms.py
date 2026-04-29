@@ -130,7 +130,6 @@ class SpectrogramPlot:
             audio = lb.resample(
                 audio, 
                 orig_sr=int(self.orig_sr / self.kwargs.get('slowdown_rate')),
-                # orig_sr=int(self.orig_sr / (self.sample_rate / self.orig_sr)),
                 target_sr=self.sample_rate
             )
             
@@ -140,7 +139,7 @@ class SpectrogramPlot:
             audio = tukey(len(audio), alpha=0.01) * audio
             return_audio = lb.util.fix_length(
                 audio, 
-                size=int((end - start) * self.orig_sr), 
+                size=self.segment_length, 
                 mode=self.kwargs['padding']
                 )
         else:

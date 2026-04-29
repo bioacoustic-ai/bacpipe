@@ -6,6 +6,7 @@ import torch
 from ..model_utils import ModelBaseClass
 
 SAMPLE_RATE = 256_000
+LENGTH_IN_SAMPLES = 256_000
 DEFAULT_SEGMENT_DURATION = 1
 NUM_FEATURES = 32
 NUM_CLASSES = 17
@@ -37,7 +38,10 @@ class Model(ModelBaseClass):
         self.classes = self.config["class_names"]
 
     def preprocess(self, audio):
-        segments = audio.numpy()
+        if audio.device.type == 'cuda':
+            segments = audio.cpu().numpy()
+        else:
+            segments = audio.numpy()
         # NOTE: Need to pre-process each segment separately
         spectrograms = torch.stack(
             [self.generate_spectrogram(segment) for segment in segments]

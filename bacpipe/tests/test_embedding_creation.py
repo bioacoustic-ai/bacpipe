@@ -26,7 +26,7 @@ with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
 with pkg_resources.open_text(bacpipe, "config.yaml") as f:
     config = yaml.load(f, Loader=yaml.CLoader)
 
-settings["overwrite"] = True
+config["overwrite"] = True
 settings["testing"] = True
 kwargs = {**config, **settings}
 

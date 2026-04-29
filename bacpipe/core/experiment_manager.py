@@ -2,6 +2,7 @@
 import json
 import yaml
 import time
+from tqdm import tqdm
 import logging
 import importlib
 import numpy as np
@@ -211,7 +212,11 @@ class Loader:
              ])
         audio_files = np.array(self.files)
         audio_suffixes = np.array([f.suffix for f in self.files])
-        for file in already_processed_files:
+        for file in tqdm(
+            already_processed_files, 
+            "Loading already processed files to update the metadata",
+            total=len(already_processed_files)
+            ):
             with open(file, 'rb') as f:
                 corresponding_audio_file_bool = (
                     relative_audio_stems==str(
@@ -241,9 +246,9 @@ class Loader:
                 self._update_audio_file_list(
                     audio_files, corresponding_audio_file_bool
                     )
+        self.metadata_dict['segment_length (samples)'] = module.LENGTH_IN_SAMPLES
+        self.metadata_dict['sample_rate (Hz)'] = module.SAMPLE_RATE
         if len(self.files) == 0:
-            self.metadata_dict['segment_length (samples)'] = module.LENGTH_IN_SAMPLES
-            self.metadata_dict['sample_rate (Hz)'] = module.SAMPLE_RATE
             self.write_metadata_file()
             self.combination_already_exists = True
 
@@ -387,7 +392,23 @@ class Loader:
             )
             return
         else:
-            self._handle_incomplete_run(d)
+            if self.only_embed_annotations:
+                self._get_metadata_dict(d)
+                logger.info(
+                    "\n### Embeddings already exist. "
+                    f"The number of audio files ({num_audio_files}) "
+                    f"and the number of embeddings files ({num_files}) don't "
+                    "exactly match. Since you selected to only compute embeddings "
+                    "from annotated segments this check might always cause problems "
+                    "if you have a lot of audio files but only some of them are annoateted. "
+                    "To avoid this causing a recomputing, move the audio files that are "
+                    "not annotated to a different folder please. \n\n"
+                    f"Using embeddings in {self.metadata_dict['embed_dir']} ###"
+                )
+                # self._handle_incomplete_run(d)
+                self.combination_already_exists = True
+            else:
+                self._handle_incomplete_run(d)
 
     def _handle_incomplete_run(self, directory):
         self.continue_incomplete_run = True
@@ -445,10 +466,12 @@ class Loader:
         audio_dir = Path(audio_dir)
         files_list = []
         [
-            [files_list.append(ll) for ll in audio_dir.rglob(f"*{string}")]
-            for string in audio_suffixes
+            files_list.append(file) 
+            for file in tqdm(audio_dir.rglob("*"), 'finding audio files')
+            if file.suffix in audio_suffixes
         ]
-        files_list = np.unique(files_list).tolist()
+        files_list = list(set(files_list))
+        files_list.sort()
         assert len(files_list) > 0, "No audio files found in audio_dir."
         if return_type == 'pathlib.Path':
             return files_list
@@ -601,7 +624,7 @@ class Loader:
             return np.vstack(list(d.values()))
         
 
-    def get_preds_array(self, return_type='dict'):
+    def get_preds_array(self, return_type='dict', **kwargs):
         preds_path = (
             self.paths.preds_path
             / 'original_classifier_outputs'
@@ -635,77 +658,82 @@ class Loader:
             / self.metadata_dict['sample_rate (Hz)']
             )
         
-        cl_dict = {}
+        
+        
+        # --- pre-allocate ---
+        total_bins = sum(self.metadata_dict['files']['nr_embeds_per_file'])
+
+        # first pass to collect all species keys
+        all_keys = set()
+        for file in tqdm(
+            files, 
+            'Collecting already found species from predictions',
+            total=len(files)
+            ):
+            with open(file, 'r') as f:
+                d = json.load(f)
+            d.pop('head')
+            all_keys.update(d.keys())
+
+        keys2idx = {k: i for i, k in enumerate(sorted(all_keys))}
+        cl_array = np.zeros((len(keys2idx), total_bins), dtype=np.float32)
+
+        # --- main loop ---
         total_length = 0
-        keys2idx = {}
-        df_dict = dict(
-            end = [],
-            start = [],
-            audiofilename = [],
-            active_time_bins = []
-            )
-        for idx, file in enumerate(files):
-            corresponding_audio_file_bool = (
-                relative_audio_stems==str(
-                    file.relative_to(preds_path)
-                    ).replace(f'_{self.model_name}.json', '')
-            )
+        for idx, file in tqdm(
+            enumerate(files), 
+            'Collecting prediction values and timestamps',             
+            total=len(files)
+            ):
             with open(file, 'r') as f:
                 outputs = json.load(f)
             current_time_bins = outputs['head']['Time bins in this file']
-            if not current_time_bins == self.metadata_dict['files']['nr_embeds_per_file'][idx]:
-                print('Length mismatch between time_bins')
             outputs.pop('head')
-            
-            for k, v in outputs.items():
-                if not keys2idx:
-                    keys2idx[k] = 0
-                if not k in keys2idx:
-                    keys2idx[k] = max(keys2idx.values()) + 1
-                    
-                idx_interval = (
-                    np.array(v['time_bins_exceeding_threshold']) + total_length
-                    )
-                if not k in cl_dict:
-                    cl_dict[k] = np.zeros([total_length + current_time_bins])    
-                else:
-                    cl_dict[k] = np.hstack([cl_dict[k], np.zeros([current_time_bins])])
-                    
-                cl_dict[k][idx_interval] = v['classifier_predictions']
-            for species in [
-                k for k, v in cl_dict.items() 
-                if len(v) < total_length + current_time_bins
-                ]:
-                cl_dict[species] = np.hstack(
-                    [cl_dict[species], np.zeros([current_time_bins])]
-                    )
 
-            if not cl_dict:
-                df_dict['active_time_bins'].append(np.array([]))
-            else:
-                df_dict['active_time_bins'].append(np.where(
-                    np.max(
-                        np.vstack(list(cl_dict.values()))[:, -current_time_bins:], 
-                        axis=0
-                        )
-                    )[0])
-            df_dict['start'].extend(
-                (df_dict['active_time_bins'][-1] * seg_len).tolist()
-            )
-            df_dict['end'].extend(
-                
-                ((df_dict['active_time_bins'][-1] * seg_len) + seg_len).tolist()
-            )
-            df_dict['audiofilename'].extend(
-                [
-                    relative_audio_stems[corresponding_audio_file_bool][0] 
-                    + '.' 
-                    +relative_audio_suffixes[corresponding_audio_file_bool][0]
-                    ] * len(df_dict['active_time_bins'][-1])
-            )
+            for k, v in outputs.items():
+                row = keys2idx[k]
+                col_indices = np.array(v['time_bins_exceeding_threshold']) + total_length
+                cl_array[row, col_indices] = v['classifier_predictions']
+
             total_length += current_time_bins
         
-        cl_array = np.array(list(cl_dict.values()))
+        
+        if return_type == 'array':
+            return cl_array.T, keys2idx
+            
+        # after the loop, cl_array is shape (n_species, total_bins)
+        active_bins_global = np.where(cl_array.max(axis=0) > 0)[0]
+
+        df_dict = {
+            'start': [],
+            'end': [],
+            'audiofilename': []
+        }
+
+        total_length = 0
+        for idx, file in tqdm(
+            enumerate(files),
+            'Building continuous dataframe from processed predictions',
+            total=len(files)
+            ):
+            current_time_bins = self.metadata_dict['files']['nr_embeds_per_file'][idx]
+            
+            # find active bins within this file's slice
+            active_in_file = active_bins_global[
+                (active_bins_global >= total_length) & 
+                (active_bins_global < total_length + current_time_bins)
+            ] - total_length  # make relative to file start
+            
+            audio_filename = (
+                relative_audio_stems[idx] + '.' + relative_audio_suffixes[idx]
+            )
+            
+            df_dict['start'].extend((active_in_file * seg_len).tolist())
+            df_dict['end'].extend(((active_in_file * seg_len) + seg_len).tolist())
+            df_dict['audiofilename'].extend([audio_filename] * len(active_in_file))
+            
+            total_length += current_time_bins
+            
         
         if return_type == 'dict':
             return_dict = {}
@@ -716,28 +744,28 @@ class Loader:
                 offset += counts
             return return_dict, keys2idx
         elif return_type == 'dataframe':
-            df = pd.DataFrame(cl_dict)
-            df = df[df.sum(axis=1)>0]
+            # get only active rows from cl_array using active_bins_global
+            df = pd.DataFrame(
+                cl_array[:, active_bins_global].T, 
+                columns=keys2idx.keys()
+            )
             df['species_richness'] = df.astype(bool).sum(axis=1)
-            
-            df_dict.pop('active_time_bins')
-            for k, v in df_dict.items():
-                df[k] = v
+            df['start'] = df_dict['start']
+            df['end'] = df_dict['end']
+            df['audiofilename'] = df_dict['audiofilename']
             cols = list(df.columns)
             cols.reverse()
             df = df[cols]
             return df
-        else:
-            return cl_array.T, keys2idx
     
-    def get_annotations_parquet(self):
+    def get_annotations_parquet(self, **kwargs):
         file_name = self.model_name + '_all_predictions'
         all_prediction_files = [f.stem for f in self.paths.preds_path.iterdir()]
         if (
-            config.overwrite
+            kwargs.get('overwrite')
             or not file_name in all_prediction_files
             ):
-            df = self.get_preds_array(return_type='dataframe')
+            df = self.get_preds_array(return_type='dataframe', **kwargs)
             if len(df) * len(df.T) > 3_000_000:
                 df.to_parquet(self.paths.preds_path / (file_name + '.parquet'))
             else:
@@ -856,13 +884,31 @@ class Loader:
             for i, var in zip(range(embeds.shape[1]), ["x", "y"])
         }
         
-        embedding_dimensions = self.metadata_dict["files"]["embedding_dimensions"]
+        if self.only_embed_annotations:
+            from bacpipe.embedding_evaluation.label_embeddings import (
+                load_labels_and_build_dict, 
+                assign_global_get_paths_function, 
+                get_paths
+                )
+            assign_global_get_paths_function(self.audio_dir)
+            paths = get_paths(self.model_name)
+            df, _ = load_labels_and_build_dict(
+                paths, 
+                self.annotations_filename,
+                self.audio_dir,
+                bool_filter_labels=False
+            )
+            t_stamps = df.start.values.tolist()
+            durations = df.end - df.start
+            d["durations"] = durations.values.tolist()
+        else:
+            embedding_dimensions = self.metadata_dict["files"]["embedding_dimensions"]
 
-        for num_segments, *_ in embedding_dimensions:
-            [
-                t_stamps.append(np.round(t, 4)) 
-                for t in np.arange(0, num_segments) * input_len
-            ]
+            for num_segments, *_ in embedding_dimensions:
+                [
+                    t_stamps.append(np.round(t, 4)) 
+                    for t in np.arange(0, num_segments) * input_len
+                ]
             
         d["timestamp"] = t_stamps
 

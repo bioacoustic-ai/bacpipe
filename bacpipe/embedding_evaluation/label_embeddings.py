@@ -41,6 +41,14 @@ class DefaultLabels:
         self.model = model
         self.default_label_keys = default_label_keys
         self.paths = paths
+        if kwargs.get('only_embed_annotations'):
+            self.only_embed_annotations = True
+            self.df, _ = load_labels_and_build_dict(
+                paths, 
+                kwargs.get('annotations_filename'), 
+                self.paths.audio_dir,
+                bool_filter_labels=False
+            )
         
         if (self.paths.preds_path / "original_classifier_outputs").exists():
             if not "default_classifier" in self.default_label_keys:
@@ -94,7 +102,7 @@ class DefaultLabels:
             self.metadata["segment_length (samples)"]
             / self.metadata["sample_rate (Hz)"]
         )
-        segment_s_dt = dt.timedelta(seconds=segment_s)
+        segment_s_dt = dt.timedelta(seconds=float(segment_s))
         time_of_day_per_file = {}
         for file, datetime_of_file in self.timestamp_per_file.items():
             timeofday = dt.datetime(
@@ -110,12 +118,20 @@ class DefaultLabels:
         self.time_of_day_per_embedding = []
         for file_idx, (file, time_of_day) in enumerate(time_of_day_per_file.items()):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
-                # TODO: if only annotate annots
-                timestamp = (
-                    (time_of_day + index_of_embedding * segment_s_dt)
-                    .time()
-                    .replace(microsecond=0)
-                )
+                
+                if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
+                    starts = self.df.start.values[self.df.audiofilename == file]
+                    timestamp = (
+                        (time_of_day + dt.timedelta(seconds=float(starts[index_of_embedding])))
+                        .time()
+                        .replace(microsecond=0)
+                    )
+                else:
+                    timestamp = (
+                        (time_of_day + index_of_embedding * segment_s_dt)
+                        .time()
+                        .replace(microsecond=0)
+                    )
                 self.time_of_day_per_embedding.append(timestamp.strftime("%H-%M-%S"))
 
     def day_of_year(self):
@@ -148,9 +164,18 @@ class DefaultLabels:
             self.timestamp_per_file.items()
         ):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
-                timestamp = (
-                    datetime_per_file + index_of_embedding * segment_s_dt
-                ).replace(microsecond=0)
+                
+                if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
+                    starts = self.df.start.values[self.df.audiofilename == file]
+                    timestamp = (
+                        (datetime_per_file + dt.timedelta(seconds=float(starts[index_of_embedding])))
+                        .time()
+                        .replace(microsecond=0)
+                    )
+                else:
+                    timestamp = (
+                        datetime_per_file + index_of_embedding * segment_s_dt
+                    ).replace(microsecond=0)
                 self.continuous_timestamp_per_embedding.append(
                     timestamp.strftime("%Y-%m-%d_%H:%M:%S")
                 )
@@ -195,7 +220,11 @@ class DefaultLabels:
             self.metadata['files']['nr_embeds_per_file']
             ):
             df_part = df[df.audiofilename == file]
-            all_time_bins = np.round(np.arange(nr_embeds) * seg_len, 4).tolist()
+            if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
+                starts = self.df.start[self.df.audiofilename == file]
+                all_time_bins = np.round(starts.values, 4).tolist()
+            else:
+                all_time_bins = np.round(np.arange(nr_embeds) * seg_len, 4).tolist()
             [all_time_bins.remove(l) for l in np.round(df_part.start, 4)]
             df_new['start'].extend(all_time_bins)
             df_new['end'].extend((np.array(all_time_bins) + seg_len).tolist())
@@ -762,8 +791,9 @@ def build_ground_truth_labels_by_file(
 
     if np.unique(file_labels).shape[0] > 2 and kwargs.get('testing'):
         raven_tables_sanity_check(
-            num_embeds, segment_s, paths, audio_file, 
-            label_df, label_idx_dict, label_column, file_labels
+            df.start if kwargs.get('only_embed_annotations') else num_embeds, 
+            segment_s, paths, audio_file, 
+            label_df, label_idx_dict, label_column, file_labels, **kwargs
         )
     return all_labels
 
@@ -815,12 +845,14 @@ def fill_all_labels_array(file_labels, all_labels):
     return all_labels
 
 def raven_tables_sanity_check(
-    num_embeds, segment_s, paths, audio_file, 
-    label_df, label_idx_dict, label_column, file_labels
+    embed_timestamps, segment_s, paths, audio_file, 
+    label_df, label_idx_dict, label_column, file_labels,
+    **kwargs
     ):
     if len(file_labels.shape) > 1:
         file_labels = file_labels[:, 0]
-    embed_timestamps = np.arange(num_embeds) * segment_s
+    if not kwargs.get('only_embed_annotations'):
+        embed_timestamps = np.arange(embed_timestamps) * segment_s
     path = paths.labels_path.joinpath("raven_tables_for_sanity_check")
     path.mkdir(exist_ok=True, parents=True)
     if (
@@ -845,7 +877,7 @@ def raven_tables_sanity_check(
             path.joinpath(f"{Path(audio_file).stem}_fit.txt"), sep="\t", index=False
         )
 
-def create_Raven_annotation_table(df, label_column):
+def create_Raven_annotation_table(df, label_column, high_freq=1000):
     df.index = np.arange(1, len(df) + 1)
     raven_df = pd.DataFrame()
     raven_df["Selection"] = df.index
@@ -855,7 +887,7 @@ def create_Raven_annotation_table(df, label_column):
     raven_df["Begin Time (s)"] = df.start
     raven_df["End Time (s)"] = df.end
     raven_df["Low Freq (Hz)"] = 0
-    raven_df["High Freq (Hz)"] = 1000
+    raven_df["High Freq (Hz)"] = high_freq
     raven_df["Label"] = df[f"label:{label_column}"]
     return raven_df
 

@@ -149,7 +149,10 @@ class DashBoardHelper:
         """Save the current embedding plot"""
         
         # Get model name for filename
-        model_name = self.model_select[widget_idx].value
+        if not kwargs.get('model_name'):
+            model_name = self.model_select[widget_idx].value
+        else:
+            model_name = kwargs.get('model_name')
         label_by = self.label_select[widget_idx].value
         
         filename = f"{model_name}_embedding_{label_by}.png"

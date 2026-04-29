@@ -17,6 +17,8 @@ EMBEDDING_DIMENSIONS = {
     "avesecho_passt": 768,
     "aves_especies": 768,
     "bat": 64,
+    "batdetect2_clip_avg": 32,
+    "batdetect2_dets_avg": 32,
     "beats": 768,
     "birdaves_especies": 1024,
     "biolingual": 512,

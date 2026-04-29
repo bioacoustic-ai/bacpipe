@@ -240,31 +240,47 @@ class Embedder(AudioHandler):
             use_sample_of_files = False
             sample_files = self.loader.files
         
-        for idx, file in enumerate(
-            tqdm(sample_files, desc="loading files", position=1, leave=False)
-        ):
-            if idx == 0:
-                embeddings = self.loader.read_embedding_file(file)
-            else:
-                embeddings = np.concatenate(
-                    [embeddings, self.loader.read_embedding_file(file)]
-                )
+        embeddings_list = []
+        for file in tqdm(
+            sample_files, 
+            desc="loading files", 
+            position=1, 
+            leave=False
+            ):
+            embeddings_list.append(self.loader.read_embedding_file(file))
+
+        embeddings = np.concatenate(embeddings_list, axis=0)
+        
         if use_sample_of_files:
             self.get_embeddings_from_model(embeddings)
-            for idx, file in enumerate(
-                tqdm(self.loader.files, desc="processing files", position=1, leave=False)
-            ):
-                if idx == 0:
-                    dim_reduced_embeddings = self.model.model.transform(
+            dim_reduced_embeddings_list = []
+            for file in tqdm(
+                self.loader.files, 
+                desc="processing files", 
+                position=1, 
+                leave=False
+                ):
+                dim_reduced_embeddings_list.append(
+                    self.model.model.transform(
                         self.loader.read_embedding_file(file)
                         )
-                else:
-                    dim_reduced_embeddings = np.concatenate(
-                        [dim_reduced_embeddings, 
-                         self.model.model.transform(self.loader.read_embedding_file(file))]
                     )
+
+            dim_reduced_embeddings = np.concatenate(dim_reduced_embeddings_list, axis=0)
         else:
-            dim_reduced_embeddings = self.get_embeddings_from_model(embeddings)
+            try:
+                dim_reduced_embeddings = self.get_embeddings_from_model(embeddings)
+            except NameError as e:
+                error_string = (
+                    "\n No embeddings found to process dimensionality reduction. It seems like "
+                    "there was an error when initially calculating embeddings. See the error "
+                    "logs in the `logs` directory or previous error messages in the terminal. \n"
+                )
+                logger.exception(
+                    f"error_string {e}"
+                )
+                raise NameError(error_string)
+            
         self.loader.save_embedding_file(file, dim_reduced_embeddings)
 
     def embeddings_using_multithreading(self, array_of_audios):
@@ -571,6 +587,24 @@ class Classifier:
         
         self.predictions = torch.tensor([])
         
+        if kwargs.get('only_embed_annotations'):
+            self.only_embed_annotations = True
+            from bacpipe.embedding_evaluation.label_embeddings import (
+                load_labels_and_build_dict, 
+                assign_global_get_paths_function, 
+                get_paths
+                )
+            assign_global_get_paths_function(audio_dir)
+            paths = get_paths(self.model_name)
+            self.df, _ = load_labels_and_build_dict(
+                paths, 
+                kwargs.get('annotations_filename'),
+                audio_dir,
+                bool_filter_labels=False
+            )
+            self.start_timestamps = self.df.start.values
+            self.end_timestamps = self.df.end.values
+        
     @staticmethod
     def filter_top_k_classifications(probabilities, class_names,
                                      class_indices, class_time_bins, 
@@ -644,9 +678,9 @@ class Classifier:
         return cls_results
     
     def classify(self, embeddings):
-        try:
+        if not isinstance(embeddings, torch.Tensor):
             clfier_output = self.model.classifier_predictions(torch.tensor(embeddings))
-        except:
+        else:
             clfier_output = self.model.classifier_predictions(embeddings)
             
         if self.model.device == "cuda" and isinstance(clfier_output, torch.Tensor):
@@ -677,26 +711,44 @@ class Classifier:
         classifier_annotations = pd.DataFrame()
         
         maxes = torch.max(self.predictions, dim=1)
-        # outputs_exceeding_thresh = self.predictions[
-        #     maxes.values > self.classifier_threshold
-        # ]
         
-        active_time_bins = np.arange(
-            self.predictions.shape[0]
-            )[maxes.values > self.classifier_threshold]
-        
-        classifier_annotations["start"] = active_time_bins * (
-            self.model.segment_length / self.model.sr
-        )
-        classifier_annotations["end"] = classifier_annotations["start"] + (
-            self.model.segment_length / self.model.sr
-        )
+        if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
+            starts = self.start_timestamps[self.df.audiofilename == str(file.relative_to(fileloader_obj.audio_dir))]
+            ends = self.end_timestamps[self.df.audiofilename == str(file.relative_to(fileloader_obj.audio_dir))]
+            starts, ends = list(set(starts)), list(set(ends))
+            starts.sort(), ends.sort()
+            starts, ends = np.array(starts), np.array(ends)
+            classifier_annotations["start"] = (
+                starts[maxes.values > self.classifier_threshold]
+            )
+            classifier_annotations["end"] = (
+                ends[maxes.values > self.classifier_threshold]
+            )
+        else:
+            time_bins = np.arange(self.predictions.shape[0])
+            self.start_timestamps = time_bins * (
+                self.model.segment_length / self.model.sr
+            )
+            self.end_timestamps = self.start_timestamps + (
+                self.model.segment_length / self.model.sr
+            )
+            classifier_annotations["start"] = self.start_timestamps[
+                maxes.values > self.classifier_threshold
+                ]
+            classifier_annotations["end"] = self.end_timestamps[
+                maxes.values > self.classifier_threshold
+                ]
+            
         classifier_annotations["audiofilename"] = str(
             file.relative_to(fileloader_obj.audio_dir)
         )
         classifier_annotations["label:default_classifier"] = np.array(
             self.model.classes
         )[maxes.indices[maxes.values > self.classifier_threshold]].tolist()
+        
+        classifier_annotations["label:confidence"] = np.array(
+            maxes.values[maxes.values > self.classifier_threshold].tolist()
+        )
 
         if not hasattr(self, "cumulative_annotations"):
             if fileloader_obj.continue_incomplete_run:
@@ -734,9 +786,13 @@ class Classifier:
                 ignore_index=True
             )
         
-    def save_annotation_table(self, loader_obj: bacpipe.Loader):
+    def save_annotation_table(self, loader_obj: bacpipe.Loader, **kwargs):
         self.paths.preds_path.mkdir(exist_ok=True, parents=True)
-        loader_obj.get_annotations_parquet()
+        loader_obj.get_annotations_parquet(
+            starts=self.start_timestamps, 
+            ends=self.end_timestamps,
+            **kwargs
+            )
         save_path = (
             self.paths.preds_path 
             / f"{loader_obj.model_name}_classifier_annotations.csv"
@@ -759,8 +815,8 @@ class Classifier:
         file_dest = str(file_dest) + ".json"
 
 
-        if self.model.only_embed_annotations: #annotation file exists
-            np.save(file_dest.replace('.json', '.npy'), self.predictions)
+        # if self.model.only_embed_annotations: #annotation file exists
+        #     np.save(file_dest.replace('.json', '.npy'), self.predictions)
         
         self._fill_dataframe_with_classiefier_results(fileloader_obj, file)
         
@@ -795,10 +851,12 @@ class Classifier:
         
         df = pd.DataFrame()
         df['label:species'] = specs
-        df['start'] = timestamps * (self.model.segment_length / self.model.sr)
-        df['end'] = df.start + (self.model.segment_length / self.model.sr)
+        df['start'] = self.start_timestamps[timestamps]
+        df['end'] = self.end_timestamps[timestamps]
         from bacpipe.embedding_evaluation.label_embeddings import create_Raven_annotation_table
-        raven_df = create_Raven_annotation_table(df, 'species')
+        raven_df = create_Raven_annotation_table(
+            df, 'species', high_freq=self.model.sr*np.array(probs)
+            )
         raven_df['Confidence'] = probs
         raven_df["Begin Path"] = relative_parent_path / (file.stem + file.suffix)
         raven_df["File Offset (s)"] = df.start
@@ -812,9 +870,9 @@ class Classifier:
             total=len(all_embeds)
             ):        
             
-            try:
+            if not isinstance(embeddings, torch.Tensor):
                 clfier_output = self.model.classifier_predictions(torch.tensor(embeddings))
-            except:
+            else:
                 clfier_output = self.model.classifier_predictions(embeddings)
 
             if isinstance(clfier_output, torch.Tensor):
