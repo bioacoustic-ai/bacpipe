@@ -81,7 +81,7 @@ class DefaultLabels:
 
     def generate(self):
         self.default_label_dict = {}
-        for default_label in self.default_label_keys:
+        for default_label in tqdm(self.default_label_keys, 'Building default labels'):
             getattr(self, default_label)()
 
             if hasattr(self, f"{default_label}_per_embedding"):
@@ -92,7 +92,7 @@ class DefaultLabels:
     def get_datetimes(self):
         if not hasattr(self, "timestamp_per_file"):
             self.timestamp_per_file = {}
-            for file in self.metadata["files"]["audio_files"]:
+            for file in tqdm(self.metadata["files"]["audio_files"], 'collecting datetimes'):
                 file_stem = Path(file).stem
                 self.timestamp_per_file.update({file: get_dt_filename(file_stem)})
 
@@ -104,7 +104,9 @@ class DefaultLabels:
         )
         segment_s_dt = dt.timedelta(seconds=float(segment_s))
         time_of_day_per_file = {}
-        for file, datetime_of_file in self.timestamp_per_file.items():
+        for file, datetime_of_file in tqdm(
+            self.timestamp_per_file.items(), 'getting time of day'
+            ):
             timeofday = dt.datetime(
                 2000,
                 1,
@@ -116,7 +118,9 @@ class DefaultLabels:
             time_of_day_per_file.update({file: timeofday})
 
         self.time_of_day_per_embedding = []
-        for file_idx, (file, time_of_day) in enumerate(time_of_day_per_file.items()):
+        for file_idx, (file, time_of_day) in tqdm(
+            enumerate(time_of_day_per_file.items()), 'getting time per embeddings'
+            ):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
                 
                 if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
@@ -137,7 +141,9 @@ class DefaultLabels:
     def day_of_year(self):
         self.get_datetimes()
         day_of_year_per_file = {}
-        for file, datetime_of_file in self.timestamp_per_file.items():
+        for file, datetime_of_file in tqdm(
+            self.timestamp_per_file.items(), 'getting day of year'
+            ):
             time_of_day = dt.datetime(
                 2000, datetime_of_file.month, datetime_of_file.day
             )
@@ -160,9 +166,10 @@ class DefaultLabels:
         segment_s_dt = dt.timedelta(seconds=segment_s)
 
         self.continuous_timestamp_per_embedding = []
-        for file_idx, (file, datetime_per_file) in enumerate(
-            self.timestamp_per_file.items()
-        ):
+        for file_idx, (file, datetime_per_file) in tqdm(
+            enumerate(self.timestamp_per_file.items()), 
+            'getting continuous timestamps'
+            ):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
                 
                 if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
@@ -182,14 +189,20 @@ class DefaultLabels:
 
     def parent_directory(self):
         self.parent_directory_per_embedding = []
-        for file_idx, file in enumerate(self.metadata["files"]["audio_files"]):
+        for file_idx, file in tqdm(
+            enumerate(self.metadata["files"]["audio_files"]),
+            'getting parent directory'
+            ):
             self.parent_directory_per_embedding.extend(
                 np.repeat(str(Path(file).parent), self.nr_embeds_per_file[file_idx])
             )
 
     def audio_file_name(self):
         self.audio_file_name_per_embedding = []
-        for file_idx, file in enumerate(self.metadata["files"]["audio_files"]):
+        for file_idx, file in tqdm(
+            enumerate(self.metadata["files"]["audio_files"]),
+            'getting audio file names'
+            ):
             self.audio_file_name_per_embedding.extend(
                 np.repeat(file, self.nr_embeds_per_file[file_idx])
             )
@@ -504,12 +517,24 @@ def create_default_labels(
             )
         default_labels.generate()
 
+        # def_labels = default_labels.default_label_dict
+        # for k, v in def_labels.items():
+        #     np.save(
+        #         paths.labels_path.joinpath(f"default_labels_{k}.npy"),
+        #         np.array(list(v)),
+        #     )
         def_labels = default_labels.default_label_dict
         np.save(
             paths.labels_path.joinpath("default_labels.npy"),
             def_labels,
         )
     else:
+        # def_labels = dict()
+        # for label_file in tqdm(paths.labels_path.rglob("*.npy"), 'loading labels'):
+        #     k = label_file.stem.split('labels_')[-1]
+        #     def_labels[k] = np.load(label_file, mmap_mode='r')
+        #     # def_labels[k] = list(np.load(label_file))
+            
         def_labels = np.load(
             paths.labels_path.joinpath("default_labels.npy"), allow_pickle=True
         ).item()
@@ -659,6 +684,57 @@ def load_labels_and_build_dict(
 
 def fit_labels_to_embedding_timestamps(
     df,
+    df_fitted_gt,
+    num_embeds,
+    segment_s,
+    label_column=None,
+    single_label=True,
+    min_annotation_length=0.65,
+    **kwargs,
+):
+    # df_fitted_gt = pd.DataFrame()
+    # for cls in df['label:species'].unique():
+    #     df_fitted_gt[cls] = np.zeros(num_embeds)
+        
+    for col in df_fitted_gt.columns:
+        df_fitted_gt[col] = np.zeros(num_embeds, dtype=np.int8)
+        
+    df_fitted_gt['starts'] = np.arange(num_embeds) * segment_s
+    df_fitted_gt['ends'] = df_fitted_gt['starts'] + segment_s
+    
+    for _, row in df.iterrows():
+        start_at_embed_nr = np.where(df_fitted_gt['starts'] - row.start <= 0)[0][-1]
+        end_at_embed_nr = np.where(df_fitted_gt['starts'] - row.end >= 0)[0]
+        if len(end_at_embed_nr) > 0:
+            end_at_embed_nr = end_at_embed_nr[0]
+        else:
+            end_at_embed_nr = len(df_fitted_gt['starts'])
+        for idx in range(start_at_embed_nr, end_at_embed_nr):
+            
+            # check if the annotation length is longer that the specified min_annotation_length
+            # if row.start >= df_fitted_gt['starts'][idx]:
+            # elif row.end >= df_fitted_gt['starts'][idx+1]:
+            if (
+                # df_fitted_gt['starts'][idx] - row.start > min_annotation_length
+                # and df_fitted_gt['starts'][idx+1] > min_annotation_length
+                row.end - row.start > min_annotation_length
+                ):
+                df_fitted_gt.loc[idx:idx+1, row[f"label:{label_column}"]] = 1
+            else:
+                logger.info(
+                    f"\nSkipping annotation from {row.start} to {row.end} with "
+                    f"label {row['label:species']} because the annotation is "
+                    f"shorter than {min_annotation_length=}. To change this, "
+                    "modify the value in the settings file."
+                )
+                
+    df_fitted_gt['species_richness'] = df_fitted_gt.drop(
+        columns=['starts', 'ends', 'audiofilename', 'species_richness']
+        ).sum(axis=1)
+    return df_fitted_gt
+        
+def old_fit_labels_to_embedding_timestamps(
+    df,
     label_idx_dict,
     num_embeds,
     segment_s,
@@ -710,7 +786,7 @@ def fit_labels_to_embedding_timestamps(
                     # if we have a 2d array already but for each timestamp the
                     # labels are the same, we can just overwrite one. we won't 
                     # loose anything and we don't have to create any new columns
-                    elif len(np.unique(file_labels[idx:idx+1])) == 1:
+                    elif len(np.unique(file_labels[idx:idx+1])) == 1 and file_labels.shape[-1] > 1:
                         file_labels[idx:idx+1, -1] = label_idx_dict[row[f"label:{label_column}"]]
                         
                     # We only go here, if there is no place we can write our new 
@@ -764,26 +840,30 @@ def build_ground_truth_labels_by_file(
     audio_file = metadata["files"]["audio_files"][ind]
     df = filter_df_by_filename(label_df, audio_file, model=model)
         
-    if df.empty:
-        logger.info(
-            f'df is empty for {audio_file}, meaning no annotations. '
-            "If that's incorrect, ensure the audiofilename column has the correct "
-            "file names."
-            )
-        label_dimensions = all_labels.shape[-1] if len(all_labels.shape) > 1 else 1
-        all_labels = np.concatenate(
-            (all_labels, np.ones([num_embeds, label_dimensions]).squeeze() * -1)
-            )
-        return all_labels
+    # if df.empty:
+    #     logger.info(
+    #         f'df is empty for {audio_file}, meaning no annotations. '
+    #         "If that's incorrect, ensure the audiofilename column has the correct "
+    #         "file names."
+    #         )
+    #     label_dimensions = all_labels.shape[-1] if len(all_labels.shape) > 1 else 1
+    #     all_labels = np.concatenate(
+    #         (all_labels, np.ones([num_embeds, label_dimensions]).squeeze() * -1)
+    #         )
+    #     return all_labels
 
     if kwargs.get('only_embed_annotations'):
         values = df[f'label:{label_column}']
         file_labels = np.array([label_idx_dict[v] for v in values])
     else:
+        file_labels = pd.DataFrame(columns=all_labels.columns)
         file_labels = fit_labels_to_embedding_timestamps(
-            df, label_idx_dict, num_embeds, segment_s, 
+            df, file_labels, num_embeds, segment_s, 
             label_column=label_column, **kwargs
         )
+        file_labels['audiofilename'] = audio_file
+        all_labels = pd.concat([file_labels, all_labels])
+        return all_labels
     
         
     
@@ -897,11 +977,24 @@ def collect_ground_truth_labels(
     label_df, label_idx_dict, **kwargs
 ):
 
-    ground_truth = np.array([])
+    # ground_truth = np.array([])
+    # 1. Get your species names
+    species_cols = label_df['label:species'].unique().tolist()
+
+    # 2. Define the schema
+    # This ensures all species columns and numeric columns are floats from the start
+    ground_truth = pd.DataFrame({
+        **{col: pd.Series(dtype='int8') for col in species_cols},
+        'species_richness': pd.Series(dtype='int8'),
+        'audiofilename': pd.Series(dtype='string'), # Use 'string' for better performance
+        'ends': pd.Series(dtype='int8'),
+        'starts': pd.Series(dtype='int8'),
+    })
 
     for ind, file in tqdm(
         enumerate(files),
-        desc=f"Loading {model} embeddings and split by labels",
+        desc=f"Collecting annotations and fitting to embeddings timestamps",
+        total=len(files),
         leave=False,
     ):
         assert (
@@ -1018,7 +1111,7 @@ def ground_truth_by_model(
         
     if (
         overwrite 
-        or not paths.labels_path.joinpath("ground_truth.npy").exists()
+        or not paths.labels_path.joinpath(f"ground_truth_species.csv").exists()
         ):
 
         # check if embeddings exist
@@ -1064,11 +1157,11 @@ def ground_truth_by_model(
             
         # find all label columns
         label_columns = [col for col in label_df.columns if "label:" in col]
-        ground_truth_dict = {}
+        # ground_truth_dict = {}
         
         # collect all the ground truth for all the label columns 
         for label_col in label_columns:
-            labels = label_col.split("label:")[-1]
+            clean_label_column = label_col.split("label:")[-1]
             ground_truth = collect_ground_truth_labels(
                 paths,
                 files,
@@ -1078,27 +1171,30 @@ def ground_truth_by_model(
                 label_df,
                 label_idx_dict[label_col],
                 single_label=single_label,
-                label_column=labels,
+                label_column=clean_label_column,
                 **kwargs,
             )
-
-            ground_truth_dict.update({
-                f"label:{labels}": ground_truth,
-                f"label_dict:{labels}": label_idx_dict[label_col],
-            })
-        np.save(paths.labels_path.joinpath("ground_truth.npy"), ground_truth_dict)
+            cols = list(ground_truth.columns)[::-1]
+            ground_truth = ground_truth[cols]
+            # ground_truth_dict.update({
+            #     f"label:{labels}": ground_truth,
+            #     f"label_dict:{labels}": label_idx_dict[label_col],
+            # })
+        # np.save(paths.labels_path.joinpath("ground_truth.npy"), ground_truth_dict)
+            ground_truth.to_csv(paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv"), index=False)
     else:
-        if not paths.labels_path.joinpath("ground_truth.npy").exists():
-            error = (
-                "\nThe ground truth label file ground_truth.npy does not exist. "
-                "Please create it first by rerunning with `overwrite=True`."
-            )
-            logger.exception(error)
-            raise ValueError(error)
-        ground_truth_dict = np.load(
-            paths.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
-        ).item()
-    return ground_truth_dict
+        # if not paths.labels_path.joinpath("ground_truth.npy").exists():
+        #     error = (
+        #         "\nThe ground truth label file ground_truth.npy does not exist. "
+        #         "Please create it first by rerunning with `overwrite=True`."
+        #     )
+        #     logger.exception(error)
+        #     raise ValueError(error)
+        # ground_truth_dict = np.load(
+        #     paths.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
+        # ).item()
+        ground_truth = pd.read_csv(paths.labels_path.joinpath(f"ground_truth_species.csv"))
+    return ground_truth
 
 def ensure_audio_files(found_audio_files, annotated_audio_files, audio_dir):
     if not annotated_audio_files:

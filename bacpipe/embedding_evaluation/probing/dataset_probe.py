@@ -130,12 +130,18 @@ def generate_annotations_for_probing_task(
         ]
         labs = [inv[i] for i in labels]
         df = pd.DataFrame()
+        
+        if not paths is None:
+            filenames, starts = get_filenames_and_starts_for_probe_df(paths, ground_truth, label_column)
+            df["filenames"] = filenames 
+            df["starts"] = starts
+            
         df["label"] = labs
-        df["predefined_set"] = "lollinger"
+        df["predefined_set"] = "undefined"
         for v in inv.values():
             l = labs.count(v)
             ar = list(df[df.label == v].index)
-            np.random.shuffle(ar)
+            np.random.shuffle(ar) # TODO have seed option
             tr_ar = ar[: int(l * train_ratio)] 
             te_ar = ar[int(l * train_ratio) : int(l * (train_ratio + test_ratio))]
             va_ar = ar[int(l * (train_ratio + test_ratio)) :]
@@ -156,3 +162,24 @@ def generate_annotations_for_probing_task(
     else:
         df = pd.read_csv(paths.labels_path.joinpath(dataset_csv_path))
     return df
+
+def get_filenames_and_starts_for_probe_df(paths, ground_truth, label_column):
+    from bacpipe.embedding_evaluation.label_embeddings import get_default_labels, get_dt_filename
+    import datetime as dt
+    model_name = paths.labels_path.parent.stem
+    default_labels = get_default_labels(model_name, overwrite=False)
+    filenames = np.array(default_labels['audio_file_name'])[
+        ground_truth[f"label:{label_column}"] > -1
+    ]
+    times_of_day = np.array(default_labels['time_of_day'])[
+        ground_truth[f"label:{label_column}"] > -1
+    ]
+    starts = [
+        (
+            dt.datetime.strptime(tod_e, '%H-%M-%S')
+            - get_dt_filename(tod_f)
+        ).seconds
+        for tod_e, tod_f in 
+        zip(times_of_day, filenames)
+        ]
+    return filenames, starts
