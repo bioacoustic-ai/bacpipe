@@ -1110,6 +1110,7 @@ def ground_truth_by_model(
         paths = get_paths(model)
         
     if (
+        # False
         overwrite 
         or not paths.labels_path.joinpath(f"ground_truth_species.csv").exists()
         ):
@@ -1181,6 +1182,7 @@ def ground_truth_by_model(
             #     f"label_dict:{labels}": label_idx_dict[label_col],
             # })
         # np.save(paths.labels_path.joinpath("ground_truth.npy"), ground_truth_dict)
+            ground_truth = ground_truth.sort_values(by=['audiofilename', 'starts'])
             ground_truth.to_csv(paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv"), index=False)
     else:
         # if not paths.labels_path.joinpath("ground_truth.npy").exists():

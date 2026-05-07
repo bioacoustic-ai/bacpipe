@@ -14,6 +14,20 @@ from .dataset_probe import generate_annotations_for_probing_task
 
 
 def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
+    # if len(ground_truth[f"label:{label_column}"].shape) > 1:
+    #     bool_array = np.any(ground_truth[f"label:{label_column}"] > -1, axis=1)
+    # else:
+    #     bool_array = ground_truth[f"label:{label_column}"] > -1
+    bool_array = (ground_truth.species_richness == 1).values
+        
+    if isinstance(embeds, np.ndarray):
+        return embeds[bool_array]
+    elif isinstance(embeds, dict):
+        return np.concatenate(list(embeds.values()))[
+        bool_array
+    ]
+        
+def old_embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
     if len(ground_truth[f"label:{label_column}"].shape) > 1:
         bool_array = np.any(ground_truth[f"label:{label_column}"] > -1, axis=1)
     else:
