@@ -291,9 +291,6 @@ class Loader:
                 and Path(self.audio_dir).stem in d.parts[-1]
                 ):
                 continue
-            self.combination_already_exists = True
-            self._get_metadata_dict(d)
-            break
             
             # is directory empty?
             if list(d.glob("*yml")) == []:
