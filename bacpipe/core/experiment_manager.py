@@ -284,12 +284,16 @@ class Loader:
         # iterate through directories backwards, starting with most recent first
         for d in existing_embed_dirs[::-1]: 
             # require that the model name and the audio dir are in the folder name
+            
             if not (
                 self.model_name in d.stem 
                 and not self.combination_already_exists
                 and Path(self.audio_dir).stem in d.parts[-1]
                 ):
                 continue
+            self.combination_already_exists = True
+            self._get_metadata_dict(d)
+            break
             
             # is directory empty?
             if list(d.glob("*yml")) == []:
@@ -629,11 +633,12 @@ class Loader:
             return np.vstack(list(d.values()))
         
 
-    def get_preds_array(self, return_type='dict', **kwargs):
-        preds_path = (
-            self.paths.preds_path
-            / 'original_classifier_outputs'
-            )
+    def get_preds_array(self, return_type='dict', preds_path=None, **kwargs):
+        if preds_path is None:
+            preds_path = (
+                self.paths.preds_path
+                / 'original_classifier_outputs'
+                )
         if not preds_path.exists():
             logger.warning(
                 "No classifier predictions have been save yet. "
@@ -649,6 +654,15 @@ class Loader:
                 self.metadata_dict['files']['audio_files']
                 ]
             )
+        if not preds_path is None:
+            parent_dir = preds_path.relative_to(self.paths.preds_path / 'original_classifier_outputs')
+            idxs = [idx for idx, aud in enumerate(relative_audio[:, 0]) if Path(aud).parent == parent_dir]
+            nr_embeds_per_file = list(np.array(self.metadata_dict['files']['nr_embeds_per_file'])[idxs])
+            relative_audio = relative_audio[idxs, :]
+        else:
+            nr_embeds_per_file = self.metadata_dict['files']['nr_embeds_per_file']
+            
+            
         if hasattr(self, 'continue_failed_run') and self.continue_failed_run:
             # we omit the last item assuming that it's just been processed
             # and corresponds to the clfier_annotations contents
@@ -666,7 +680,8 @@ class Loader:
         
         
         # --- pre-allocate ---
-        total_bins = sum(self.metadata_dict['files']['nr_embeds_per_file'])
+        
+        total_bins = sum(nr_embeds_per_file)
 
         # first pass to collect all species keys
         all_keys = set()
@@ -694,7 +709,8 @@ class Loader:
         for idx, file in tqdm(
             enumerate(files), 
             'Collecting prediction values and timestamps',             
-            total=len(files)
+            total=len(files),
+            leave=False
             ):
             with open(file, 'r') as f:
                 try:
@@ -731,9 +747,10 @@ class Loader:
         for idx, file in tqdm(
             enumerate(files),
             'Building continuous dataframe from processed predictions',
-            total=len(files)
+            total=len(files),
+            leave=False
             ):
-            current_time_bins = self.metadata_dict['files']['nr_embeds_per_file'][idx]
+            current_time_bins = nr_embeds_per_file[idx]
             
             # find active bins within this file's slice
             active_in_file = active_bins_global[
@@ -775,26 +792,36 @@ class Loader:
             df = df[cols]
             return df
     
-    def get_annotations_parquet(self, **kwargs):
+    def get_annotations_parquet(self, preds_path=None, **kwargs):
+        if preds_path is None:
+            preds_path = self.paths.preds_path
         file_name = self.model_name + '_all_predictions'
-        all_prediction_files = [f.stem for f in self.paths.preds_path.iterdir()]
+        all_prediction_files = [f.stem for f in preds_path.iterdir()]
         if (
             kwargs.get('overwrite')
             or not file_name in all_prediction_files
             ):
-            df = self.get_preds_array(return_type='dataframe', **kwargs)
-            if len(df) * len(df.T) > 3_000_000:
-                df.to_parquet(self.paths.preds_path / (file_name + '.parquet'))
+            if not preds_path is None:
+                preds_src_path = (
+                    self.paths.preds_path
+                    / 'original_classifier_outputs'
+                    / preds_path.relative_to(self.paths.preds_path)
+                )
             else:
-                df.to_csv(self.paths.preds_path / (file_name + '.csv'))
+                preds_src_path = None
+            df = self.get_preds_array(return_type='dataframe', preds_path=preds_src_path, **kwargs)
+            if len(df) * len(df.T) > 3_000_000:
+                df.to_parquet(preds_path / (file_name + '.parquet'))
+            else:
+                df.to_csv(preds_path / (file_name + '.csv'))
         else:
             try:
-                df = pd.read_csv(self.paths.preds_path / (file_name + '.csv'))
+                df = pd.read_csv(preds_path / (file_name + '.csv'))
             except:
-                df = pd.read_parquet(self.paths.preds_path / (file_name + '.parquet'))
+                df = pd.read_parquet(preds_path / (file_name + '.parquet'))
         return df
         
-    def predictions(self, return_type='dict'):
+    def predictions(self, return_type='dict', parent_dir=None):
         """
         Load and return classifier predictions. This method
         can only be used for already processed predictions. 
@@ -823,10 +850,41 @@ class Loader:
             or tuple of (dict, dict) for `dict`
             or pd.DataFrame
         """
-        if return_type == 'dataframe':
-            return self.get_annotations_parquet()
+        
+        if len(self.files) > 10_000:
+            parents = list(set([f.parent for f in self.files]))
+            parents.sort()
+            parent_dirs = [f.relative_to(self.embed_dir) for f in parents]
+            if not self.paths is None:
+                for p_dir in tqdm(
+                    parent_dirs,
+                    'Creating dataframes for each parent directory',
+                    len(parents),
+                    leave=False
+                    ):
+                    preds_path = self.paths.preds_path / p_dir
+                    preds_path.mkdir(exist_ok=True, parents=True)
+                    _ = self.get_annotations_parquet(preds_path=preds_path)
+            elif parent_dir in parent_dirs:
+                preds_path = self.paths.preds_path / parent_dir
+                if return_type == 'dataframe':
+                    return self.get_annotations_parquet(preds_path=preds_path)
+                else:
+                    return self.get_preds_array(return_type=return_type)
+            else:
+                logger.exception(
+                    "Your dataset is too large to give you all predictions at once. "
+                    "Please specify the name of the parent directory you would like "
+                    "the predictions from. Possible parent directories are:"
+                    f"{parent_dirs=}."
+                )
+                import sys
+                sys.exit(1)
         else:
-            return self.get_preds_array(return_type=return_type)
+            if return_type == 'dataframe':
+                return self.get_annotations_parquet()
+            else:
+                return self.get_preds_array(return_type=return_type)
 
     def _write_audio_file_to_metadata(self, file, model, embeddings, file_length):
         if (
