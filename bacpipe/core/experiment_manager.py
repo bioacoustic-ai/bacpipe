@@ -347,8 +347,12 @@ class Loader:
         """
         try:
             num_files = len(
-                [f for f in list(d.rglob(f"*{self.embed_suffix}"))]
+                [f for f in tqdm(
+                    d.rglob(f"*{self.embed_suffix}"), 
+                    'Finding all generated embeddings'
+                    )]
             )
+            logger.info(f"Found {num_files} embedding files.")
             num_audio_files = len(
                 self.get_audio_files(self.audio_dir)
                 )
@@ -472,6 +476,7 @@ class Loader:
         ]
         files_list = list(set(files_list))
         files_list.sort()
+        logger.info(f"Found {len(files_list)} number of audio files.")
         assert len(files_list) > 0, "No audio files found in audio_dir."
         if return_type == 'pathlib.Path':
             return files_list
@@ -671,7 +676,13 @@ class Loader:
             total=len(files)
             ):
             with open(file, 'r') as f:
-                d = json.load(f)
+                try:
+                    d = json.load(f)
+                except json.decoder.JSONDecodeError:
+                    logger.warning(
+                        f"Failed to load {file}. Continuing with next file"
+                        )
+                    continue
             d.pop('head')
             all_keys.update(d.keys())
 
@@ -686,7 +697,13 @@ class Loader:
             total=len(files)
             ):
             with open(file, 'r') as f:
-                outputs = json.load(f)
+                try:
+                    outputs = json.load(f)
+                except json.decoder.JSONDecodeError:
+                    logger.warning(
+                        f"Failed to load {file}. Continuing with next file"
+                        )
+                    continue
             current_time_bins = outputs['head']['Time bins in this file']
             outputs.pop('head')
 
@@ -989,6 +1006,8 @@ class Loader:
                 return False
             else:
                 return True
+        elif True:
+            self.predictions(return_type='dataframe')
 
 def replace_default_kwargs_with_user_kwargs(remove_keys=None, **kwargs):
     from bacpipe import config, settings
