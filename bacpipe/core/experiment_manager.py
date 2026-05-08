@@ -633,7 +633,7 @@ class Loader:
             logger.warning(
                 "No classifier predictions have been save yet. "
             )
-            return None
+            return None, None
         files = list(preds_path.rglob('*json'))
         files.sort()
         

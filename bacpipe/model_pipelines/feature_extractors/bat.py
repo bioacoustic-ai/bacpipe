@@ -42,6 +42,8 @@ class Model(ModelBaseClass):
         self.model.eval()
 
     def preprocess(self, audio: torch.Tensor):
+        
+        audio = audio.to('cpu')
         b_y = audio.numpy()   # b n
 
         input_seq = []
