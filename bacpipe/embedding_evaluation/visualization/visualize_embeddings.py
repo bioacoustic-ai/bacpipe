@@ -694,7 +694,7 @@ def plot_embeddings_px(
     
     starts = embeds['timestamp']
     
-    if embeds.get('durations'):
+    if bool(embeds.get('durations')) and len(embeds.get('durations')) > 0:
         ends = np.array(embeds.get('durations')) + np.array(starts)
         ends = ends.tolist()
     else:

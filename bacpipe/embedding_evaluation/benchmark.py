@@ -71,10 +71,13 @@ def benchmark(
     
     print('\nFetching model predictions.\n')
     preds, label2idx = loader_obj.predictions(return_type='array')
+    if preds is None:
+        return {'error': "No predictions have been generated, or model does not have classifier."}
     
     # Align ground truth labels to predicted label indices
     ground_truth_array = gt['label:species']
     not_found = []
+    found = []
 
     print(
         'The following species were found in the ground truth '
@@ -83,6 +86,7 @@ def benchmark(
     for label, idx in gt['label_dict:species'].items():
         if label in label2idx:
             print(label)
+            found.append(label)
             ground_truth_array[gt['label:species'] == idx] = label2idx[label]
         else:
             not_found.append(label)
@@ -98,11 +102,13 @@ def benchmark(
             label_regex = re.sub(r'[-\s]', '', label).lower()
             if label_regex in l2i_regex:
                 print('With regex we found', label)
+                found.append(label)
                 ground_truth_array[gt['label:species'] == idx] = l2i_regex[label_regex]
                 not_found.remove(label)
         print('With regex we still did not find:', not_found)
                 
-                
+    if len(found) == 0:
+        return {'error': "No ground truth classes have been found in the predictions."}
     # Build binary matrices using l2i as column ordering
     n_timestamps = len(preds)
     n_classes = len(label2idx)
