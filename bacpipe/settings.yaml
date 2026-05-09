@@ -57,6 +57,19 @@ nr_parallel_workers: False
 # Set to False if you want to keep embeddings even if the process is interrupted.
 rm_embedding_on_keyboard_interrupt: True
 
+# To avoid creating embeddings over and over again every time you run bacpipe,
+# this option exists is and is True by default so that bacpipe can compare if a 
+# combination of model and dataset has already been processed. Bacpipe will still
+# compare the number of files and if there are audio files that have not been 
+# processed yet, will continue where it left off before.
+check_if_already_processed: True
+
+# This is the same option as the previous one, just for the dimensionality reduction
+# So if you want to use the embeddings you already have, but use a different dimensionality
+# reduction, leave the previous option True and set this one to False.
+check_if_already_dim_reduced: True
+
+
 #########------------------------------------###########
 #########   USING YOUR ANOOTATION SETTINGS   ###########
 #########------------------------------------###########
