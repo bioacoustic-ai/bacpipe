@@ -118,7 +118,7 @@ class Embedder(AudioHandler):
         self.model.prepare_inference()
 
     def init_dataloader(self, audio):
-        if "tensorflow" in str(type(audio)):
+        if "tensorflow" in str(type(audio)) or "numpy" in str(type(audio)):
             import tensorflow as tf
 
             return (
@@ -401,38 +401,51 @@ class Embedder(AudioHandler):
         """
         if not self.nr_parallel_workers:
             from multiprocessing import cpu_count
-            available_workers = cpu_count() -1
+            available_workers = cpu_count() - 8
         else:
             available_workers = self.nr_parallel_workers
+
         if self.loader.combination_already_exists:
             return
-        task_queue = queue.Queue(maxsize=available_workers)  # small buffer to balance I/O vs compute
-        # --- Producer: load + preprocess in background ---
+
+        task_queue = queue.Queue(maxsize=available_workers)
+
+        # Build batches of file indices
+        files = self.loader.files
+        file_batches = [
+            files[i:i + available_workers] 
+            for i in range(0, len(files), available_workers)
+        ]
+
+        # --- Producer: load + preprocess batches in background ---
         def producer():
-            for idx, file in enumerate(self.loader.files):
-                try:
-                    preprocessed = self.prepare_audio(file)
-                    task_queue.put((idx, file, preprocessed))
-                                    
-                except torch.cuda.OutOfMemoryError:
-                    logger.error(
-                        "\nCuda device is out of memory. Your Vram doesn't seem to be "
-                        "large enough for this process. Try setting the variable "
-                        "`avoid_pipelined_gpu_inference` to `True`. That way data "
-                        "will be processed in series instead of parallel which will "
-                        "reduce memory requirements. If that also fails use `cpu` "
-                        "instead of `cuda`."
-                    )
-                    os._exit(1) 
-                except Exception as e:
-                    task_queue.put((idx, file, e))
-            task_queue.put(None)  # sentinel = done
+            for batch_idx, batch_files in enumerate(file_batches):
+                preprocessed_batch = []
+                failed = []
+                for file in batch_files:
+                    try:
+                        preprocessed = self.prepare_audio(file)
+                        preprocessed_batch.append((file, preprocessed))
+                    except torch.cuda.OutOfMemoryError:
+                        logger.error(
+                            "\nCuda device is out of memory. Your Vram doesn't seem to be "
+                            "large enough for this process. Try setting the variable "
+                            "`avoid_pipelined_gpu_inference` to `True`. That way data "
+                            "will be processed in series instead of parallel which will "
+                            "reduce memory requirements. If that also fails use `cpu` "
+                            "instead of `cuda`."
+                        )
+                        os._exit(1)
+                    except Exception as e:
+                        failed.append((file, e))
+                task_queue.put((batch_idx, preprocessed_batch, failed))
+            task_queue.put(None)  # sentinel
 
         threading.Thread(target=producer, daemon=True).start()
 
-        # --- Consumer: embed + save metadata/embeddings ---
+        # --- Consumer: embed + save ---
         with tqdm(
-            total=len(self.loader.files),
+            total=len(files),
             desc="processing files",
             position=1,
             leave=False,
@@ -441,24 +454,46 @@ class Embedder(AudioHandler):
                 item = task_queue.get()
                 if item is None:
                     break
+                batch_idx, preprocessed_batch, failed = item
 
-                idx, file, data = item
-                if isinstance(data, Exception):
-                    logger.warning(
-                        f"Error preprocessing {file}, skipping file.\nError: {data}"
-                    )
+                # Log any files that failed preprocessing
+                for file, e in failed:
+                    logger.warning(f"Error preprocessing {file}, skipping.\nError: {e}")
                     pbar.update(1)
+
+                if not preprocessed_batch:
                     continue
 
                 try:
-                    embeddings = self.get_embeddings_for_audio(data)
-            
-                    self.loader._write_audio_file_to_metadata(
-                        file, self.model, embeddings, self.file_length
+                    batch_files = [f for f, _ in preprocessed_batch]
+                    batch_data = [d for _, d in preprocessed_batch]
+
+                    # Stack into a single batch tensor if possible
+                    try:
+                        if not isinstance(batch_data[0], torch.Tensor):
+                            # batch_data = [torch.tensor(b.numpy()) for b in batch_data]
+                            batch_data = np.vstack(batch_data)
+                        else:
+                            batch_data = torch.vstack(batch_data)
+                        lengths = [len(a) for a in batch_data]
+                    except Exception:
+                        pass  # leave as list if stacking fails (e.g. variable length)
+
+                    batch_embeddings = self.get_embeddings_for_audio(batch_data)
+
+                    # Save each file's embeddings individually
+                    lengths.insert(0, 0)
+                    for i, file in enumerate(batch_files):
+                        embeddings = batch_embeddings[lengths[i]:lengths[i+1]]
+                        self.loader._write_audio_file_to_metadata(
+                            file, self.model, embeddings, self.file_length
                         )
-                    self.loader.save_embedding_file(file, embeddings)
-                    if self.model.bool_classifier:
-                        self.classifier.save_classifier_outputs(self.loader, file)
+                        self.loader.save_embedding_file(file, embeddings)
+                        if self.model.bool_classifier:
+                            self.classifier.save_classifier_outputs(self.loader, file)
+                        pbar.update(1)
+
+                # except torch.cuda.OutOfMemoryError:
                 except torch.cuda.OutOfMemoryError as e:
                     logger.exception(
                         "You're out of memory unfortunately. This can happend because you are "
@@ -468,6 +503,27 @@ class Embedder(AudioHandler):
                         "do the trick. If you simply don't have enough VRAM, you can reduce the global "
                         f"batch size in the settings file. Or just compute on the cpu. {e}"
                     )
+                    logger.warning(
+                        f"OOM on batch, falling back to processing files individually."
+                    )
+                    # Fallback: process one by one
+                    for file, data in preprocessed_batch:
+                        try:
+                            embeddings = self.get_embeddings_for_audio(data)
+                            self.loader._write_audio_file_to_metadata(
+                                file, self.model, embeddings, self.file_length
+                            )
+                            self.loader.save_embedding_file(file, embeddings)
+                            if self.model.bool_classifier:
+                                self.classifier.save_classifier_outputs(self.loader, file)
+                        except Exception as e:
+                            logger.warning(f"Error processing {file}: {e}")
+                        pbar.update(1)
+
+                except Exception as e:
+                    logger.warning(f"Error processing batch: {e}")
+                    for file, _ in preprocessed_batch:
+                        pbar.update(1)
                 except AttributeError as e:
                     logger.warning(
                         f"The results folder structure does not exist, therefore files can't be "
