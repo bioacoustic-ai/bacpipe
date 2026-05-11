@@ -61,6 +61,7 @@ def probing_pipeline(
         paths = get_paths_func(model_name)
     if (
         overwrite
+        or name=='knn'
         or not paths.probe_path.joinpath(f"probe_results_{name}.json").exists()
     ):
         df = generate_annotations_for_probing_task(
