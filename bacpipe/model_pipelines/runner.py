@@ -401,7 +401,7 @@ class Embedder(AudioHandler):
         """
         if not self.nr_parallel_workers:
             from multiprocessing import cpu_count
-            available_workers = cpu_count() - 8
+            available_workers = cpu_count() - 1
         else:
             available_workers = self.nr_parallel_workers
 
