@@ -217,35 +217,35 @@ class Loader:
             "Loading already processed files to update the metadata",
             total=len(already_processed_files)
             ):
-            with open(file, 'rb') as f:
-                corresponding_audio_file_bool = (
-                    relative_audio_stems==str(
-                        file.relative_to(self.embed_dir)
-                        ).replace(f'_{self.model_name}.npy', '')
+            # with open(file, 'rb') as f:
+            corresponding_audio_file_bool = (
+                relative_audio_stems==str(
+                    file.relative_to(self.embed_dir)
+                    ).replace(f'_{self.model_name}.npy', '')
+            )
+            try:
+                embed = np.load(file, mmap_mode='r')
+            except Exception as e:
+                logger.exception(
+                    f"Unable to load file {file}. Continuing with the "
+                    f"next file. {e}"
                 )
-                try:
-                    embed = np.load(f)
-                except Exception as e:
-                    logger.exception(
-                        f"Unable to load file {f}. Continuing with the "
-                        f"next file. {e}"
+                continue
+            self.metadata_dict['files']['audio_files'].append(
+                relative_audio_stems[corresponding_audio_file_bool][0]
+                + audio_suffixes[corresponding_audio_file_bool][0]
+            )
+            self.metadata_dict['files']['nr_embeds_per_file'].append(
+                embed.shape[0]
+            )
+            self.metadata_dict['files']['file_lengths (s)'].append(
+                embed.shape[0] * (
+                    module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE
                     )
-                    continue
-                self.metadata_dict['files']['audio_files'].append(
-                    relative_audio_stems[corresponding_audio_file_bool][0]
-                    + audio_suffixes[corresponding_audio_file_bool][0]
+            )
+            self._update_audio_file_list(
+                audio_files, corresponding_audio_file_bool
                 )
-                self.metadata_dict['files']['nr_embeds_per_file'].append(
-                    embed.shape[0]
-                )
-                self.metadata_dict['files']['file_lengths (s)'].append(
-                    embed.shape[0] * (
-                        module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE
-                        )
-                )
-                self._update_audio_file_list(
-                    audio_files, corresponding_audio_file_bool
-                    )
         self.metadata_dict['segment_length (samples)'] = module.LENGTH_IN_SAMPLES
         self.metadata_dict['sample_rate (Hz)'] = module.SAMPLE_RATE
         if len(self.files) == 0:
@@ -284,6 +284,7 @@ class Loader:
         # iterate through directories backwards, starting with most recent first
         for d in existing_embed_dirs[::-1]: 
             # require that the model name and the audio dir are in the folder name
+            
             if not (
                 self.model_name in d.stem 
                 and not self.combination_already_exists
@@ -347,8 +348,12 @@ class Loader:
         """
         try:
             num_files = len(
-                [f for f in list(d.rglob(f"*{self.embed_suffix}"))]
+                [f for f in tqdm(
+                    d.rglob(f"*{self.embed_suffix}"), 
+                    'Finding all generated embeddings'
+                    )]
             )
+            logger.info(f"Found {num_files} embedding files.")
             num_audio_files = len(
                 self.get_audio_files(self.audio_dir)
                 )
@@ -472,6 +477,7 @@ class Loader:
         ]
         files_list = list(set(files_list))
         files_list.sort()
+        logger.info(f"Found {len(files_list)} number of audio files.")
         assert len(files_list) > 0, "No audio files found in audio_dir."
         if return_type == 'pathlib.Path':
             return files_list
@@ -624,11 +630,12 @@ class Loader:
             return np.vstack(list(d.values()))
         
 
-    def get_preds_array(self, return_type='dict', **kwargs):
-        preds_path = (
-            self.paths.preds_path
-            / 'original_classifier_outputs'
-            )
+    def get_preds_array(self, return_type='dict', preds_path=None, **kwargs):
+        if preds_path is None:
+            preds_path = (
+                self.paths.preds_path
+                / 'original_classifier_outputs'
+                )
         if not preds_path.exists():
             logger.warning(
                 "No classifier predictions have been save yet. "
@@ -644,6 +651,15 @@ class Loader:
                 self.metadata_dict['files']['audio_files']
                 ]
             )
+        if not preds_path is None:
+            parent_dir = preds_path.relative_to(self.paths.preds_path / 'original_classifier_outputs')
+            idxs = [idx for idx, aud in enumerate(relative_audio[:, 0]) if Path(aud).parent == parent_dir]
+            nr_embeds_per_file = list(np.array(self.metadata_dict['files']['nr_embeds_per_file'])[idxs])
+            relative_audio = relative_audio[idxs, :]
+        else:
+            nr_embeds_per_file = self.metadata_dict['files']['nr_embeds_per_file']
+            
+            
         if hasattr(self, 'continue_failed_run') and self.continue_failed_run:
             # we omit the last item assuming that it's just been processed
             # and corresponds to the clfier_annotations contents
@@ -661,7 +677,8 @@ class Loader:
         
         
         # --- pre-allocate ---
-        total_bins = sum(self.metadata_dict['files']['nr_embeds_per_file'])
+        
+        total_bins = sum(nr_embeds_per_file)
 
         # first pass to collect all species keys
         all_keys = set()
@@ -671,7 +688,13 @@ class Loader:
             total=len(files)
             ):
             with open(file, 'r') as f:
-                d = json.load(f)
+                try:
+                    d = json.load(f)
+                except json.decoder.JSONDecodeError:
+                    logger.warning(
+                        f"Failed to load {file}. Continuing with next file"
+                        )
+                    continue
             d.pop('head')
             all_keys.update(d.keys())
 
@@ -683,10 +706,17 @@ class Loader:
         for idx, file in tqdm(
             enumerate(files), 
             'Collecting prediction values and timestamps',             
-            total=len(files)
+            total=len(files),
+            leave=False
             ):
             with open(file, 'r') as f:
-                outputs = json.load(f)
+                try:
+                    outputs = json.load(f)
+                except json.decoder.JSONDecodeError:
+                    logger.warning(
+                        f"Failed to load {file}. Continuing with next file"
+                        )
+                    continue
             current_time_bins = outputs['head']['Time bins in this file']
             outputs.pop('head')
 
@@ -702,7 +732,10 @@ class Loader:
             return cl_array.T, keys2idx
             
         # after the loop, cl_array is shape (n_species, total_bins)
-        active_bins_global = np.where(cl_array.max(axis=0) > 0)[0]
+        if len(cl_array) > 0:
+            active_bins_global = np.where(cl_array.max(axis=0) > 0)[0]
+        else:
+            active_bins_global = []
 
         df_dict = {
             'start': [],
@@ -714,9 +747,10 @@ class Loader:
         for idx, file in tqdm(
             enumerate(files),
             'Building continuous dataframe from processed predictions',
-            total=len(files)
+            total=len(files),
+            leave=False
             ):
-            current_time_bins = self.metadata_dict['files']['nr_embeds_per_file'][idx]
+            current_time_bins = nr_embeds_per_file[idx]
             
             # find active bins within this file's slice
             active_in_file = active_bins_global[
@@ -758,26 +792,37 @@ class Loader:
             df = df[cols]
             return df
     
-    def get_annotations_parquet(self, **kwargs):
+    def get_annotations_parquet(self, preds_path=None, **kwargs):
+        if preds_path is None:
+            preds_path = self.paths.preds_path
         file_name = self.model_name + '_all_predictions'
-        all_prediction_files = [f.stem for f in self.paths.preds_path.iterdir()]
+        all_prediction_files = [f.stem for f in preds_path.iterdir()]
         if (
             kwargs.get('overwrite')
             or not file_name in all_prediction_files
             ):
-            df = self.get_preds_array(return_type='dataframe', **kwargs)
-            if len(df) * len(df.T) > 3_000_000:
-                df.to_parquet(self.paths.preds_path / (file_name + '.parquet'))
+            if not preds_path is None:
+                preds_src_path = (
+                    self.paths.preds_path
+                    / 'original_classifier_outputs'
+                    / preds_path.relative_to(self.paths.preds_path)
+                )
             else:
-                df.to_csv(self.paths.preds_path / (file_name + '.csv'))
+                preds_src_path = None
+            df = self.get_preds_array(return_type='dataframe', preds_path=preds_src_path, **kwargs)
+            if isinstance(df, pd.DataFrame):
+                if len(df) * len(df.T) > 3_000_000:
+                    df.to_parquet(preds_path / (file_name + '.parquet'))
+                else:
+                    df.to_csv(preds_path / (file_name + '.csv'))
         else:
             try:
-                df = pd.read_csv(self.paths.preds_path / (file_name + '.csv'))
+                df = pd.read_csv(preds_path / (file_name + '.csv'))
             except:
-                df = pd.read_parquet(self.paths.preds_path / (file_name + '.parquet'))
+                df = pd.read_parquet(preds_path / (file_name + '.parquet'))
         return df
         
-    def predictions(self, return_type='dict'):
+    def predictions(self, return_type='dict', parent_dir=None):
         """
         Load and return classifier predictions. This method
         can only be used for already processed predictions. 
@@ -806,10 +851,41 @@ class Loader:
             or tuple of (dict, dict) for `dict`
             or pd.DataFrame
         """
-        if return_type == 'dataframe':
-            return self.get_annotations_parquet()
+        
+        if len(self.files) > 10_000:
+            parents = list(set([f.parent for f in self.files]))
+            parents.sort()
+            parent_dirs = [f.relative_to(self.audio_dir) for f in parents]
+            if not self.paths is None:
+                for p_dir in tqdm(
+                    parent_dirs,
+                    'Creating dataframes for each parent directory',
+                    len(parents),
+                    leave=False
+                    ):
+                    preds_path = self.paths.preds_path / p_dir
+                    preds_path.mkdir(exist_ok=True, parents=True)
+                    _ = self.get_annotations_parquet(preds_path=preds_path)
+            elif parent_dir in parent_dirs:
+                preds_path = self.paths.preds_path / parent_dir
+                if return_type == 'dataframe':
+                    return self.get_annotations_parquet(preds_path=preds_path)
+                else:
+                    return self.get_preds_array(return_type=return_type)
+            else:
+                logger.exception(
+                    "Your dataset is too large to give you all predictions at once. "
+                    "Please specify the name of the parent directory you would like "
+                    "the predictions from. Possible parent directories are:"
+                    f"{parent_dirs=}."
+                )
+                import sys
+                sys.exit(1)
         else:
-            return self.get_preds_array(return_type=return_type)
+            if return_type == 'dataframe':
+                return self.get_annotations_parquet()
+            else:
+                return self.get_preds_array(return_type=return_type)
 
     def _write_audio_file_to_metadata(self, file, model, embeddings, file_length):
         if (
@@ -989,6 +1065,8 @@ class Loader:
                 return False
             else:
                 return True
+        elif True:
+            self.predictions(return_type='dataframe')
 
 def replace_default_kwargs_with_user_kwargs(remove_keys=None, **kwargs):
     from bacpipe import config, settings
