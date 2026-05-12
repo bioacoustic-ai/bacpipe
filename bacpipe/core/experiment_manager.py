@@ -217,35 +217,35 @@ class Loader:
             "Loading already processed files to update the metadata",
             total=len(already_processed_files)
             ):
-            with open(file, 'rb') as f:
-                corresponding_audio_file_bool = (
-                    relative_audio_stems==str(
-                        file.relative_to(self.embed_dir)
-                        ).replace(f'_{self.model_name}.npy', '')
+            # with open(file, 'rb') as f:
+            corresponding_audio_file_bool = (
+                relative_audio_stems==str(
+                    file.relative_to(self.embed_dir)
+                    ).replace(f'_{self.model_name}.npy', '')
+            )
+            try:
+                embed = np.load(file, mmap_mode='r')
+            except Exception as e:
+                logger.exception(
+                    f"Unable to load file {file}. Continuing with the "
+                    f"next file. {e}"
                 )
-                try:
-                    embed = np.load(f)
-                except Exception as e:
-                    logger.exception(
-                        f"Unable to load file {f}. Continuing with the "
-                        f"next file. {e}"
+                continue
+            self.metadata_dict['files']['audio_files'].append(
+                relative_audio_stems[corresponding_audio_file_bool][0]
+                + audio_suffixes[corresponding_audio_file_bool][0]
+            )
+            self.metadata_dict['files']['nr_embeds_per_file'].append(
+                embed.shape[0]
+            )
+            self.metadata_dict['files']['file_lengths (s)'].append(
+                embed.shape[0] * (
+                    module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE
                     )
-                    continue
-                self.metadata_dict['files']['audio_files'].append(
-                    relative_audio_stems[corresponding_audio_file_bool][0]
-                    + audio_suffixes[corresponding_audio_file_bool][0]
+            )
+            self._update_audio_file_list(
+                audio_files, corresponding_audio_file_bool
                 )
-                self.metadata_dict['files']['nr_embeds_per_file'].append(
-                    embed.shape[0]
-                )
-                self.metadata_dict['files']['file_lengths (s)'].append(
-                    embed.shape[0] * (
-                        module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE
-                        )
-                )
-                self._update_audio_file_list(
-                    audio_files, corresponding_audio_file_bool
-                    )
         self.metadata_dict['segment_length (samples)'] = module.LENGTH_IN_SAMPLES
         self.metadata_dict['sample_rate (Hz)'] = module.SAMPLE_RATE
         if len(self.files) == 0:
@@ -732,7 +732,10 @@ class Loader:
             return cl_array.T, keys2idx
             
         # after the loop, cl_array is shape (n_species, total_bins)
-        active_bins_global = np.where(cl_array.max(axis=0) > 0)[0]
+        if len(cl_array) > 0:
+            active_bins_global = np.where(cl_array.max(axis=0) > 0)[0]
+        else:
+            active_bins_global = []
 
         df_dict = {
             'start': [],
@@ -807,10 +810,11 @@ class Loader:
             else:
                 preds_src_path = None
             df = self.get_preds_array(return_type='dataframe', preds_path=preds_src_path, **kwargs)
-            if len(df) * len(df.T) > 3_000_000:
-                df.to_parquet(preds_path / (file_name + '.parquet'))
-            else:
-                df.to_csv(preds_path / (file_name + '.csv'))
+            if isinstance(df, pd.DataFrame):
+                if len(df) * len(df.T) > 3_000_000:
+                    df.to_parquet(preds_path / (file_name + '.parquet'))
+                else:
+                    df.to_csv(preds_path / (file_name + '.csv'))
         else:
             try:
                 df = pd.read_csv(preds_path / (file_name + '.csv'))
@@ -851,7 +855,7 @@ class Loader:
         if len(self.files) > 10_000:
             parents = list(set([f.parent for f in self.files]))
             parents.sort()
-            parent_dirs = [f.relative_to(self.embed_dir) for f in parents]
+            parent_dirs = [f.relative_to(self.audio_dir) for f in parents]
             if not self.paths is None:
                 for p_dir in tqdm(
                     parent_dirs,

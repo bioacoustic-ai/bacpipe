@@ -771,14 +771,15 @@ class Classifier:
             }
         
         df = fileloader_obj.predictions(return_type='dataframe')
-        df_dict = df[['audiofilename', 'start', 'end']]
-        if len(df) > 0:
-            cols = df.iloc[:, 4:].columns
-            maxes = np.argmax(np.array(df.iloc[:, 4:]), axis=1)
-            highest_prob_species = [cols[i] for i in maxes]
+        if isinstance(df, pd.DataFrame):
+            df_dict = df[['audiofilename', 'start', 'end']]
+            if len(df) > 0:
+                cols = df.iloc[:, 4:].columns
+                maxes = np.argmax(np.array(df.iloc[:, 4:]), axis=1)
+                highest_prob_species = [cols[i] for i in maxes]
 
-            df.iloc[:, 4:].max(axis=1)
-            df_dict['label:default_classifier'] = highest_prob_species
+                df.iloc[:, 4:].max(axis=1)
+                df_dict['label:default_classifier'] = highest_prob_species
 
         self.cumulative_annotations = pd.DataFrame(df_dict)
         self.cumulative_annotations = pd.concat(
