@@ -632,17 +632,22 @@ class Loader:
 
     def get_preds_array(self, return_type='dict', preds_path=None, **kwargs):
         if preds_path is None:
-            preds_path = (
+            preds_path_loc = (
                 self.paths.preds_path
                 / 'original_classifier_outputs'
                 )
-        if not preds_path.exists():
+        else:
+            preds_path_loc = preds_path
+        if not preds_path_loc.exists():
             logger.warning(
                 "No classifier predictions have been save yet. "
             )
             return None, None
-        files = list(preds_path.rglob('*json'))
+        files = list(preds_path_loc.rglob('*json'))
         files.sort()
+        
+        if not hasattr(self, 'metadata_dict'):
+            self._get_metadata_dict(self.embed_dir)
         
         relative_audio = np.array(
             [
@@ -793,36 +798,26 @@ class Loader:
             return df
     
     def get_annotations_parquet(self, preds_path=None, **kwargs):
-        if preds_path is None:
-            preds_path = self.paths.preds_path
+        all_prediction_files, preds_path_local = self.get_generated_annotation_files(preds_path=preds_path)
         file_name = self.model_name + '_all_predictions'
-        all_prediction_files = [f.stem for f in preds_path.iterdir()]
         if (
             kwargs.get('overwrite')
             or not file_name in all_prediction_files
             ):
-            if not preds_path is None:
-                preds_src_path = (
-                    self.paths.preds_path
-                    / 'original_classifier_outputs'
-                    / preds_path.relative_to(self.paths.preds_path)
-                )
-            else:
-                preds_src_path = None
-            df = self.get_preds_array(return_type='dataframe', preds_path=preds_src_path, **kwargs)
+            df = self.get_preds_array(return_type='dataframe', preds_path=None, **kwargs)
             if isinstance(df, pd.DataFrame):
                 if len(df) * len(df.T) > 3_000_000:
-                    df.to_parquet(preds_path / (file_name + '.parquet'))
+                    df.to_parquet(preds_path_local / (file_name + '.parquet'))
                 else:
-                    df.to_csv(preds_path / (file_name + '.csv'))
+                    df.to_csv(preds_path_local / (file_name + '.csv'))
         else:
             try:
-                df = pd.read_csv(preds_path / (file_name + '.csv'))
+                df = pd.read_csv(preds_path_local / (file_name + '.csv'))
             except:
-                df = pd.read_parquet(preds_path / (file_name + '.parquet'))
+                df = pd.read_parquet(preds_path_local / (file_name + '.parquet'))
         return df
         
-    def predictions(self, return_type='dict', parent_dir=None):
+    def predictions(self, return_type='dict', parent_dir=None, **kwargs):
         """
         Load and return classifier predictions. This method
         can only be used for already processed predictions. 
@@ -865,13 +860,13 @@ class Loader:
                     ):
                     preds_path = self.paths.preds_path / p_dir
                     preds_path.mkdir(exist_ok=True, parents=True)
-                    _ = self.get_annotations_parquet(preds_path=preds_path)
+                    _ = self.get_annotations_parquet(preds_path=preds_path, **kwargs)
             elif parent_dir in parent_dirs:
                 preds_path = self.paths.preds_path / parent_dir
                 if return_type == 'dataframe':
-                    return self.get_annotations_parquet(preds_path=preds_path)
+                    return self.get_annotations_parquet(preds_path=preds_path, **kwargs)
                 else:
-                    return self.get_preds_array(return_type=return_type)
+                    return self.get_preds_array(return_type=return_type, **kwargs)
             else:
                 logger.exception(
                     "Your dataset is too large to give you all predictions at once. "
@@ -883,9 +878,9 @@ class Loader:
                 sys.exit(1)
         else:
             if return_type == 'dataframe':
-                return self.get_annotations_parquet()
+                return self.get_annotations_parquet(**kwargs)
             else:
-                return self.get_preds_array(return_type=return_type)
+                return self.get_preds_array(return_type=return_type, **kwargs)
 
     def _write_audio_file_to_metadata(self, file, model, embeddings, file_length):
         if (
@@ -1019,9 +1014,13 @@ class Loader:
                 )
             
     def classifier_should_be_run(
-        self, paths, run_pretrained_classifier, testing, **kwargs
+        self, run_pretrained_classifier=False, testing=False, paths=None, **kwargs
         ):
-        
+        if not paths:
+            if hasattr(self, 'paths'):
+                paths = self.paths
+            else:
+                raise AttributeError("No paths passed to check for predictions.")
         if (
             testing 
             or (
@@ -1066,7 +1065,21 @@ class Loader:
             else:
                 return True
         elif True:
-            self.predictions(return_type='dataframe')
+            all_prediction_files, _ = self.get_generated_annotation_files()
+            self.predictions(return_type='dataframe', **kwargs)
+            if not f'{self.model_name}_classifier_annotations' in all_prediction_files:
+                return True
+
+    def get_generated_annotation_files(self, preds_path=None):
+        if not preds_path is None:
+            preds_src_path = (
+                self.paths.preds_path
+                / 'original_classifier_outputs'
+                / preds_path.relative_to(self.paths.preds_path)
+            )
+        else:
+            preds_src_path = self.paths.preds_path
+        return [f.stem for f in preds_src_path.iterdir()], preds_src_path
 
 def replace_default_kwargs_with_user_kwargs(remove_keys=None, **kwargs):
     from bacpipe import config, settings

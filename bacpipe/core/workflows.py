@@ -447,7 +447,7 @@ def model_specific_evaluation(
     
     for idx, model_name in enumerate(models):
         paths = get_paths(model_name)
-        if loader_dict[model_name].classifier_should_be_run(paths, **kwargs):
+        if loader_dict[model_name].classifier_should_be_run(**kwargs):
             embed = Embedder(
                 model_name, 
                 loader_dict[model_name], 
