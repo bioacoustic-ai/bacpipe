@@ -727,7 +727,7 @@ def plot_embeddings_px(
     })
 
     # 2. Setup Figure based on Label Count
-    if n_labels > 50:
+    if n_labels > 500:
     # if label_by in ['time_of_day', 'continuous_timestamp', 'day_of_year']:
         # --- HIGH CARDINALITY: Use Colorbar ---
         # We map color to 'label_id' (int) to force a continuous scale
