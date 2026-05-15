@@ -89,6 +89,17 @@ def collect_dim_reduced_embeds(
         if file.suffix == ".json":  # and dim_reduction_model in file.stem:
             with open(file, "r") as f:
                 embeds_dict = json.load(f)
+    if bool(embeds_dict.get('x')) and bool(embeds_dict.get('timestamp')):
+        if not len(embeds_dict['x']) == len(embeds_dict['timestamp']):
+            logger.warning(
+                "The lengths of timestamps and embeddings do not match. "
+                "This could be the result of processing in multiple steps. "
+                "It could also be caused if you are generating embeddings "
+                "from annotations and the filenames in the csv file do not "
+                "match the names of the audio files."
+                "The safest way to avoid this, is by rerunning the dimensionality "
+                "reduced embeddings. To do this delete the dim_reduced_embeddings folder."
+            )
     return embeds_dict
 
 
@@ -694,7 +705,7 @@ def plot_embeddings_px(
     
     starts = embeds['timestamp']
     
-    if bool(embeds.get('durations')) and len(embeds.get('durations')) > 0:
+    if 'durations' in embeds.keys() and len(embeds.get('durations')) > 0:
         ends = np.array(embeds.get('durations')) + np.array(starts)
         ends = ends.tolist()
     else:

@@ -460,7 +460,7 @@ def model_specific_evaluation(
                     )
                 
         # if not evaluation_task in ["None", [], None, False]:
-        embeds = loader_dict[model_name].embeddings()
+        embeds = loader_dict[model_name].embeddings(return_type='array')
         try:
             ground_truth = ground_truth_by_model(
                 model_name, paths=paths, single_label=True, **kwargs
@@ -513,8 +513,7 @@ def model_specific_evaluation(
                 f"{model_name.upper()} embeddings"
             )
 
-            embeds_array = np.concatenate(list(embeds.values()))
-            clustering_pipeline(model_name, ground_truth, embeds_array, paths, **kwargs)
+            clustering_pipeline(model_name, ground_truth, embeds, paths, **kwargs)
 
 def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwargs):
     """
