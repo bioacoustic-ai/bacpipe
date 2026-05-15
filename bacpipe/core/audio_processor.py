@@ -108,13 +108,10 @@ class AudioHandler:
         self, file_path, audio, annotations_filename='annotations.csv', **_
         ):
         import pandas as pd
+        from bacpipe import Loader
         annots = pd.read_csv(Path(self.audio_dir) / annotations_filename)
         # filter current file
-        file_annots = annots[annots.audiofilename==file_path.relative_to(self.audio_dir)]
-        if len(file_annots) == 0:
-            file_annots = annots[annots.audiofilename==file_path.stem+file_path.suffix]
-        if len(file_annots) == 0:
-            file_annots = annots[annots.audiofilename==str(file_path.relative_to(self.audio_dir))]
+        file_annots = Loader.filter_df_by_file(self.audio_dir, annots, file_path)
         if len(file_annots) == 0:
             raise AssertionError(
                 f"No annotations found for audio file {file_path.relative_to(self.audio_dir)}. "

@@ -584,6 +584,16 @@ class Loader:
         self.metadata_dict["files"]["embedding_dimensions"].append(embeds.shape)
         return embeds
 
+    @staticmethod
+    def filter_df_by_file(audio_dir, annots, file_path):
+        file_annots = annots[annots.audiofilename==file_path.relative_to(audio_dir)]
+        if len(file_annots) == 0:
+            file_annots = annots[annots.audiofilename==file_path.stem+file_path.suffix]
+        if len(file_annots) == 0:
+            file_annots = annots[annots.audiofilename==str(file_path.relative_to(audio_dir))]
+        return file_annots
+
+
     def embeddings(self, return_type='dict'):
         """
         Load and return processed embeddings. This method can 
@@ -896,6 +906,7 @@ class Loader:
                 paths, 
                 self.annotations_filename,
                 self.audio_dir,
+                audio_files=self.metadata_dict['files']['audio_files'],
                 bool_filter_labels=False
             )
             t_stamps = df.start.values.tolist()

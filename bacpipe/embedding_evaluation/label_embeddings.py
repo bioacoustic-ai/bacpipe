@@ -602,6 +602,7 @@ def load_labels_and_build_dict(
     paths,
     annotations_filename,
     audio_dir,
+    audio_files=[],
     bool_filter_labels=True,
     min_label_occurrences=150,
     main_label_column=None,
@@ -645,6 +646,14 @@ def load_labels_and_build_dict(
             )
         else:
             label_df = label_df[label_df[main_label_column].isin(filtered_labels)]
+    if len(audio_files) > 0:
+        from bacpipe import Loader
+        filtered_df = pd.DataFrame()
+        for file in audio_files:
+            df_temp = Loader.filter_df_by_file(paths.audio_dir, label_df, Path(paths.audio_dir) / file)
+            filtered_df = pd.concat([filtered_df, df_temp])
+        label_df = filtered_df
+        
     label_idx_dict = {}
     for label_column in [l for l in label_df.columns if 'label:' in l]:
         label_idx_dict[label_column] = {
