@@ -151,7 +151,12 @@ class Embedder(AudioHandler):
                     batch = batch.cuda()
                 embeddings = self.model(batch)
                 if self.model.bool_classifier:
-                    self.classifier.classify(embeddings)
+                    try:
+                        self.classifier.classify(embeddings)
+                    except Exception as e:
+                        logger.exception(
+                            f"\nEmbeddings were created but classification failed due to error, {e}"
+                        )
 
             if isinstance(embeddings, torch.Tensor) and embeddings.dim() == 1:
                 embeddings = embeddings.unsqueeze(0)
@@ -679,7 +684,7 @@ class Classifier:
     
     def classify(self, embeddings):
         if not isinstance(embeddings, torch.Tensor):
-            clfier_output = self.model.classifier_predictions(torch.tensor(embeddings))
+            clfier_output = self.model.classifier_predictions(torch.tensor(np.array(embeddings)))
         else:
             clfier_output = self.model.classifier_predictions(embeddings)
             
@@ -871,7 +876,7 @@ class Classifier:
             ):        
             
             if not isinstance(embeddings, torch.Tensor):
-                clfier_output = self.model.classifier_predictions(torch.tensor(embeddings))
+                clfier_output = self.model.classifier_predictions(torch.tensor(np.array(embeddings)))
             else:
                 clfier_output = self.model.classifier_predictions(embeddings)
 
