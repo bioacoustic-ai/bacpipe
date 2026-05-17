@@ -591,6 +591,8 @@ class Loader:
             file_annots = annots[annots.audiofilename==file_path.stem+file_path.suffix]
         if len(file_annots) == 0:
             file_annots = annots[annots.audiofilename==str(file_path.relative_to(audio_dir))]
+        if len(file_annots) == 0:
+            file_annots = annots[annots.audiofilename==str(file_path.relative_to(audio_dir).as_posix())]
         return file_annots
 
 
