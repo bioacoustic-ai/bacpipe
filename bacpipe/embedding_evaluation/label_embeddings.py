@@ -124,7 +124,9 @@ class DefaultLabels:
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
                 
                 if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
-                    starts = self.df.start.values[self.df.audiofilename == file]
+                    from bacpipe import Loader
+                    df = Loader.filter_df_by_file(self.paths.audio_dir, self.df, self.paths.audio_dir / file)
+                    starts = df.start.values
                     timestamp = (
                         (time_of_day + dt.timedelta(seconds=float(starts[index_of_embedding])))
                         .time()
@@ -173,7 +175,9 @@ class DefaultLabels:
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
                 
                 if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
-                    starts = self.df.start.values[self.df.audiofilename == file]
+                    from bacpipe import Loader
+                    df = Loader.filter_df_by_file(self.paths.audio_dir, self.df, self.paths.audio_dir / file)
+                    starts = df.start.values
                     timestamp = (
                         (datetime_per_file + dt.timedelta(seconds=float(starts[index_of_embedding])))
                         .time()
@@ -213,7 +217,7 @@ class DefaultLabels:
             self.default_label_keys.remove("default_classifier")
         else:
             path = clfier_paths[0]
-            df = pd.read_csv(path)
+            df = pd.read_csv(path) # TODO this causes problems, if previously only_annotated
             if not len(self.parent_directory_per_embedding) == len(df):
                 df = self.fill_remaining_labels(df)
             self.default_classifier_per_embedding = df[
@@ -221,6 +225,7 @@ class DefaultLabels:
             ].values.tolist()
 
     def fill_remaining_labels(self, df):
+        from bacpipe import Loader
         seg_len = self.metadata['segment_length (samples)'] / self.metadata['sample_rate (Hz)']
         df_new = {
             'start': [],
@@ -232,10 +237,13 @@ class DefaultLabels:
             self.metadata['files']['audio_files'], 
             self.metadata['files']['nr_embeds_per_file']
             ):
-            df_part = df[df.audiofilename == file]
+            df_part = Loader.filter_df_by_file(self.paths.audio_dir, df, self.paths.audio_dir / file)
+            # df_part = df[df.audiofilename == file]
             if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
-                starts = self.df.start[self.df.audiofilename == file]
-                all_time_bins = np.round(starts.values, 4).tolist()
+                df_tmp = Loader.filter_df_by_file(self.paths.audio_dir, self.df, self.paths.audio_dir / file)
+                starts = df_tmp.start.values
+                # starts = self.df.start[self.df.audiofilename == file]
+                all_time_bins = np.round(starts, 4).tolist()
             else:
                 all_time_bins = np.round(np.arange(nr_embeds) * seg_len, 4).tolist()
             [all_time_bins.remove(l) for l in np.round(df_part.start, 4)]
@@ -627,6 +635,7 @@ def load_labels_and_build_dict(
     paths,
     annotations_filename,
     audio_dir,
+    audio_files=[],
     bool_filter_labels=True,
     min_label_occurrences=150,
     main_label_column=None,
@@ -670,6 +679,14 @@ def load_labels_and_build_dict(
             )
         else:
             label_df = label_df[label_df[main_label_column].isin(filtered_labels)]
+    if len(audio_files) > 0:
+        from bacpipe import Loader
+        filtered_df = pd.DataFrame()
+        for file in audio_files:
+            df_temp = Loader.filter_df_by_file(paths.audio_dir, label_df, Path(paths.audio_dir) / file)
+            filtered_df = pd.concat([filtered_df, df_temp])
+        label_df = filtered_df
+        
     label_idx_dict = {}
     for label_column in [l for l in label_df.columns if 'label:' in l]:
         label_idx_dict[label_column] = {

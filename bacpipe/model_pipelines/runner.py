@@ -151,7 +151,12 @@ class Embedder(AudioHandler):
                     batch = batch.cuda()
                 embeddings = self.model(batch)
                 if self.model.bool_classifier:
-                    self.classifier.classify(embeddings)
+                    try:
+                        self.classifier.classify(embeddings)
+                    except Exception as e:
+                        logger.exception(
+                            f"\nEmbeddings were created but classification failed due to error, {e}"
+                        )
 
             if isinstance(embeddings, torch.Tensor) and embeddings.dim() == 1:
                 embeddings = embeddings.unsqueeze(0)
@@ -679,7 +684,7 @@ class Classifier:
     
     def classify(self, embeddings):
         if not isinstance(embeddings, torch.Tensor):
-            clfier_output = self.model.classifier_predictions(torch.tensor(embeddings))
+            clfier_output = self.model.classifier_predictions(torch.tensor(np.array(embeddings)))
         else:
             clfier_output = self.model.classifier_predictions(embeddings)
             
@@ -713,8 +718,10 @@ class Classifier:
         maxes = torch.max(self.predictions, dim=1)
         
         if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
-            starts = self.start_timestamps[self.df.audiofilename == str(file.relative_to(fileloader_obj.audio_dir))]
-            ends = self.end_timestamps[self.df.audiofilename == str(file.relative_to(fileloader_obj.audio_dir))]
+            from bacpipe import Loader
+            df = Loader.filter_df_by_file(fileloader_obj.audio_dir, self.df, file)
+            starts = df.start.values#self.start_timestamps[self.df.audiofilename == str(file.relative_to(fileloader_obj.audio_dir))]
+            ends = df.end.values#self.end_timestamps[self.df.audiofilename == str(file.relative_to(fileloader_obj.audio_dir))]
             starts, ends = list(set(starts)), list(set(ends))
             starts.sort(), ends.sort()
             starts, ends = np.array(starts), np.array(ends)
@@ -740,7 +747,7 @@ class Classifier:
                 ]
             
         classifier_annotations["audiofilename"] = str(
-            file.relative_to(fileloader_obj.audio_dir)
+            file.relative_to(fileloader_obj.audio_dir).to_posix()
         )
         classifier_annotations["label:default_classifier"] = np.array(
             self.model.classes
@@ -871,7 +878,7 @@ class Classifier:
             ):        
             
             if not isinstance(embeddings, torch.Tensor):
-                clfier_output = self.model.classifier_predictions(torch.tensor(embeddings))
+                clfier_output = self.model.classifier_predictions(torch.tensor(np.array(embeddings)))
             else:
                 clfier_output = self.model.classifier_predictions(embeddings)
 
