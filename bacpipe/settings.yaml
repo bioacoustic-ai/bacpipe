@@ -58,7 +58,7 @@ nr_parallel_workers: False
 rm_embedding_on_keyboard_interrupt: True
 
 # To avoid creating embeddings over and over again every time you run bacpipe,
-# this option exists is and is True by default so that bacpipe can compare if a 
+# this option exists and is True by default so that bacpipe can compare if a 
 # combination of model and dataset has already been processed. Bacpipe will still
 # compare the number of files and if there are audio files that have not been 
 # processed yet, will continue where it left off before.
