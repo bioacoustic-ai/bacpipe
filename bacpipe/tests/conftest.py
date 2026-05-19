@@ -93,7 +93,10 @@ def pytest_generate_tests(metafunc):
     for opt in BOOL_OPTIONS:
             if opt in metafunc.fixturenames:
                 raw = metafunc.config.getoption(opt)
-                if raw is None:
+                if raw is None and opt == 'overwrite':
+                    vals = [True, False]
+                    metafunc.parametrize(opt, vals, ids=[f"{opt.split('_')[0]}={str(v)[0]}" for v in vals])
+                elif raw is None:
                     vals = [False, True]
                     # This creates labels like 'overwrite=True' and 'overwrite=False'
                     metafunc.parametrize(opt, vals, ids=[f"{opt.split('_')[0]}={str(v)[0]}" for v in vals])

@@ -54,6 +54,10 @@ def test_evaluation(model, overwrite, device, only_embed_annotations, kwargs):
     except FileNotFoundError:
         ground_truth = None
     assert len(embeds) > 1
+    
+    if overwrite:
+        if (paths.labels_path / 'probing_dataframe.csv').exists():
+            (paths.labels_path / 'probing_dataframe.csv').unlink()
     for class_config in kwargs.get("probe_configs", {}).values():
         if class_config["bool"]:
             probing_pipeline(
@@ -71,6 +75,23 @@ def test_evaluation(model, overwrite, device, only_embed_annotations, kwargs):
         paths, 
         **kwargs
         )
+    
+def test_collecting_embeddings(model):
+    embeds = embeddings[model].embeddings(return_type='array')
+    assert len(embeds) > 0
+    embeds = embeddings[model].embeddings(return_type='dict')
+    assert len(embeds) > 0
+    
+def test_collecting_predictions(model):
+    try:
+        ar_preds = embeddings[model].predictions(return_type='array')
+        df_preds = embeddings[model].predictions(return_type='dataframe')
+        di_preds = embeddings[model].predictions(return_type='dict')
+        assert len(ar_preds) > 0
+        assert len(df_preds) > 0
+        assert len(di_preds) > 0
+    except FileNotFoundError:
+        pass
 
 def test_benchmarking(
     model,
@@ -80,7 +101,6 @@ def test_benchmarking(
     ):
         
     results = bacpipe.benchmark(
-        # 'birdnet',
         model,
         kwargs['audio_dir'],
         check_if_already_processed=True,

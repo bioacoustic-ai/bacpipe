@@ -593,6 +593,7 @@ class Loader:
             file_annots = annots[annots.audiofilename==str(file_path.relative_to(audio_dir))]
         if len(file_annots) == 0:
             file_annots = annots[annots.audiofilename==str(file_path.relative_to(audio_dir).as_posix())]
+            
         return file_annots
 
 
@@ -772,6 +773,17 @@ class Loader:
     
     def get_annotations_parquet(self, **kwargs):
         file_name = self.model_name + '_all_predictions'
+        if not self.paths.preds_path.exists():
+            error = (
+                "\nNo classifier predictions have been found for this model. Either "
+                "this model does not have a pretrained classifier or bacpipe was previously "
+                "run with `run_pretrained_classifier=False`. If you are sure this model has "
+                "a pretrained classifier, please recompute the embeddings by setting "
+                "`check_if_already_processed=False`, that way embeddings will be recomputed "
+                "and with it classifier predictions will be saved."
+            )
+            logger.exception(error)
+            raise FileNotFoundError(error)
         all_prediction_files = [f.stem for f in self.paths.preds_path.iterdir()]
         if (
             kwargs.get('overwrite')

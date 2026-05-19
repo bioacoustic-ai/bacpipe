@@ -745,9 +745,8 @@ class Classifier:
             classifier_annotations["end"] = self.end_timestamps[
                 maxes.values > self.classifier_threshold
                 ]
-            
         classifier_annotations["audiofilename"] = str(
-            file.relative_to(fileloader_obj.audio_dir).to_posix()
+            file.relative_to(fileloader_obj.audio_dir).as_posix()
         )
         classifier_annotations["label:default_classifier"] = np.array(
             self.model.classes

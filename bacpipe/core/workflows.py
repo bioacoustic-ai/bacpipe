@@ -551,7 +551,7 @@ def run_pipeline_for_single_model(
     model_name,
     audio_dir,
     dim_reduction_model="None",
-    check_if_already_processed=True,
+    check_if_already_processed=False,
     check_if_already_dim_reduced=True,
     testing=False,
     **kwargs,
