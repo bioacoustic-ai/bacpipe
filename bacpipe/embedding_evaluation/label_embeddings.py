@@ -743,6 +743,7 @@ def fit_labels_to_embedding_timestamps(
         
     for col in df_fitted_gt.columns:
         df_fitted_gt[col] = np.zeros(num_embeds, dtype=np.int8)
+    df = df.sort_values('start')
         
     if not only_embed_annotations:
         df_fitted_gt['starts'] = np.arange(num_embeds) * segment_s
