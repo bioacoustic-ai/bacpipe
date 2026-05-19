@@ -122,7 +122,6 @@ def generate_annotations_for_probing_task(
     if (
         paths is None
         or not Path(dataset_csv_path).exists()
-        or not paths.labels_path.joinpath(dataset_csv_path).exists()
         ):
         
         non_species_labels = ['starts', 'ends', 'audiofilename', 'species_richness']
@@ -134,16 +133,16 @@ def generate_annotations_for_probing_task(
         
         gt_4_probing_only_species_columns = gt_4_probing.drop(columns=non_species_labels)
         
-        active_labels = gt_4_probing_only_species_columns.columns[
-            np.where(gt_4_probing_only_species_columns.values)[-1]
-            ]
+        active_labels = gt_4_probing_only_species_columns.idxmax(axis=1).values
         
         df = pd.DataFrame()
         
         if not paths is None:
-            filenames, starts = gt_4_probing['audiofilename'], gt_4_probing['starts']
+            filenames = gt_4_probing['audiofilename']
+            starts, ends = gt_4_probing['starts'], gt_4_probing['ends']
             df["audiofilename"] = filenames 
             df["starts"] = starts
+            df["ends"] = ends
             
             
         df["label"] = active_labels
@@ -169,7 +168,6 @@ def generate_annotations_for_probing_task(
             df.loc[tr_ar, "predefined_set"] = "train"
             df.loc[te_ar, "predefined_set"] = "test"
             df.loc[va_ar, "predefined_set"] = "val"
-        df = df[df.predefined_set.isin(["train", "val", "test"])]
         
         df = df.sort_values(by=['audiofilename', 'starts'])
         
@@ -181,7 +179,12 @@ def generate_annotations_for_probing_task(
                 index=False,
             )
     else:
-        df = pd.read_csv(paths.labels_path.joinpath(dataset_csv_path))
+        logger.info(
+            f"Found file: {str(dataset_csv_path)}. Loading dataframe probing "
+            "dataframe. If you would like to automatically create a new probing "
+            "dataframe. Please delete the existing one."
+        )
+        df = pd.read_csv(dataset_csv_path, index_col=False)
     return df
 
 def old_generate_annotations_for_probing_task(

@@ -104,9 +104,9 @@ def eval_clustering(
     Returns
     -------
     dict
-        performance metrics
+        performance results
     """
-    metrics = {"AMI": dict(), "ARI": dict()}
+    results = {"AMI": dict(), "ARI": dict()}
     for cl_name, cl_labels in clusterings.items():
         if cl_name == f"{label_column}_no_noise":
             if -1 in ground_truth:
@@ -116,15 +116,15 @@ def eval_clustering(
         if default_labels and not hasattr(default_labels, 'kmeans'):
             default_labels["kmeans"] = clusterings["kmeans"]
         if not default_labels:
-            metrics[f"AMI"][f"{cl_name}-ground_truth"] = AMI(ground_truth, cl_labels)
-            metrics[f"ARI"][f"{cl_name}-ground_truth"] = ARI(ground_truth, cl_labels)
+            results[f"AMI"][f"{cl_name}-ground_truth"] = AMI(ground_truth, cl_labels)
+            results[f"ARI"][f"{cl_name}-ground_truth"] = ARI(ground_truth, cl_labels)
         else:
             for def_name, def_labels in default_labels.items():
                 if "no_noise" in cl_name:
                     def_labels = np.array(def_labels)[ground_truth != -1]
-                metrics[f"AMI"][f"{cl_name}-{def_name}"] = AMI(def_labels, cl_labels)
-                metrics[f"ARI"][f"{cl_name}-{def_name}"] = ARI(def_labels, cl_labels)
-    return metrics
+                results[f"AMI"][f"{cl_name}-{def_name}"] = AMI(def_labels, cl_labels)
+                results[f"ARI"][f"{cl_name}-{def_name}"] = ARI(def_labels, cl_labels)
+    return results
 
 def eval_with_silhouette(embeds, ground_truth, metrics=None):
     """
@@ -251,19 +251,23 @@ def clustering_pipeline(
         
         if "audio_dir" in kwargs: kwargs.pop("audio_dir")
         
-        if ground_truth:
-            ground_truth = ground_truth[f"label:{label_column}"]
-            if len(ground_truth.shape) > 1:
+        if len(ground_truth) > 0:
+            if max(ground_truth.species_richness) > 0:
                 logger.warning(
                     "You have passed a multi-label ground truth array. "
                     "However bacpipe only supports single label clustering "
                     "and will therefore only take one species for each timestamp."
                 )
-                ground_truth = ground_truth[:, 0]
+                
+                non_species_labels = ['starts', 'ends', 'audiofilename', 'species_richness']
+                gt_without_metadata = ground_truth.drop(columns=non_species_labels)
+                ground_truth_1d = gt_without_metadata.idxmax(axis=1).values
+                idx2label = {idx: l for idx, l in enumerate(set(ground_truth_1d))}
+                
         else:
-            ground_truth = []
+            ground_truth_1d = []
 
-        clust_params = get_nr_of_clusters(ground_truth, **kwargs)
+        clust_params = get_nr_of_clusters(ground_truth_1d, **kwargs)
 
         cluster_configs = get_clustering_models(clust_params)
 
@@ -272,15 +276,15 @@ def clustering_pipeline(
         )
         
         clusterings = run_clustering(
-            embeds, cluster_configs, label_column, ground_truth
+            embeds, cluster_configs, label_column, ground_truth_1d
             )
-        metrics = eval_clustering(
-            clusterings, ground_truth, embeds, default_labels, label_column, **kwargs
+        results = eval_clustering(
+            clusterings, ground_truth_1d, embeds, default_labels, label_column, **kwargs
         )
         if kwargs.get('evaluate_with_silhouette'):
-            metrics = eval_with_silhouette(embeds, clusterings, metrics)
+            results = eval_with_silhouette(embeds, clusterings, results)
 
-        save_clustering_performance(paths, clusterings, metrics, label_column)
+        save_clustering_performance(paths, clusterings, results, label_column)
         
     else:
         logger.info(
@@ -293,6 +297,6 @@ def clustering_pipeline(
             allow_pickle=True
             ).item()
         with open(paths.clust_path.joinpath(f"clust_results.json"), "r") as f:
-            metrics = json.load(f)
+            results = json.load(f)
             
-    return clusterings, metrics
+    return clusterings, results

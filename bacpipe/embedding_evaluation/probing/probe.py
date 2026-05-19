@@ -13,19 +13,21 @@ from .evaluate_probe import eval_probe
 from .dataset_probe import generate_annotations_for_probing_task
 
 
-def embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
+def embeds_array_without_noise(embeds, ground_truth, df, **kwargs):
     # if len(ground_truth[f"label:{label_column}"].shape) > 1:
     #     bool_array = np.any(ground_truth[f"label:{label_column}"] > -1, axis=1)
     # else:
     #     bool_array = ground_truth[f"label:{label_column}"] > -1
-    bool_array = (ground_truth.species_richness == 1).values
+    bool_array_gt = (ground_truth.species_richness == 1).values
+    
+    bool_array_probing = df.predefined_set.isin(["train", "val", "test"]).values
+    
+    df = df[bool_array_probing]
+    df.index = range(len(df))
         
     if isinstance(embeds, np.ndarray):
-        return embeds[bool_array]
-    elif isinstance(embeds, dict):
-        return np.concatenate(list(embeds.values()))[
-        bool_array
-    ]
+        embeds = embeds[bool_array_gt]
+        return df, embeds[bool_array_probing]
         
 def old_embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
     if len(ground_truth[f"label:{label_column}"].shape) > 1:
@@ -46,6 +48,7 @@ def probing_pipeline(
     paths=None, name='linear', 
     overwrite=True, 
     label_column=bacpipe.settings.label_column, 
+    dataset_csv_path='annotations.csv',
     **kwargs
 ):
     """
@@ -73,23 +76,41 @@ def probing_pipeline(
             bacpipe.config.audio_dir, bacpipe.settings.main_results_dir
         )
         paths = get_paths_func(model_name)
+        
+    
+    df = generate_annotations_for_probing_task(
+        ground_truth, 
+        paths, 
+        label_column=label_column, 
+        dataset_csv_path=paths.labels_path / dataset_csv_path,
+        **kwargs
+        )
+    
     if (
         overwrite
         or name=='knn'
         or not paths.probe_path.joinpath(f"probe_results_{name}.json").exists()
     ):
-        df = generate_annotations_for_probing_task(
-            ground_truth, paths, label_column=label_column, **kwargs
-            )
         if len(df) == 0:
             logger.exception(
                 "Not enough data in annotations to perform probing task"
             )
             return None
 
-        embeds = embeds_array_without_noise(
-            embeds, ground_truth, label_column=label_column, **kwargs
+        df, embeds = embeds_array_without_noise(
+            embeds, ground_truth, df, **kwargs
             )
+        if not len(df) == embeds.shape[0]:
+            error = (
+                "\nYour embeddings and ground truth dataframe ('probing_dataframe.csv') "
+                "have different lengths and are therefore incompatible. This could be the "
+                "case for multiple reasons, the most likely one is that the file was created "
+                "when `only_embed_annotations` was `True` and now it's false, or vice versa. "
+                "This error can be fixed by setting `overwrite` to `True` and deleting the "
+                "existing 'probing_dataframe.csv'. "
+            )
+            logger.exception(error)
+            raise AttributeError(error)
         
         if not len(embeds) > 0:
             error = (

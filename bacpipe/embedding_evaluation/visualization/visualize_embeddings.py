@@ -288,20 +288,27 @@ def get_labels_for_plot(model_name=None, **kwargs):
     labels = dict()
     labels = le.get_default_labels(model_name, **kwargs)
 
-    if le.get_paths(model_name).labels_path.joinpath("ground_truth.npy").exists():
-        ground_truth = le.get_ground_truth(model_name)
-        for label_column in [key for key in ground_truth.keys() if "label:" in key]:
-            label = label_column.split("label:")[-1]
-            inv = {v: k for k, v in ground_truth[f"label_dict:{label}"].items()}
-            inv[-1.0] = "noise"
-            inv[-2.0] = "noise"
+    ground_truth_files = list(le.get_paths(model_name).labels_path.glob("ground_truth*"))
+    if len(ground_truth_files) > 0:
+        for gt_file in ground_truth_files:
+            ground_truth_df = le.get_ground_truth(model_name, file_path=gt_file, return_type='dataframe')
+            label = gt_file.stem.split('_')[-1]
+            
+            # inv = {v: k for k, v in ground_truth[f"label_dict:{label}"].items()}
+            # inv[-1.0] = "noise"
+            # inv[-2.0] = "noise"
             # technically -2.0 is not noise, but corresponds to sections
             # with multiple sources vocalizing simultaneously
-            if len(ground_truth[label_column].shape) > 1:
+            if max(ground_truth_df.species_richness) > 1:
                 # TODO for display we're just taking the first label
-                labels[label] = [inv[v] for v in ground_truth[label_column][:, 0]]
-            else:
-                labels[label] = [inv[v] for v in ground_truth[label_column]]
+                logger.warning(
+                    "You have passed a multi-label ground truth array. "
+                    "However for visualization only one label will be displayed."
+                )
+                
+            non_species_labels = ['starts', 'ends', 'audiofilename', 'species_richness']
+            gt_without_metadata = ground_truth_df.drop(columns=non_species_labels)
+            labels[label] = gt_without_metadata.idxmax(axis=1).values
             bool_noise = np.array(labels[label]) == "noise"
     else:
         bool_noise = np.array([False] * len(list(labels.values())[0]))
