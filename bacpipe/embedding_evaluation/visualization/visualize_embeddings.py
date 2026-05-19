@@ -288,7 +288,7 @@ def get_labels_for_plot(model_name=None, **kwargs):
     labels = dict()
     labels = le.get_default_labels(model_name, **kwargs)
 
-    ground_truth_files = list(le.get_paths(model_name).labels_path.glob("ground_truth*"))
+    ground_truth_files = list(le.get_paths(model_name).labels_path.glob("ground_truth*csv"))
     if len(ground_truth_files) > 0:
         for gt_file in ground_truth_files:
             ground_truth_df = le.get_ground_truth(model_name, file_path=gt_file, return_type='dataframe')
