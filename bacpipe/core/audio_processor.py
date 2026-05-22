@@ -13,7 +13,11 @@ class AudioHandler:
     """
     Helper class for all methods related to loading and padding audio. 
     """
-    def __init__(self, model, padding, audio_dir, 
+    def __init__(self, padding, audio_dir, 
+                 model=None, 
+                 segment_length=160_000, 
+                 device='cpu', 
+                 sr=32_000, 
                  bool_slowdown=False, slowdown_rate=None, 
                  **kwargs):
         """
@@ -31,11 +35,20 @@ class AudioHandler:
             path to audio dir
         """
         self.model = model
+        if not self.model is None:
+            self.segment_length = self.model.segment_length
+            self.device = self.model.device
+            self.sr = self.model.sr
+        else:
+            self.segment_length = segment_length
+            self.device = device
+            self.sr = sr
         self.padding = padding
         self.audio_dir = audio_dir
         self.bool_slowdown = bool_slowdown
         self.slowdown_rate = slowdown_rate
         self.kwargs = kwargs
+        self.file_length = {}
     
     def prepare_audio(self, sample):
         """
@@ -75,7 +88,7 @@ class AudioHandler:
         try:
             if not self.bool_slowdown:
                 audio, sr = lb.load(
-                    str(path), sr=self.model.sr, mono=True
+                    str(path), sr=self.sr, mono=True
                     )
             else:
                 #TODO Need to ensure that input length get's prolonged accordingly
@@ -83,13 +96,13 @@ class AudioHandler:
                     str(path), sr=None, mono=True
                     )
                 if 'batdetect2' in self.model_name:
-                    fake_original_sr = self.model.sr
+                    fake_original_sr = self.sr
                 else:
                     fake_original_sr = int(sr * self.slowdown_rate)
                 audio = lb.resample(
                     audio, 
                     orig_sr=fake_original_sr, 
-                    target_sr=self.model.sr
+                    target_sr=self.sr
                     )
             audio = audio.reshape(1, -1)
         except Exception as e:
@@ -135,7 +148,7 @@ class AudioHandler:
                 continue
             segments = lb.util.fix_length(
                 audio[s:e+1],
-                size=self.model.segment_length,
+                size=self.segment_length,
                 mode=self.padding
                 )
             if idx == 0:
@@ -143,13 +156,13 @@ class AudioHandler:
             else:
                 cumulative_segments = np.vstack([cumulative_segments, segments])
         cumulative_segments = torch.Tensor(cumulative_segments)
-        cumulative_segments = cumulative_segments.to(self.model.device)
+        cumulative_segments = cumulative_segments.to(self.device)
         return cumulative_segments
     
     def _load_audio_based_on_fixed_segment_length(self, audio, segment_length, **_):
         nr_segments = len(audio) // segment_length +1
-        starts = np.arange(nr_segments) * segment_length * self.model.sr
-        ends = np.arange(1, nr_segments+1) * segment_length * self.model.sr
+        starts = np.arange(nr_segments) * segment_length * self.sr
+        ends = np.arange(1, nr_segments+1) * segment_length * self.sr
         return starts, ends
 
     def _load_and_pad_audio_based_on_grid(self, audio, starts, ends, file_path):
@@ -176,17 +189,17 @@ class AudioHandler:
         return cumulative_segments
 
     def _window_audio(self, audio):
-        num_frames = int(np.ceil(len(audio[0]) / self.model.segment_length))
+        num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
         if isinstance(audio, torch.Tensor):
             audio = audio.cpu()
         padded_audio = lb.util.fix_length(
             audio,
-            size=int(num_frames * self.model.segment_length),
+            size=int(num_frames * self.segment_length),
             mode=self.padding,
         )
         logger.debug(f"{self.padding} was used on an audio segment.")
-        frames = padded_audio.reshape([num_frames, self.model.segment_length])
+        frames = padded_audio.reshape([num_frames, self.segment_length])
         if not isinstance(frames, torch.Tensor):
             frames = torch.tensor(frames)
-        frames = frames.to(self.model.device)
+        frames = frames.to(self.device)
         return frames
