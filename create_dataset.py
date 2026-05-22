@@ -12,7 +12,8 @@ SEED = 42 # ensure that always the same context files get selected
 GLOBAL_LENGTH = 3 # 5s is the standard for bird volcalizations
 SR = 32_000
 NR_REPITITIONS = 6
-PLOT = True
+RATIO_NOISE_TO_TARGET = 4
+PLOT = False
 # src_path = '/media/siriussound/Extreme SSD/Recordings'
 noise_srcs = {
     # 'anura': f'{src_path}/terrestrial/Amphibians/AnuranSet/AnuranSet',
@@ -57,6 +58,8 @@ def load_audios(paths_dict):
             df_tmp = pd.DataFrame()
             df_tmp['target'] = [k] * len(win_audio)
             df_tmp['file_stem'] = [file.stem] * len(win_audio)
+            df_tmp['start'] = np.arange(len(win_audio)) * GLOBAL_LENGTH
+            df_tmp['end'] = df_tmp['start'] + GLOBAL_LENGTH
             
             df = pd.concat([df, df_tmp])
     df.index = range(len(df))
@@ -133,7 +136,7 @@ def collect_audio_segments():
         'noise_end': [],
     }
     df = pd.DataFrame(data)
-    mixed_audios = []
+    audios = []
     
     species_sounds, species_df = load_audios(target_paths)
     noise_sounds, noise_df = load_audios(noise_srcs)
@@ -147,33 +150,55 @@ def collect_audio_segments():
             species_audio = torch.vstack(species_sounds)[species_idxs]
             noise_audio = torch.vstack(noise_sounds)[noise_idxs]
             
+            random_indices = np.random.permutation(len(noise_audio))
+            
             for idx_rep, repetition in tqdm(enumerate(range(0, len(noise_audio), len(species_audio))), desc='rep', leave=False, position=2, total=NR_REPITITIONS):
                 if idx_rep == NR_REPITITIONS:
                     break
-                rand_idxs = np.random.permutation(len(noise_audio))[repetition:repetition+len(species_audio)]
-                rnd_noise_arrays = noise_audio[rand_idxs]
+                batch_random_indices = random_indices[repetition:repetition+len(species_audio)]
+                rnd_noise_arrays = noise_audio[batch_random_indices]
                 
                 for snr in tqdm([0, 1.5, 3, 6, 9, 12], desc='snr', leave=False, position=3):
                     df_tmp = pd.DataFrame(data)
                     mixed = combined_target_and_noise(species_audio, rnd_noise_arrays, species=species, noise_env=noise_env, snr_db=snr, plot=PLOT)
                     
-                    mixed_audios.append(torch.vstack(mixed))
+                    audios.append(torch.vstack(mixed))
                     
-                    df_tmp.noise_filename = species_df.file_stem
-                    df_tmp.species_filename = noise_df.file_stem
-                    df_tmp.species_start = np.arange(len(species_idxs)) * GLOBAL_LENGTH
-                    df_tmp.species_end = np.arange(1, len(species_idxs)+1) * GLOBAL_LENGTH
-                    df_tmp.noise_start = rand_idxs * GLOBAL_LENGTH
-                    df_tmp.noise_end = (rand_idxs + 1) * GLOBAL_LENGTH
+                    df_tmp.species_filename = species_df.file_stem[species_idxs]
+                    df_tmp.noise_filename = noise_df.file_stem[noise_idxs[batch_random_indices]].values
+                    df_tmp.species_start = species_df.start[species_idxs]
+                    df_tmp.species_end = species_df.end[species_idxs]
+                    df_tmp.noise_start = noise_df.start[noise_idxs[batch_random_indices]].values
+                    df_tmp.noise_end = noise_df.end[noise_idxs[batch_random_indices]].values
                     df_tmp.species = species
                     df_tmp.noise_env = noise_env
                     df_tmp.snr = snr
                     
                     df = pd.concat([df, df_tmp])
+            
+            # these are pure noise to cluster against
+            df_tmp = pd.DataFrame(data)
+            
+            remaining_random_indices = random_indices[repetition+len(species_audio):(repetition+len(species_audio))*RATIO_NOISE_TO_TARGET*NR_REPITITIONS]
+            only_noise = noise_audio[remaining_random_indices]
+            
+            audios.append(only_noise)
+            
+            df_tmp.noise_filename = noise_df.file_stem[noise_idxs[remaining_random_indices]].values
+            df_tmp.species_filename = ''
+            df_tmp.species_start = -1
+            df_tmp.species_end = -1
+            df_tmp.noise_start = noise_df.start[noise_idxs[remaining_random_indices]].values
+            df_tmp.noise_end = noise_df.end[noise_idxs[remaining_random_indices]].values
+            df_tmp.species = ''
+            df_tmp.noise_env = noise_env
+            df_tmp.snr = -1
+            
+            df = pd.concat([df, df_tmp])
                 
                 
-    mixed_audios = torch.vstack(mixed_audios)
-    return mixed_audios, df
+    audios = torch.vstack(audios)
+    return audios, df
 
 
 
@@ -209,13 +234,17 @@ def write_dataset_to_file(file, audio, df, chunk_size=500):
     Length of all sound segments = {GLOBAL_LENGTH}. 
     Global SR for all = {SR}.
     """
+    
         
 def create_dataset():
     audio, df = collect_audio_segments()
     
-    file_name = f"unknown_sounds_len_{GLOBAL_LENGTH}_sr_{SR}_repetitions_{NR_REPITITIONS}"
-    with h5py.File(f"data/data_h5_files/{file_name}.h5", "w") as f:
+    file_name = f"unknown_sounds_len_{GLOBAL_LENGTH}_sr_{SR}_repetitions_{NR_REPITITIONS}_ratio-n2t_{RATIO_NOISE_TO_TARGET}"
+    save_path = f"data/data_h5_files/{file_name}"
+    with h5py.File(save_path + '.h5', "w") as f:
         write_dataset_to_file(f, audio, df)
+    
+    df.to_csv(save_path + '.csv', index=False)
         
 
 def read_dataset():
