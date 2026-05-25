@@ -11,8 +11,8 @@ import h5py
 SEED = 42 # ensure that always the same context files get selected
 GLOBAL_LENGTH = 3 # 5s is the standard for bird volcalizations
 SR = 32_000
-NR_REPITITIONS = 3
-RATIO_NOISE_TO_TARGET = 1
+NR_REPITITIONS = 1
+RATIO_NOISE_TO_TARGET = 2
 PLOT = False
 # src_path = '/media/siriussound/Extreme SSD/Recordings'
 noise_srcs = {
@@ -241,7 +241,8 @@ def create_dataset():
     audio, df = collect_audio_segments()
     
     file_name = f"unknown_sounds_len_{GLOBAL_LENGTH}_sr_{SR}_repetitions_{NR_REPITITIONS}_ratio-n2t_{RATIO_NOISE_TO_TARGET}"
-    save_path = f"data/data_h5_files/{file_name}"
+    save_path = f"data/data_h5_files/{NR_REPITITIONS}_ratio-n2t_{RATIO_NOISE_TO_TARGET}/{file_name}"
+    Path(save_path).parent.mkdir(exist_ok=True, parents=True)
     with h5py.File(save_path + '.h5', "w") as f:
         write_dataset_to_file(f, audio, df)
     
