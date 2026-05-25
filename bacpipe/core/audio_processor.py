@@ -198,7 +198,10 @@ class AudioHandler:
             mode=self.padding,
         )
         logger.debug(f"{self.padding} was used on an audio segment.")
-        frames = padded_audio.reshape([num_frames, self.segment_length])
+        if len(padded_audio.shape) > 1 and padded_audio.shape[0] > 1:
+            frames = padded_audio
+        else:
+            frames = padded_audio.reshape([num_frames, self.segment_length])
         if not isinstance(frames, torch.Tensor):
             frames = torch.tensor(frames)
         frames = frames.to(self.device)
