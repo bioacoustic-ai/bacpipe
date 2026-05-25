@@ -11,8 +11,8 @@ import h5py
 SEED = 42 # ensure that always the same context files get selected
 GLOBAL_LENGTH = 3 # 5s is the standard for bird volcalizations
 SR = 32_000
-NR_REPITITIONS = 6
-RATIO_NOISE_TO_TARGET = 4
+NR_REPITITIONS = 3
+RATIO_NOISE_TO_TARGET = 1
 PLOT = False
 # src_path = '/media/siriussound/Extreme SSD/Recordings'
 noise_srcs = {
@@ -23,7 +23,8 @@ noise_srcs = {
     }
 
 target_paths = {
-    'white-crested turaco': '/home/siriussound/Code/identifying_unknown_species/data/target_species/clean_target_sounds/birds/white-crested turaco/eq-ed and noise reduced'
+    'white-crested turaco': '/home/siriussound/Code/identifying_unknown_species/data/target_species/clean_target_sounds/birds/white-crested turaco/eq-ed and noise reduced',
+    'Decticus albifrons': '/home/siriussound/Code/identifying_unknown_species/data/target_species/clean_target_sounds/insects/Decticus albifrons'
 }
 
 # RATIO_WITHIN_FILE = 2
@@ -142,8 +143,8 @@ def collect_audio_segments():
     noise_sounds, noise_df = load_audios(noise_srcs)
     
     
-    for species in tqdm(species_df.target.unique(), desc='species', leave=False, position=0):
-        for noise_env in tqdm(noise_df.target.unique(), desc='noise_env', leave=False, position=1):
+    for noise_env in tqdm(noise_df.target.unique(), desc='noise_env', leave=False, position=0):
+        for species in tqdm(species_df.target.unique(), desc='species', leave=False, position=1):
             species_idxs = species_df[species_df.target == species].index
             noise_idxs = noise_df[noise_df.target == noise_env].index
             
@@ -164,7 +165,7 @@ def collect_audio_segments():
                     
                     audios.append(torch.vstack(mixed))
                     
-                    df_tmp.species_filename = species_df.file_stem[species_idxs]
+                    df_tmp.species_filename = species_df.file_stem[species_idxs][:len(mixed)]
                     df_tmp.noise_filename = noise_df.file_stem[noise_idxs[batch_random_indices]].values
                     df_tmp.species_start = species_df.start[species_idxs]
                     df_tmp.species_end = species_df.end[species_idxs]
@@ -176,25 +177,25 @@ def collect_audio_segments():
                     
                     df = pd.concat([df, df_tmp])
             
-            # these are pure noise to cluster against
-            df_tmp = pd.DataFrame(data)
-            
-            remaining_random_indices = random_indices[repetition+len(species_audio):(repetition+len(species_audio))*RATIO_NOISE_TO_TARGET*NR_REPITITIONS]
-            only_noise = noise_audio[remaining_random_indices]
-            
-            audios.append(only_noise)
-            
-            df_tmp.noise_filename = noise_df.file_stem[noise_idxs[remaining_random_indices]].values
-            df_tmp.species_filename = ''
-            df_tmp.species_start = -1
-            df_tmp.species_end = -1
-            df_tmp.noise_start = noise_df.start[noise_idxs[remaining_random_indices]].values
-            df_tmp.noise_end = noise_df.end[noise_idxs[remaining_random_indices]].values
-            df_tmp.species = ''
-            df_tmp.noise_env = noise_env
-            df_tmp.snr = -1
-            
-            df = pd.concat([df, df_tmp])
+        # these are pure noise to cluster against
+        df_tmp = pd.DataFrame(data)
+        
+        remaining_random_indices = random_indices[repetition+len(species_audio):(repetition+len(species_audio))*RATIO_NOISE_TO_TARGET*NR_REPITITIONS]
+        only_noise = noise_audio[remaining_random_indices]
+        
+        audios.append(only_noise)
+        
+        df_tmp.noise_filename = noise_df.file_stem[noise_idxs[remaining_random_indices]].values
+        df_tmp.species_filename = ''
+        df_tmp.species_start = -1
+        df_tmp.species_end = -1
+        df_tmp.noise_start = noise_df.start[noise_idxs[remaining_random_indices]].values
+        df_tmp.noise_end = noise_df.end[noise_idxs[remaining_random_indices]].values
+        df_tmp.species = ''
+        df_tmp.noise_env = noise_env
+        df_tmp.snr = -1
+        
+        df = pd.concat([df, df_tmp])
                 
                 
     audios = torch.vstack(audios)
@@ -247,12 +248,7 @@ def create_dataset():
     df.to_csv(save_path + '.csv', index=False)
         
 
-def read_dataset():
-    dataset_files = list(Path('data/data_h5_files').rglob('*.h5'))
-    
-    file = dataset_files[0]
-    
-    
+def read_dataset(file):
     df_columns = {
         'species': [],
         'noise_env': [],
@@ -277,9 +273,11 @@ def read_dataset():
     
     print('loaded')
     return df, audio
-        
-create_dataset()
-# df, audio = read_dataset()
-        
-        
-print('worked')
+
+
+if __name__ == '__main__':
+    create_dataset()
+    # df, audio = read_dataset()
+            
+            
+    print('worked')
