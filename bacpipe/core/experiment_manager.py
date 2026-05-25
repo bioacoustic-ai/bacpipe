@@ -160,7 +160,11 @@ class Loader:
         
         if self.use_folder_structure:
             from bacpipe import settings
-            kwargs = {**vars(settings)}
+            settings_kwargs = {**vars(settings)}
+            for key in kwargs.keys():
+                if key in settings_kwargs.keys():
+                    settings_kwargs.pop(key)
+            kwargs = {**settings_kwargs, **kwargs}
 
         for key, val in kwargs.items():
             if key == "main_results_dir":
@@ -350,7 +354,7 @@ class Loader:
                 [f for f in list(d.rglob(f"*{self.embed_suffix}"))]
             )
             num_audio_files = len(
-                self.get_audio_files(self.audio_dir)
+                self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes)
                 )
         except AssertionError as e:
             self._get_metadata_dict(d)
@@ -413,12 +417,12 @@ class Loader:
     def _handle_incomplete_run(self, directory):
         self.continue_incomplete_run = True
         self.embed_dir = directory
-        self.files = self.get_audio_files(self.audio_dir)
+        self.files = self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes)
         self._init_metadata_dict()
         self._get_metadata_from_created_embeddings()
 
     def _get_audio_paths_and_init_embed_dir(self):
-        self.files = self.get_audio_files(self.audio_dir)
+        self.files = self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes)
         self.files.sort()
         if not hasattr(self, 'embed_parent_dir'):
             from bacpipe import settings as settings
