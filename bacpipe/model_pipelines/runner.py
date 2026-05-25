@@ -76,7 +76,7 @@ class Embedder(AudioHandler):
             self.model_name = model_name
             
         kwargs = replace_default_kwargs_with_user_kwargs(
-            ['audio_dir', 'models', 'dim_reduction_model'], kwargs=kwargs
+            ['audio_dir', 'models', 'dim_reduction_model'], **kwargs
         )
         self.nr_parallel_workers = kwargs.get('nr_parallel_workers')
         
@@ -303,7 +303,7 @@ class Embedder(AudioHandler):
         if len(array_of_audios.shape) == 1:
             array_of_audios = torch.tensor(array_of_audios).unsqueeze(0)
         windowed_audios = self._window_audio(array_of_audios)
-        windowed_audios = torch.tensor(windowed_audios).unsqueeze(1)
+        windowed_audios = windowed_audios.unsqueeze(1)
         if not self.nr_parallel_workers:
             from multiprocessing import cpu_count
             available_workers = cpu_count() -1
@@ -312,9 +312,9 @@ class Embedder(AudioHandler):
         task_queue = queue.Queue(maxsize=available_workers)  # small buffer to balance I/O vs compute
         # --- Producer: load + preprocess in background ---
         def producer():
-            for idx, audio in enumerate(windowed_audios):
+            for idx, audio_idx_range in enumerate(range(0, len(windowed_audios), self.model.batch_size)):
                 try:
-                    preprocessed = self.model.preprocess(audio)
+                    preprocessed = self.model.preprocess(windowed_audios[audio_idx_range:audio_idx_range+self.model.batch_size].squeeze())
                     task_queue.put((idx, preprocessed))
                                     
                 except torch.cuda.OutOfMemoryError:
