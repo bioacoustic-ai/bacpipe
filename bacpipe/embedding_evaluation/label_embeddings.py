@@ -306,7 +306,7 @@ def make_set_paths_func(
             object containing the paths for the results of the embedding evaluation
         """
         dataset_path = Path(main_results_dir).joinpath(Path(audio_dir).parts[-1])
-        task_path = dataset_path.joinpath("evaluations").joinpath(model_name)
+        task_path = dataset_path.joinpath("evaluations").joinpath(model_name) # TODO this should be evaluations_dir
 
         paths = {
             "audio_dir": audio_dir,
@@ -752,7 +752,7 @@ def fit_labels_to_embedding_timestamps(
         df_fitted_gt['starts'] = df['start'].values
         df_fitted_gt['ends'] = df['end'].values
         
-    
+    df.index = range(len(df))
     for _, row in df.iterrows():
         start_at_embed_nr = np.where(df_fitted_gt['starts'] - row.start <= 0)[0][-1]
         end_at_embed_nr = np.where(df_fitted_gt['starts'] - row.end >= 0)[0]
@@ -770,7 +770,7 @@ def fit_labels_to_embedding_timestamps(
                 # and df_fitted_gt['starts'][idx+1] > min_annotation_length
                 row.end - row.start > min_annotation_length
                 ):
-                df_fitted_gt.loc[idx:idx+1, row[f"label:{label_column}"]] = 1
+                df_fitted_gt.loc[idx, row[f"label:{label_column}"]] = 1
             else:
                 logger.info(
                     f"\nSkipping annotation from {row.start} to {row.end} with "
@@ -778,7 +778,13 @@ def fit_labels_to_embedding_timestamps(
                     f"shorter than {min_annotation_length=}. To change this, "
                     "modify the value in the settings file."
                 )
-                
+            
+            if len(df_fitted_gt.columns) > 5:    
+                species_richness = df_fitted_gt.drop(
+                    columns=['starts', 'ends', 'audiofilename', 'species_richness']
+                    ).loc[idx, :].sum()
+                if species_richness != 1:
+                    print('hi')
     df_fitted_gt['species_richness'] = df_fitted_gt.drop(
         columns=['starts', 'ends', 'audiofilename', 'species_richness']
         ).sum(axis=1)
