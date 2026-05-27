@@ -5,7 +5,7 @@ import numpy as np
 
 import bacpipe.embedding_evaluation.label_embeddings as le
 from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
-    load_results, plot_per_class_metrics
+    load_results, plot_per_class_results
 )
 import matplotlib
 
@@ -45,20 +45,20 @@ def visualise_results_across_models(plot_path, task_name, model_list):
     model_list : list
         list of models
     """
-    metrics = load_results(le.get_paths, task_name, model_list)
+    results = load_results(le.get_paths, task_name, model_list)
     with open(plot_path.joinpath(f"{task_name}_results.json"), "w") as f:
-        json.dump(metrics, f, indent=2)
+        json.dump(results, f, indent=2)
 
     if task_name == "probing":
         iterate_through_subtasks(
-            plot_per_class_metrics, plot_path, task_name, model_list, metrics
+            plot_per_class_results, plot_path, task_name, model_list, results
         )
 
         iterate_through_subtasks(
-            plot_overview_metrics, plot_path, task_name, model_list, metrics
+            plot_overview_results, plot_path, task_name, model_list, results
         )
     else:
-        plot_overview_metrics(plot_path, task_name, model_list, metrics, path_func=le.get_paths)
+        plot_overview_results(plot_path, task_name, model_list, results, path_func=le.get_paths)
 
 
 def iterate_through_subtasks(plot_func, plot_path, task_name, model_list, metrics):
@@ -250,7 +250,7 @@ def generate_bar_plot(
     return fig
 
 
-def plot_overview_metrics(
+def plot_overview_results(
     plot_path,
     task_name,
     model_list,
@@ -280,8 +280,15 @@ def plot_overview_metrics(
     # doesn't know the current model and this should be caught
     if not metrics:
         res_path = path_func(model_list[0]).plot_path.parent.parent.joinpath("overview")
-        with open(res_path.joinpath(f"probing_results.json"), "r") as f:
-            metrics = json.load(f)
+        try:
+            with open(res_path.joinpath(f"probing_results.json"), "r") as f:
+                metrics = json.load(f)
+        except FileNotFoundError as e:
+            logger.warning(
+                f"\nThe file {res_path.joinpath(f'probing_results.json')} was not found. Perhaps "
+                "you are only computing one model and that is the reason no overview plot is created. "
+            )
+            return {}
         metrics = {
             k.split("(")[0]: v["overall"] for k, v in metrics.items() if task_name in k
         }
@@ -297,6 +304,7 @@ def plot_overview_metrics(
             "multiple models were computed. Try selecting at least two models, that way "
             "this error should be fixed."
         )
+        return error
     elif not all([model in metrics for model in model_list]):
         raise AttributeError(
             "It seems like you have selected models for which the classification scores "

@@ -206,8 +206,11 @@ def eval_probe(
         y_pred.extend(predicted.cpu().numpy().tolist())
         y_true.extend(y.cpu().numpy().tolist())
         probabilities.extend(probs)
+        
 
-    metrics = compute_task_metrics(y_pred, y_true, probabilities, label2index)
+
+
+    results = compute_task_metrics(y_pred, y_true, probabilities, label2index)
     
     
     if save_probe and not paths is None:
@@ -215,10 +218,47 @@ def eval_probe(
         torch.save(state_dict, paths.probe_path / f"{config}_probe.pt")
         with open(paths.probe_path / "label2index.json", "w") as f:
             json.dump(label2index, f, indent=1)
-        save_probe_results(paths, config, metrics, **kwargs)
-        plot_classification_results(paths=paths, task_name=config, metrics=metrics)
+        save_probe_results(paths, config, results, **kwargs)
+        save_confusion_matrix(paths, y_true, y_pred, label2index, task_name=config)
+        plot_classification_results(paths=paths, task_name=config, results=results)
         
     
-    return metrics
+    return results
 
         
+def save_confusion_matrix(paths, y_true, y_pred, label2index, task_name='linear'):
+    from matplotlib import pyplot as plt
+    
+    i2l = {v:k for k, v in label2index.items()}
+    labels_list = list(i2l.values())
+    num_classes = len(labels_list)
+    conf_matrx = metrics.confusion_matrix(
+        [str(i2l[v]) for v in y_true], 
+        [str(i2l[v]) for v in y_pred], 
+        labels=[str(l) for l in labels_list]  
+    )
+    
+    conf_matrx_plot = metrics.ConfusionMatrixDisplay(
+        conf_matrx, 
+        display_labels=labels_list
+        )
+    
+    side_length = max(5, 5 + (num_classes * 0.8))
+    fig, ax = plt.subplots(figsize=[side_length, side_length])
+    
+    conf_matrx_plot.plot(ax=ax)#, cmap='Blues', values_format='d')
+    ax.grid(False)
+    
+    ax.set_xlabel("Predicted Label", fontsize=14, fontweight='bold', labelpad=15)
+    ax.set_ylabel("True Label", fontsize=14, fontweight='bold', labelpad=15)
+    
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    
+    # Rotate tick labels if they get crowded
+    if num_classes > 5:
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+        plt.setp(ax.get_yticklabels(), rotation=0)
+    
+    plt.tight_layout()
+    fig.savefig(paths.probe_path / f"confusion_matrix_{task_name}.png", bbox_inches='tight')
+    plt.close(fig)

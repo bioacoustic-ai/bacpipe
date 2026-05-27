@@ -81,7 +81,7 @@ class DefaultLabels:
 
     def generate(self):
         self.default_label_dict = {}
-        for default_label in self.default_label_keys:
+        for default_label in tqdm(self.default_label_keys, 'Building default labels'):
             getattr(self, default_label)()
 
             if hasattr(self, f"{default_label}_per_embedding"):
@@ -92,7 +92,7 @@ class DefaultLabels:
     def get_datetimes(self):
         if not hasattr(self, "timestamp_per_file"):
             self.timestamp_per_file = {}
-            for file in self.metadata["files"]["audio_files"]:
+            for file in tqdm(self.metadata["files"]["audio_files"], 'collecting datetimes'):
                 file_stem = Path(file).stem
                 self.timestamp_per_file.update({file: get_dt_filename(file_stem)})
 
@@ -104,7 +104,9 @@ class DefaultLabels:
         )
         segment_s_dt = dt.timedelta(seconds=float(segment_s))
         time_of_day_per_file = {}
-        for file, datetime_of_file in self.timestamp_per_file.items():
+        for file, datetime_of_file in tqdm(
+            self.timestamp_per_file.items(), 'getting time of day'
+            ):
             timeofday = dt.datetime(
                 2000,
                 1,
@@ -116,11 +118,15 @@ class DefaultLabels:
             time_of_day_per_file.update({file: timeofday})
 
         self.time_of_day_per_embedding = []
-        for file_idx, (file, time_of_day) in enumerate(time_of_day_per_file.items()):
+        for file_idx, (file, time_of_day) in tqdm(
+            enumerate(time_of_day_per_file.items()), 'getting time per embeddings'
+            ):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
                 
                 if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
-                    starts = self.df.start.values[self.df.audiofilename == file]
+                    from bacpipe import Loader
+                    df = Loader.filter_df_by_file(self.paths.audio_dir, self.df, Path(self.paths.audio_dir) / file)
+                    starts = df.start.values
                     timestamp = (
                         (time_of_day + dt.timedelta(seconds=float(starts[index_of_embedding])))
                         .time()
@@ -137,7 +143,9 @@ class DefaultLabels:
     def day_of_year(self):
         self.get_datetimes()
         day_of_year_per_file = {}
-        for file, datetime_of_file in self.timestamp_per_file.items():
+        for file, datetime_of_file in tqdm(
+            self.timestamp_per_file.items(), 'getting day of year'
+            ):
             time_of_day = dt.datetime(
                 2000, datetime_of_file.month, datetime_of_file.day
             )
@@ -160,13 +168,16 @@ class DefaultLabels:
         segment_s_dt = dt.timedelta(seconds=segment_s)
 
         self.continuous_timestamp_per_embedding = []
-        for file_idx, (file, datetime_per_file) in enumerate(
-            self.timestamp_per_file.items()
-        ):
+        for file_idx, (file, datetime_per_file) in tqdm(
+            enumerate(self.timestamp_per_file.items()), 
+            'getting continuous timestamps'
+            ):
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
                 
                 if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
-                    starts = self.df.start.values[self.df.audiofilename == file]
+                    from bacpipe import Loader
+                    df = Loader.filter_df_by_file(self.paths.audio_dir, self.df, Path(self.paths.audio_dir) / file)
+                    starts = df.start.values
                     timestamp = (
                         (datetime_per_file + dt.timedelta(seconds=float(starts[index_of_embedding])))
                         .time()
@@ -182,14 +193,20 @@ class DefaultLabels:
 
     def parent_directory(self):
         self.parent_directory_per_embedding = []
-        for file_idx, file in enumerate(self.metadata["files"]["audio_files"]):
+        for file_idx, file in tqdm(
+            enumerate(self.metadata["files"]["audio_files"]),
+            'getting parent directory'
+            ):
             self.parent_directory_per_embedding.extend(
                 np.repeat(str(Path(file).parent), self.nr_embeds_per_file[file_idx])
             )
 
     def audio_file_name(self):
         self.audio_file_name_per_embedding = []
-        for file_idx, file in enumerate(self.metadata["files"]["audio_files"]):
+        for file_idx, file in tqdm(
+            enumerate(self.metadata["files"]["audio_files"]),
+            'getting audio file names'
+            ):
             self.audio_file_name_per_embedding.extend(
                 np.repeat(file, self.nr_embeds_per_file[file_idx])
             )
@@ -208,6 +225,7 @@ class DefaultLabels:
             ].values.tolist()
 
     def fill_remaining_labels(self, df):
+        from bacpipe import Loader
         seg_len = self.metadata['segment_length (samples)'] / self.metadata['sample_rate (Hz)']
         df_new = {
             'start': [],
@@ -219,13 +237,32 @@ class DefaultLabels:
             self.metadata['files']['audio_files'], 
             self.metadata['files']['nr_embeds_per_file']
             ):
-            df_part = df[df.audiofilename == file]
+            df_part = Loader.filter_df_by_file(self.paths.audio_dir, df, Path(self.paths.audio_dir) / file)
+            # df_part = df[df.audiofilename == file]
             if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
-                starts = self.df.start[self.df.audiofilename == file]
-                all_time_bins = np.round(starts.values, 4).tolist()
+                df_tmp = Loader.filter_df_by_file(self.paths.audio_dir, self.df, Path(self.paths.audio_dir) / file)
+                starts = df_tmp.start.values
+                # starts = self.df.start[self.df.audiofilename == file]
+                all_time_bins = np.round(starts, 4).tolist()
             else:
                 all_time_bins = np.round(np.arange(nr_embeds) * seg_len, 4).tolist()
-            [all_time_bins.remove(l) for l in np.round(df_part.start, 4)]
+            
+            try:
+                [all_time_bins.remove(l) for l in np.round(df_part.start, 4)]
+            except ValueError:
+                exception_label = (
+                    "\nThe timestamps from the precomputed predictions do not match those "
+                    "of the generated embeddings. This is the case if a run has previously "
+                    "been created for `only_embed_annotations=True` and now you are running "
+                    "bacpipe with the setting False. Or the other way around. In this case "
+                    "you have to recompute the embeddings. Please rename or delete the created "
+                    "embeddings and evaluations folder to avoid problems."
+                )
+                logger.exception(exception_label)
+                self.default_label_keys.remove("default_classifier")
+                raise ValueError(exception_label)
+                # import sys
+                # sys.exit(1)
             df_new['start'].extend(all_time_bins)
             df_new['end'].extend((np.array(all_time_bins) + seg_len).tolist())
             df_new['audiofilename'].extend([file] * len(all_time_bins))
@@ -269,7 +306,7 @@ def make_set_paths_func(
             object containing the paths for the results of the embedding evaluation
         """
         dataset_path = Path(main_results_dir).joinpath(Path(audio_dir).parts[-1])
-        task_path = dataset_path.joinpath("evaluations").joinpath(model_name)
+        task_path = dataset_path.joinpath("evaluations").joinpath(model_name) # TODO this should be evaluations_dir
 
         paths = {
             "audio_dir": audio_dir,
@@ -332,7 +369,7 @@ def get_default_labels(model_name, **kwargs):
     return create_default_labels(paths.audio_dir, model_name, paths, **kwargs)
 
 
-def get_ground_truth(model_name):
+def get_ground_truth(model_name, file_path=None, return_type='dataframe'):
     """
     Return dictionary of the ground truth labels based on the files that were 
     already processed and saved. This is model dependent, as the input length is 
@@ -348,10 +385,13 @@ def get_ground_truth(model_name):
     dict
         dictionary of ground truth labels
     """
-    return np.load(
-        get_paths(model_name).labels_path.joinpath("ground_truth.npy"),
-        allow_pickle=True,
-    ).item()
+    if return_type == 'dataframe' and not file_path is None:
+        return pd.read_csv(file_path, index_col=False)
+    elif return_type == 'array':
+        return np.load(
+            get_paths(model_name).labels_path.joinpath("ground_truth.npy"),
+            allow_pickle=True,
+        ).item()
 
 def get_dt_filename(file):
     """
@@ -504,12 +544,24 @@ def create_default_labels(
             )
         default_labels.generate()
 
+        # def_labels = default_labels.default_label_dict
+        # for k, v in def_labels.items():
+        #     np.save(
+        #         paths.labels_path.joinpath(f"default_labels_{k}.npy"),
+        #         np.array(list(v)),
+        #     )
         def_labels = default_labels.default_label_dict
         np.save(
             paths.labels_path.joinpath("default_labels.npy"),
             def_labels,
         )
     else:
+        # def_labels = dict()
+        # for label_file in tqdm(paths.labels_path.rglob("*.npy"), 'loading labels'):
+        #     k = label_file.stem.split('labels_')[-1]
+        #     def_labels[k] = np.load(label_file, mmap_mode='r')
+        #     # def_labels[k] = list(np.load(label_file))
+            
         def_labels = np.load(
             paths.labels_path.joinpath("default_labels.npy"), allow_pickle=True
         ).item()
@@ -602,6 +654,7 @@ def load_labels_and_build_dict(
     paths,
     annotations_filename,
     audio_dir,
+    audio_files=[],
     bool_filter_labels=True,
     min_label_occurrences=150,
     main_label_column=None,
@@ -612,7 +665,15 @@ def load_labels_and_build_dict(
         try:
             label_df = pd.read_csv(Path(audio_dir).joinpath(annotations_filename))
         except FileNotFoundError as e:
-            label_df = pd.read_csv(list(Path(audio_dir).rglob(annotations_filename))[0])
+            try:
+                label_df = pd.read_csv(Path(audio_dir).joinpath(annotations_filename))
+            except FileNotFoundError as e:
+                logger.warning(
+                    "No annotations file found, not able to create ground_truth.npy file. "
+                    "bacpipe should still work, but you will not be able to label by ground truth. "
+                    "You also will not be able to evaluate using classification."
+                )
+                raise FileNotFoundError("No annotations file found.")
     except FileNotFoundError as e:
         logger.warning(
             f"No annotations file found in {audio_dir}, trying in "
@@ -645,6 +706,14 @@ def load_labels_and_build_dict(
             )
         else:
             label_df = label_df[label_df[main_label_column].isin(filtered_labels)]
+    if len(audio_files) > 0:
+        from bacpipe import Loader
+        filtered_df = pd.DataFrame()
+        for file in audio_files:
+            df_temp = Loader.filter_df_by_file(paths.audio_dir, label_df, Path(paths.audio_dir) / file)
+            filtered_df = pd.concat([filtered_df, df_temp])
+        label_df = filtered_df
+        
     label_idx_dict = {}
     for label_column in [l for l in label_df.columns if 'label:' in l]:
         label_idx_dict[label_column] = {
@@ -658,6 +727,70 @@ def load_labels_and_build_dict(
 
 
 def fit_labels_to_embedding_timestamps(
+    df,
+    df_fitted_gt,
+    num_embeds,
+    segment_s,
+    label_column=None,
+    single_label=True,
+    min_annotation_length=0.65,
+    only_embed_annotations=False,
+    **kwargs,
+):
+    # df_fitted_gt = pd.DataFrame()
+    # for cls in df['label:species'].unique():
+    #     df_fitted_gt[cls] = np.zeros(num_embeds)
+        
+    for col in df_fitted_gt.columns:
+        df_fitted_gt[col] = np.zeros(num_embeds, dtype=np.int8)
+    df = df.sort_values('start')
+        
+    if not only_embed_annotations:
+        df_fitted_gt['starts'] = np.arange(num_embeds) * segment_s
+        df_fitted_gt['ends'] = df_fitted_gt['starts'] + segment_s
+    else:
+        df_fitted_gt['starts'] = df['start'].values
+        df_fitted_gt['ends'] = df['end'].values
+        
+    df.index = range(len(df))
+    for _, row in df.iterrows():
+        start_at_embed_nr = np.where(df_fitted_gt['starts'] - row.start <= 0)[0][-1]
+        end_at_embed_nr = np.where(df_fitted_gt['starts'] - row.end >= 0)[0]
+        if len(end_at_embed_nr) > 0:
+            end_at_embed_nr = end_at_embed_nr[0]
+        else:
+            end_at_embed_nr = len(df_fitted_gt['starts'])
+        for idx in range(start_at_embed_nr, end_at_embed_nr):
+            
+            # check if the annotation length is longer that the specified min_annotation_length
+            # if row.start >= df_fitted_gt['starts'][idx]:
+            # elif row.end >= df_fitted_gt['starts'][idx+1]:
+            if (
+                # df_fitted_gt['starts'][idx] - row.start > min_annotation_length
+                # and df_fitted_gt['starts'][idx+1] > min_annotation_length
+                row.end - row.start > min_annotation_length
+                ):
+                df_fitted_gt.loc[idx, row[f"label:{label_column}"]] = 1
+            else:
+                logger.info(
+                    f"\nSkipping annotation from {row.start} to {row.end} with "
+                    f"label {row['label:species']} because the annotation is "
+                    f"shorter than {min_annotation_length=}. To change this, "
+                    "modify the value in the settings file."
+                )
+            
+            if len(df_fitted_gt.columns) > 5:    
+                species_richness = df_fitted_gt.drop(
+                    columns=['starts', 'ends', 'audiofilename', 'species_richness']
+                    ).loc[idx, :].sum()
+                if species_richness != 1:
+                    print('hi')
+    df_fitted_gt['species_richness'] = df_fitted_gt.drop(
+        columns=['starts', 'ends', 'audiofilename', 'species_richness']
+        ).sum(axis=1)
+    return df_fitted_gt
+        
+def old_fit_labels_to_embedding_timestamps(
     df,
     label_idx_dict,
     num_embeds,
@@ -710,7 +843,7 @@ def fit_labels_to_embedding_timestamps(
                     # if we have a 2d array already but for each timestamp the
                     # labels are the same, we can just overwrite one. we won't 
                     # loose anything and we don't have to create any new columns
-                    elif len(np.unique(file_labels[idx:idx+1])) == 1:
+                    elif len(np.unique(file_labels[idx:idx+1])) == 1 and file_labels.shape[-1] > 1:
                         file_labels[idx:idx+1, -1] = label_idx_dict[row[f"label:{label_column}"]]
                         
                     # We only go here, if there is no place we can write our new 
@@ -758,44 +891,51 @@ def build_ground_truth_labels_by_file(
     label_df=None,
     label_idx_dict=None,
     label_column=None,
+    only_embed_annotations=False,
     **kwargs,
 ):
 
     audio_file = metadata["files"]["audio_files"][ind]
     df = filter_df_by_filename(label_df, audio_file, model=model)
         
-    if df.empty:
-        logger.info(
-            f'df is empty for {audio_file}, meaning no annotations. '
-            "If that's incorrect, ensure the audiofilename column has the correct "
-            "file names."
-            )
-        label_dimensions = all_labels.shape[-1] if len(all_labels.shape) > 1 else 1
-        all_labels = np.concatenate(
-            (all_labels, np.ones([num_embeds, label_dimensions]).squeeze() * -1)
-            )
-        return all_labels
+    # if df.empty:
+    #     logger.info(
+    #         f'df is empty for {audio_file}, meaning no annotations. '
+    #         "If that's incorrect, ensure the audiofilename column has the correct "
+    #         "file names."
+    #         )
+    #     label_dimensions = all_labels.shape[-1] if len(all_labels.shape) > 1 else 1
+    #     all_labels = np.concatenate(
+    #         (all_labels, np.ones([num_embeds, label_dimensions]).squeeze() * -1)
+    #         )
+    #     return all_labels
 
-    if kwargs.get('only_embed_annotations'):
-        values = df[f'label:{label_column}']
-        file_labels = np.array([label_idx_dict[v] for v in values])
-    else:
-        file_labels = fit_labels_to_embedding_timestamps(
-            df, label_idx_dict, num_embeds, segment_s, 
-            label_column=label_column, **kwargs
-        )
+    # if not only_embed_annotations:
+    #     values = df[f'label:{label_column}']
+    #     file_labels = np.array([label_idx_dict[v] for v in values])
+    # else:
+    file_labels = pd.DataFrame(columns=all_labels.columns)
+    file_labels = fit_labels_to_embedding_timestamps(
+        df, file_labels, num_embeds, segment_s, 
+        label_column=label_column, 
+        only_embed_annotations=only_embed_annotations,
+        **kwargs
+    )
+    file_labels['audiofilename'] = audio_file
+    all_labels = pd.concat([all_labels, file_labels])
+    return all_labels
     
         
     
-    all_labels = fill_all_labels_array(file_labels, all_labels)
+    # all_labels = fill_all_labels_array(file_labels, all_labels)
 
-    if np.unique(file_labels).shape[0] > 2 and kwargs.get('testing'):
-        raven_tables_sanity_check(
-            df.start if kwargs.get('only_embed_annotations') else num_embeds, 
-            segment_s, paths, audio_file, 
-            label_df, label_idx_dict, label_column, file_labels, **kwargs
-        )
-    return all_labels
+    # if np.unique(file_labels).shape[0] > 2 and kwargs.get('testing'):
+    #     raven_tables_sanity_check(
+    #         df.start if only_embed_annotations else num_embeds, 
+    #         segment_s, paths, audio_file, 
+    #         label_df, label_idx_dict, label_column, file_labels, **kwargs
+    #     )
+    # return all_labels
 
 def filter_df_by_filename(
     df_to_filer, file_name, file_name_column = 'audiofilename', model=None
@@ -894,14 +1034,27 @@ def create_Raven_annotation_table(df, label_column, high_freq=1000):
 
 def collect_ground_truth_labels(
     paths, files, model, segment_s, metadata, 
-    label_df, label_idx_dict, **kwargs
+    label_df, label_idx_dict, label_column, **kwargs
 ):
 
-    ground_truth = np.array([])
+    # ground_truth = np.array([])
+    # 1. Get your species names
+    species_cols = label_df[f'label:{label_column}'].unique().tolist()
+
+    # 2. Define the schema
+    # This ensures all species columns and numeric columns are floats from the start
+    ground_truth = pd.DataFrame({
+        **{col: pd.Series(dtype='int8') for col in species_cols},
+        'species_richness': pd.Series(dtype='int8'),
+        'audiofilename': pd.Series(dtype='string'), # Use 'string' for better performance
+        'ends': pd.Series(dtype='int8'),
+        'starts': pd.Series(dtype='int8'),
+    })
 
     for ind, file in tqdm(
         enumerate(files),
-        desc=f"Loading {model} embeddings and split by labels",
+        desc=f"Collecting annotations and fitting to embeddings timestamps",
+        total=len(files),
         leave=False,
     ):
         assert (
@@ -911,7 +1064,7 @@ def collect_ground_truth_labels(
             f"File names do not match for {file} and "
             f"{metadata['files']['audio_files'][ind]}"
         )
-        if kwargs.get('only_embed_annotations'):
+        if False:#kwargs.get('only_embed_annotations'):
             num_embeds = int(
                 metadata["files"]["file_lengths (s)"][ind] 
                 / (metadata['segment_length (samples)'] / metadata['sample_rate (Hz)'])
@@ -928,6 +1081,7 @@ def collect_ground_truth_labels(
             ground_truth,
             label_df,
             label_idx_dict,
+            label_column=label_column,
             **kwargs,
         )
     return ground_truth
@@ -1018,7 +1172,7 @@ def ground_truth_by_model(
         
     if (
         overwrite 
-        or not paths.labels_path.joinpath("ground_truth.npy").exists()
+        or not paths.labels_path.joinpath(f"ground_truth_species.csv").exists()
         ):
 
         # check if embeddings exist
@@ -1064,11 +1218,10 @@ def ground_truth_by_model(
             
         # find all label columns
         label_columns = [col for col in label_df.columns if "label:" in col]
-        ground_truth_dict = {}
         
         # collect all the ground truth for all the label columns 
         for label_col in label_columns:
-            labels = label_col.split("label:")[-1]
+            clean_label_column = label_col.split("label:")[-1]
             ground_truth = collect_ground_truth_labels(
                 paths,
                 files,
@@ -1078,27 +1231,29 @@ def ground_truth_by_model(
                 label_df,
                 label_idx_dict[label_col],
                 single_label=single_label,
-                label_column=labels,
+                label_column=clean_label_column,
                 **kwargs,
             )
-
-            ground_truth_dict.update({
-                f"label:{labels}": ground_truth,
-                f"label_dict:{labels}": label_idx_dict[label_col],
-            })
-        np.save(paths.labels_path.joinpath("ground_truth.npy"), ground_truth_dict)
+            cols = list(ground_truth.columns)[::-1]
+            ground_truth = ground_truth[cols]
+            ground_truth = ground_truth.sort_values(by=['audiofilename', 'starts'])
+            ground_truth.to_csv(paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv"), index=False)
+        if not clean_label_column == label_column and not clean_label_column in label_column:
+            if ':' in label_column:
+                label_column = label_column.split(':')[-1]
+                
+            ground_truth = pd.read_csv(
+                paths.labels_path.joinpath(f"ground_truth_{label_column}.csv"), 
+                index_col=False
+                )
+            
     else:
-        if not paths.labels_path.joinpath("ground_truth.npy").exists():
-            error = (
-                "\nThe ground truth label file ground_truth.npy does not exist. "
-                "Please create it first by rerunning with `overwrite=True`."
+        clean_label_column = label_column.split("label:")[-1]
+        ground_truth = pd.read_csv(
+            paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv"), 
+            index_col=False
             )
-            logger.exception(error)
-            raise ValueError(error)
-        ground_truth_dict = np.load(
-            paths.labels_path.joinpath("ground_truth.npy"), allow_pickle=True
-        ).item()
-    return ground_truth_dict
+    return ground_truth
 
 def ensure_audio_files(found_audio_files, annotated_audio_files, audio_dir):
     if not annotated_audio_files:
@@ -1118,8 +1273,6 @@ def ensure_audio_files(found_audio_files, annotated_audio_files, audio_dir):
             Path(f).stem for f in found_audio_files
         ]
         matching = set(annotated_stems).intersection(set(found_stems))
-        
-    # TODO maybe a case where they are nested but have duplicate filenames
     
     if len(matching) < len(annotated_audio_files) or len(matching) == 0:
         not_found = []

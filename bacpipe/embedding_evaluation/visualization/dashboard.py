@@ -18,7 +18,7 @@ from . import tooltips
 from .visualize import (
     plot_clusterings,
     clustering_overview,
-    plot_overview_metrics,
+    plot_overview_results,
 )
 from .visualize_spectrograms import SpectrogramPlot
 from .visualize_predictions import (
@@ -72,18 +72,13 @@ class DashBoard(DashBoardHelper):
         self.dim_reduc_parent_dir = dim_reduc_parent_dir
 
         self.ground_truth = None
-        if (
-            le.get_paths(model_names[0])
-            .labels_path.joinpath("ground_truth.npy")
-            .exists()
-        ):
-            ground_truth = np.load(
-                le.get_paths(model_names[0]).labels_path.joinpath("ground_truth.npy"),
-                allow_pickle=True,
-            ).item()
-            labels = np.unique(
-                [lab.split(":")[-1] for lab in ground_truth.keys()]
-            ).tolist()
+        ground_truth_files = list(le.get_paths(model_names[0]).labels_path.glob("ground_truth*"))
+        if len(ground_truth_files) > 0:
+            labels = []
+            if len(ground_truth_files) > 0:
+                for gt_file in ground_truth_files:
+                    ground_truth_df = le.get_ground_truth(model_names[0], file_path=gt_file, return_type='dataframe')
+                    labels.append(gt_file.stem.split('_')[-1])
             self.ground_truth = True
             self.label_by += labels
 
@@ -392,7 +387,7 @@ class DashBoard(DashBoardHelper):
                     "Probing Metrics",
                     (
                         self.plot_widget(
-                            plot_overview_metrics,
+                            plot_overview_results,
                             plot_path=None,
                             metrics=None,
                             task_name=self.class_select[widget_idx],

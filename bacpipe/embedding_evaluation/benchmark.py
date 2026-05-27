@@ -60,6 +60,11 @@ def benchmark(
         bool_filter_labels=False,
         overwrite=True
     )
+    
+    # Isolate species columns from metadata
+    non_species_labels = ['starts', 'ends', 'audiofilename', 'species_richness']
+    gt_species_cols = [col for col in gt.columns if col not in non_species_labels]
+    gt_without_metadata = gt[gt_species_cols]
 
     loader_obj = bacpipe.run_pipeline_for_single_model(
         model_name=model,
@@ -74,83 +79,74 @@ def benchmark(
     if preds is None:
         return {'error': "No predictions have been generated, or model does not have classifier."}
     
-    # Align ground truth labels to predicted label indices
-    ground_truth_array = gt['label:species']
-    not_found = []
-    found = []
+    # --- Class Matching & Validation ---
+    def clean_string(s):
+        return re.sub(r'[-\s]', '', s).lower()
 
-    print(
-        'The following species were found in the ground truth '
-        'and the predictions:'
-        )
-    for label, idx in gt['label_dict:species'].items():
-        if label in label2idx:
-            print(label)
-            found.append(label)
-            ground_truth_array[gt['label:species'] == idx] = label2idx[label]
-        else:
-            not_found.append(label)
+    # Find exact matching classes
+    found = [label for label in gt_species_cols if label in label2idx]
+    not_found = [label for label in gt_species_cols if label not in label2idx]
+
+    print('The following species were found in the ground truth and the predictions:')
+    for label in found:
+        print(f" - {label}")
     
+    # Fallback to Regex matching for missing classes
     if not_found:
-        print(
-            '\nThese species were found in the ground truth but '
-            'NOT in the predictions:',
-            not_found
-            )
-        l2i_regex = {re.sub(r'[-\s]', '', label).lower(): i for label, i in label2idx.items()}
+        print(f'\nSpecies found in ground truth but NOT exactly in predictions: {not_found}')
+        
+        l2i_regex = {clean_string(lbl): lbl for lbl in label2idx.keys()}
+        still_not_found = []
+        
         for label in not_found:
-            label_regex = re.sub(r'[-\s]', '', label).lower()
-            if label_regex in l2i_regex:
-                print('With regex we found', label)
+            cleaned = clean_string(label)
+            if cleaned in l2i_regex:
+                matched_label = l2i_regex[cleaned]
+                print(f"With regex we matched ground truth '{label}' to prediction '{matched_label}'")
                 found.append(label)
-                ground_truth_array[gt['label:species'] == idx] = l2i_regex[label_regex]
-                not_found.remove(label)
-        print('With regex we still did not find:', not_found)
+            else:
+                still_not_found.append(label)
                 
-    if len(found) == 0:
+        not_found = still_not_found
+        print(f'Remaining unmatched species: {not_found}')
+                
+    if not found:
         return {'error': "No ground truth classes have been found in the predictions."}
-    # Build binary matrices using l2i as column ordering
-    n_timestamps = len(preds)
-    n_classes = len(label2idx)
 
-    gt_binary = np.zeros((n_timestamps, n_classes), dtype=int)
-    pred_binary = preds
-    pred_binary[pred_binary > 0] = 1
-
-    for label, col_idx in label2idx.items():
-        gt_binary[np.any(ground_truth_array == col_idx, axis=1), col_idx] = 1
-
-    # Filter to columns that appear in ground truth
-    gt_classes = set(ground_truth_array[ground_truth_array > -1].astype(int))
-    pred_classes = set(label2idx.values())
-    all_classes = gt_classes.intersection(pred_classes)
+    # --- Matrix Generation & Alignment (Condensed) ---
+    # 1. Align ground truth to label2idx columns, filling missing ones with 0
+    gt_aligned = gt_without_metadata.reindex(columns=label2idx.keys(), fill_value=0)
     
-    gt_binary = gt_binary[:, list(all_classes)]
-    pred_binary = pred_binary[:, list(all_classes)]
+    # 2. Get shared labels and their corresponding integer indices
+    shared_labels = [lbl for lbl in label2idx.keys() if lbl in gt_without_metadata.columns]
+    shared_indices = [label2idx[lbl] for lbl in shared_labels]
+    
+    # 3. Extract and filter matrices in one go
+    # Convert predictions to binary (0 or 1) and drop down to shared classes
+    gt_binary = gt_aligned[shared_labels].to_numpy()
+    pred_binary = (preds[:, shared_indices] > 0).astype(int)
 
-    # Filter out unannotated timestamps
+    # 4. Filter out unannotated timestamps
     annotated_mask = gt_binary.sum(axis=1) > 0
     gt_binary = gt_binary[annotated_mask]
     pred_binary = pred_binary[annotated_mask]
 
-    print(f"annotated timestamps: {annotated_mask.sum()} of {n_timestamps}")
+    print(f"Annotated timestamps: {annotated_mask.sum()} of {len(preds)}")
 
-    # Evaluate performance
-    idx2label = {v: k for k, v in label2idx.items()}
-    target_names = [idx2label[i] for i in all_classes]
-
+    # --- Performance Evaluation ---
     report = classification_report(
         gt_binary,
         pred_binary,
-        target_names=target_names,
+        target_names=shared_labels,
         zero_division=0,
         output_dict=True
     )
+    
     print("\n--- Overall Report ---")
     print(classification_report(
         gt_binary,
         pred_binary,
-        target_names=target_names,
+        target_names=shared_labels,
         zero_division=0
     ))
 
@@ -161,4 +157,3 @@ def benchmark(
         'label2idx': label2idx,
         'not_found': not_found
     }
-
