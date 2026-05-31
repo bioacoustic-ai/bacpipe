@@ -128,7 +128,9 @@ class DashBoardHelper:
         
         # Just update the figure object (no recreation!)
         if p_type == "interactive_embed":
-            self.interactive_embed_plot[widget_idx].object = plot_func(**kwargs)
+            self.interactive_embed_plot[widget_idx].object = plot_func(
+                widget_idx=widget_idx, **kwargs
+                )
             
             # add the onclick function
             self.embed_save_button[widget_idx].on_click(

@@ -58,7 +58,9 @@ def visualise_results_across_models(plot_path, task_name, model_list):
             plot_overview_results, plot_path, task_name, model_list, results
         )
     else:
-        plot_overview_results(plot_path, task_name, model_list, results, path_func=le.get_paths)
+        plot_overview_results(
+            plot_path, task_name, model_list, results, path_func=le.get_paths
+            )
 
 
 def iterate_through_subtasks(plot_func, plot_path, task_name, model_list, metrics):

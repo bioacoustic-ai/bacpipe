@@ -1,6 +1,7 @@
 import json
 
 import matplotlib.pyplot as plt
+plt.ioff()
 from matplotlib.figure import Figure
 import numpy as np
 from pathlib import Path
@@ -270,12 +271,17 @@ def plot_embeddings(
         fig.savefig(paths.plot_path.joinpath("embeddings.png"), dpi=300)
         plt.close(fig)
 
-def init_embed_figure(fig, axes, bool_3d=False, **kwargs):
+def init_embed_figure(fig, axes, bool_3d=False, widget_idx=None, **kwargs):
     if not fig:
         if bool_3d:
             fig, axes = plt.subplots(subplot_kw={"projection": "3d"}, figsize=(12, 8))
         else:
-            fig, axes = plt.subplots(figsize=(12, 8), dpi=400)
+            try:
+                plt.close(widget_idx)
+            except:
+                pass
+            fig = plt.figure(num=widget_idx, figsize=(12, 8), dpi=400)
+            axes = fig.subplots()
         return_axes = False
     else:
         return_axes = True
