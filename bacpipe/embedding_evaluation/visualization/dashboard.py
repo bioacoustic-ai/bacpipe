@@ -153,8 +153,8 @@ class DashBoard(DashBoardHelper):
             
             self.init_interactive_embed_plot(widget_idx)
             
-            # Callback to update plot when label_by changes, while preserving accordion state.
-            def update_plot_on_label_change(event):
+            # Callback to update plot when any selector changes, while preserving accordion state.
+            def update_plot_on_change(event):
                 self.update_main_plot(
                     "interactive_embed",
                     plot_embeddings,
@@ -166,18 +166,24 @@ class DashBoard(DashBoardHelper):
                     dim_reduction_model=self.dim_reduction_model,
                     remove_noise=(
                         self.noise_select[widget_idx].value
-                        if len(self.noise_select.keys()) > 0
+                        if widget_idx in self.noise_select and self.noise_select[widget_idx] is not None
                         else False
                     ),
                     dashboard=True,
                     dashboard_idx=widget_idx,
                 )
             
-            # Watch label_select for changes and update plot without re-rendering the entire panel.
-            self.label_select[widget_idx].param.watch(update_plot_on_label_change, 'value')
+            # Only attach watchers once per widget (check if already attached)
+            if not hasattr(self.model_select[widget_idx], '_embedding_watchers_attached'):
+                self.model_select[widget_idx].param.watch(update_plot_on_change, 'value')
+                self.label_select[widget_idx].param.watch(update_plot_on_change, 'value')
+                if widget_idx in self.noise_select and self.noise_select[widget_idx] is not None:
+                    self.noise_select[widget_idx].param.watch(update_plot_on_change, 'value')
+                # Mark that watchers have been attached
+                self.model_select[widget_idx]._embedding_watchers_attached = True
             
-            # Render plot once on initial load with current widget values.
-            update_plot_on_label_change(None)
+            # Render plot with current widget values (every time, to refresh display when navigating tabs)
+            update_plot_on_change(None)
             
             # Embed plot reference (no longer using pn.bind to avoid accordion collapse).
             embedding_plot = self.interactive_embed_plot[widget_idx]        
@@ -669,9 +675,9 @@ class DashBoard(DashBoardHelper):
         model0_page = self.model_page(0, single_model=True)
         model1_page = self.model_page(1)
         model2_page = self.model_page(2)
-        model_all_page = self.all_models_page(1)
-        apply_classifier0_page = self.apply_clfier_page(0)
-        apply_classifier1_page = self.apply_clfier_page(1)
+        model_all_page = self.all_models_page(3)
+        apply_classifier0_page = self.apply_clfier_page(4)
+        apply_classifier1_page = self.apply_clfier_page(5)
 
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
