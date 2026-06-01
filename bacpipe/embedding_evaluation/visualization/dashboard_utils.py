@@ -120,9 +120,27 @@ class DashBoardHelper:
         button = pn.widgets.Button(name="Save Figure", button_type="primary")
         notification = pn.pane.Markdown("")
         
+        # Attach save button handler that gets current values from widgets at click time
+        button.on_click(lambda e: self._on_save_button_click(e, widget_idx))
+        
         self.embed_save_button[widget_idx] = button
         self.embed_notification[widget_idx] = notification
         
+    
+    def _on_save_button_click(self, event, widget_idx):
+        """Button click handler that saves the current embedding plot with preserved zoom/pan"""
+        model_name = self.model_select[widget_idx].value
+        label_by = self.label_select[widget_idx].value
+        displayed_fig = self.interactive_embed_plot[widget_idx].object
+        
+        filename = f"{model_name}_embedding_{label_by}.png"
+        save_path = self.path_func(model_name).plot_path / filename
+        
+        try:
+            displayed_fig.write_image(save_path, width=1200, height=800)
+            self.embed_notification[widget_idx].object = f"✓ Saved to: {save_path}"
+        except Exception as e:
+            self.embed_notification[widget_idx].object = f"✗ Error: {e}"
     
     def update_main_plot(self, p_type, plot_func, widget_idx, **kwargs):
         """Update existing plot by just updating the .object"""
@@ -134,11 +152,6 @@ class DashBoardHelper:
                 widget_idx=widget_idx, **kwargs
                 )
             
-            # add the onclick function
-            self.embed_save_button[widget_idx].on_click(
-                lambda e: self.save_embedding_plot(e, widget_idx, plot_func, **kwargs)
-                )
-            
         else:
             # Other plot types
             new_panel = self.add_save_button(plot_func, **kwargs)
@@ -148,35 +161,6 @@ class DashBoardHelper:
                 new_panel[0].object = plot_func(**kwargs)
         
         return plots_dict[widget_idx]
-    
-    def save_embedding_plot(self, event, widget_idx, plot_func, **kwargs):
-        """Save the current embedding plot"""
-        
-        # Get model name for filename
-        if not kwargs.get('model_name'):
-            model_name = self.model_select[widget_idx].value
-        else:
-            model_name = kwargs.get('model_name')
-        label_by = self.label_select[widget_idx].value
-        
-        filename = f"{model_name}_embedding_{label_by}.png"
-        save_path = self.path_func(model_name).plot_path / filename
-        
-        # recreate figure:
-        fresh_fig = plot_func(**kwargs)
-        
-        # Copy zoom/pan from displayed figure
-        displayed = self.interactive_embed_plot[widget_idx].object
-        if hasattr(displayed.layout.xaxis, 'range'):
-            fresh_fig.layout.xaxis.range = displayed.layout.xaxis.range
-            fresh_fig.layout.yaxis.range = displayed.layout.yaxis.range
-        
-        try:
-            fresh_fig.write_image(save_path, width=1200, height=800)
-            self.embed_notification[widget_idx].object = f"✓ Saved to: {save_path}"
-        except Exception as e:
-            self.embed_notification[widget_idx].object = f"✗ Error: {e}"
-            
             
     def init_plot(self, p_type, plot_func, widget_idx, **kwargs):
         getattr(self, f"{p_type}_plot")[widget_idx] = pn.panel(
@@ -279,50 +263,3 @@ class DashBoardHelper:
         notification = pn.pane.Markdown("")
 
         return pn.Column(fig_panel, pn.Row(button), notification)
-    
-    # def add_save_button(self, plot_func, **kwargs):
-    #     """Adds a save button that triggers Plotly's native camera"""
-    #     has_widgets = any(hasattr(v, 'value') for v in kwargs.values())
-        
-    #     if has_widgets:
-    #         fig_panel = pn.panel(pn.bind(plot_func, **kwargs))
-    #     else:
-    #         fig_panel = pn.panel(plot_func(**kwargs))
-        
-    #     # JavaScript to trigger camera click
-    #     trigger_camera_js = """
-    #     <script>
-    #     function triggerCamera() {
-    #         // Find the camera button in the modebar
-    #         const cameraBtn = document.querySelector('[data-title*="Download plot"]');
-    #         if (cameraBtn) {
-    #             cameraBtn.click();
-    #         }
-    #     }
-    #     </script>
-    #     <button onclick="triggerCamera()" class="bk bk-btn bk-btn-primary">Save Figure</button>
-    #     """
-        
-    #     custom_button = pn.pane.HTML(trigger_camera_js)
-        
-    #     # Configure the camera button
-    #     def get_filename():
-    #         # ... your filename logic ...
-    #         print('worked!')
-    #         pass
-        
-    #     config = {
-    #         'toImageButtonOptions': {
-    #             'format': 'png',
-    #             'filename': get_filename(),
-    #             'height': 1200,
-    #             'width': 1600,
-    #             'scale': 2
-    #         },
-    #         'displaylogo': False
-    #     }
-        
-    #     if isinstance(fig_panel, pn.pane.Plotly):
-    #         fig_panel.config = config
-        
-    #     return pn.Column(fig_panel, custom_button)
