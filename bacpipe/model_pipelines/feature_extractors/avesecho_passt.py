@@ -81,11 +81,12 @@ class AugmentMelSTFT(nn.Module):
             return_complex=False,
         )
         x = (x**2).sum(dim=-1)  # power mag
-        fmin = self.fmin + torch.randint(self.fmin_aug_range, (1,)).item()
+        fmin = self.fmin# + torch.randint(self.fmin_aug_range, (1,)).item()
         fmax = (
             self.fmax
             + self.fmax_aug_range // 2
-            - torch.randint(self.fmax_aug_range, (1,)).item()
+            - 500
+            # - torch.randint(self.fmax_aug_range, (1,)).item()
         )
         # don't augment eval data
 
@@ -140,6 +141,7 @@ class Model(ModelBaseClass):
         self.classes = df.iloc[:, 1].values.tolist()
 
     def preprocess(self, audio):
+        audio = audio.to(self.device)
         return self.preprocessor(audio)
 
     @torch.inference_mode()

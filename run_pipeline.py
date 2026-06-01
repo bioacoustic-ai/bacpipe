@@ -20,6 +20,12 @@ if __name__ == "__main__":
     
     # But it's probably easier if you just modify the config.yaml or bacpipe/settings.yaml files
     
-    
+    # results = bacpipe.benchmark(
+    #     'birdnet',
+    #     # model,
+    #     'bacpipe/tests/test_data',
+    #     check_if_already_processed=True,
+    #     annotations_file='annotations.csv'
+    # )
     bacpipe.play(bool_save_logs=True)
     

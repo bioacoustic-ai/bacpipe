@@ -14,10 +14,11 @@ from .visualize_embeddings import (
     plot_comparison,
     EmbedAndLabelLoader,
 )
+from . import tooltips
 from .visualize import (
     plot_clusterings,
     clustering_overview,
-    plot_overview_metrics,
+    plot_overview_results,
 )
 from .visualize_spectrograms import SpectrogramPlot
 from .visualize_predictions import (
@@ -71,18 +72,16 @@ class DashBoard(DashBoardHelper):
         self.dim_reduc_parent_dir = dim_reduc_parent_dir
 
         self.ground_truth = None
-        if (
-            le.get_paths(model_names[0])
-            .labels_path.joinpath("ground_truth.npy")
-            .exists()
-        ):
-            ground_truth = np.load(
-                le.get_paths(model_names[0]).labels_path.joinpath("ground_truth.npy"),
-                allow_pickle=True,
-            ).item()
-            labels = np.unique(
-                [lab.split(":")[-1] for lab in ground_truth.keys()]
-            ).tolist()
+        ground_truth_files = list(le.get_paths(model_names[0]).labels_path.glob("ground_truth*"))
+        if len(ground_truth_files) > 0:
+            labels = []
+            if len(ground_truth_files) > 0:
+                for gt_file in ground_truth_files:
+                    if gt_file.suffix == '.csv':
+                        ground_truth_df = le.get_ground_truth(model_names[0], file_path=gt_file, return_type='dataframe')
+                    elif gt_file.suffix == '.npy':
+                        ground_truth_df = le.get_ground_truth(model_names[0], file_path=gt_file, return_type='array')
+                    labels.append(gt_file.stem.split('_')[-1])
             self.ground_truth = True
             self.label_by += labels
 
@@ -154,24 +153,34 @@ class DashBoard(DashBoardHelper):
             
             self.init_interactive_embed_plot(widget_idx)
             
-            embedding_plot = pn.bind(
-                        self.update_main_plot,
-                        "interactive_embed",
-                        plot_embeddings,
-                        widget_idx,
-                        loader=self.vis_loader,
-                        model_name=self.model_select[widget_idx],
-                        label_by=self.label_select[widget_idx],
-                        ground_truth=self.ground_truth,
-                        dim_reduction_model=self.dim_reduction_model,
-                        remove_noise=(
-                            self.noise_select[widget_idx]
-                            if len(self.noise_select.keys()) > 0
-                            else False
-                        ),
-                        dashboard=True,
-                        dashboard_idx=widget_idx,
-                        )        
+            # Callback to update plot when label_by changes, while preserving accordion state.
+            def update_plot_on_label_change(event):
+                self.update_main_plot(
+                    "interactive_embed",
+                    plot_embeddings,
+                    widget_idx,
+                    loader=self.vis_loader,
+                    model_name=self.model_select[widget_idx].value,
+                    label_by=self.label_select[widget_idx].value,
+                    ground_truth=self.ground_truth,
+                    dim_reduction_model=self.dim_reduction_model,
+                    remove_noise=(
+                        self.noise_select[widget_idx].value
+                        if len(self.noise_select.keys()) > 0
+                        else False
+                    ),
+                    dashboard=True,
+                    dashboard_idx=widget_idx,
+                )
+            
+            # Watch label_select for changes and update plot without re-rendering the entire panel.
+            self.label_select[widget_idx].param.watch(update_plot_on_label_change, 'value')
+            
+            # Render plot once on initial load with current widget values.
+            update_plot_on_label_change(None)
+            
+            # Embed plot reference (no longer using pn.bind to avoid accordion collapse).
+            embedding_plot = self.interactive_embed_plot[widget_idx]        
         return (
                 "2D Embedding Plot",
                 pn.Column(
@@ -243,21 +252,24 @@ class DashBoard(DashBoardHelper):
         return (
             "Clustering Results",
             (
-                self.plot_widget(
-                    plot_clusterings,
-                    path_func=self.path_func,
-                    model_name=self.model_select[widget_idx],
-                    label_by=self.label_select[widget_idx],
-                    no_noise=(
-                        self.noise_select[widget_idx]
-                        if len(self.noise_select.keys()) > 0
-                        else False
-                    ),
-                )
-                if "clustering" in self.evaluation_task
-                else pn.pane.Markdown(
-                    "No clustering task specified. "
-                    "Please check the config file."
+                pn.Column(
+                    pn.widgets.TooltipIcon(value=tooltips.clustering),
+                    self.plot_widget(
+                        plot_clusterings,
+                        path_func=self.path_func,
+                        model_name=self.model_select[widget_idx],
+                        label_by=self.label_select[widget_idx],
+                        no_noise=(
+                            self.noise_select[widget_idx]
+                            if len(self.noise_select.keys()) > 0
+                            else False
+                        ),
+                    )
+                    if "clustering" in self.evaluation_task
+                    else pn.pane.Markdown(
+                        "No clustering task specified. "
+                        "Please check the config file."
+                    )
                 )
             )
         )
@@ -266,17 +278,20 @@ class DashBoard(DashBoardHelper):
         return (
             "Probing Performance",
             (
-                self.plot_widget(
-                    plot_classification_results,
-                    path_func=self.path_func,
-                    task_name=self.class_select[widget_idx],
-                    model_name=self.model_select[widget_idx],
-                    return_fig=True,
-                )
-                if "probing" in self.evaluation_task
-                else pn.pane.Markdown(
-                    "No probing task specified. "
-                    "Please check the config file."
+                pn.Column(
+                    pn.widgets.TooltipIcon(value=tooltips.probing),
+                    self.plot_widget(
+                        plot_classification_results,
+                        path_func=self.path_func,
+                        task_name=self.class_select[widget_idx],
+                        model_name=self.model_select[widget_idx],
+                        return_fig=True,
+                    )
+                    if "probing" in self.evaluation_task
+                    else pn.pane.Markdown(
+                        "No probing task specified. "
+                        "Please check the config file."
+                    )
                 )
             )
         )
@@ -359,22 +374,25 @@ class DashBoard(DashBoardHelper):
                 (
                     "Clustering Overview",
                     (
-                        self.plot_widget(
-                            clustering_overview,
-                            path_func=self.path_func,
-                            model_list=self.models,
-                            label_by=self.label_select[widget_idx],
-                            no_noise=(
-                                self.noise_select[widget_idx]
-                                if len(self.noise_select.keys()) > 0
-                                else False
-                            ),
-                            **self.kwargs
-                        )
-                        if "clustering" in self.evaluation_task
-                        else pn.pane.Markdown(
-                            "No clustering task specified. "
-                            "Please check the config file."
+                        pn.Column(
+                            pn.widgets.TooltipIcon(value=tooltips.clustering),
+                            self.plot_widget(
+                                clustering_overview,
+                                path_func=self.path_func,
+                                model_list=self.models,
+                                label_by=self.label_select[widget_idx],
+                                no_noise=(
+                                    self.noise_select[widget_idx]
+                                    if len(self.noise_select.keys()) > 0
+                                    else False
+                                ),
+                                **self.kwargs
+                            )
+                            if "clustering" in self.evaluation_task
+                            else pn.pane.Markdown(
+                                "No clustering task specified. "
+                                "Please check the config file."
+                            )
                         )
                     ),
                 ),
@@ -382,7 +400,7 @@ class DashBoard(DashBoardHelper):
                     "Probing Metrics",
                     (
                         self.plot_widget(
-                            plot_overview_metrics,
+                            plot_overview_results,
                             plot_path=None,
                             metrics=None,
                             task_name=self.class_select[widget_idx],
@@ -524,6 +542,7 @@ class DashBoard(DashBoardHelper):
                         accumulate_by=self.accumulate_select[widget_idx], 
                         species=self.species_select[widget_idx],
                         threshold=self.clfier_thresh[widget_idx],
+                        clfier_type=self.clfier_select[widget_idx],
                         **self.kwargs
                         )
                     

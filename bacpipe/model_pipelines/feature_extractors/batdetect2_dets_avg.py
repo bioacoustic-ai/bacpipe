@@ -6,9 +6,71 @@ class Model(Model):
     def __init__(self, **kwargs):
         super().__init__(use_detections=True, **kwargs)
 
+SAMPLE_RATE = 256_000
+LENGTH_IN_SAMPLES = 256_000
+DEFAULT_SEGMENT_DURATION = 1
+DEFAULT_DETECTION_THRESHOLD = 0.3
+NUM_FEATURES = 32
+NUM_CLASSES = 17
+
+
+class Model(ModelBaseClass):
+    def __init__(
+        self,
+        segment_duration=DEFAULT_SEGMENT_DURATION,
+        detection_threshold=DEFAULT_DETECTION_THRESHOLD,
+        top_k_detections=None,
+        **kwargs,
+    ):
+        super().__init__(
+            sr=SAMPLE_RATE,
+            segment_length=int(segment_duration * SAMPLE_RATE),
+            **kwargs,
+        )
+
+        import batdetect2.detector.post_process as pp
+        from batdetect2 import api
+
+        self.detection_threshold = detection_threshold
+        self.top_k_detections = top_k_detections
+
+        self.config = api.get_config(detection_threshold=self.detection_threshold)
+        self.model, _ = api.load_model(device=self.device)  # type: ignore
+
+        self.generate_spectrogram = partial(
+            api.generate_spectrogram,
+            config=self.config,
+            samp_rate=SAMPLE_RATE,
+            device=self.device,
+        )
+        self.non_max_suppression = partial(
+            pp.run_nms,
+            params={
+                "nms_kernel_size": self.config["nms_kernel_size"],
+                "max_freq": self.config["max_freq"],
+                "min_freq": self.config["min_freq"],
+                "fft_win_length": self.config["fft_win_length"],
+                "fft_overlap": self.config["fft_overlap"],
+                "resize_factor": self.config["resize_factor"],
+                "nms_top_k_per_sec": self.config["nms_top_k_per_sec"],
+                "detection_threshold": self.detection_threshold,
+            },
+        )
+
+        self.classes = self.config["class_names"]
+
+    def preprocess(self, audio):
+        if audio.device.type == 'cuda':
+            segments = audio.cpu().numpy()
+        else:
+            segments = audio.numpy()
+        # NOTE: Need to pre-process each segment separately
+        spectrograms = [self.generate_spectrogram(segment) for segment in segments]
+        return torch.stack(spectrograms, axis=0).squeeze()
 
     @torch.no_grad()
-    def __call__(self, x):
+    def __call__(self, x, return_class_results=False):
+        x = x.unsqueeze(1)
         output = self.model(x)
 
         results, features = self.non_max_suppression(
@@ -34,8 +96,15 @@ class Model(Model):
 
         return output_features
 
-    def classifier_predictions(self, inference_results):
-        return self.output_class_scores
+    # def classifier_predictions(self, inference_results):
+    #     # NOTE: This method is left unimplemented. Since 'inference_results'
+    #     # are averaged across several detections to map to the single-feature
+    #     # interface, running a classifier on these aggregated features won't
+    #     # produce the intended results.
+    #     raise NotImplementedError(
+    #         "Classifier predictions are invalid for averaged features."
+    #     )
+
 
 def get_mean_detection_features(
     results,

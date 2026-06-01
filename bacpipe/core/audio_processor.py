@@ -60,7 +60,7 @@ class AudioHandler:
         else:
             frames = self._window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
-        if not self.bool_change_speed and not 'batdetect2' in self.model_name:
+        if not self.bool_change_speed:
             self.file_length[sample.stem] = len(audio[0]) / self.model.sr
         elif 'batdetect2' in self.model_name:
             self.file_length[sample.stem] = len(audio[0]) / (sr / (self.model.sr / sr))
@@ -74,7 +74,7 @@ class AudioHandler:
     
     def _load_and_resample(self, path):
         try:
-            if not self.bool_change_speed and not 'batdetect2' in self.model_name:
+            if not self.bool_change_speed:
                 audio, sr = lb.load(
                     str(path), sr=self.model.sr, mono=True
                     )
@@ -110,16 +110,18 @@ class AudioHandler:
         ):
         # TODO: not implemented for bats and slowdown
         import pandas as pd
+        from bacpipe import Loader
         annots = pd.read_csv(Path(self.audio_dir) / annotations_filename)
         # filter current file
-        file_annots = annots[annots.audiofilename==file_path.relative_to(self.audio_dir)]
+        file_annots = Loader.filter_df_by_file(self.audio_dir, annots, file_path)
         if len(file_annots) == 0:
-            file_annots = annots[annots.audiofilename==file_path.stem+file_path.suffix]
-        if len(file_annots) == 0:
-            file_annots = annots[annots.audiofilename==str(file_path.relative_to(self.audio_dir))]
+            raise AssertionError(
+                f"No annotations found for audio file {file_path.relative_to(self.audio_dir)}. "
+                "Continuing with next file."
+            )
         
-        starts = np.array(file_annots.start, dtype=np.float32)*self.model.sr
-        ends = np.array(file_annots.end, dtype=np.float32)*self.model.sr
+        starts = np.array(file_annots.start.unique(), dtype=np.float32)*self.model.sr
+        ends = np.array(file_annots.end.unique(), dtype=np.float32)*self.model.sr
 
         audio = audio.cpu().squeeze()
         for idx, (s, e) in enumerate(zip(starts, ends)):
@@ -185,5 +187,5 @@ class AudioHandler:
         frames = padded_audio.reshape([num_frames, self.model.segment_length])
         if not isinstance(frames, torch.Tensor):
             frames = torch.tensor(frames)
-        # frames = frames.to(self.model.device)
+        frames = frames.to(self.model.device)
         return frames

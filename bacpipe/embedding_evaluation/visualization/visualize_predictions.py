@@ -17,7 +17,7 @@ from bacpipe.embedding_evaluation.probing.inference_probe import (
 def plot_classification_results(
     task_name,
     paths=None,
-    metrics=None,
+    results=None,
     return_fig=False,
     path_func=None,
     model_name=None,
@@ -32,7 +32,7 @@ def plot_classification_results(
         name of task
     paths : SimpleNamespace object
         path to store plots
-    metrics : dict
+    results : dict
         classification performance
     return_fig : bool
         if True the figure will be returned, by default False
@@ -48,29 +48,29 @@ def plot_classification_results(
     """
     if path_func and model_name:
         paths = path_func(model_name)
-    if not metrics:
+    if not results:
         probe_path = paths.probe_path / f"probe_results_{task_name}.json"
         if not probe_path.exists():
             error = (
-                f"\nThe classification file {probe_path} does not exist. Perhaps it was not "
+                f"\nThe probing file {probe_path} does not exist. Perhaps it was not "
                 "created yet. To avoid getting this error, make sure you have not "
-                " included 'classification' in the 'evaluation_tasks'. If you want to compute "
-                "classification, make sure to set `overwrite=True`."
+                " included 'probing' in the 'evaluation_tasks'. If you want to compute "
+                "probing, make sure to set `overwrite=True`."
             )
             logger.exception(error)
             raise AssertionError(error)
 
         with open(paths.probe_path / f"probe_results_{task_name}.json", "r") as f:
-            metrics = json.load(f)
+            results = json.load(f)
 
-    # Filter overall metrics if needed
-    metrics["overall"] = {
-        k: v for k, v in metrics["overall"].items() if not "micro" in k
+    # Filter overall results if needed
+    results["overall"] = {
+        k: v for k, v in results["overall"].items() if not "micro" in k
     }
 
     # Sort classes by accuracy for better visualization
     class_items = sorted(
-        metrics["per_class_accuracy"].items(), key=lambda x: x[1], reverse=True
+        results["per_class_accuracy"].items(), key=lambda x: x[1], reverse=True
     )
     class_names = [item[0] for item in class_items]
     class_values = [item[1] for item in class_items]
@@ -98,15 +98,15 @@ def plot_classification_results(
         color=colors,
     )
 
-    # Create metrics string
-    metrics_string = "".join(
-        [f"{k}: {v:.3f} | " for k, v in metrics["overall"].items()]
+    # Create results string
+    results_string = "".join(
+        [f"{k}: {v:.3f} | " for k, v in results["overall"].items()]
     )
 
     fig.suptitle(
         f"Classwise accuracy for {task_name} "
         f"probe with {model_name.upper()}\n"
-        f"{metrics_string}",
+        f"{results_string}",
         fontsize=fontsize,
     )
 
@@ -160,7 +160,7 @@ def load_results(path_func, task, model_list):
     dict
         performance for different tasks and models
     """
-    metrics = {}
+    results = {}
     for model_name in model_list:
         paths = path_func(model_name)
         if task == 'clustering':
@@ -170,14 +170,14 @@ def load_results(path_func, task, model_list):
         for file in getattr(paths, key).rglob("*results*.json"):
             if task == "probing":
                 subtask = file.stem.split("_")[-1]
-                metrics[f"{model_name}({subtask})"] = json.load(open(file, "r"))
+                results[f"{model_name}({subtask})"] = json.load(open(file, "r"))
             else:
-                metrics[model_name] = json.load(open(file, "r"))
-    return metrics
+                results[model_name] = json.load(open(file, "r"))
+    return results
 
 
 
-def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
+def plot_per_class_results(plot_path, task_name, model_list, results):
     """
     Visualization of per class results. Resulting figure is stored in
     plot path. Models are sorted by the value of the first entry.
@@ -190,31 +190,31 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
         name of task
     model_list : list
         list of models
-    metrics : dict
+    results : dict
         performance dictionary
     """
-    per_class_metrics = {m: v["per_class_accuracy"] for m, v in metrics.items()}
-    overall_metrics = {m: v["overall"] for m, v in metrics.items()}
-    num_classes = len(per_class_metrics[model_list[0]].keys())
+    per_class_results = {m: v["per_class_accuracy"] for m, v in results.items()}
+    overall_results = {m: v["overall"] for m, v in results.items()}
+    num_classes = len(per_class_results[model_list[0]].keys())
     fig_width = max(12, num_classes * 0.5)
     fig, ax = plt.subplots(1, 1, figsize=(fig_width, 8))
 
     cmap = plt.cm.tab10
     model_colors = cmap(np.arange(len(model_list)) % cmap.N)
 
-    d = {m: v["macro_accuracy"] for m, v in overall_metrics.items()}
+    d = {m: v["macro_accuracy"] for m, v in overall_results.items()}
     model_list = sorted(d, key=d.get, reverse=True)
-    all_classes = sorted(per_class_metrics[model_list[0]].keys())
+    all_classes = sorted(per_class_results[model_list[0]].keys())
 
     for i, model_name in enumerate(model_list):
-        class_values = per_class_metrics[model_name].values()
+        class_values = per_class_results[model_name].values()
 
         ax.scatter(
             np.arange(len(class_values)),
             class_values,
             color=model_colors[i],
             label=f"{model_name.upper()} "
-            + f"(accuracy: {overall_metrics[model_name]['macro_accuracy']:.3f})",
+            + f"(accuracy: {overall_results[model_name]['macro_accuracy']:.3f})",
             s=100,
         )
 
@@ -227,7 +227,7 @@ def plot_per_class_metrics(plot_path, task_name, model_list, metrics):
         )
 
     fig.suptitle(
-        f"Per class metrics for {task_name} across models",
+        f"Per class results for {task_name} across models",
         fontsize=14,
     )
     ax.set_ylabel("Accuracy")
@@ -302,6 +302,11 @@ def plot_classification_heatmap(
     if len(y_indices) > len(y_indices) / int(kwargs.get('heatmap_fig_height') / 100):
         nr_y_ticks = int(kwargs.get('heatmap_fig_height') / 100) 
     
+    clfier_type = (
+        f'{predictions_loader.current_clfier_type} probing' 
+        if not predictions_loader.current_clfier_type == 'Integrated' 
+        else 'integrated classifier'
+        )
     # Create heatmap
     fig = px.imshow(
         plot_data,
@@ -314,7 +319,7 @@ def plot_classification_heatmap(
         aspect="auto",
         title=(
             f'Presence heatmap using {model.upper()} with '
-            f'{predictions_loader.current_clfier_type} probing <br>'
+            f'{clfier_type} <br>'
             f'for {species} '
             f'with threshold of {PredictionsLoader.verify_threshold(threshold)}.'
             )
@@ -387,14 +392,15 @@ class PredictionsLoader:
         ):
         threshold = self.verify_threshold(threshold)
         if hasattr(self, 'binary_presence'):
-            if (
-                self.current_model == model
-                and self.current_threshold == threshold
-                and (
+            if all([
+                self.current_model == model,
+                self.current_threshold == threshold,
+                not self.class_dict is None,
+                (
                     self.current_clfier_type == clfier_type
                     or clfier_type is None
                     )
-                ):
+                ]):
                 return
             
         self.current_model = model
@@ -433,9 +439,9 @@ class PredictionsLoader:
         
         if self.binary_presence is None:
             warning_string = (
-                "It seems like the classifier hasn't been run yet, or "
-                f"that {model} doesn't have a pretrained classifier. "
-                "If the model has a pretrained classifier, please rerun "
+                "It seems like the classifier hasn't been run yet, or <br>"
+                f"that {model} doesn't have a pretrained classifier. <br>"
+                "If the model has a pretrained classifier, please rerun <br>"
                 "bacpipe with the setting `run default classifier` set to `True`."
             )
             self.loading_pane.value = warning_string

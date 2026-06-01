@@ -118,8 +118,8 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
     ----------
     model_base_path : Path
         Local base directory where the checkpoints should be stored.
-    model_names : list
-        list of models to run
+    model_names : str or list
+        Model name or list of model names to run
     repo_id : str, optional
         Hugging Face Hub repo ID, by default "vinikay/bacpipe_models"
 
@@ -128,6 +128,9 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
     str
         path to saved models
     """
+    if isinstance(model_names, str):
+        model_names = [model_names]
+
     model_base_path = Path(model_base_path)
     model_base_path.parent.mkdir(exist_ok=True, parents=True)
     
@@ -440,6 +443,8 @@ def model_specific_evaluation(
         CustomModels = kwargs.pop('CustomModels')
     else:
         CustomModels = [None] * len(models)
+    ensure_models_exist(settings.model_base_path, models)
+    
     for idx, model_name in enumerate(models):
         paths = get_paths(model_name)
         if loader_dict[model_name].classifier_should_be_run(paths, **kwargs):
@@ -455,14 +460,14 @@ def model_specific_evaluation(
                     )
                 
         # if not evaluation_task in ["None", [], None, False]:
-        embeds = loader_dict[model_name].embeddings()
+        embeds = loader_dict[model_name].embeddings(return_type='array')
         try:
             ground_truth = ground_truth_by_model(
                 model_name, paths=paths, single_label=True, **kwargs
                 )
         except FileNotFoundError as e:
             logger.exception(
-                f"unable to process ground truth, {e}"
+                f"unable to process ground truth, no annotations file found."
             )
             ground_truth = None
         except IndexError as e:
@@ -508,8 +513,7 @@ def model_specific_evaluation(
                 f"{model_name.upper()} embeddings"
             )
 
-            embeds_array = np.concatenate(list(embeds.values()))
-            clustering_pipeline(model_name, ground_truth, embeds_array, paths, **kwargs)
+            clustering_pipeline(model_name, ground_truth, embeds, paths, **kwargs)
 
 def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwargs):
     """
@@ -547,9 +551,8 @@ def run_pipeline_for_single_model(
     model_name,
     audio_dir,
     dim_reduction_model="None",
-    check_if_already_processed=True,
+    check_if_already_processed=False,
     check_if_already_dim_reduced=True,
-    overwrite=False,
     testing=False,
     **kwargs,
 ):
@@ -709,7 +712,7 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
             # Finalize
             if embed.model.bool_classifier and not embed.dim_reduction_model:
                 try:
-                    embed.classifier.save_annotation_table(ld)
+                    embed.classifier.save_annotation_table(ld, **kwargs)
                 except Exception as e:
                     logger.warning(
                         "Error when trying to save classifier predictions. "
@@ -731,13 +734,17 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                 embed.classifier.run_default_classifier(ld)
         return ld
     except KeyboardInterrupt:
-        if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
-            all_files = list(Path(ld.embed_dir).rglob('*'))
-            if len(all_files) < 15:
-                logger.info(f"KeyboardInterrupt: Exiting and deleting created {ld.embed_dir}.")
-                import shutil
+        try:
+            if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
+                all_files = list(Path(ld.embed_dir).rglob('*'))
+                if len(all_files) < 15:
+                    logger.info(f"KeyboardInterrupt: Exiting and deleting created {ld.embed_dir}.")
+                    import shutil
 
-                shutil.rmtree(ld.embed_dir)
-            else:
-                logger.info(f"KeyboardInterrupt: Exiting but not deleting {ld.embed_dir}.")
+                    shutil.rmtree(ld.embed_dir)
+                else:
+                    logger.info(f"KeyboardInterrupt: Exiting but not deleting {ld.embed_dir}.")
+        except NameError:
+            logger.info("Bacpipe exiting.")
         import sys
+        sys.exit()

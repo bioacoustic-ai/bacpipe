@@ -1,6 +1,6 @@
 [project]
 name = "bacpipe"
-version = "1.3.0.dev4"
+version = "1.3.2"
 description = "Use bacpipe to streamline the process of generating embeddings and analysing your PAM datasets."
 readme = "README.md"
 authors = [
@@ -69,7 +69,7 @@ dependencies = [
     "kiwisolver==1.4.9",
     "lazy-loader==0.4",
     "libclang==18.1.1",
-    "librosa==0.10.2.post1",
+    "librosa>=0.10.2.post1",
     "linkify-it-py==2.0.3",
     "llvmlite==0.44.0",
     "markdown==3.9",
@@ -86,7 +86,7 @@ dependencies = [
     "nest-asyncio==1.6.0",
     "networkx==3.5",
     "numba==0.61.2",
-    "numpy>=1.26.4",
+    "numpy==1.26.4",
     "oauthlib==3.3.1",
     "objsize==0.7.1",
     "opt-einsum==3.4.0",
@@ -189,12 +189,38 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.setuptools.packages.find]
-include = ["bacpipe*"]
+# 1. The Wheel (What users actually install via pip)
+[tool.hatch.build.targets.wheel]
+include = [
+    "/bacpipe",
+    "src",
+    "run_pipeline.py"
+]
+exclude = [
+    "*.gif",
+    "*.jpg",
+    "*.jpeg",
+    "bacpipe.egg-info",
+    "bacpipe/model_checkpoints",
+    "bacpipe/examples"
+]
 
-[tool.setuptools.package-data]
-"bacpipe" = ["*.yaml", "*.png"]
-"*" = ["*.txt", "*.csv"]
+# 2. The Source Distribution (The raw code package uploaded to PyPI)
+[tool.hatch.build.targets.sdist]
+include = [
+    "/bacpipe",
+    "src",
+    "run_pipeline.py"
+]
+exclude = [
+    "*.gif",
+    "*.jpg",
+    "*.jpeg",
+    "bacpipe.egg-info",
+    "bacpipe/model_checkpoints",
+    "bacpipe/examples"
+
+]

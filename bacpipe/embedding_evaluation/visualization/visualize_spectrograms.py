@@ -53,18 +53,31 @@ class SpectrogramPlot:
         
         # Extract data from click
         point_data = clickData.get('customdata', [None]*6)
-        audiofilename, start_s, end_s, idx, label, label_id = point_data
+        audiofilename, start_s, end_s, idx, label, variable_labels_json, label_id = point_data
         
         # Load Audio
         audio, file_stem = self.load_audio(start_s, end_s, audiofilename)
         spec_fig = self.create_specs(audio)
         
-        self.update_text(start_s, end_s, audiofilename, label)
+        self.update_text(start_s, end_s, audiofilename, label, variable_labels_json)
             
         return spec_fig
 
-
-    def update_text(self, start_s, end_s, audiofilename, label):
+# pd.read_csv(
+#     '/mnt/swap/Work/Data/Min/bacpipe_results/bacpipe_audio_MK_1/evaluations/birdnet/labels/ground_truth_id.csv',
+#     skiprows=180, nrows=1)[0]
+    def update_text(self, start_s, end_s, audiofilename, label, variable_labels_json=None):
+        # Parse variable labels from JSON
+        variable_labels_html = ""
+        if variable_labels_json:
+            try:
+                import json
+                var_labels_dict = json.loads(variable_labels_json)
+                for key, value in var_labels_dict.items():
+                    variable_labels_html += f"<b>{key}</b> = {value}; "
+            except:
+                pass
+        
         self.panel_static_text.visible=True
         self.panel_static_text.value = f"""
             <b>model sample rate</b> = {self.sample_rate} Hz; 
@@ -72,7 +85,8 @@ class SpectrogramPlot:
             <b>filename</b> = {audiofilename}; <br>
             <b>offset</b> = {start_s} s;        
             <b>duration</b> = {end_s - start_s} s;        
-            <b>label</b> = {label}
+            <b>label</b> = {label}; <br>
+            {variable_labels_html}
         """
     
     def create_specs(self, audio):
@@ -110,7 +124,7 @@ class SpectrogramPlot:
         
     def load_audio(self, start, end, filename):
         path = Path(self.audio_dir) / filename
-        if not self.kwargs.get('bool_change_speed') and not 'batdetect2' in self.model_name:
+        if not self.kwargs.get('bool_change_speed'):
             audio, self.orig_sr = lb.load(
                 path, 
                 sr=self.sample_rate, 
@@ -125,11 +139,13 @@ class SpectrogramPlot:
             audio, self.orig_sr = lb.load(
                 path, 
                 sr=None, 
-                offset=float(start * new_speed), 
-                duration=(
-                    float(end * new_speed)
-                    - float(start * new_speed)
-                    )
+                offset=float(start), 
+                duration=float(end)-float(start)
+                # offset=float(start / self.kwargs.get('new_speed')), 
+                # duration=(
+                #     float(end / self.kwargs.get('new_speed'))
+                #     - float(start / self.kwargs.get('new_speed'))
+                #     )
                 )
             if 'batdetect2' in self.model_name:
                 fake_orig_sr = self.sample_rate
@@ -137,7 +153,7 @@ class SpectrogramPlot:
                 fake_orig_sr = int(self.orig_sr * self.kwargs.get('new_speed'))
             audio = lb.resample(
                 audio, 
-                orig_sr=fake_orig_sr,
+                orig_sr=int(self.orig_sr * self.kwargs.get('new_speed')),
                 target_sr=self.sample_rate
             )
             
@@ -147,7 +163,7 @@ class SpectrogramPlot:
             audio = tukey(len(audio), alpha=0.01) * audio
             return_audio = lb.util.fix_length(
                 audio, 
-                size=int((end - start) * self.orig_sr), 
+                size=self.segment_length, 
                 mode=self.kwargs['padding']
                 )
         else:

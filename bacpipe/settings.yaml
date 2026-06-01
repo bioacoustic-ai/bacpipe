@@ -5,7 +5,7 @@
 # fixed path, embeddings will be stored here, advised not to change
 # because this is also where bacpipe will look for existing embeddings
 ### IMPORTANT! WINODWS USERS DON'T USE QUOTATIONS HERE
-main_results_dir :      bacpipe_results
+main_results_dir :      /mnt/swap/Work/Data/Min/bacpipe_results
 embed_parent_dir :      embeddings
 dim_reduc_parent_dir :  dim_reduced_embeddings
 evaluations_dir :       evaluations
@@ -57,24 +57,39 @@ nr_parallel_workers: False
 # Set to False if you want to keep embeddings even if the process is interrupted.
 rm_embedding_on_keyboard_interrupt: True
 
+# To avoid creating embeddings over and over again every time you run bacpipe,
+# this option exists and is True by default so that bacpipe can compare if a 
+# combination of model and dataset has already been processed. Bacpipe will still
+# compare the number of files and if there are audio files that have not been 
+# processed yet, will continue where it left off before.
+check_if_already_processed: True
+
+# This is the same option as the previous one, just for the dimensionality reduction
+# So if you want to use the embeddings you already have, but use a different dimensionality
+# reduction, leave the previous option True and set this one to False.
+check_if_already_dim_reduced: True
+
+
 #########------------------------------------###########
 #########   USING YOUR ANOOTATION SETTINGS   ###########
 #########------------------------------------###########
 
 # key corresponding to the label in the annotation.csv file, if labeled data exists
 # by default this is species, but change if needed
-label_column: 'species'
+# label_column: 'species'
+label_column: 'id'
 
 # file name of the annotations file. This file needs to be located
 # in the root directory of your audio data.
-annotations_filename :  annotations.csv
+annotations_filename :  knownID.csv
+# annotations_filename :  annotations.csv
 
 # If you have an annotations file in the format specified in the 
 # ReadMe file, you can choose to only create embeddings for the segments
 # corresponding to the annotations. For model's that require input segments
 # longer than an annotation, the audio will be padded according to the 
 # padding specified below (see `padding`).
-only_embed_annotations: False
+only_embed_annotations: True
 
 ##########-----------------------------#################
 ##########   DEFAULT LABELS SETTINGS   #################
@@ -210,8 +225,8 @@ color_continuous: 'Twilight'
 # to slow down or speed up audio so that ultrasonic
 # recordings can be reduced in apparent frequency and
 # models like birdnet can process ultrasonic recordings
-bool_change_speed: False
-new_speed: 0.1
+bool_change_speed: True
+new_speed: 2
 
 
 ###########################################
