@@ -77,7 +77,10 @@ class DashBoard(DashBoardHelper):
             labels = []
             if len(ground_truth_files) > 0:
                 for gt_file in ground_truth_files:
-                    ground_truth_df = le.get_ground_truth(model_names[0], file_path=gt_file, return_type='dataframe')
+                    if gt_file.suffix == '.csv':
+                        ground_truth_df = le.get_ground_truth(model_names[0], file_path=gt_file, return_type='dataframe')
+                    elif gt_file.suffix == '.npy':
+                        ground_truth_df = le.get_ground_truth(model_names[0], file_path=gt_file, return_type='array')
                     labels.append(gt_file.stem.split('_')[-1])
             self.ground_truth = True
             self.label_by += labels
@@ -150,24 +153,34 @@ class DashBoard(DashBoardHelper):
             
             self.init_interactive_embed_plot(widget_idx)
             
-            embedding_plot = pn.bind(
-                        self.update_main_plot,
-                        "interactive_embed",
-                        plot_embeddings,
-                        widget_idx,
-                        loader=self.vis_loader,
-                        model_name=self.model_select[widget_idx],
-                        label_by=self.label_select[widget_idx],
-                        ground_truth=self.ground_truth,
-                        dim_reduction_model=self.dim_reduction_model,
-                        remove_noise=(
-                            self.noise_select[widget_idx]
-                            if len(self.noise_select.keys()) > 0
-                            else False
-                        ),
-                        dashboard=True,
-                        dashboard_idx=widget_idx,
-                        )        
+            # Callback to update plot when label_by changes, while preserving accordion state.
+            def update_plot_on_label_change(event):
+                self.update_main_plot(
+                    "interactive_embed",
+                    plot_embeddings,
+                    widget_idx,
+                    loader=self.vis_loader,
+                    model_name=self.model_select[widget_idx].value,
+                    label_by=self.label_select[widget_idx].value,
+                    ground_truth=self.ground_truth,
+                    dim_reduction_model=self.dim_reduction_model,
+                    remove_noise=(
+                        self.noise_select[widget_idx].value
+                        if len(self.noise_select.keys()) > 0
+                        else False
+                    ),
+                    dashboard=True,
+                    dashboard_idx=widget_idx,
+                )
+            
+            # Watch label_select for changes and update plot without re-rendering the entire panel.
+            self.label_select[widget_idx].param.watch(update_plot_on_label_change, 'value')
+            
+            # Render plot once on initial load with current widget values.
+            update_plot_on_label_change(None)
+            
+            # Embed plot reference (no longer using pn.bind to avoid accordion collapse).
+            embedding_plot = self.interactive_embed_plot[widget_idx]        
         return (
                 "2D Embedding Plot",
                 pn.Column(

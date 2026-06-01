@@ -4,6 +4,7 @@ import seaborn as sns
 import pandas as pd
 import datetime
 import logging
+from bacpipe import settings
 
 logger = logging.getLogger("bacpipe")
 
@@ -101,10 +102,11 @@ class DashBoardHelper:
         """Initialize interactive embedding plot with dummy figure"""
         from .visualize_spectrograms import SpectrogramPlot
         
-        # Create Plotly pane with dummy figure
+        # Create Plotly pane with dummy figure and reserved height to prevent accordion collapse
         self.interactive_embed_plot[widget_idx] = pn.pane.Plotly(
             SpectrogramPlot.dummy_image(title='Loading...'),
             sizing_mode='stretch_width',
+            height=settings.embed_fig_height,
             config={'responsive': True}
         )
         
