@@ -764,6 +764,7 @@ def plot_embeddings_px(
     data_dict = {**data_dict}
 
     df = pd.DataFrame(data_dict)
+    df = df.sort_values('label')
     
     hover_data={k: False for k in data_dict}
     for k in hover_data.keys():
