@@ -292,7 +292,7 @@ def get_labels_for_plot(model_name=None, **kwargs):
     if len(ground_truth_files) > 0:
         for gt_file in ground_truth_files:
             ground_truth_df = le.get_ground_truth(model_name, file_path=gt_file, return_type='dataframe')
-            label = gt_file.stem.split('_')[-1]
+            label = gt_file.stem.split('truth_')[-1]
             
             # inv = {v: k for k, v in ground_truth[f"label_dict:{label}"].items()}
             # inv[-1.0] = "noise"
@@ -398,6 +398,8 @@ def plot_embedding_points(
 
         num_labels = np.array([c_label_dict[lab] for lab in labels])
         if not len(labels) == len(embeds['x']):
+            # labels = labels[:len(embeds['x'])]
+            # num_labels = num_labels[:len(embeds['x'])]
             raise AssertionError(
                 f"The number of labels is {len(labels)} whereas the number of "
                 f"embedding points is {len(embeds['x'])}. This mismatch could "

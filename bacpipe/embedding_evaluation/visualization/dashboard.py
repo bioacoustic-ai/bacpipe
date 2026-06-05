@@ -78,7 +78,7 @@ class DashBoard(DashBoardHelper):
             if len(ground_truth_files) > 0:
                 for gt_file in ground_truth_files:
                     ground_truth_df = le.get_ground_truth(model_names[0], file_path=gt_file, return_type='dataframe')
-                    labels.append(gt_file.stem.split('_')[-1])
+                    labels.append(gt_file.stem.split('truth_')[-1])
             self.ground_truth = True
             self.label_by += labels
 
