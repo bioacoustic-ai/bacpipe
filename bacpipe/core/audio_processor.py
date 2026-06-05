@@ -13,13 +13,19 @@ class AudioHandler:
     """
     Helper class for all methods related to loading and padding audio. 
     """
-    def __init__(self, padding, audio_dir, 
-                 model=None, 
-                 segment_length=160_000, 
-                 device='cpu', 
-                 sr=32_000, 
-                 bool_slowdown=False, slowdown_rate=None, 
-                 **kwargs):
+    def __init__(
+        self, 
+        audio_dir,
+        padding='wrap', 
+        model=None, 
+        segment_length=160_000, 
+        device='cpu', 
+        sr=22_050, 
+        bool_slowdown=False, 
+        slowdown_rate=None, 
+        only_embed_annotations=False, 
+        **kwargs
+        ):
         """
         Helper class for all methods related to loading and padding audio. 
 
@@ -39,10 +45,12 @@ class AudioHandler:
             self.segment_length = self.model.segment_length
             self.device = self.model.device
             self.sr = self.model.sr
+            self.only_embed_annotations = self.model.only_embed_annotations
         else:
             self.segment_length = segment_length
             self.device = device
             self.sr = sr
+            self.only_embed_annotations = only_embed_annotations
         self.padding = padding
         self.audio_dir = audio_dir
         self.bool_slowdown = bool_slowdown
@@ -67,12 +75,7 @@ class AudioHandler:
         torch.Tensor
             audio frames preprocessed with model specific preprocessing
         """
-        audio, sr = self._load_and_resample(sample)
-        # audio = audio.to(self.model.device)
-        if self.model.only_embed_annotations:
-            frames = self._only_load_annotated_segments(sample, audio, **self.kwargs)
-        else:
-            frames = self._window_audio(audio)
+        frames, sr = self.return_windowed_audio(sample)
         preprocessed_frames = self.model.preprocess(frames)
         if not self.bool_slowdown:
             self.file_length[sample.stem] = len(audio[0]) / self.model.sr
@@ -83,6 +86,14 @@ class AudioHandler:
             del audio, frames
             torch.cuda.empty_cache()
         return preprocessed_frames
+    
+    def return_windowed_audio(self, sample, **kwargs):
+        audio, sr = self._load_and_resample(sample)
+        if self.only_embed_annotations:
+            frames = self._only_load_annotated_segments(sample, audio, **kwargs, **self.kwargs)
+        else:
+            frames = self._window_audio(audio)
+        return frames, sr
     
     def _load_and_resample(self, path):
         try:
@@ -118,21 +129,22 @@ class AudioHandler:
         return torch.tensor(audio), sr
 
     def _only_load_annotated_segments(
-        self, file_path, audio, annotations_filename='annotations.csv', **_
+        self, file_path, audio, annotations_filename='annotations.csv', annotations_df=None, **_
         ):
-        import pandas as pd
-        from bacpipe import Loader
-        annots = pd.read_csv(Path(self.audio_dir) / annotations_filename)
-        # filter current file
-        file_annots = Loader.filter_df_by_file(self.audio_dir, annots, file_path)
-        if len(file_annots) == 0:
-            raise AssertionError(
-                f"No annotations found for audio file {file_path.relative_to(self.audio_dir)}. "
-                "Continuing with next file."
-            )
+        if annotations_df is None:
+            import pandas as pd
+            from bacpipe import Loader
+            annots = pd.read_csv(Path(self.audio_dir) / annotations_filename)
+            # filter current file
+            annotations_df = Loader.filter_df_by_file(self.audio_dir, annots, file_path)
+            if len(annotations_df) == 0:
+                raise AssertionError(
+                    f"No annotations found for audio file {file_path.relative_to(self.audio_dir)}. "
+                    "Continuing with next file."
+                )
         
-        starts = np.array(file_annots.start.unique(), dtype=np.float32)*self.model.sr
-        ends = np.array(file_annots.end.unique(), dtype=np.float32)*self.model.sr
+        starts = np.array(annotations_df.start.unique(), dtype=np.float32)*self.sr
+        ends = np.array(annotations_df.end.unique(), dtype=np.float32)*self.sr
 
         audio = audio.cpu().squeeze()
         for idx, (s, e) in enumerate(zip(starts, ends)):
@@ -153,7 +165,6 @@ class AudioHandler:
             else:
                 cumulative_segments = np.vstack([cumulative_segments, segments])
         cumulative_segments = torch.Tensor(cumulative_segments)
-        cumulative_segments = cumulative_segments.to(self.device)
         return cumulative_segments
     
     def _load_audio_based_on_fixed_segment_length(self, audio, segment_length, **_):
@@ -161,29 +172,6 @@ class AudioHandler:
         starts = np.arange(nr_segments) * segment_length * self.sr
         ends = np.arange(1, nr_segments+1) * segment_length * self.sr
         return starts, ends
-
-    def _load_and_pad_audio_based_on_grid(self, audio, starts, ends, file_path):
-        audio = audio.cpu().squeeze()
-        for idx, (s, e) in enumerate(zip(starts, ends)):
-            s, e = int(s), int(e)
-            if s > len(audio):
-                logger.warning(
-                    f"Annotation with start {s} and end {e} is outside of "
-                    f"range of {file_path}. Skipping annotation."
-                )
-                continue
-            segments = lb.util.fix_length(
-                audio[s:e+1],
-                size=self.model.segment_length,
-                mode=self.padding
-                )
-            if idx == 0:
-                cumulative_segments = segments
-            else:
-                cumulative_segments = np.vstack([cumulative_segments, segments])
-        cumulative_segments = torch.Tensor(cumulative_segments)
-        cumulative_segments = cumulative_segments.to(self.device)
-        return cumulative_segments
 
     def _window_audio(self, audio):
         num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
@@ -201,5 +189,4 @@ class AudioHandler:
             frames = padded_audio.reshape([num_frames, self.segment_length])
         if not isinstance(frames, torch.Tensor):
             frames = torch.tensor(frames)
-        frames = frames.to(self.device)
         return frames
