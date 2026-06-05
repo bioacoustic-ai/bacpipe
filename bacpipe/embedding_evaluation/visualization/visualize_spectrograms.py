@@ -111,12 +111,16 @@ class SpectrogramPlot:
     def load_audio(self, start, end, filename):
         path = Path(self.audio_dir) / filename
         if not self.kwargs.get('bool_slowdown'):
-            audio, self.orig_sr = lb.load(
-                path, 
-                sr=self.sample_rate, 
-                offset=float(start), 
-                duration=float(end)-float(start)
-                )
+            import h5py
+            idx = int(start / (self.segment_length / self.sample_rate))
+            with h5py.File(path, 'r') as data:
+                audio = data['audio'][idx]
+            # audio, self.orig_sr = lb.load(
+            #     path, 
+            #     sr=self.sample_rate, 
+            #     offset=float(start), 
+            #     duration=float(end)-float(start)
+            #     )
         else:
             audio, self.orig_sr = lb.load(
                 path, 
