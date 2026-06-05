@@ -19,7 +19,7 @@ logger = logging.getLogger("bacpipe")
 
 
 class DefaultLabels:
-    def __init__(self, paths, model, default_label_keys, **kwargs):
+    def __init__(self, paths, model, default_label_keys, annotations_df=None, **kwargs):
         """
         Class to generate default labels based on audio files and 
         number of generated embeddings per file. 
@@ -43,12 +43,15 @@ class DefaultLabels:
         self.paths = paths
         if kwargs.get('only_embed_annotations'):
             self.only_embed_annotations = True
-            self.df, _ = load_labels_and_build_dict(
-                paths, 
-                kwargs.get('annotations_filename'), 
-                self.paths.audio_dir,
-                bool_filter_labels=False
-            )
+            if annotations_df is None:
+                self.df, _ = load_labels_and_build_dict(
+                    paths, 
+                    kwargs.get('annotations_filename'), 
+                    self.paths.audio_dir,
+                    bool_filter_labels=False
+                )
+            else:
+                self.df = annotations_df
         
         if (self.paths.preds_path / "original_classifier_outputs").exists():
             if not "default_classifier" in self.default_label_keys:
@@ -121,11 +124,12 @@ class DefaultLabels:
         for file_idx, (file, time_of_day) in tqdm(
             enumerate(time_of_day_per_file.items()), 'getting time per embeddings'
             ):
+            if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
+                from bacpipe import Loader
+                df = Loader.filter_df_by_file(self.paths.audio_dir, self.df, Path(self.paths.audio_dir) / file)
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
                 
                 if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
-                    from bacpipe import Loader
-                    df = Loader.filter_df_by_file(self.paths.audio_dir, self.df, Path(self.paths.audio_dir) / file)
                     starts = df.start.values
                     timestamp = (
                         (time_of_day + dt.timedelta(seconds=float(starts[index_of_embedding])))
@@ -172,11 +176,12 @@ class DefaultLabels:
             enumerate(self.timestamp_per_file.items()), 
             'getting continuous timestamps'
             ):
+            if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
+                from bacpipe import Loader
+                df = Loader.filter_df_by_file(self.paths.audio_dir, self.df, Path(self.paths.audio_dir) / file)
             for index_of_embedding in range(self.nr_embeds_per_file[file_idx]):
                 
                 if hasattr(self, 'only_embed_annotations') and getattr(self, 'only_embed_annotations'):
-                    from bacpipe import Loader
-                    df = Loader.filter_df_by_file(self.paths.audio_dir, self.df, Path(self.paths.audio_dir) / file)
                     starts = df.start.values
                     timestamp = (
                         (datetime_per_file + dt.timedelta(seconds=float(starts[index_of_embedding])))
@@ -1053,9 +1058,9 @@ def collect_ground_truth_labels(
 
     for ind, file in tqdm(
         enumerate(files),
-        desc=f"Collecting annotations and fitting to embeddings timestamps",
+        desc=f"Collecting annotations and fitting to embeddings timestamps for {label_column}",
         total=len(files),
-        leave=False,
+        leave=True,
     ):
         assert (
             Path(metadata["files"]["audio_files"][ind]).stem
@@ -1086,11 +1091,16 @@ def collect_ground_truth_labels(
         )
     return ground_truth
 
-def assign_global_get_paths_function(audio_dir):
-    if not 'get_paths' in globals():
-        from bacpipe import settings as bapcipe_settings
+def assign_global_get_paths_function(audio_dir, main_results_dir=None, **kwargs):
+    from bacpipe import settings as bapcipe_settings
+    if (
+        not 'get_paths' in globals() 
+        or not main_results_dir in [bapcipe_settings.main_results_dir, None]
+        ):
+        if main_results_dir is None:
+            main_results_dir = bapcipe_settings.main_results_dir
         make_set_paths_func(
-            audio_dir, bapcipe_settings.main_results_dir
+            audio_dir, main_results_dir
             )
 
 def ground_truth_by_model(
@@ -1167,7 +1177,7 @@ def ground_truth_by_model(
         if gorund truth file is not found
     """
     if paths is None:
-        assign_global_get_paths_function(audio_dir)
+        assign_global_get_paths_function(audio_dir, **kwargs)
         paths = get_paths(model)
         
     if (
@@ -1185,7 +1195,7 @@ def ground_truth_by_model(
             path = None
 
         # get annotations is not provided
-        if label_df is None or label_idx_dict is None:
+        if label_df is None:
             if not 'label:' in label_column:
                 label_column = 'label:' + label_column
             if kwargs.get('testing'):
@@ -1229,7 +1239,7 @@ def ground_truth_by_model(
                 segment_s,
                 metadata,
                 label_df,
-                label_idx_dict[label_col],
+                label_idx_dict[label_col] if not label_idx_dict is None else None,
                 single_label=single_label,
                 label_column=clean_label_column,
                 **kwargs,
@@ -1248,11 +1258,23 @@ def ground_truth_by_model(
                 )
             
     else:
-        clean_label_column = label_column.split("label:")[-1]
-        ground_truth = pd.read_csv(
-            paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv"), 
-            index_col=False
-            )
+        if label_df is None:
+            clean_label_column = label_column.split("label:")[-1]
+            ground_truth = pd.read_csv(
+                paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv"), 
+                index_col=False
+                )
+        else:    
+            label_columns = [col for col in label_df.columns if "label:" in col]
+            
+            # collect all the ground truth for all the label columns 
+            for label_col in label_columns:
+                clean_label_column = label_column.split("label:")[-1]
+                ground_truth = pd.read_csv(
+                    paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv"), 
+                    index_col=False
+                    )
+                
     return ground_truth
 
 def ensure_audio_files(found_audio_files, annotated_audio_files, audio_dir):
