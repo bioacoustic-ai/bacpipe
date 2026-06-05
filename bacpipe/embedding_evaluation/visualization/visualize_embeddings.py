@@ -398,8 +398,6 @@ def plot_embedding_points(
 
         num_labels = np.array([c_label_dict[lab] for lab in labels])
         if not len(labels) == len(embeds['x']):
-            # labels = labels[:len(embeds['x'])]
-            # num_labels = num_labels[:len(embeds['x'])]
             raise AssertionError(
                 f"The number of labels is {len(labels)} whereas the number of "
                 f"embedding points is {len(embeds['x'])}. This mismatch could "

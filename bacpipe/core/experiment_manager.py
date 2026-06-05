@@ -625,8 +625,10 @@ class Loader:
         """
         d = {}
         if not self.files[0].suffix == self.embed_suffix:
-            self.files = list(self.embed_dir.rglob(f'*{self.embed_suffix}'))
-            self.files.sort()
+            files = list(self.embed_dir.rglob(f'*{self.embed_suffix}'))
+            files.sort()
+            if len(files) > 0:
+                self.files = files
         for file in self.files:
             if not self.dim_reduction_model:
                 embeds = np.load(file)
