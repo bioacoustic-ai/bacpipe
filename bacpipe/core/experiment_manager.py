@@ -10,7 +10,10 @@ import pandas as pd
 from pathlib import Path
 
 from bacpipe import config, settings
-from bacpipe.embedding_evaluation.label_embeddings import make_set_paths_func
+from bacpipe.embedding_evaluation.label_embeddings import (
+    make_set_paths_func,
+    load_metadata_file
+    )
 logger = logging.getLogger("bacpipe")
 
 
@@ -494,10 +497,11 @@ class Loader:
                 "nr_embeds_per_file": [],
             },
         }
+    
 
     def _get_metadata_dict(self, folder):
-        with open(folder.joinpath("metadata.yml"), "r") as f:
-            self.metadata_dict = yaml.load(f, Loader=yaml.CLoader)
+        self.metadata_dict = load_metadata_file(folder)
+
         for key, val in self.metadata_dict.items():
             if isinstance(val, str):
                 if key == 'model_name':
@@ -589,7 +593,7 @@ class Loader:
         return embeds
 
     @staticmethod
-    def filter_df_by_file(audio_dir, annots, file_path):
+    def filter_df_by_file(audio_dir, annots, file_path, sort_by_start=True):
         file_annots = annots[annots.audiofilename==file_path.relative_to(audio_dir)]
         if len(file_annots) == 0:
             file_annots = annots[annots.audiofilename==file_path.stem+file_path.suffix]
@@ -597,7 +601,9 @@ class Loader:
             file_annots = annots[annots.audiofilename==str(file_path.relative_to(audio_dir))]
         if len(file_annots) == 0:
             file_annots = annots[annots.audiofilename==str(file_path.relative_to(audio_dir).as_posix())]
-            
+
+        if sort_by_start:
+            file_annots = file_annots.sort_values('start')
         return file_annots
 
 

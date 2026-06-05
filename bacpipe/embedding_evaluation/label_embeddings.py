@@ -15,6 +15,7 @@ from librosa import get_duration
 
 import logging
 
+
 logger = logging.getLogger("bacpipe")
 
 
@@ -61,7 +62,7 @@ class DefaultLabels:
         
         try:
             embed_path = model_specific_embedding_path(paths.main_embeds_path, model)
-            self.metadata = yaml.safe_load(open(embed_path.joinpath("metadata.yml"), "r"))
+            self.metadata = load_metadata_file(embed_path)
             self.nr_embeds_per_file = self.metadata["files"]["nr_embeds_per_file"]
             self.nr_embeds_total = self.metadata["nr_embeds_total"]
         except ValueError as e:
@@ -351,6 +352,26 @@ def get_dim_reduc_path_func(model_name, dim_reduction_model="umap", **kwargs):
         **kwargs,
     )
 
+
+def ensure_windoof_path_to_posix(path):
+    if '\\' in path:
+        from pathlib import PureWindowsPath
+        return str(PureWindowsPath(path).as_posix())
+    else:
+        return str(path )
+    
+    
+def load_metadata_file(folder):
+    with open(folder.joinpath("metadata.yml"), "r") as f:
+        metadata_dict = yaml.load(f, Loader=yaml.CLoader)
+    
+    metadata_dict['audio_dir'] = ensure_windoof_path_to_posix(
+        metadata_dict['audio_dir']
+        )
+    metadata_dict['embed_dir'] = ensure_windoof_path_to_posix(
+        metadata_dict['embed_dir']
+        )
+    return metadata_dict
 
 def get_default_labels(model_name, **kwargs):
     """
@@ -784,7 +805,10 @@ def fit_labels_to_embedding_timestamps(
                     "modify the value in the settings file."
                 )
             
-            if len(df_fitted_gt.columns) > 5:    
+            # This is for debugging why species richness
+            # is != 1. most likely because the previous
+            # line ends before this one began.
+            if False:#len(df_fitted_gt.columns) > 5:    
                 species_richness = df_fitted_gt.drop(
                     columns=['starts', 'ends', 'audiofilename', 'species_richness']
                     ).loc[idx, :].sum()
@@ -1213,10 +1237,8 @@ def ground_truth_by_model(
         if path is not None and len(list(path.iterdir())) > 0:
             files = list(path.rglob("*.npy"))
             files.sort()
-
-            metadata = yaml.safe_load(
-                open(list(path.rglob("metadata.yml"))[0], "r")
-                )
+            
+            metadata = load_metadata_file(path)
             segment_s = (
                 metadata["segment_length (samples)"] 
                 / metadata["sample_rate (Hz)"]

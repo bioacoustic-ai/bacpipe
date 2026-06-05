@@ -251,7 +251,7 @@ def clustering_pipeline(
         
         if "audio_dir" in kwargs: kwargs.pop("audio_dir")
         
-        if len(ground_truth) > 0:
+        if not ground_truth is None and len(ground_truth) > 0:
             if max(ground_truth.species_richness) > 0:
                 logger.warning(
                     "You have passed a multi-label ground truth array. "
