@@ -33,6 +33,7 @@ def get_embeddings(path):
 
     for model_name in ['birdnet', 'audioprotopnet', 'perch_v2']:#
         embeds_snr[model_name] = {}
+        umaps[model_name] = {}
         for snr_dir in audio_dir.iterdir():
             snr_string = snr_dir.stem if snr_dir.is_dir() else False
             if not snr_string:
@@ -73,108 +74,17 @@ def get_embeddings(path):
 
             loader_dr = Loader(snr_dir, model_name, use_folder_structure=True, dim_reduction_model='umap', audio_suffixes=['.h5'], main_results_dir=f'bacpipe_results/{audio_dir.stem}')
 
-            umaps[model_name] = {}
             try:
                 files = list(loader_dr.embed_dir.rglob('*json'))
                 if len(files) == 0:
                     raise FileNotFoundError("umaps haven't been computed yet")
                 for file in files:
                     with open(file, 'r') as f:
-                        umaps[model_name][file.stem] = json.load(f)
+                        umaps[model_name][file.stem.split('_')[0]] = json.load(f)
             except:
                 umap_embed_obj = Embedder(model_name, loader=loader_dr, device='cuda', padding='wrap', dim_reduction_model='umap')
                 umap_embed_obj.run_dimensionality_reduction_pipeline()
                 loader_dr.write_metadata_file()
-                
-                
-                
-                
-        
-        # reorganize embeds dict
-        # embeds_snr[model_name] = {}
-        # audio_files = get_audio_files(path, audio_suffixes=['.h5'])
-        # noise_keys = [k for k in embeds[model_name] if not 'snr' in k]
-        # noise_keys.sort()
-        # snr_keys = [l for l in embeds[model_name] if 'snr' in l]
-        # snr_audio_keys = [l for l in audio_files if 'snr' in l.stem]
-        # for snr_file in snr_keys:
-        #     snr_string = [s.stem for s in snr_audio_keys if s.stem in snr_file][0]
-                
-                # umaps[model_name][snr_string] = umap_embed_obj.get_reduced_dimensionality_embeddings(embeds_snr[model_name][snr_string])
-                
-                # loader_dr.metadata_dict["files"]["embedding_files"].append(
-                #     [l.stem+l.suffix for l in loader_dr.files]
-                # )
-                
-                # # loader_dr.metadata_dict["files"]["embedding_dimensions"].append(embeds_array.shape)
-                
-                # # if idx == 0:
-                # #     for k in loader.metadata_dict['files'].keys():
-                # #         loader_dr.metadata_dict["files"][k][idx:idx] = (
-                # #             loader.metadata_dict['files'][k][:len(noise_keys)]
-                # #         )
-                        
-                # #     for k in loader.metadata_dict['files'].keys():
-                # #         loader_dr.metadata_dict["files"][k] = (
-                # #             loader_dr.metadata_dict["files"][k][idx:len(noise_keys)+1+idx]
-                # #         )
-                # # else:
-                # #     for k in loader.metadata_dict['files'].keys():
-                # #         loader_dr.metadata_dict["files"][k][-1] = loader.metadata_dict['files'][k][len(noise_keys)+1:][0]
-                    
-                # loader_dr.metadata_dict['nr_embeds_total'] = sum(loader_dr.metadata_dict["files"]['nr_embeds_per_file'])
-                    
-                    
-                # loader_dr._save_embeddings_dict_with_timestamps(
-                #     loader_dr.embed_dir / f'{snr}.json', 
-                #     umaps[model_name][snr],
-                #     loader.metadata_dict['segment_length (samples)'] / loader.metadata_dict['sample_rate (Hz)']
-                # )
-                
-
-
-
-
-                # # loader_dr.files = snr_keys
-                # keep_idxs = [idx for idx, f in enumerate(loader.metadata_dict['files']['audio_files']) if 'snr' in f]
-                # for k in loader.metadata_dict['files']:
-                #     loader_dr.metadata_dict['files'][k] = [loader.metadata_dict['files'][k][idx] for idx in keep_idxs]
-                # for idx, (snr, embeds_array) in tqdm(enumerate(embeds_snr[model_name].items())):
-                
-                #     umaps[model_name][snr] = umap_embed_obj.get_reduced_dimensionality_embeddings(embeds_array)
-                    
-                #     loader_dr.metadata_dict["files"]["embedding_files"].append(
-                #         loader_dr.files[idx]
-                #     )
-                    
-                #     loader_dr.metadata_dict["files"]["embedding_dimensions"].append(embeds_array.shape)
-                    
-                #     if idx == 0:
-                #         for k in loader.metadata_dict['files'].keys():
-                #             loader_dr.metadata_dict["files"][k][idx:idx] = (
-                #                 loader.metadata_dict['files'][k][:len(noise_keys)]
-                #             )
-                            
-                #         for k in loader.metadata_dict['files'].keys():
-                #             loader_dr.metadata_dict["files"][k] = (
-                #                 loader_dr.metadata_dict["files"][k][idx:len(noise_keys)+1+idx]
-                #             )
-                #     else:
-                #         for k in loader.metadata_dict['files'].keys():
-                #             loader_dr.metadata_dict["files"][k][-1] = loader.metadata_dict['files'][k][len(noise_keys)+1:][0]
-                        
-                #     loader_dr.metadata_dict['nr_embeds_total'] = sum(loader_dr.metadata_dict["files"]['nr_embeds_per_file'])
-                        
-                        
-                #     loader_dr._save_embeddings_dict_with_timestamps(
-                #         loader_dr.embed_dir / f'{snr}.json', 
-                #         umaps[model_name][snr],
-                #         loader.metadata_dict['segment_length (samples)'] / loader.metadata_dict['sample_rate (Hz)']
-                #     )
-                    
-                    
-                # loader_dr.metadata_dict['files']['nr_embeds_per_file'] = [loader_dr.metadata_dict['nr_embeds_total']] * len(embeds_snr[model_name])
-                # loader_dr.write_metadata_file()
     return embeds_snr, umaps
 
 def collect_noise_dfs(path):
@@ -215,63 +125,7 @@ for model in embeds:
 df.index = range(len(df))
 
 
-model = 'perch_v2'
-snr_str = 'snr=12_perch_v2'
-df_vis = pd.DataFrame()
-for h5_file in umaps[model][snr_str]['metadata']['audio_files']:
-    df_tmp, audio = read_dataset(path / snr_str.split('_')[0] / h5_file, return_audio=False)   
-    df_tmp['audiofilename'] = h5_file
-    input_length = (
-        umaps[model][snr_str]['metadata']['segment_length (samples)']
-        / umaps[model][snr_str]['metadata']['sample_rate (Hz)']
-    )
-    df_tmp['start'] = np.arange(len(df_tmp)) * input_length
-    df_tmp['end'] = df_tmp['start'] + input_length
-    df_vis = pd.concat([df_vis, df_tmp])
-    
-cols2rename = [c for c in df_vis.columns if not c in ['audiofilename', 'start' ,'end', 'noise_start', 'noise_end', 'species_end', 'noise_filename']]
-df_vis = df_vis.rename(columns={k: f'label:{k}' for k in cols2rename})
 
-snr_str = 'snr=12'
-ground_truth_by_model(
-    model=model,
-    main_results_dir = Path(settings.main_results_dir) / path.stem,
-    audio_dir=path / snr_str,
-    label_df=df_vis,
-    overwrite=False
-    # label_idx_dict=None,
-    # label_column='label:species',
-)
-
-# with h5py.File('/media/siriussound/Extreme SSD/identifying_unknown_sounds/data_h5_files/6_ratio-n2t_10/snr=0/unknown_sounds_len_3_sr_32000_repetitions_6_ratio-n2t_10_AnuranSet_INCT41.h5', 'r') as data:
-#     a = data['audio'][:]
-    
-
-remaining_settings = {**vars(settings)}
-
-vis_settings = {
-    'models':[model],#list(embeds.keys()), 
-    'audio_dir':path / snr_str, 
-    'audio_suffixes' : ['.h5'],
-    'main_results_dir':Path(settings.main_results_dir) / path.stem, 
-    'default_label_keys':settings.default_label_keys,#{}, 
-    'evaluation_task':config.evaluation_task, 
-    'dim_reduction_model':config.dim_reduction_model, 
-    'dim_reduc_parent_dir':settings.dim_reduc_parent_dir,
-    'only_embed_annotations':True,
-    'annotations_df' : df_vis,
-}
-
-
-for k in vis_settings.keys():
-    if k in remaining_settings:
-        remaining_settings.pop(k)
-        
-        
-visualize_using_dashboard(
-    **vis_settings,
-    **remaining_settings
-    )
 
 
 
@@ -394,16 +248,91 @@ else:
     with open(main_results_path / 'clust_results.json', 'r') as f:
         clust_results = json.load(f)
         
+if not (path / 'visualization_dataframe.csv').exists():
+    df_vis = clust_df.copy()
+    df_vis = df_vis.sort_values(['noise_env', 'snr'])
+    cols2rename = [c for c in df_vis.columns if not c in ['audiofilename', 'start' ,'end', 'noise_start', 'noise_end', 'species_end', 'noise_filename', 'model', 'snr']]
+    df_vis = df_vis.rename(columns={k: f'label:{k}' for k in cols2rename})
+    
+    for model in umaps:
+        for snr_str in umaps[model]:
+            snr_val = float(snr_str.split('=')[-1].replace(',', '.'))
+            snr_model_df = pd.DataFrame()
+            for h5_file in umaps[model][snr_str]['metadata']['audio_files']:
+                df_tmp, audio = read_dataset(path / snr_str.split('_')[0] / h5_file, return_audio=False)   
+                df_tmp['audiofilename'] = h5_file
+                input_length = (
+                    umaps[model][snr_str]['metadata']['segment_length (samples)']
+                    / umaps[model][snr_str]['metadata']['sample_rate (Hz)']
+                )
+                df_tmp['start'] = np.arange(len(df_tmp)) * input_length
+                df_tmp['end'] = df_tmp['start'] + input_length
+                snr_model_df = pd.concat([snr_model_df, df_tmp])
                 
-print(clust_results)
+            snr_model_df = snr_model_df.sort_values(['noise_env', 'snr'])
+            for col in ['audiofilename', 'start', 'end']:
+                df_vis.loc[(df_vis.snr.isin([snr_val, -1])).values & (df_vis.model==model).values, col] = snr_model_df.loc[:, col].values
 
-model = 'audioprotopnet'
-clust_name = 'hdb'
-snr = '9.0'
-# species = 'Black-bellied Plover'
-eval_name = 'species_vs_infile_noise'
-## plot species by snr 
-for model in ['birdnet', 'audioprotopnet']:
+            
+            clust_df_equiv = clust_df[clust_df.snr.isin([snr_val, -1]).values & (clust_df[f'{model}_{snr_val}_hdb'] >-3).values]
+
+            for col in clust_df_equiv.columns:
+                if model in col and str(snr_val) in col:
+                    df_vis[f'label:{col}'] = clust_df_equiv[col]
+                    
+            gt_df = df_vis.copy()
+            drop_cols = [c for c in gt_df.columns if '.' in c and (not model in c or not str(snr_val) in c)]
+            
+            for col in drop_cols:
+                gt_df.pop(col)
+            
+            
+            ground_truth_by_model(
+                model=model,
+                main_results_dir = Path(settings.main_results_dir) / path.stem,
+                audio_dir=path / snr_str,
+                label_df=gt_df,
+                overwrite=False
+                # label_idx_dict=None,
+                # label_column='label:species',
+            )
+    df_vis.to_csv(path / 'visualization_dataframe.csv', index=False)
+else:
+    df_vis = pd.read_csv(path / 'visualization_dataframe.csv', index_col=False)
+
+# with h5py.File('/media/siriussound/Extreme SSD/identifying_unknown_sounds/data_h5_files/6_ratio-n2t_10/snr=0/unknown_sounds_len_3_sr_32000_repetitions_6_ratio-n2t_10_AnuranSet_INCT41.h5', 'r') as data:
+#     a = data['audio'][:]
+    
+
+remaining_settings = {**vars(settings)}
+
+snr_str = 'snr=9'
+snr_val = 9.0
+vis_settings = {
+    'models':list(embeds.keys()), 
+    'audio_dir':path / snr_str, 
+    'audio_suffixes' : ['.h5'],
+    'main_results_dir':Path(settings.main_results_dir) / path.stem, 
+    'default_label_keys':settings.default_label_keys,#{}, 
+    'evaluation_task':config.evaluation_task, 
+    'dim_reduction_model':config.dim_reduction_model, 
+    'dim_reduc_parent_dir':settings.dim_reduc_parent_dir,
+    'only_embed_annotations':True,
+    'annotations_df' : df_vis[df_vis.snr.isin([snr_val, -1])],
+}
+
+
+for k in vis_settings.keys():
+    if k in remaining_settings:
+        remaining_settings.pop(k)
+        
+        
+# visualize_using_dashboard(
+#     **vis_settings,
+#     **remaining_settings
+#     )
+
+def print_clusterings(clust_results, df, model, clust_name, eval_name, save_path):
     plot_data= {}
     for species in df.species.unique():
         if species == '':
@@ -423,7 +352,14 @@ for model in ['birdnet', 'audioprotopnet']:
             ax[idx].plot([s for s in df.snr.unique() if s >= 0], plot_data[species][noise_env], label=noise_env)
         ax[idx].set_title(species)
         
-        ax[idx].set_ylim([0, 1])
+        if (
+            not eval_name == 'species_vs_infile_noise' 
+            and not np.max(list(plot_data[species].values())) > 0.5
+            ):
+            
+            ax[idx].set_ylim([0, 0.5])
+        else:
+            ax[idx].set_ylim([0, 1])
         
         ax[idx].set_xticks([s for s in df.snr.unique() if s >= 0], [str(s) for s in df.snr.unique() if s >= 0])
         idx += 1
@@ -433,11 +369,37 @@ for model in ['birdnet', 'audioprotopnet']:
     ax[-1].set_xlabel('SNR')
     fig.suptitle(f'{clust_name} {eval_name} {model}')
     fig.tight_layout()
-    fig.savefig(main_results_path / f'{clust_name}_{eval_name}_{model}.png')
+    fig.savefig(save_path / f'{clust_name}_{eval_name}_{model}.png')
+    plt.close(fig)
+
+print(clust_results)
+
+# model = 'audioprotopnet'
+# clust_name = 'hdb'
+# snr = '9.0'
+# # species = 'Black-bellied Plover'
+# eval_name = 'species_vs_all'
+# species_vs_infile_noise
+# species_vs_all
+# species_vs_species
+# species_vs_other_noise
+## plot species by snr 
+for model in ['birdnet', 'audioprotopnet', 'perch_v2']:
+    for clust_name in ['hdb', 'kmeans']:
+        for eval_name in [
+            'species_vs_infile_noise',
+            'species_vs_all',
+            'species_vs_species',
+            'species_vs_other_noise'
+            ]:
+            save_path = main_results_path / f'{clust_name}_{model}'
+            save_path.mkdir(exist_ok=True)
+            print_clusterings(clust_results, df, model, clust_name, eval_name, save_path)
+
 
 # Convert string labels to numeric codes for coloring
-print(clust_results[model][snr][clust_name][eval_name]['BIRB_NES'][species])
-print(clust_results[model][snr]['kmeans'][eval_name]['BIRB_NES'][species])
+# print(clust_results[model][snr][clust_name][eval_name]['BIRB_NES'][species])
+# print(clust_results[model][snr]['kmeans'][eval_name]['BIRB_NES'][species])
 
 clust_name_list = list(clust_results[model].keys())
 eval_name_list = list(clust_results[model]['kmeans'].keys())
