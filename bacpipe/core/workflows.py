@@ -469,7 +469,7 @@ def model_specific_evaluation(
         embeds = loader_dict[model_name].embeddings(return_type="array")
         try:
             ground_truth = ground_truth_by_model(
-                model_name, paths=paths, single_label=True, **kwargs
+                model_name, paths=paths, **kwargs
             )
         except FileNotFoundError as e:
             logger.exception(

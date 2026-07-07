@@ -58,7 +58,6 @@ def benchmark(
         model,
         audio_dir=dataset,
         annotations_filename=annotations_file,
-        single_label=False,
         bool_filter_labels=False,
         overwrite=True,
     )

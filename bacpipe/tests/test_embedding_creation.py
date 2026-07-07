@@ -51,7 +51,7 @@ def test_evaluation(model, overwrite, device, only_embed_annotations, kwargs):
         kwargs["device"] = "cpu"
     try:
         ground_truth = ground_truth_by_model(
-            model, single_label=False, **kwargs
+            model, **kwargs
         )
     except FileNotFoundError:
         ground_truth = None
@@ -67,7 +67,6 @@ def test_evaluation(model, overwrite, device, only_embed_annotations, kwargs):
                 ground_truth,
                 embeds,
                 paths,
-                single_label=False,
                 **class_config,
                 **kwargs,
             )

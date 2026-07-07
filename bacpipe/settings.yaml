@@ -192,6 +192,12 @@ clust_configs:
 #######   DASHBOARD SETTINGS   ############
 #######------------------------############
 
+# maximum number of discrete categories
+# This number determines how many categories will be shown
+# as distinct labels. If more categories than this number
+# are found a colorbar will be used
+max_nr_categories: 100
+
 # port for dashboard
 dashboard_port: 5006
 
@@ -211,7 +217,6 @@ accordion_width: 780
 # color scales used in dashboard
 spec_colorscale: 'Viridis'
 color_continuous: 'Twilight'
-
 
 
 #######-----------------------------------############

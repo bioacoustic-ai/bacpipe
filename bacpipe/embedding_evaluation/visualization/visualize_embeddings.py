@@ -326,7 +326,6 @@ def get_labels_for_plot(model_name=None, **kwargs):
             # technically -2.0 is not noise, but corresponds to sections
             # with multiple sources vocalizing simultaneously
             if max(ground_truth_df.species_richness) > 1:
-                # TODO for display we're just taking the first label
                 logger.warning(
                     "You have passed a multi-label ground truth array. "
                     "However for visualization only one label will be displayed."
@@ -366,7 +365,7 @@ def get_labels_for_plot(model_name=None, **kwargs):
 def set_colorbar_or_legend(
     fig, axes, points, c_label_dict, label_by, **kwargs
 ):
-    if len(c_label_dict.keys()) > 20:
+    if len(c_label_dict.keys()) > settings.max_nr_categories:
         if isinstance(list(c_label_dict.keys())[0], int):
             fontsize = 9
         elif isinstance(list(c_label_dict.keys())[0], np.int32):
@@ -429,7 +428,7 @@ def plot_embedding_points(
     plt object
         axes points
     """
-    if len(c_label_dict.keys()) > 50:
+    if len(c_label_dict.keys()) > settings.max_nr_categories:
         import matplotlib.cm as cm
 
         cmap = cm.viridis  # or 'plasma', 'inferno', 'magma', etc.
@@ -569,7 +568,7 @@ def data_split_by_labels(embeds_dict, labels):
     """
     split_data = {}
     uni_labels = np.unique(labels)
-    if len(uni_labels) > 20:
+    if len(uni_labels) > settings.max_nr_categories:
         split_data["all"] = np.array(
             [
                 np.array(embeds_dict["x"]),
@@ -577,9 +576,7 @@ def data_split_by_labels(embeds_dict, labels):
             ]
         )
     else:
-        for (
-            label
-        ) in uni_labels:  # TODO don't do this for more than 20 categories
+        for label in uni_labels:
             split_data[str(label)] = np.array(
                 [
                     np.array(embeds_dict["x"])[np.array(labels) == label],
@@ -835,7 +832,7 @@ def plot_embeddings_px(
     ]
 
     # 2. Setup Figure based on Label Count
-    if n_labels > 500:
+    if n_labels > settings.max_nr_categories:
         # if label_by in ['time_of_day', 'continuous_timestamp', 'day_of_year']:
         # --- HIGH CARDINALITY: Use Colorbar ---
         # We map color to 'label_id' (int) to force a continuous scale

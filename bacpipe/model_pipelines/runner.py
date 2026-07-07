@@ -565,7 +565,8 @@ class Embedder(AudioHandler):
         else:
             if not isinstance(sample, Path):
                 sample = Path(sample)
-                # TODO might not know audio_suffixes
+                if not hasattr(self, 'audio_suffixes'):
+                    self.audio_suffixes = bacpipe.settings.audio_suffixes
                 if not sample.suffix in self.audio_suffixes:
                     error = (
                         "\nThe provided path does not lead to a supported audio file with the ending"
