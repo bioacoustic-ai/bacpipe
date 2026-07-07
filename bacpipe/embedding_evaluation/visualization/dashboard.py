@@ -77,7 +77,10 @@ class DashBoard(DashBoardHelper):
             labels = []
             if len(ground_truth_files) > 0:
                 for gt_file in ground_truth_files:
-                    ground_truth_df = le.get_ground_truth(model_names[0], file_path=gt_file, return_type='dataframe')
+                    if gt_file.suffix == '.csv':
+                        ground_truth_df = le.get_ground_truth(model_names[0], file_path=gt_file, return_type='dataframe')
+                    elif gt_file.suffix == '.npy':
+                        ground_truth_df = le.get_ground_truth(model_names[0], file_path=gt_file, return_type='array')
                     labels.append(gt_file.stem.split('_')[-1])
             self.ground_truth = True
             self.label_by += labels
@@ -150,24 +153,40 @@ class DashBoard(DashBoardHelper):
             
             self.init_interactive_embed_plot(widget_idx)
             
-            embedding_plot = pn.bind(
-                        self.update_main_plot,
-                        "interactive_embed",
-                        plot_embeddings,
-                        widget_idx,
-                        loader=self.vis_loader,
-                        model_name=self.model_select[widget_idx],
-                        label_by=self.label_select[widget_idx],
-                        ground_truth=self.ground_truth,
-                        dim_reduction_model=self.dim_reduction_model,
-                        remove_noise=(
-                            self.noise_select[widget_idx]
-                            if len(self.noise_select.keys()) > 0
-                            else False
-                        ),
-                        dashboard=True,
-                        dashboard_idx=widget_idx,
-                        )        
+            # Callback to update plot when any selector changes, while preserving accordion state.
+            def update_plot_on_change(event):
+                self.update_main_plot(
+                    "interactive_embed",
+                    plot_embeddings,
+                    widget_idx,
+                    loader=self.vis_loader,
+                    model_name=self.model_select[widget_idx].value,
+                    label_by=self.label_select[widget_idx].value,
+                    ground_truth=self.ground_truth,
+                    dim_reduction_model=self.dim_reduction_model,
+                    remove_noise=(
+                        self.noise_select[widget_idx].value
+                        if widget_idx in self.noise_select and self.noise_select[widget_idx] is not None
+                        else False
+                    ),
+                    dashboard=True,
+                    dashboard_idx=widget_idx,
+                )
+            
+            # Only attach watchers once per widget (check if already attached)
+            if not hasattr(self.model_select[widget_idx], '_embedding_watchers_attached'):
+                self.model_select[widget_idx].param.watch(update_plot_on_change, 'value')
+                self.label_select[widget_idx].param.watch(update_plot_on_change, 'value')
+                if widget_idx in self.noise_select and self.noise_select[widget_idx] is not None:
+                    self.noise_select[widget_idx].param.watch(update_plot_on_change, 'value')
+                # Mark that watchers have been attached
+                self.model_select[widget_idx]._embedding_watchers_attached = True
+            
+            # Render plot with current widget values (every time, to refresh display when navigating tabs)
+            update_plot_on_change(None)
+            
+            # Embed plot reference (no longer using pn.bind to avoid accordion collapse).
+            embedding_plot = self.interactive_embed_plot[widget_idx]        
         return (
                 "2D Embedding Plot",
                 pn.Column(
@@ -656,9 +675,9 @@ class DashBoard(DashBoardHelper):
         model0_page = self.model_page(0, single_model=True)
         model1_page = self.model_page(1)
         model2_page = self.model_page(2)
-        model_all_page = self.all_models_page(1)
-        apply_classifier0_page = self.apply_clfier_page(0)
-        apply_classifier1_page = self.apply_clfier_page(1)
+        model_all_page = self.all_models_page(3)
+        apply_classifier0_page = self.apply_clfier_page(4)
+        apply_classifier1_page = self.apply_clfier_page(5)
 
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
