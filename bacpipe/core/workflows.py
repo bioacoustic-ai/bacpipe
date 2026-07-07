@@ -447,7 +447,7 @@ def model_specific_evaluation(
     
     for idx, model_name in enumerate(models):
         paths = get_paths(model_name)
-        if loader_dict[model_name].classifier_should_be_run(paths, **kwargs):
+        if loader_dict[model_name].classifier_should_be_run(**kwargs):
             embed = Embedder(
                 model_name, 
                 loader_dict[model_name], 
@@ -728,10 +728,11 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                 import tensorflow as tf
                 tf.keras.backend.clear_session()
                 
-        elif hasattr(kwargs, 'paths') and ld.classifier_should_be_run(**kwargs):
-            embed = Embedder(loader=ld, **kwargs)
-            if hasattr(embed.model, 'classifier_predictions'):
-                embed.classifier.run_default_classifier(ld)
+        elif ld.classifier_should_be_run(**kwargs):
+            if hasattr(kwargs, 'paths'):
+                embed = Embedder(loader=ld, **kwargs)
+                if hasattr(embed.model, 'classifier_predictions'):
+                    embed.classifier.run_default_classifier(ld)
         return ld
     except KeyboardInterrupt:
         try:
