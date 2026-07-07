@@ -14,7 +14,7 @@ class AudioHandler:
     Helper class for all methods related to loading and padding audio. 
     """
     def __init__(self, model, padding, audio_dir, 
-                 bool_slowdown=False, slowdown_rate=None, 
+                 bool_change_speed=False, new_speed=None, 
                  **kwargs):
         """
         Helper class for all methods related to loading and padding audio. 
@@ -33,8 +33,8 @@ class AudioHandler:
         self.model = model
         self.padding = padding
         self.audio_dir = audio_dir
-        self.bool_slowdown = bool_slowdown
-        self.slowdown_rate = slowdown_rate
+        self.bool_change_speed = bool_change_speed
+        self.new_speed = new_speed
         self.kwargs = kwargs
     
     def prepare_audio(self, sample):
@@ -61,7 +61,7 @@ class AudioHandler:
         else:
             frames = self._window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
-        if not self.bool_slowdown:
+        if not self.bool_change_speed:
             self.file_length[sample.stem] = len(audio[0]) / self.model.sr
         else:
             self.file_length[sample.stem] = len(audio[0]) / sr
@@ -73,7 +73,7 @@ class AudioHandler:
     
     def _load_and_resample(self, path):
         try:
-            if not self.bool_slowdown:
+            if not self.bool_change_speed:
                 audio, sr = lb.load(
                     str(path), sr=self.model.sr, mono=True
                     )
@@ -85,7 +85,7 @@ class AudioHandler:
                 if 'batdetect2' in self.model_name:
                     fake_original_sr = self.model.sr
                 else:
-                    fake_original_sr = int(sr * self.slowdown_rate)
+                    fake_original_sr = int(sr * self.new_speed)
                 audio = lb.resample(
                     audio, 
                     orig_sr=fake_original_sr, 

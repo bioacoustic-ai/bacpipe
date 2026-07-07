@@ -120,11 +120,11 @@ class SpectrogramPlot:
             return
         audio = tukey(len(self.audio), alpha=0.01) * self.audio
         
-        sd.play(audio, self.sample_rate)#int(self.orig_sr / self.kwargs.get('slowdown_rate')))
+        sd.play(audio, self.sample_rate)#int(self.orig_sr / self.kwargs.get('new_speed')))
         
     def load_audio(self, start, end, filename):
         path = Path(self.audio_dir) / filename
-        if not self.kwargs.get('bool_slowdown'):
+        if not self.kwargs.get('bool_change_speed'):
             audio, self.orig_sr = lb.load(
                 path, 
                 sr=self.sample_rate, 
@@ -135,15 +135,15 @@ class SpectrogramPlot:
             audio, self.orig_sr = lb.load(
                 path, 
                 sr=None, 
-                offset=float(start / self.kwargs.get('slowdown_rate')), 
+                offset=float(start / self.kwargs.get('new_speed')), 
                 duration=(
-                    float(end / self.kwargs.get('slowdown_rate'))
-                    - float(start / self.kwargs.get('slowdown_rate'))
+                    float(end / self.kwargs.get('new_speed'))
+                    - float(start / self.kwargs.get('new_speed'))
                     )
                 )
             audio = lb.resample(
                 audio, 
-                orig_sr=int(self.orig_sr / self.kwargs.get('slowdown_rate')),
+                orig_sr=int(self.orig_sr / self.kwargs.get('new_speed')),
                 target_sr=self.sample_rate
             )
             
