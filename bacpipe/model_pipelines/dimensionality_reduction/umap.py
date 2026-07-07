@@ -1,7 +1,6 @@
 from ..model_utils import ModelBaseClass
 import umap
 
-
 # UMAP settings
 
 

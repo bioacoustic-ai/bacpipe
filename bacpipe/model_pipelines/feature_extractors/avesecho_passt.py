@@ -6,8 +6,6 @@ import torch
 import yaml
 import pandas as pd
 
-
-
 SAMPLE_RATE = 32000
 LENGTH_IN_SAMPLES = int(3 * SAMPLE_RATE)  # burooj used 3 seconds
 # LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
@@ -50,7 +48,9 @@ class AugmentMelSTFT(nn.Module):
         self.norm = norm
         self.hopsize = hopsize
         self.register_buffer(
-            "window", torch.hann_window(win_length, periodic=False), persistent=False
+            "window",
+            torch.hann_window(win_length, periodic=False),
+            persistent=False,
         )
         assert (
             fmin_aug_range >= 1
@@ -62,14 +62,16 @@ class AugmentMelSTFT(nn.Module):
         self.fmax_aug_range = fmax_aug_range
 
         self.register_buffer(
-            "preemphasis_coefficient", torch.as_tensor([[[-0.97, 1]]]), persistent=False
+            "preemphasis_coefficient",
+            torch.as_tensor([[[-0.97, 1]]]),
+            persistent=False,
         )
 
     def forward(self, x):
 
-        x = nn.functional.conv1d(x.unsqueeze(1), self.preemphasis_coefficient).squeeze(
-            1
-        )
+        x = nn.functional.conv1d(
+            x.unsqueeze(1), self.preemphasis_coefficient
+        ).squeeze(1)
         x = torch.stft(
             x,
             self.n_fft,
@@ -81,7 +83,7 @@ class AugmentMelSTFT(nn.Module):
             return_complex=False,
         )
         x = (x**2).sum(dim=-1)  # power mag
-        fmin = self.fmin# + torch.randint(self.fmin_aug_range, (1,)).item()
+        fmin = self.fmin  # + torch.randint(self.fmin_aug_range, (1,)).item()
         fmax = (
             self.fmax
             + self.fmax_aug_range // 2
@@ -101,7 +103,9 @@ class AugmentMelSTFT(nn.Module):
             vtln_warp_factor=1.0,
         )
         mel_basis = torch.as_tensor(
-            torch.nn.functional.pad(mel_basis, (0, 1), mode="constant", value=0),
+            torch.nn.functional.pad(
+                mel_basis, (0, 1), mode="constant", value=0
+            ),
             device=x.device,
         )
         with torch.amp.autocast("cuda", enabled=False):
@@ -119,9 +123,15 @@ class AugmentMelSTFT(nn.Module):
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
-        self.model = get_basic_model(mode="logits", arch="passt_s_kd_p16_128_ap486")
-        self.model.net = get_model_passt(arch="passt_s_kd_p16_128_ap486", n_classes=585)
+        super().__init__(
+            sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
+        )
+        self.model = get_basic_model(
+            mode="logits", arch="passt_s_kd_p16_128_ap486"
+        )
+        self.model.net = get_model_passt(
+            arch="passt_s_kd_p16_128_ap486", n_classes=585
+        )
         self.model.net.to(self.device)
         ckpnt = torch.load(
             self.model_base_path / "avesecho_passt/best_model_passt.pt",
@@ -135,7 +145,7 @@ class Model(ModelBaseClass):
         )
         self.preprocessor = self.preprocessor.to(self.device)
         class_file_path = (
-            self.model_utils_base_path / 'avesecho_passt/list_AvesEcho.csv'
+            self.model_utils_base_path / "avesecho_passt/list_AvesEcho.csv"
         )
         df = pd.read_csv(class_file_path, header=None)
         self.classes = df.iloc[:, 1].values.tolist()

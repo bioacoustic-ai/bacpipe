@@ -30,4 +30,3 @@ into train, validation and test and using that a linear and knn probe is
 trained and fitted. The results below show the classwise performance 
 of the probe.
 """
-

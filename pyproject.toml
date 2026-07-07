@@ -226,3 +226,6 @@ exclude = [
     "bacpipe/examples"
 
 ]
+
+[tool.black]
+line-length = 79

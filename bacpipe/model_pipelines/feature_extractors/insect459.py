@@ -11,8 +11,12 @@ LENGTH_IN_SAMPLES = int(5.5 * SAMPLE_RATE)
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
-        with open(f"{self.model_base_path}/insect66/config_insecteffnet.yaml", "rt") as infp:
+        super().__init__(
+            sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
+        )
+        with open(
+            f"{self.model_base_path}/insect66/config_insecteffnet.yaml", "rt"
+        ) as infp:
             cfg = SimpleNamespace(**yaml.safe_load(infp))
 
         checkpoint = torch.load(

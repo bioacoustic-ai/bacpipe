@@ -6,7 +6,7 @@ from datetime import datetime
 # -- Path setup --------------------------------------------------------------
 # Ensure the package can be imported
 # If your package is in src/, adjust accordingly: sys.path.insert(0, os.path.abspath('../../src'))
-sys.path.insert(0, os.path.abspath('../../'))  # root so `import bacpipe` works
+sys.path.insert(0, os.path.abspath("../../"))  # root so `import bacpipe` works
 
 # -- Project info -----------------------------------------------------------
 project = "bacpipe"
@@ -17,11 +17,11 @@ release = "1.1.2"  # keep in sync with your package/version
 # -- General configuration ---------------------------------------------------
 extensions = [
     "sphinx.ext.autodoc",
-    "sphinx.ext.napoleon",         # Google/NumPy style docstrings
+    "sphinx.ext.napoleon",  # Google/NumPy style docstrings
     "sphinx.ext.autosummary",
-    "sphinx.ext.viewcode",        # add links to source
-    "sphinx_autodoc_typehints",   # show type hints
-    "myst_parser",                # enable Markdown
+    "sphinx.ext.viewcode",  # add links to source
+    "sphinx_autodoc_typehints",  # show type hints
+    "myst_parser",  # enable Markdown
 ]
 
 autosummary_generate = True  # generate stub files for autosummary
@@ -37,7 +37,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 html_sidebars = {
     "**": [
-        "globaltoc.html",   # <- Always show full ToC
+        "globaltoc.html",  # <- Always show full ToC
         "relations.html",
         "searchbox.html",
     ]
@@ -54,8 +54,9 @@ napoleon_include_special_with_doc = True
 # -- Options for HTML output -------------------------------------------------
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
-html_logo = "_static/bacpipe_logo.png"      # optional logo
+html_logo = "_static/bacpipe_logo.png"  # optional logo
 html_favicon = "_static/bacpipe_favicon_white.png"  # optional favicon
+
 
 def run_apidoc(_):
     from sphinx.ext.apidoc import main
@@ -67,6 +68,6 @@ def run_apidoc(_):
 
     main(["-o", api_out, src_dir, "--force"])
 
+
 def setup(app):
     app.connect("builder-inited", run_apidoc)
-

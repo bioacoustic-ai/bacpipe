@@ -12,7 +12,6 @@ from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
 )
 
 
-
 #  accuracy per class
 def accuracy_per_class(y_true, y_pred, label2index, items_per_class):
     """
@@ -107,7 +106,11 @@ def compute_task_metrics(y_pred, y_true, probability_scores, label2index):
     metrics["overall"] = {
         "macro_accuracy": macro_accuracy(y_true, y_pred),
         "micro_accuracy": micro_accuracy(y_true, y_pred),
-        "auc": auc(y_true, probability_scores) if np.unique(y_true).size > 1 else None,
+        "auc": (
+            auc(y_true, probability_scores)
+            if np.unique(y_true).size > 1
+            else None
+        ),
         "macro_f1": macro_f1(y_true, y_pred),
         "micro_f1": micro_f1(y_true, y_pred),
     }
@@ -136,11 +139,11 @@ def save_probe_results(paths, config, metrics, **kwargs):
     metrics : dict
         performance
     """
-    
+
     for k, v in kwargs.items():
         if isinstance(v, Path):
             kwargs[k] = v.as_posix()
-            
+
     metrics["config"] = kwargs
 
     save_path = paths.probe_path.joinpath(f"probe_results_{config}.json")
@@ -149,11 +152,17 @@ def save_probe_results(paths, config, metrics, **kwargs):
         json.dump(metrics, f, indent=2)
 
 
-
 def eval_probe(
-    probe, embeds, df, label2index, 
-    device="cuda:0", config="linear", 
-    paths=None, save_probe=False, **kwargs):
+    probe,
+    embeds,
+    df,
+    label2index,
+    device="cuda:0",
+    config="linear",
+    paths=None,
+    save_probe=False,
+    **kwargs,
+):
     """
     Perform inference using probe.
 
@@ -177,10 +186,11 @@ def eval_probe(
     np.array
         probabilities for each class and each embedding
     """
-    
-    test_dataloader = probe_dataset_loader("test", df, embeds, label2index, **kwargs)
 
-    
+    test_dataloader = probe_dataset_loader(
+        "test", df, embeds, label2index, **kwargs
+    )
+
     device = torch.device(device)
     probe = probe.to(device)
 
@@ -206,59 +216,69 @@ def eval_probe(
         y_pred.extend(predicted.cpu().numpy().tolist())
         y_true.extend(y.cpu().numpy().tolist())
         probabilities.extend(probs)
-        
-
-
 
     results = compute_task_metrics(y_pred, y_true, probabilities, label2index)
-    
-    
+
     if save_probe and not paths is None:
         state_dict = probe.state_dict()
         torch.save(state_dict, paths.probe_path / f"{config}_probe.pt")
         with open(paths.probe_path / "label2index.json", "w") as f:
             json.dump(label2index, f, indent=1)
         save_probe_results(paths, config, results, **kwargs)
-        save_confusion_matrix(paths, y_true, y_pred, label2index, task_name=config)
-        plot_classification_results(paths=paths, task_name=config, results=results)
-        
-    
+        save_confusion_matrix(
+            paths, y_true, y_pred, label2index, task_name=config
+        )
+        plot_classification_results(
+            paths=paths, task_name=config, results=results
+        )
+
     return results
 
-        
-def save_confusion_matrix(paths, y_true, y_pred, label2index, task_name='linear'):
+
+def save_confusion_matrix(
+    paths, y_true, y_pred, label2index, task_name="linear"
+):
     from matplotlib import pyplot as plt
-    
-    i2l = {v:k for k, v in label2index.items()}
+
+    i2l = {v: k for k, v in label2index.items()}
     labels_list = list(i2l.values())
     num_classes = len(labels_list)
     conf_matrx = metrics.confusion_matrix(
-        [str(i2l[v]) for v in y_true], 
-        [str(i2l[v]) for v in y_pred], 
-        labels=[str(l) for l in labels_list]  
+        [str(i2l[v]) for v in y_true],
+        [str(i2l[v]) for v in y_pred],
+        labels=[str(l) for l in labels_list],
     )
-    
+
     conf_matrx_plot = metrics.ConfusionMatrixDisplay(
-        conf_matrx, 
-        display_labels=labels_list
-        )
-    
+        conf_matrx, display_labels=labels_list
+    )
+
     side_length = max(5, 5 + (num_classes * 0.8))
     fig, ax = plt.subplots(figsize=[side_length, side_length])
-    
-    conf_matrx_plot.plot(ax=ax)#, cmap='Blues', values_format='d')
+
+    conf_matrx_plot.plot(ax=ax)  # , cmap='Blues', values_format='d')
     ax.grid(False)
-    
-    ax.set_xlabel("Predicted Label", fontsize=14, fontweight='bold', labelpad=15)
-    ax.set_ylabel("True Label", fontsize=14, fontweight='bold', labelpad=15)
-    
-    ax.tick_params(axis='both', which='major', labelsize=10)
-    
+
+    ax.set_xlabel(
+        "Predicted Label", fontsize=14, fontweight="bold", labelpad=15
+    )
+    ax.set_ylabel("True Label", fontsize=14, fontweight="bold", labelpad=15)
+
+    ax.tick_params(axis="both", which="major", labelsize=10)
+
     # Rotate tick labels if they get crowded
     if num_classes > 5:
-        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+        plt.setp(
+            ax.get_xticklabels(),
+            rotation=45,
+            ha="right",
+            rotation_mode="anchor",
+        )
         plt.setp(ax.get_yticklabels(), rotation=0)
-    
+
     plt.tight_layout()
-    fig.savefig(paths.probe_path / f"confusion_matrix_{task_name}.png", bbox_inches='tight')
+    fig.savefig(
+        paths.probe_path / f"confusion_matrix_{task_name}.png",
+        bbox_inches="tight",
+    )
     plt.close(fig)

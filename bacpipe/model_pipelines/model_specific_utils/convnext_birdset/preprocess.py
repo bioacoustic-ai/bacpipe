@@ -6,13 +6,12 @@ from torchvision import transforms
 import torchaudio
 
 
-
 class PowerToDB(torch.nn.Module):
     """
     A power spectrogram to decibel conversion layer. See birdset.datamodule.components.augmentations
     """
 
-    def __init__(self, ref=1.0, amin=1e-10, top_db=80.0, device='cpu'):
+    def __init__(self, ref=1.0, amin=1e-10, top_db=80.0, device="cpu"):
         super(PowerToDB, self).__init__()
         # Initialize parameters
         self.ref = ref
@@ -40,10 +39,14 @@ class PowerToDB(torch.nn.Module):
 
         # Compute the log spectrogram
         log_spec = 10.0 * torch.log10(
-            torch.maximum(magnitude, torch.tensor(self.amin, device=self.device))
+            torch.maximum(
+                magnitude, torch.tensor(self.amin, device=self.device)
+            )
         )
         log_spec -= 10.0 * torch.log10(
-            torch.maximum(ref_value, torch.tensor(self.amin, device=self.device))
+            torch.maximum(
+                ref_value, torch.tensor(self.amin, device=self.device)
+            )
         )
 
         # Apply top_db threshold if necessary
@@ -55,12 +58,11 @@ class PowerToDB(torch.nn.Module):
         return log_spec
 
 
-
 class ConvNextPreProcess:
     def __init__(self, sample_rate, device):
-        
+
         # Initialize the transformations
-        device='cpu'
+        device = "cpu"
 
         self.spectrogram_converter = torchaudio.transforms.Spectrogram(
             n_fft=1024, hop_length=320, power=2.0
@@ -70,7 +72,6 @@ class ConvNextPreProcess:
         )
         self.normalizer = transforms.Normalize((-4.268,), (4.569,))
         self.powerToDB = PowerToDB(top_db=80, device=device)
-
 
     def preprocess(self, audio):
         """
@@ -89,4 +90,3 @@ class ConvNextPreProcess:
         # add dimension 3 from left
         normalized_dbscale = normalized_dbscale.unsqueeze(-3)
         return normalized_dbscale
-

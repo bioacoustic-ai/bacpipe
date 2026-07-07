@@ -46,7 +46,9 @@ class SpectrogramCNN(nn.Module):
         )
 
         self.amplitude_to_db = ta.transforms.AmplitudeToDB(top_db=cfg.top_db)
-        self.wav2timefreq = torch.nn.Sequential(self.mel_spec, self.amplitude_to_db)
+        self.wav2timefreq = torch.nn.Sequential(
+            self.mel_spec, self.amplitude_to_db
+        )
 
         if init_backbone:
             # Initialize pre-trained CNN
@@ -61,14 +63,22 @@ class SpectrogramCNN(nn.Module):
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
-        with open(f"{self.model_base_path}/insect66/config_insecteffnet.yaml", "rt") as infp:
+        super().__init__(
+            sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
+        )
+        with open(
+            f"{self.model_base_path}/insect66/config_insecteffnet.yaml", "rt"
+        ) as infp:
             cfg = SimpleNamespace(**yaml.safe_load(infp))
 
-        checkpoint = torch.jit.load(f"{self.model_base_path}/insect66/model_traced.pt")
+        checkpoint = torch.jit.load(
+            f"{self.model_base_path}/insect66/model_traced.pt"
+        )
         state_dict = checkpoint.state_dict()
         for k in ["wav2img.0.spectrogram.window", "wav2img.0.mel_scale.fb"]:
-            state_dict[k.replace("wav2img", "wav2timefreq")] = state_dict.pop(k)
+            state_dict[k.replace("wav2img", "wav2timefreq")] = state_dict.pop(
+                k
+            )
 
         self.model = SpectrogramCNN(cfg)
         self.model.load_state_dict(state_dict)

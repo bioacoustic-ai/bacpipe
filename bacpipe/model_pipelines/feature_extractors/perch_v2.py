@@ -1,8 +1,11 @@
-from bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.model_configs import load_model_by_name
+from bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.model_configs import (
+    load_model_by_name,
+)
 import tensorflow as tf
 import numpy as np
 import pandas as pd
 import logging
+
 logger = logging.getLogger("bacpipe")
 
 tf.keras.backend.clear_session()
@@ -15,30 +18,34 @@ LENGTH_IN_SAMPLES = 160000
 
 class Model(ModelBaseClass):
     def __init__(
-        self, model_choice="perch_v2_cpu", sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
+        self,
+        model_choice="perch_v2_cpu",
+        sr=SAMPLE_RATE,
+        segment_length=LENGTH_IN_SAMPLES,
+        **kwargs,
     ):
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
-        
-        if model_choice == 'vggish':
+
+        if model_choice == "vggish":
             self.bool_classifier = False
-        
-        if self.device == 'cuda' and model_choice.startswith('perch_v2'):
+
+        if self.device == "cuda" and model_choice.startswith("perch_v2"):
             if len(tf.config.list_physical_devices("GPU")) > 0:
-                model_choice = 'perch_v2'
+                model_choice = "perch_v2"
         mod = load_model_by_name(model_choice)
 
         self.model = mod.embed
-                
-        if not hasattr(self, 'class_label_key'):
+
+        if not hasattr(self, "class_label_key"):
             self.class_label_key = "labels"
-        
-        if model_choice in ['vggish']:
+
+        if model_choice in ["vggish"]:
             return
         elif not model_choice in ["multispecies_whale"]:
             self.class_list = mod.class_list[self.class_label_key].classes
             self.ebird2name = pd.read_csv(
-                self.model_utils_base_path /
-                "perch_v2/perch_hoplite/eBird2name.csv"
+                self.model_utils_base_path
+                / "perch_v2/perch_hoplite/eBird2name.csv"
             )
             self.classes = self.class_list
             self.classes = [
@@ -53,9 +60,9 @@ class Model(ModelBaseClass):
             ]
         else:
             self.class_list = mod.class_list
-            
-        if model_choice.startswith('perch_v2'):
-            self.class_label_key = 'label'
+
+        if model_choice.startswith("perch_v2"):
+            self.class_label_key = "label"
 
     def preprocess(self, audio):
         audio = audio.cpu()
@@ -69,11 +76,12 @@ class Model(ModelBaseClass):
                 "You are on a operating system that does not currently support this model. "
                 "Perch V2 is currently only supported on linux or other machines supporting "
                 "XLA deserialization. ",
-                e                
+                e,
             )
             import sys
+
             sys.exit(0)
-        
+
         return self.results.embeddings
 
     def classifier_predictions(self, embeddings):

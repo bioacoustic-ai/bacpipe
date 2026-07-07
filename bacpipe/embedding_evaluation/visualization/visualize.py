@@ -5,7 +5,8 @@ import numpy as np
 
 import bacpipe.embedding_evaluation.label_embeddings as le
 from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
-    load_results, plot_per_class_results
+    load_results,
+    plot_per_class_results,
 )
 import matplotlib
 
@@ -14,7 +15,6 @@ from matplotlib.figure import Figure
 import logging
 
 logger = logging.getLogger(__name__)
-
 
 
 matplotlib.rcParams.update(
@@ -60,10 +60,12 @@ def visualise_results_across_models(plot_path, task_name, model_list):
     else:
         plot_overview_results(
             plot_path, task_name, model_list, results, path_func=le.get_paths
-            )
+        )
 
 
-def iterate_through_subtasks(plot_func, plot_path, task_name, model_list, metrics):
+def iterate_through_subtasks(
+    plot_func, plot_path, task_name, model_list, metrics
+):
     """
     For classification multiple subtasks exist (linear and knn). Iterate
     over each of the subtasks and call the plotting functions to create
@@ -87,7 +89,9 @@ def iterate_through_subtasks(plot_func, plot_path, task_name, model_list, metric
         sub_task_metrics = {
             k.split("(")[0]: v for k, v in metrics.items() if subtask in k
         }
-        plot_func(plot_path, f"{subtask} {task_name}", model_list, sub_task_metrics)
+        plot_func(
+            plot_path, f"{subtask} {task_name}", model_list, sub_task_metrics
+        )
 
 
 def clustering_overview(
@@ -121,7 +125,9 @@ def clustering_overview(
     fig.subplots_adjust(bottom=0.25, right=0.9)
     flat_metrics = dict()
     for model_name in model_list:
-        with open(path_func(model_name).clust_path / "clust_results.json", "r") as f:
+        with open(
+            path_func(model_name).clust_path / "clust_results.json", "r"
+        ) as f:
             metrics = json.load(f)
         if no_noise:
             no_noise = "_no_noise"
@@ -238,7 +244,9 @@ def generate_bar_plot(
     ax.set_yticks(np.arange(len(metrics_sorted.keys())))
     ax.set_yticklabels(list(metrics_sorted.keys()))
     ax.set_xlabel(x_label)
-    ax.vlines(0, -1, out_idx, linestyles="dashed", color="black", linewidth=0.3)
+    ax.vlines(
+        0, -1, out_idx, linestyles="dashed", color="black", linewidth=0.3
+    )
     hand, labl = ax.get_legend_handles_labels()
     if not no_legend:
         fig.legend(
@@ -278,10 +286,12 @@ def plot_overview_results(
     sort_string : str
         string to sort the metrics by, defaults to "kmeans-audio_file_name"
     """
-    # TODO when first ran mutliple models and then just one, metrics 
+    # TODO when first ran mutliple models and then just one, metrics
     # doesn't know the current model and this should be caught
     if not metrics:
-        res_path = path_func(model_list[0]).plot_path.parent.parent.joinpath("overview")
+        res_path = path_func(model_list[0]).plot_path.parent.parent.joinpath(
+            "overview"
+        )
         try:
             with open(res_path.joinpath(f"probing_results.json"), "r") as f:
                 metrics = json.load(f)
@@ -292,7 +302,9 @@ def plot_overview_results(
             )
             return {}
         metrics = {
-            k.split("(")[0]: v["overall"] for k, v in metrics.items() if task_name in k
+            k.split("(")[0]: v["overall"]
+            for k, v in metrics.items()
+            if task_name in k
         }
 
     if "probing" in task_name:
@@ -345,7 +357,9 @@ def plot_overview_results(
             )
     ax.set_ylabel("Various Metrics")
     ax.set_xlabel("Models")
-    ax.set_xticks(np.arange(len(metrics.keys())) - bar_width * (num_metrics - 1) / 2)
+    ax.set_xticks(
+        np.arange(len(metrics.keys())) - bar_width * (num_metrics - 1) / 2
+    )
     ax.set_xticklabels(
         [model.upper() for model in metrics.keys()],
         rotation=45,
@@ -364,14 +378,13 @@ def plot_overview_results(
     if return_fig:
         return fig
     file = (
-        f"overview_metrics_{task_name}_" 
-        + "-".join([m[:2] for m in metrics.keys()]) 
+        f"overview_metrics_{task_name}_"
+        + "-".join([m[:2] for m in metrics.keys()])
         + ".png"
-        )
+    )
     plot_path.mkdir(exist_ok=True, parents=True)
     fig.savefig(
         plot_path.joinpath(file),
         dpi=300,
     )
     plt.close(fig)
-

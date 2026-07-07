@@ -3,7 +3,12 @@ import numpy as np
 import librosa
 
 from ..model_specific_utils.bat.module import BAT
-from ..model_specific_utils.bat.prepare_data import prepareData, getSequences, slideWindow, germanBats
+from ..model_specific_utils.bat.prepare_data import (
+    prepareData,
+    getSequences,
+    slideWindow,
+    germanBats,
+)
 from ..model_utils import ModelBaseClass
 
 IS_EXPANDED = False
@@ -11,13 +16,15 @@ if IS_EXPANDED:
     SAMPLE_RATE = 22050
     LENGTH_IN_SAMPLES = int(0.78 * SAMPLE_RATE * 10)
 else:
-    SAMPLE_RATE = 22050 * 10    # time expand
+    SAMPLE_RATE = 22050 * 10  # time expand
     LENGTH_IN_SAMPLES = int(0.78 * SAMPLE_RATE)
 
 
 class Model(ModelBaseClass):
     def __init__(self, threshold=0.5, **kwargs):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
+        super().__init__(
+            sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
+        )
 
         self.threshold = threshold
         self.classes = list(germanBats)
@@ -42,15 +49,15 @@ class Model(ModelBaseClass):
         self.model.eval()
 
     def preprocess(self, audio: torch.Tensor):
-        
-        audio = audio.to('cpu')
-        b_y = audio.numpy()   # b n
+
+        audio = audio.to("cpu")
+        b_y = audio.numpy()  # b n
 
         input_seq = []
         for y in b_y:
             # Spectrogram
             D = librosa.stft(y, n_fft=512)
-            S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max) # H, W
+            S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)  # H, W
 
             # Custom filtering + denoising
             S_db = prepareData(y)
@@ -58,7 +65,9 @@ class Model(ModelBaseClass):
             # Sequence extraction
             sequence = np.asarray(slideWindow(S_db, size=44, step=22)[:-1])
             n, w, h = sequence.shape
-            input_seq.append(torch.tensor(sequence, dtype=torch.float32).reshape(n * w, h))
+            input_seq.append(
+                torch.tensor(sequence, dtype=torch.float32).reshape(n * w, h)
+            )
 
         return torch.stack(input_seq, dim=0)
 

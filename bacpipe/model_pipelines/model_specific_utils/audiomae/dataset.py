@@ -21,7 +21,12 @@ import math
 
 class DistributedSamplerWrapper(DistributedSampler):
     def __init__(
-        self, sampler, dataset, num_replicas=None, rank=None, shuffle: bool = True
+        self,
+        sampler,
+        dataset,
+        num_replicas=None,
+        rank=None,
+        shuffle: bool = True,
     ):
         super(DistributedSamplerWrapper, self).__init__(
             dataset, num_replicas, rank, shuffle
@@ -53,17 +58,23 @@ class DistributedWeightedSampler(Sampler):
     ):
         if num_replicas is None:
             if not dist.is_available():
-                raise RuntimeError("Requires distributed package to be available")
+                raise RuntimeError(
+                    "Requires distributed package to be available"
+                )
             num_replicas = dist.get_world_size()
         if rank is None:
             if not dist.is_available():
-                raise RuntimeError("Requires distributed package to be available")
+                raise RuntimeError(
+                    "Requires distributed package to be available"
+                )
             rank = dist.get_rank()
         self.dataset = dataset
         self.num_replicas = num_replicas
         self.rank = rank
         self.epoch = 0
-        self.num_samples = int(math.ceil(len(self.dataset) * 1.0 / self.num_replicas))
+        self.num_samples = int(
+            math.ceil(len(self.dataset) * 1.0 / self.num_replicas)
+        )
         self.total_size = self.num_samples * self.num_replicas
         self.replacement = replacement
         self.weights = torch.from_numpy(weights)
@@ -212,16 +223,19 @@ class AudiosetDataset(Dataset):
     def _fbank(self, filename, filename2=None):
         if filename2 == None:
             fn1 = os.path.join(
-                self.fbank_dir, os.path.basename(filename).replace(".wav", ".npy")
+                self.fbank_dir,
+                os.path.basename(filename).replace(".wav", ".npy"),
             )
             fbank = np.load(fn1)
             return torch.from_numpy(fbank), 0
         else:
             fn1 = os.path.join(
-                self.fbank_dir, os.path.basename(filename).replace(".wav", ".npy")
+                self.fbank_dir,
+                os.path.basename(filename).replace(".wav", ".npy"),
             )
             fn2 = os.path.join(
-                self.fbank_dir, os.path.basename(filename2).replace(".wav", ".npy")
+                self.fbank_dir,
+                os.path.basename(filename2).replace(".wav", ".npy"),
             )
             # sample lambda from beta distribtion
             mix_lambda = np.random.beta(10, 10)

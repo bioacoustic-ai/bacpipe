@@ -1,7 +1,6 @@
 from ..model_utils import ModelBaseClass
 from sklearn.decomposition import SparsePCA
 
-
 # UMAP settings
 tsne_config = {"n_components": 2}
 

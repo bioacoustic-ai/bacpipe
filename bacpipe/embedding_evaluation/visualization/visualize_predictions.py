@@ -11,8 +11,10 @@ logger = logging.getLogger(__name__)
 
 from pathlib import Path
 from bacpipe.embedding_evaluation.probing.inference_probe import (
-    prepare_probe_inference, run_probe_inference
-    )
+    prepare_probe_inference,
+    run_probe_inference,
+)
+
 
 def plot_classification_results(
     task_name,
@@ -60,7 +62,9 @@ def plot_classification_results(
             logger.exception(error)
             raise AssertionError(error)
 
-        with open(paths.probe_path / f"probe_results_{task_name}.json", "r") as f:
+        with open(
+            paths.probe_path / f"probe_results_{task_name}.json", "r"
+        ) as f:
             results = json.load(f)
 
     # Filter overall results if needed
@@ -163,18 +167,19 @@ def load_results(path_func, task, model_list):
     results = {}
     for model_name in model_list:
         paths = path_func(model_name)
-        if task == 'clustering':
+        if task == "clustering":
             key = "clust_path"
-        elif task == 'probing':
+        elif task == "probing":
             key = "probe_path"
         for file in getattr(paths, key).rglob("*results*.json"):
             if task == "probing":
                 subtask = file.stem.split("_")[-1]
-                results[f"{model_name}({subtask})"] = json.load(open(file, "r"))
+                results[f"{model_name}({subtask})"] = json.load(
+                    open(file, "r")
+                )
             else:
                 results[model_name] = json.load(open(file, "r"))
     return results
-
 
 
 def plot_per_class_results(plot_path, task_name, model_list, results):
@@ -193,7 +198,9 @@ def plot_per_class_results(plot_path, task_name, model_list, results):
     results : dict
         performance dictionary
     """
-    per_class_results = {m: v["per_class_accuracy"] for m, v in results.items()}
+    per_class_results = {
+        m: v["per_class_accuracy"] for m, v in results.items()
+    }
     overall_results = {m: v["overall"] for m, v in results.items()}
     num_classes = len(per_class_results[model_list[0]].keys())
     fig_width = max(12, num_classes * 0.5)
@@ -235,12 +242,14 @@ def plot_per_class_results(plot_path, task_name, model_list, results):
     ax.set_xticks(np.arange(len(all_classes)))
     ax.set_xticklabels(all_classes, rotation=90)
 
-    ax.legend(loc="upper left", bbox_to_anchor=(1.05, 1), title="Models", fontsize=10)
+    ax.legend(
+        loc="upper left", bbox_to_anchor=(1.05, 1), title="Models", fontsize=10
+    )
 
     fig.subplots_adjust(right=0.65, bottom=0.3)
     file_name = (
-        f"comparison_{task_name.replace(' ', '_')}_" 
-        + "-".join([m[:2] for m in model_list]) 
+        f"comparison_{task_name.replace(' ', '_')}_"
+        + "-".join([m[:2] for m in model_list])
         + ".png"
     )
     plot_path.mkdir(exist_ok=True, parents=True)
@@ -250,47 +259,62 @@ def plot_per_class_results(plot_path, task_name, model_list, results):
     )
     plt.close(fig)
 
+
 import plotly.express as px
 import numpy as np
-from bacpipe.embedding_evaluation.visualization.visualize_spectrograms import SpectrogramPlot
+from bacpipe.embedding_evaluation.visualization.visualize_spectrograms import (
+    SpectrogramPlot,
+)
+
 
 def plot_classification_heatmap(
-    event, predictions_loader, model, accumulate_by, 
-    threshold, species=None, **kwargs
-    ):
+    event,
+    predictions_loader,
+    model,
+    accumulate_by,
+    threshold,
+    species=None,
+    **kwargs,
+):
     if event is None and species is None:
-        return SpectrogramPlot.dummy_image(title="Click the button to generate a prediction heatmap.")
+        return SpectrogramPlot.dummy_image(
+            title="Click the button to generate a prediction heatmap."
+        )
     try:
         predictions_loader.get_data(model, threshold, **kwargs)
     except Exception as e:
         logger.exception(e)
         # TODO thid doesn't update the plot for some reason
-        return SpectrogramPlot.dummy_image(title=str(e)) 
+        return SpectrogramPlot.dummy_image(title=str(e))
     # if predictions_loader.binary_presence is None:
     #     return predictions_loader.failed_fig
-    accumulated_presence = predictions_loader.accumulate_data(species, accumulate_by)
+    accumulated_presence = predictions_loader.accumulate_data(
+        species, accumulate_by
+    )
     timestamps = predictions_loader.timestamps
-    
-    logger.info('Redrawing heatmap plot')
-    
+
+    logger.info("Redrawing heatmap plot")
+
     # Prepare data - mask values below 0
     plot_data = accumulated_presence.T.copy()
     plot_data = np.where(plot_data < 0, np.nan, plot_data)
-    
+
     # Get time labels based on accumulation type
-    if accumulate_by == 'day':
+    if accumulate_by == "day":
         y_labels = [str(ts.date()) for ts in timestamps]
-        y_axis_label = 'Dates'
-    elif accumulate_by == 'month':
-        y_labels = [f'{date.year}-{date.month}' for date in timestamps]
-        y_axis_label = 'Months'
-    elif accumulate_by == 'week':
-        y_labels = [f'{date.year}-W{date.isocalendar().week}' for date in timestamps]
-        y_axis_label = 'Weeks'
-    
+        y_axis_label = "Dates"
+    elif accumulate_by == "month":
+        y_labels = [f"{date.year}-{date.month}" for date in timestamps]
+        y_axis_label = "Months"
+    elif accumulate_by == "week":
+        y_labels = [
+            f"{date.year}-W{date.isocalendar().week}" for date in timestamps
+        ]
+        y_axis_label = "Weeks"
+
     # Hour labels (0-23)
     x_labels = list(range(24))
-    
+
     # Get unique labels (preserving order)
     unique_labels = []
     seen = set()
@@ -299,51 +323,55 @@ def plot_classification_heatmap(
             unique_labels.append(label)
             seen.add(label)
     y_indices = list(range(len(unique_labels)))
-    if len(y_indices) > len(y_indices) / int(kwargs.get('heatmap_fig_height') / 100):
-        nr_y_ticks = int(kwargs.get('heatmap_fig_height') / 100) 
-    
+    if len(y_indices) > len(y_indices) / int(
+        kwargs.get("heatmap_fig_height") / 100
+    ):
+        nr_y_ticks = int(kwargs.get("heatmap_fig_height") / 100)
+
     clfier_type = (
-        f'{predictions_loader.current_clfier_type} probing' 
-        if not predictions_loader.current_clfier_type == 'Integrated' 
-        else 'integrated classifier'
-        )
+        f"{predictions_loader.current_clfier_type} probing"
+        if not predictions_loader.current_clfier_type == "Integrated"
+        else "integrated classifier"
+    )
     # Create heatmap
     fig = px.imshow(
         plot_data,
-        labels=dict(x="Hours", y=y_axis_label, color="Binary presence per hour"),
+        labels=dict(
+            x="Hours", y=y_axis_label, color="Binary presence per hour"
+        ),
         x=x_labels,
         # y=np.unique(y_labels),
         y=y_indices,  # ✅ Use integer indices instead of labels
-        color_continuous_scale='Viridis',
+        color_continuous_scale="Viridis",
         zmin=0,  # Values below this will be white (nan handling)
         aspect="auto",
         title=(
-            f'Presence heatmap using {model.upper()} with '
-            f'{clfier_type} <br>'
-            f'for {species} '
-            f'with threshold of {PredictionsLoader.verify_threshold(threshold)}.'
-            )
+            f"Presence heatmap using {model.upper()} with "
+            f"{clfier_type} <br>"
+            f"for {species} "
+            f"with threshold of {PredictionsLoader.verify_threshold(threshold)}."
+        ),
     )
-    
+
     # Customize layout
     fig.update_layout(
         # autosize=True,
         # width=600,
-        height=kwargs.get('heatmap_fig_height'),
-        template='plotly_white',
+        height=kwargs.get("heatmap_fig_height"),
+        template="plotly_white",
         xaxis=dict(
-            tickmode='array',
+            tickmode="array",
             tickvals=[0, 6, 12, 18, 23],
-            ticktext=['0', '6', '12', '18', '23']
+            ticktext=["0", "6", "12", "18", "23"],
         ),
         # yaxis=dict(
         #     autorange='reversed'  # Optional: match seaborn orientation
         # ),
         yaxis=dict(
-            autorange='reversed',  # Match seaborn orientation
-            tickmode='array',
+            autorange="reversed",  # Match seaborn orientation
+            tickmode="array",
             tickvals=y_indices[::nr_y_ticks],
-            ticktext=unique_labels[::nr_y_ticks]
+            ticktext=unique_labels[::nr_y_ticks],
         ),
         coloraxis_colorbar=dict(
             title="",
@@ -351,33 +379,42 @@ def plot_classification_heatmap(
         annotations=[
             dict(
                 text="Binary presence per hour",
-                textangle=-90,     # This is the magic 90-degree rotation
-                xref="paper",      # Position relative to the whole figure
+                textangle=-90,  # This is the magic 90-degree rotation
+                xref="paper",  # Position relative to the whole figure
                 yref="paper",
-                x=1.2,            # Adjust this to move it left/right of the colorbar
-                y=0.5,             # Center it vertically
+                x=1.2,  # Adjust this to move it left/right of the colorbar
+                y=0.5,  # Center it vertically
                 showarrow=False,
-                font=dict(size=14)
+                font=dict(size=14),
             )
         ],
-        margin=dict(r=100)
+        margin=dict(r=100),
     )
-    
+
     # Make NaN values appear white
     fig.update_traces(
-        hovertemplate='Hour: %{x}<br>' + y_axis_label + ': %{y}<br>Presence: %{z}<extra></extra>',
-        customdata=np.array(unique_labels)[:, None]  # Add date labels to hover
+        hovertemplate="Hour: %{x}<br>"
+        + y_axis_label
+        + ": %{y}<br>Presence: %{z}<extra></extra>",
+        customdata=np.array(unique_labels)[
+            :, None
+        ],  # Add date labels to hover
     )
-    
+
     return fig
 
 
 class PredictionsLoader:
     def __init__(
-        self, vis_loader, path_func, models, 
-        panel_selection, progress_bar, loading_pane, 
-        thresh=0.5
-        ):
+        self,
+        vis_loader,
+        path_func,
+        models,
+        panel_selection,
+        progress_bar,
+        loading_pane,
+        thresh=0.5,
+    ):
         self.vis_loader = vis_loader
         self.path_func = path_func
         self.models = models
@@ -385,58 +422,59 @@ class PredictionsLoader:
         self.panel_selection = panel_selection
         self.progress_bar = progress_bar
         self.loading_pane = loading_pane
-    
+
     def get_data(
-        self, model, threshold, 
-        clfier_type=None, probe_path='', **kwargs
-        ):
+        self, model, threshold, clfier_type=None, probe_path="", **kwargs
+    ):
         threshold = self.verify_threshold(threshold)
-        if hasattr(self, 'binary_presence'):
-            if all([
-                self.current_model == model,
-                self.current_threshold == threshold,
-                not self.class_dict is None,
-                (
-                    self.current_clfier_type == clfier_type
-                    or clfier_type is None
-                    )
-                ]):
+        if hasattr(self, "binary_presence"):
+            if all(
+                [
+                    self.current_model == model,
+                    self.current_threshold == threshold,
+                    not self.class_dict is None,
+                    (
+                        self.current_clfier_type == clfier_type
+                        or clfier_type is None
+                    ),
+                ]
+            ):
                 return
-            
+
         self.current_model = model
         self.current_threshold = threshold
         self.current_clfier_type = clfier_type
-            
-        
+
         if not (
-            self.path_func(self.models[0]).probe_path / 'linear_probe.pt'
-            ).exists():
-            clfier_type = 'Integrated'
-        
-        if clfier_type == 'Linear':
-            self.loading_pane.value = 'Loading embeddings for classification'
+            self.path_func(self.models[0]).probe_path / "linear_probe.pt"
+        ).exists():
+            clfier_type = "Integrated"
+
+        if clfier_type == "Linear":
+            self.loading_pane.value = "Loading embeddings for classification"
             linear_probe, self.class_dict = prepare_probe_inference(
                 model, probe_path
             )
-            self.loading_pane.value = 'Running linear probe'
+            self.loading_pane.value = "Running linear probe"
             threshold = self.verify_threshold(threshold)
-            
+
             self.binary_presence = run_probe_inference(
-                model, linear_probe, threshold, 
-                return_binary_presence=True, 
-                callbacks={'progress_bar': self.progress_bar}
+                model,
+                linear_probe,
+                threshold,
+                return_binary_presence=True,
+                callbacks={"progress_bar": self.progress_bar},
             )
-            
-        elif clfier_type == 'Integrated':
-            self.loading_pane.name = 'Preparing heatmap'
-            self.loading_pane.value = 'Loading precomputed embeddings'
+
+        elif clfier_type == "Integrated":
+            self.loading_pane.name = "Preparing heatmap"
+            self.loading_pane.value = "Loading precomputed embeddings"
             self.binary_presence, self.class_dict = self.load_classification(
                 model, threshold
-                )
-        
-        
+            )
+
         self.embed_dict = self.vis_loader.embeds[model]
-        
+
         if self.binary_presence is None:
             warning_string = (
                 "It seems like the classifier hasn't been run yet, or <br>"
@@ -446,196 +484,212 @@ class PredictionsLoader:
             )
             self.loading_pane.value = warning_string
             raise FileNotFoundError(warning_string)
-        
-        if not len(self.embed_dict['x']) == len(self.binary_presence):
+
+        if not len(self.embed_dict["x"]) == len(self.binary_presence):
             logger.warning(
                 "There is a mismatch between the number of embeddings "
                 "and the number of predictions. Going to zero pad the "
                 "rest, but this could misalign things. "
             )
             self.binary_presence = np.pad(
-                self.binary_presence, 
+                self.binary_presence,
                 (
-                    (0, len(self.embed_dict['x'])-len(self.binary_presence)), 
-                    (0, 0)
-                ), 
-                'constant')
-            
-            
-        
+                    (0, len(self.embed_dict["x"]) - len(self.binary_presence)),
+                    (0, 0),
+                ),
+                "constant",
+            )
+
         self.get_timestamps_per_embedding(model)
-        
-        self.class_dict['overall'] = len(self.class_dict)
+
+        self.class_dict["overall"] = len(self.class_dict)
         self.binary_presence = np.concatenate(
-            [self.binary_presence.T, 
-             [np.sum(self.binary_presence, axis=1).astype(np.int8)]]
-            ).T
-        
-        
+            [
+                self.binary_presence.T,
+                [np.sum(self.binary_presence, axis=1).astype(np.int8)],
+            ]
+        ).T
+
         self.class_dict = self.reorder_by_most_occurrance(
             self.binary_presence, self.class_dict
-            )
-        
-        self.panel_selection.options = list(self.class_dict.keys())        
-    
-    
+        )
 
-            
+        self.panel_selection.options = list(self.class_dict.keys())
+
     @staticmethod
     def verify_threshold(threshold):
-        if threshold == '':
+        if threshold == "":
             threshold = 0.5
         else:
             threshold = float(threshold)
         return threshold
 
-    
     @staticmethod
     def reorder_by_most_occurrance(probs, label2index):
-        sums = [sum(probs[:,a]) for a in range(probs.shape[1])]
-        
-        sorted_l2i = dict(sorted(
-            label2index.items(), 
-            key=lambda x: sums[x[1]],
-            reverse=True
-            ))
+        sums = [sum(probs[:, a]) for a in range(probs.shape[1])]
+
+        sorted_l2i = dict(
+            sorted(label2index.items(), key=lambda x: sums[x[1]], reverse=True)
+        )
         return sorted_l2i
-        
+
     def get_classes(self, path):
-        if path == '':
+        if path == "":
             path = (
-                self.path_func(self.models[0]).probe_path / 'linear_probe.pt'
-                )
+                self.path_func(self.models[0]).probe_path / "linear_probe.pt"
+            )
         if path.exists():
-            with open(Path(path).parent / 'label2index.json', 'r') as f:
+            with open(Path(path).parent / "label2index.json", "r") as f:
                 classes = json.load(f)
             return list(classes.keys())
         else:
             return []
-            
+
     def load_classification(self, model, threshold):
-        integrated_clfier_path = (
-            self.path_func(model)
-            .preds_path.joinpath('original_classifier_outputs')
+        integrated_clfier_path = self.path_func(model).preds_path.joinpath(
+            "original_classifier_outputs"
         )
         if not integrated_clfier_path.exists():
             return None, None
         else:
-            files = list(integrated_clfier_path.rglob('*json'))
-            
-        if not (integrated_clfier_path / 'as_dataframe.parquet').exists():
+            files = list(integrated_clfier_path.rglob("*json"))
+
+        if not (integrated_clfier_path / "as_dataframe.parquet").exists():
             cl_dict = {}
             total_length = 0
             keys2idx = {}
             for idx, file in enumerate(files):
-                with open(file, 'r') as f:
+                with open(file, "r") as f:
                     d = json.load(f)
-                    current_time_bins = d['head']['Time bins in this file']
-                    d.pop('head')
-                    
+                    current_time_bins = d["head"]["Time bins in this file"]
+                    d.pop("head")
+
                     for k, v in d.items():
-                        cl_dict[k] = np.zeros([total_length + current_time_bins])    
+                        cl_dict[k] = np.zeros(
+                            [total_length + current_time_bins]
+                        )
                         if not keys2idx:
                             keys2idx[k] = 0
                         if not k in keys2idx:
                             keys2idx[k] = max(keys2idx.values()) + 1
-                            
-                        cl_dict[k][np.array(v['time_bins_exceeding_threshold']) + total_length] = v['classifier_predictions']
+
+                        cl_dict[k][
+                            np.array(v["time_bins_exceeding_threshold"])
+                            + total_length
+                        ] = v["classifier_predictions"]
                         # file_specific_classification[v['time_bins_exceeding_threshold'], k2idx[k]] = v['classifier_predictions']
                     for species in [
-                        k for k, v in cl_dict.items() 
+                        k
+                        for k, v in cl_dict.items()
                         if len(v) < total_length + current_time_bins
-                        ]:
-                        cl_dict[species] = np.hstack([cl_dict[species], np.zeros([current_time_bins])])
-                    
+                    ]:
+                        cl_dict[species] = np.hstack(
+                            [cl_dict[species], np.zeros([current_time_bins])]
+                        )
+
                     total_length += current_time_bins
-                self.progress_bar.value = int((idx+1)/len(files)*100)
+                self.progress_bar.value = int((idx + 1) / len(files) * 100)
             import pandas as pd
-            
+
             probs_array = np.array(list(cl_dict.values())).T
             df = pd.DataFrame(probs_array)
             df.columns = keys2idx.keys()
-            df.to_parquet(integrated_clfier_path / 'as_dataframe.parquet')
+            df.to_parquet(integrated_clfier_path / "as_dataframe.parquet")
         else:
             import pandas as pd
-            df = pd.read_parquet(integrated_clfier_path / 'as_dataframe.parquet')
+
+            df = pd.read_parquet(
+                integrated_clfier_path / "as_dataframe.parquet"
+            )
             keys = df.columns
             keys2idx = {k: i for i, k in enumerate(keys)}
         # binary_classification = probs_array[probs_array > thresh]
         binary_classification = np.zeros(df.shape, dtype=np.int8)
         binary_classification[df > threshold] = 1
-        
+
         return binary_classification, keys2idx
-    
-    def accumulate_data(
-        self, species, accumulate_by='day'
-        ):
+
+    def accumulate_data(self, species, accumulate_by="day"):
         if not species:
-            species = 'overall'
+            species = "overall"
         self.panel_selection.value = species
         species_idx = self.class_dict[species]
         species_presence = self.binary_presence[:, species_idx]
-        
+
         dates = np.array([ts.date() for ts in self.timestamps])
         hours = np.array([ts.hour for ts in self.timestamps])
-        if accumulate_by == 'day':
+        if accumulate_by == "day":
             date_tuple = [(d.year, d.month, d.day) for d in dates]
             accumulated = self.transform_presence_into_hour_heatmap(
                 species_presence, hours, accumulator=date_tuple
-                )
-        elif accumulate_by == 'week':
-            week_tuple = [(date.year, date.isocalendar().week) for date in dates]
+            )
+        elif accumulate_by == "week":
+            week_tuple = [
+                (date.year, date.isocalendar().week) for date in dates
+            ]
             accumulated = self.transform_presence_into_hour_heatmap(
                 species_presence, hours, accumulator=week_tuple
-                )
-        elif accumulate_by == 'month':
+            )
+        elif accumulate_by == "month":
             month_tuple = [(date.year, date.month) for date in dates]
             accumulated = self.transform_presence_into_hour_heatmap(
                 species_presence, hours, accumulator=month_tuple
-                )
+            )
         return accumulated
-            
+
     @staticmethod
     def transform_presence_into_hour_heatmap(
         species_presence, hours, accumulator
-        ):
-        accumulated = np.ones(
-            [24, len(np.unique(accumulator, axis=0))]
-            , dtype=np.int8
-            ) *-1
+    ):
+        accumulated = (
+            np.ones([24, len(np.unique(accumulator, axis=0))], dtype=np.int8)
+            * -1
+        )
         for acc_idx, item in enumerate(np.unique(accumulator, axis=0)):
-            month_presence_idx = np.where(np.all(accumulator == item, axis=1))[0]
+            month_presence_idx = np.where(np.all(accumulator == item, axis=1))[
+                0
+            ]
             for hour in range(24):
                 hourly_presence_idx = np.where(
-                    hours[month_presence_idx]==hour
-                    )[0]
+                    hours[month_presence_idx] == hour
+                )[0]
                 if len(hourly_presence_idx) > 0:
                     try:
                         accumulated[hour, acc_idx] = sum(
-                            species_presence[month_presence_idx[hourly_presence_idx]]
-                            )
+                            species_presence[
+                                month_presence_idx[hourly_presence_idx]
+                            ]
+                        )
                     except Exception as e:
                         raise Exception
         return accumulated
-        
+
     def get_timestamps_per_embedding(self, model):
-        from bacpipe.embedding_evaluation.label_embeddings import get_dt_filename
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            get_dt_filename,
+        )
         import datetime as dt
-        
+
         # embed_dict = self.vis_loader.embeds[model]
-        ts_within_audio_files = [dt.timedelta(seconds=ts) for ts in self.embed_dict['timestamp']]
-        unique_audio_files = list(set(self.embed_dict['metadata']['audio_files']))
+        ts_within_audio_files = [
+            dt.timedelta(seconds=ts) for ts in self.embed_dict["timestamp"]
+        ]
+        unique_audio_files = list(
+            set(self.embed_dict["metadata"]["audio_files"])
+        )
         unique_audio_files.sort()
         ts_files = [get_dt_filename(f) for f in unique_audio_files]
         ts_files_same_length_as_embeds = []
         [
-            ts_files_same_length_as_embeds.extend([ts_file] * embed_len) 
-            for ts_file, embed_len in zip(ts_files, self.embed_dict['metadata']['nr_embeds_per_file'])
+            ts_files_same_length_as_embeds.extend([ts_file] * embed_len)
+            for ts_file, embed_len in zip(
+                ts_files, self.embed_dict["metadata"]["nr_embeds_per_file"]
+            )
         ]
-        
+
         self.timestamps = [
-            ts_file+ts_within_audio_file
-            for ts_file, ts_within_audio_file in 
-            zip(ts_files_same_length_as_embeds, ts_within_audio_files)
-            ]
-        
+            ts_file + ts_within_audio_file
+            for ts_file, ts_within_audio_file in zip(
+                ts_files_same_length_as_embeds, ts_within_audio_files
+            )
+        ]

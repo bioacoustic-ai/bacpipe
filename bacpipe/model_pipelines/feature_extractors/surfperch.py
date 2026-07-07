@@ -8,8 +8,8 @@ class Model(Model):
     def __init__(self, **kwargs):
         self.class_label_key = "reef_label"
         super().__init__(
-            sr=SAMPLE_RATE, 
-            segment_length=LENGTH_IN_SAMPLES, 
+            sr=SAMPLE_RATE,
+            segment_length=LENGTH_IN_SAMPLES,
             model_choice="surfperch",
-            **kwargs
+            **kwargs,
         )
