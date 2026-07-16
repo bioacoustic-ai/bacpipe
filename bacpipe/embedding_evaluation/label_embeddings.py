@@ -662,6 +662,9 @@ def create_default_labels(
     return def_labels
 
 def fetch_annotation_file(audio_dir, annotations_filename, paths):
+    if annotations_filename is None:
+        annotations_filename = bacpipe.settings.annotations_filename
+
     try:
         try:
             return pd.read_csv(
@@ -1084,12 +1087,17 @@ def ground_truth_by_model(
         if path is not None and len(list(path.iterdir())) > 0:
             files = list(path.rglob("*.npy"))
             files.sort()
-
-            metadata = load_metadata_file(path)
-            segment_s = (
-                metadata["segment_length (samples)"]
-                / metadata["sample_rate (Hz)"]
-            )
+            
+            try:
+                metadata = load_metadata_file(path)
+                segment_s = (
+                    metadata["segment_length (samples)"]
+                    / metadata["sample_rate (Hz)"]
+                )
+            except:
+                files, segment_s, metadata = get_files_if_no_embeds(
+                    audio_dir, model, label_df, only_embed_annotations
+                )    
         else:
             files, segment_s, metadata = get_files_if_no_embeds(
                 audio_dir, model, label_df, only_embed_annotations
