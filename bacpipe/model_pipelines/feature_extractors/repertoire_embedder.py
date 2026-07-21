@@ -20,8 +20,8 @@ class Model(ModelBaseClass):
         decoder = sparrow_decoder(bottleneck, (nMel//32, 4))
         self.model = torch.nn.Sequential(encoder, decoder)
         state_dict = torch.load(
-            self.model_base_path / "repertoire_embedder/generic_embedder.weights",
-            map_location='cpu'
+            self.model_base_path / "repertoire_embedder" / "generic_embedder.weights",
+            map_location=self.device
         )
         self.model.load_state_dict(state_dict)
 
