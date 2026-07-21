@@ -192,7 +192,6 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# 1. The Wheel (What users actually install via pip)
 [tool.hatch.build.targets.wheel]
 include = [
     "/bacpipe",
@@ -209,7 +208,7 @@ exclude = [
     "bacpipe/examples"
 ]
 
-# 2. The Source Distribution (The raw code package uploaded to PyPI)
+
 [tool.hatch.build.targets.sdist]
 include = [
     "/bacpipe",

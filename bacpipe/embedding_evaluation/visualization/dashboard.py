@@ -4,6 +4,7 @@ import sys
 import seaborn as sns
 import numpy as np
 import logging
+from pathlib import Path
 
 logger = logging.getLogger("bacpipe")
 
@@ -739,8 +740,10 @@ class DashBoard(DashBoardHelper):
         )
 
     def add_styling(self, *pages):
-        with pkg_resources.path(bacpipe.imgs, "bacpipe_unlabelled.png") as p:
-            logo_path = str(p)
+        
+        logo = pkg_resources.files("bacpipe") / "imgs" / "bacpipe_unlabelled.png"
+            
+        logo_path = Path(str(logo))
 
         for page in pages:
             sidebar = page.objects[0]
@@ -810,8 +813,9 @@ def visualize_using_dashboard(
         )
         raise e
 
-    with pkg_resources.path(bacpipe.imgs, "bacpipe_favicon_white.png") as p:
-        favicon_path = str(p)
+    favicon_logo = pkg_resources.files("bacpipe") / "imgs" / "bacpipe_favicon_white.png"
+    
+    favicon_path = Path(str(favicon_logo))
 
     template = pn.template.BootstrapTemplate(
         site="bacpipe dashboard",

@@ -18,11 +18,12 @@ logger.setLevel(logging.INFO)
 # --------------------------------------------------------------------
 # Load config & settings
 # --------------------------------------------------------------------
-with pkg_resources.open_text(__package__, "config.yaml") as f:
-    _config_dict = yaml.load(f, Loader=yaml.CLoader)
-
-with pkg_resources.open_text(__package__, "settings.yaml") as f:
-    _settings_dict = yaml.load(f, Loader=yaml.CLoader)
+_config_dict = yaml.safe_load((
+    pkg_resources.files("bacpipe") / "config.yaml"
+    ).read_text(encoding="utf-8"))
+_settings_dict = yaml.safe_load((
+    pkg_resources.files("bacpipe") / "settings.yaml"
+    ).read_text(encoding="utf-8"))
 
 # Expose as mutable namespaces
 config = SimpleNamespace(**_config_dict)

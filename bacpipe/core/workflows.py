@@ -73,11 +73,13 @@ def play(bool_save_logs=False, **kwargs):
     if kwargs.get("audio_dir") == "bacpipe/tests/test_data" or kwargs.get(
         "testing"
     ):
-        with pkg_resources.path(
-            __package__.split(".")[0] + ".tests.test_data", ""
-        ) as audio_dir:
-            audio_dir = Path(audio_dir)
+        root_pkg = __package__.split(".")[0]
 
+        resource_path = pkg_resources.files(root_pkg) / "tests" / "test_data"
+
+        with pkg_resources.as_file(resource_path) as audio_dir:
+            audio_dir = Path(audio_dir)
+      
         if not audio_dir.exists():
             error = (
                 f"\nAudio directory {kwargs.get('audio_dir')} does not exist. Please check the path. "
@@ -814,3 +816,6 @@ def generate_embeddings(
         import sys
 
         sys.exit()
+        
+    except Exception as e:
+        logger.exception(e)

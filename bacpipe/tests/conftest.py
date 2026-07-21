@@ -141,11 +141,12 @@ def check_if_already_dim_reduced(request):
 
 @pytest.fixture(scope="function")
 def kwargs(request):
-    # 1. Load your YAMLs once
-    with pkg_resources.open_text(bacpipe, "settings.yaml") as f:
-        settings_dict = yaml.load(f, Loader=yaml.CLoader)
-    with pkg_resources.open_text(bacpipe, "config.yaml") as f:
-        config_dict = yaml.load(f, Loader=yaml.CLoader)
+    config_dict = yaml.safe_load((
+        pkg_resources.files("bacpipe") / "config.yaml"
+        ).read_text(encoding="utf-8"))
+    settings_dict = yaml.safe_load((
+        pkg_resources.files("bacpipe") / "settings.yaml"
+        ).read_text(encoding="utf-8"))
 
     settings_dict["testing"] = True
 
@@ -173,8 +174,8 @@ def kwargs(request):
     for k, v in settings_dict.items():
         if hasattr(bacpipe.settings, k):
             setattr(bacpipe.settings, k, v)
-
-    with pkg_resources.path(bacpipe.tests, "test_data") as audio_dir:
-        config_dict["audio_dir"] = Path(audio_dir)
+        
+    audio_dir_resource = pkg_resources.files("bacpipe") / "tests" / "test_data"
+    config_dict["audio_dir"] = Path(str(audio_dir_resource))
 
     return {**config_dict, **settings_dict}

@@ -112,10 +112,14 @@ class ModelBaseClass:
         logger.info(f"Using {device=}")
 
         self.model_base_path = Path(model_base_path)
-        with pkg_resources.path(
-            bacpipe.model_pipelines, "model_specific_utils"
-        ) as utils_path:
-            self.model_utils_base_path = Path(utils_path)
+            
+        utils_path = (
+            pkg_resources.files("bacpipe") 
+            / "model_pipelines" 
+            / "model_specific_utils"
+            )
+        
+        self.model_utils_base_path = Path(str(utils_path))
 
         self.global_batch_size = global_batch_size
 

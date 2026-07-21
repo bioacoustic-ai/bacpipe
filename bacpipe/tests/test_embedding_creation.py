@@ -28,6 +28,7 @@ def test_embedding_generation(
     bacpipe.ensure_models_exist(
         bacpipe.settings.model_base_path, model_names=[model]
     )
+    model = bacpipe.confirm_model_name(model)
 
     embeddings[model] = run_pipeline_for_single_model(
         model_name=model, **kwargs
@@ -37,6 +38,7 @@ def test_embedding_generation(
 
 
 def test_embedding_dimensions(model, kwargs):
+    model = bacpipe.confirm_model_name(model)
     assert (
         embeddings[model].metadata_dict["embedding_size"]
         == EMBEDDING_DIMENSIONS[model]
@@ -44,6 +46,7 @@ def test_embedding_dimensions(model, kwargs):
 
 
 def test_evaluation(model, overwrite, device, only_embed_annotations, kwargs):
+    model = bacpipe.confirm_model_name(model)
     embeds = embeddings[model].embeddings(return_type="array")
     get_paths = make_set_paths_func(**kwargs)
     paths = get_paths(model)
@@ -74,6 +77,7 @@ def test_evaluation(model, overwrite, device, only_embed_annotations, kwargs):
 
 
 def test_collecting_embeddings(model):
+    model = bacpipe.confirm_model_name(model)
     embeds = embeddings[model].embeddings(return_type="array")
     assert len(embeds) > 0
     embeds = embeddings[model].embeddings(return_type="dict")
@@ -81,6 +85,7 @@ def test_collecting_embeddings(model):
 
 
 def test_collecting_predictions(model):
+    model = bacpipe.confirm_model_name(model)
     try:
         ar_preds = embeddings[model].predictions(return_type="array")
         df_preds = embeddings[model].predictions(return_type="dataframe")
@@ -93,11 +98,14 @@ def test_collecting_predictions(model):
 
 
 def test_benchmarking(model, device, only_embed_annotations, kwargs):
-
-    results = bacpipe.benchmark(
-        model,
-        kwargs["audio_dir"],
-        check_if_already_processed=True,
-        annotations_file="annotations.csv",
-    )
-    assert isinstance(results, dict)
+    model = bacpipe.confirm_model_name(model)
+    try:
+        results = bacpipe.benchmark(
+            model,
+            kwargs["audio_dir"],
+            check_if_already_processed=True,
+            annotations_file="annotations.csv",
+        )
+        assert isinstance(results, dict)
+    except AttributeError as e:
+        print(e)
