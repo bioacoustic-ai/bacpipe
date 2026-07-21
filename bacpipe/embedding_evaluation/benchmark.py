@@ -275,6 +275,7 @@ def benchmark(
         of the species that weren't found in the classifier
         class list
     """
+    model = bacpipe.confirm_model_name(model)
     logger.info("Fetching ground truth and mapping it to model timestamps.\n")
     gt = bacpipe.ground_truth_by_model(
         model,

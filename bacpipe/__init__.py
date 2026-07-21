@@ -45,6 +45,7 @@ from bacpipe.core.workflows import (
     run_pipeline_for_single_model,
     ensure_models_exist,
     get_model_names,
+    confirm_model_name,
     evaluation_with_settings_already_exists,
     run_pipeline_for_models,
     model_specific_evaluation,
@@ -115,6 +116,7 @@ __all__ = [
     model_specific_evaluation,
     cross_model_evaluation,
     ## experiment managing functions
+    confirm_model_name,
     ensure_models_exist,
     evaluation_with_settings_already_exists,
     get_model_names,

@@ -132,6 +132,9 @@ def ensure_models_exist(
     """
     if isinstance(model_names, str):
         model_names = [model_names]
+        
+    # always use lower case model name
+    model_names = [confirm_model_name(model) for model in model_names]
 
     model_base_path = Path(model_base_path)
     model_base_path.parent.mkdir(exist_ok=True, parents=True)
@@ -181,6 +184,35 @@ def ensure_models_exist(
     [model_names.remove(l) for l in remove_from_list]
     return model_base_path.parent / "model_checkpoints"
 
+def confirm_model_name(model_name):
+    """
+    Confirm that the model name is supported by bacpipe.
+
+    Parameters
+    ----------
+    model_name : str
+        name of model to use for processing
+
+    Raises
+    ------
+    ValueError
+        If model name is not of type str.
+    NameError
+        If model name not supported by bacpipe raise NameError.
+    """
+    if not isinstance(model_name, str):
+        raise ValueError(
+            f"You provided a model_name of type {type(model_name)}, "
+            "please provide a string of a single model."
+        )
+    model_name = model_name.lower()
+    from bacpipe import supported_models
+    if not model_name in supported_models:
+        raise NameError(
+            f"The provided {model_name=} is not included in the {supported_models=}."
+        )
+    else:
+        return model_name
 
 def get_model_names(
     models,
@@ -242,6 +274,7 @@ def get_model_names(
         else:
             return np.unique(model_names).tolist()
     else:
+        models = [confirm_model_name(model) for model in models]
         return models
 
 
@@ -358,6 +391,10 @@ def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
     loader_dict : dict
         dictionary containing the loader objects for each model
     """
+    if isinstance(models, list):
+        models = [confirm_model_name(model) for model in models]
+    else:
+        models = [confirm_model_name(model) for model in [models]]
     loader_dict = {}
     remove_models_from_list = []
     if "CustomModels" in kwargs:
@@ -539,6 +576,7 @@ def cross_model_evaluation(
     models : list
         embedding models
     """
+    models = [confirm_model_name(model) for model in models]
     if len(models) > 1:
         plot_path = get_paths(models[0]).plot_path.parent.parent.joinpath(
             "overview"
@@ -604,6 +642,8 @@ def run_pipeline_for_single_model(
     bacpipe.Loader
         object to processed embeddings and classifier predictions
     """
+    model_name = confirm_model_name(model_name)
+        
     kwargs = replace_default_kwargs_with_user_kwargs(
         remove_keys=["audio_dir", "dim_reduction_model", "testing"], **kwargs
     )
@@ -666,7 +706,12 @@ def run_pipeline_for_single_model(
     return loader_embeddings
 
 
-def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
+def generate_embeddings(
+    model_name,
+    audio_dir,
+    avoid_pipelined_gpu_inference=False, 
+    **kwargs
+    ):
     """
     Run the embedding generation pipeline including classification
     using the pretrained classifier (if included).
@@ -678,6 +723,10 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
 
     Parameters
     ----------
+    model_name : str
+        name of model to use for processing
+    audio_dir : string or pathlib.Path
+        path to audio data
     avoid_pipelined_gpu_inference : bool, optional
         set to True to avoid multiprocessing, by default False
 
@@ -685,30 +734,27 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
     -------
     bacpipe.Loader
         loader object to access embeddings and classifier predictions
-
-    Raises
-    ------
-    ValueError
-        if not model name is provided
     """
+    model_name = confirm_model_name(model_name)
     if "dim_reduction_model" in kwargs:
         logger.info(
             f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"
         )
-    elif "model_name" in kwargs:
+    elif not model_name is None:
         logger.info(
-            f"\n\n\n###### Generating embeddings using {kwargs['model_name'].upper()} ######\n"
+            f"\n\n\n###### Generating embeddings using {model_name.upper()} ######\n"
         )
-    else:
-        error = "\nmodel_name not provided in kwargs."
-        logger.exception(error)
-        raise ValueError(error)
     try:
         start = time.time()
-        ld = Loader(use_folder_structure=True, **kwargs)
+        ld = Loader(
+            use_folder_structure=True, 
+            audio_dir=audio_dir,
+            model_name=model_name, 
+            **kwargs
+            )
         logger.debug(f"Loading the data took {time.time()-start:.2f}s.")
         if not ld.combination_already_exists:
-            embed = Embedder(loader=ld, **kwargs)
+            embed = Embedder(loader=ld, model_name=model_name, **kwargs)
 
             if ld.dim_reduction_model:
                 # (1) Dimensionality reduction stage
@@ -737,14 +783,14 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
             # clear GPU
             del embed
 
-            if kwargs["model_name"] in TF_MODELS:
+            if model_name in TF_MODELS:
                 import tensorflow as tf
 
                 tf.keras.backend.clear_session()
 
         elif ld.classifier_should_be_run(**kwargs):
             if hasattr(kwargs, "paths"):
-                embed = Embedder(loader=ld, **kwargs)
+                embed = Embedder(loader=ld, model_name=model_name, **kwargs)
                 if hasattr(embed.model, "classifier_predictions"):
                     embed.classifier.run_default_classifier(ld)
         return ld

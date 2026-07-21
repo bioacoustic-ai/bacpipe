@@ -792,6 +792,7 @@ def visualize_using_dashboard(
     kwargs : dict
         Dictionary with parameters for dashboard creation
     """
+    models = [bacpipe.confirm_model_name(model) for model in models]
     from bacpipe.embedding_evaluation.visualization.dashboard import DashBoard
     import panel as pn
 
