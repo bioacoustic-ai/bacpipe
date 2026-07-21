@@ -286,9 +286,6 @@ def clustering_pipeline(
                     columns=non_species_labels
                 )
                 ground_truth_1d = gt_without_metadata.idxmax(axis=1).values
-                idx2label = {
-                    idx: l for idx, l in enumerate(set(ground_truth_1d))
-                }
 
         else:
             ground_truth_1d = []

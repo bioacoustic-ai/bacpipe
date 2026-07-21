@@ -44,7 +44,7 @@ class DefaultLabels:
         self.paths = paths
         if kwargs.get("only_embed_annotations"):
             self.only_embed_annotations = True
-            self.df, _ = load_labels_and_build_dict(
+            self.df = load_labels_and_build_dict(
                 paths,
                 kwargs.get("annotations_filename"),
                 self.paths.audio_dir,

@@ -318,6 +318,13 @@ def benchmark(
         label2idx, 
         gt_without_metadata
     )
+    if len(label_tuple) == 1:
+        raise AttributeError(
+            "No ground truth classes have been found in the predictions."
+            "This could be because the model didn't find any of the annotated "
+            "species. But it could also be because the model was not trained "
+            "to classify the species annotated in the ground truth."
+        )
     gt_aligned, shared_labels, shared_indices, not_found = label_tuple
 
     # 3. Extract and filter matrices in one go

@@ -1032,7 +1032,7 @@ class Loader:
 
             assign_global_get_paths_function(self.audio_dir)
             paths = get_paths(self.model_name)
-            df, _ = load_labels_and_build_dict(
+            df = load_labels_and_build_dict(
                 paths,
                 self.annotations_filename,
                 self.audio_dir,

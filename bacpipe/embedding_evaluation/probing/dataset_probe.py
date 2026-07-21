@@ -167,7 +167,7 @@ def generate_annotations_for_probing_task(
         for v in species:
             num_species_occurances = gt_4_probing[v].sum()
             ar = gt_4_probing[gt_4_probing[v] == 1].index.values
-            rng.random.shuffle(ar)
+            rng.shuffle(ar)
             tr_ar = ar[: int(num_species_occurances * train_ratio)]
             te_ar = ar[
                 int(num_species_occurances * train_ratio) : int(

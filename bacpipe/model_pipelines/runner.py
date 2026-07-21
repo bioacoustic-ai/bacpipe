@@ -640,7 +640,7 @@ class Classifier:
 
             assign_global_get_paths_function(audio_dir)
             paths = get_paths(self.model_name)
-            self.df, _ = load_labels_and_build_dict(
+            self.df = load_labels_and_build_dict(
                 paths,
                 kwargs.get("annotations_filename"),
                 audio_dir,
