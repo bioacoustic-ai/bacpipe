@@ -40,4 +40,13 @@ jobs:
         run: |
           python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py \
             --models=avesecho_passt \
+            --only-embed-annotations=True \
+            --device=cpu
+            
+      # 6. Run custom embedding creation test suite
+      - name: Run Embedding Creation Tests
+        run: |
+          python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py \
+            --models=avesecho_passt \
+            --only-embed-annotations=False \
             --device=cpu
