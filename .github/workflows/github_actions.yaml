@@ -15,11 +15,11 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-      # 1. Clone repository code (v6 targets Node 24 natively)
+      # 1. Clone repository code
       - name: Check out repository code
         uses: actions/checkout@v6
 
-      # 2. Set up Python 3.11 (v6 targets Node 24 natively)
+      # 2. Set up Python 3.11
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -35,18 +35,18 @@ jobs:
           pip install pytest
           pip install --no-deps -e .
 
-      # 5. Run custom embedding creation test suite
-      - name: Run Embedding Creation Tests
-        run: |
-          python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py \
-            --models=avesecho_passt \
-            --only_embed_annotations=False \
-            --device=cpu
-            
-      # 6. Run custom embedding creation test suite
-      - name: Run Embedding Creation Tests
-        run: |
-          python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py \
-            --models=avesecho_passt \
-            --only_embed_annotations=True \
-            --device=cpu
+      # 5. Run embedding creation tests (only_embed_annotations=False)
+      - name: Run Embedding Creation Tests (Full)
+        run: >-
+          python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py
+          --models=avesecho_passt
+          --only_embed_annotations=False
+          --device=cpu
+
+      # 6. Run embedding creation tests (only_embed_annotations=True)
+      - name: Run Embedding Creation Tests (Annotations Only)
+        run: >-
+          python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py
+          --models=avesecho_passt
+          --only_embed_annotations=True
+          --device=cpu
