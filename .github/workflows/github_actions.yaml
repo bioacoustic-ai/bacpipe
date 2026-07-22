@@ -4,27 +4,36 @@ on: [push]
 
 jobs:
   explore:
-    runs-on: ubuntu-latest
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false  # Allows all OS runs to finish even if one fails
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
     steps:
-      # 1. ADD THIS STEP to clone your repository into the workspace
+      # 1. Clone repository code into the runner
       - name: Check out repository code
         uses: actions/checkout@v4
 
-      # 2. Set up Python (recommended before running pip)
+      # 2. Set up Python 3.11
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 3. Your custom commands will now work!
+      # 3. Verify requirements file exists
       - name: Check requirements file
         run: ls requirements-no-tf.txt
 
-      - name: Install dependencies
+      # 4. Install requirements (PIP will automatically evaluate sys_platform markers here)
+      - name: Install dependencies from requirements
         run: pip install -r requirements-no-tf.txt
 
-      - name: Install dependencies
+      # 5. Install bacpipe source code without overwriting pinned dependencies
+      - name: Install bacpipe (editable)
         run: pip install --no-deps -e .
 
+      # 6. Run the test script
       - name: Run test script
         run: python bacpipe/tests/test_minimal.py
