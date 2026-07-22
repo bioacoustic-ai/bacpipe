@@ -40,7 +40,7 @@ jobs:
         run: |
           python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py \
             --models=avesecho_passt \
-            --only-embed-annotations=True \
+            --only_embed_annotations=False \      
             --device=cpu
             
       # 6. Run custom embedding creation test suite
@@ -48,5 +48,5 @@ jobs:
         run: |
           python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py \
             --models=avesecho_passt \
-            --only-embed-annotations=False \
+            --only_embed_annotations=True \            
             --device=cpu
