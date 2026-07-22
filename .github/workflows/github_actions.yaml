@@ -23,5 +23,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-no-tf.txt
 
+      - name: Install dependencies
+        run: pip install -r --no-deps pyproject.toml
+
       - name: Run test script
         run: python bacpipe/tests/test_minimal.py
