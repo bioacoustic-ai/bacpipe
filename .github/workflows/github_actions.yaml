@@ -39,7 +39,5 @@ jobs:
       - name: Run Embedding Creation Tests
         run: |
           python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py \
-            --only_embed_annotations=True \
             --models=avesecho_passt \
-            --check_if_already_processed=True \
-            --check_if_already_dim_reduced=True
+            --device=cpu
