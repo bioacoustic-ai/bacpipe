@@ -6,34 +6,40 @@ jobs:
   explore:
     name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash  # Ensures multi-line bash commands run identically on Windows, Mac, and Linux
     strategy:
       fail-fast: false  # Allows all OS runs to finish even if one fails
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-      # 1. Clone repository code into the runner
+      # 1. Clone repository code (v6 targets Node 24 natively)
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      # 2. Set up Python 3.11
+      # 2. Set up Python 3.11 (v6 targets Node 24 natively)
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
-      # 3. Verify requirements file exists
-      - name: Check requirements file
-        run: ls requirements-no-tf.txt
-
-      # 4. Install requirements (PIP will automatically evaluate sys_platform markers here)
+      # 3. Install requirements
       - name: Install dependencies from requirements
         run: pip install -r requirements-no-tf.txt
 
-      # 5. Install bacpipe source code without overwriting pinned dependencies
-      - name: Install bacpipe (editable)
-        run: pip install --no-deps -e .
+      # 4. Install Pytest and bacpipe package
+      - name: Install pytest and bacpipe (editable)
+        run: |
+          pip install pytest
+          pip install --no-deps -e .
 
-      # 6. Run the test script
-      - name: Run test script
-        run: python bacpipe/tests/test_minimal.py
+      # 5. Run custom embedding creation test suite
+      - name: Run Embedding Creation Tests
+        run: |
+          python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py \
+            --only_embed_annotations=True \
+            --models=avesecho_passt \
+            --check_if_already_processed=True \
+            --check_if_already_dim_reduced=True
