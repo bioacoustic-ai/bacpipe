@@ -27,14 +27,14 @@ einops>=0.8.0
 safetensors==0.4.5
 
 # --- TensorFlow & JAX Ecosystem ---
-tensorflow==2.20.0; sys_platform == 'linux'
+tensorflow==2.20.0; sys_platform != 'win32'
 tensorflow==2.15.1; sys_platform == 'win32'
-tensorflow-hub==0.16.0; sys_platform == 'linux'
-tensorboard==2.20.0; sys_platform == 'linux'
-tensorboard-data-server==0.7.2; sys_platform == 'linux'
+tensorflow-hub==0.16.0; sys_platform != 'win32'
+tensorboard==2.20.0; sys_platform != 'win32'
+tensorboard-data-server==0.7.2; sys_platform != 'win32'
 ml-collections==0.1.0
 kagglehub==0.3.13
-keras==3.11.0; sys_platform == 'linux'
+keras==3.11.0; sys_platform != 'win32'
 h5py==3.14.0
 jax==0.4.33
 jaxlib==0.4.33
