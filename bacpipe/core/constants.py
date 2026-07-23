@@ -1,5 +1,6 @@
 TF_MODELS = [
     "birdnet",
+    # "perch_v2",
     "perch_bird",
     "google_whale",
     "surfperch",
@@ -50,6 +51,7 @@ NEEDS_CHECKPOINT = [
     "insect459",
     "mix2",
     "naturebeats",
+    "perch_v2",
     "protoclr",
     "rcl_fs_bsed",
 ]

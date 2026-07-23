@@ -36,13 +36,14 @@ class Model(ModelBaseClass):
         if "predictor.bias" in beats_ckpt_naturelm.keys():
             beats_ckpt_naturelm.pop("predictor.bias")
 
-        self.beats.model.load_state_dict(beats_ckpt_naturelm, strict=True)
-        self.beats.model.eval()
-        self.beats.model.to(self.device)
+        self.model = self.beats.model
+        self.model.load_state_dict(beats_ckpt_naturelm, strict=True)
+        self.model.eval()
+        self.model.to(self.device)
 
     def preprocess(self, audio):
         audio = torch.clamp(audio, -1.0, 1.0)
-        return self.beats.process_audio_beats(audio)
+        return self.model.process_audio_beats(audio)
 
     def __call__(self, x):
-        return self.beats.get_embeddings(x)
+        return self.model.get_embeddings(x)

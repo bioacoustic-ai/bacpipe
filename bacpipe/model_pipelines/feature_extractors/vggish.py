@@ -1,6 +1,6 @@
 import numpy as np
 
-from .perch_v2 import Model
+from .perch_bird import Model
 
 SAMPLE_RATE = 16000
 LENGTH_IN_SAMPLES = int(1 * SAMPLE_RATE)

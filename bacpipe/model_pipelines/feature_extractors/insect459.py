@@ -15,7 +15,7 @@ class Model(ModelBaseClass):
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
         with open(
-            f"{self.model_base_path}/insect66/config_insecteffnet.yaml", "rt"
+            f"{self.model_utils_base_path}/insect66/config_insecteffnet.yaml", "rt"
         ) as infp:
             cfg = SimpleNamespace(**yaml.safe_load(infp))
 

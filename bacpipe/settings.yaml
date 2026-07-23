@@ -111,6 +111,11 @@ default_label_keys: [
 #######   INTEGRATED CLASSIFIER  SETTINGS   ############
 #######-------------------------------------############
 
+# Maximum number of labels per timestamp. This drastically reduces file size
+# of predictions for models that return high amounts of false positives. Set to
+# False if you want to retrieve all predictions exceeding the threshold.
+max_labels_per_timestamp: 30
+
 # For evaluation using classification it is necessary to have a minimum number 
 # of embeddings for each label. The remaining embeddings will be marked as noise.
 # Change this value at will, but be aware that classification might fail if it's too low. 

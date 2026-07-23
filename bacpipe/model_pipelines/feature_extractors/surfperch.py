@@ -1,4 +1,4 @@
-from .perch_v2 import Model
+from .perch_bird import Model
 
 SAMPLE_RATE = 32000
 LENGTH_IN_SAMPLES = 160000

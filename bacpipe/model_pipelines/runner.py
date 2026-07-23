@@ -651,7 +651,7 @@ class Classifier:
 
     @staticmethod
     def filter_top_k_classifications(
-        probabilities, class_names, class_indices, class_time_bins, k=50
+        probabilities, class_names, class_indices, class_time_bins
     ):
         """
         Generate a dictionary with the top k classes. By limiting the class number to
@@ -669,16 +669,15 @@ class Classifier:
             class indices exceeding the threshold
         class_time_bins : np.array
             time bin indices exceeding the threshold
-        k : int, optional
-            number of classes to save in the dict. keep this below 100
-            otherwise the operation will start slowing the process down
-            a lot, by default 50
 
         Returns
         -------
         dict
             dictionary of top k classes with time bin indices exceeding threshold
         """
+        if not bacpipe.settings.max_labels_per_timestamp is None:
+            k = bacpipe.settings.max_labels_per_timestamp
+        
         classes, class_counts = np.unique(class_indices, return_counts=True)
 
         cls_dict = {k: v for k, v in zip(classes, class_counts)}
@@ -686,7 +685,7 @@ class Classifier:
             sorted(cls_dict.items(), key=lambda x: x[1], reverse=True)
         )
         top_k_cls = {
-            k: v for i, (k, v) in enumerate(cls_dict.items()) if i < k
+            key: v for i, (key, v) in enumerate(cls_dict.items()) if i < k
         }
 
         cls_results = {
