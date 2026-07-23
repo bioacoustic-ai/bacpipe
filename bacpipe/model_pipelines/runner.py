@@ -503,6 +503,10 @@ class Embedder(AudioHandler):
                     pbar.update(1)
                 except Exception as e:
                     logger.warning(
+                        # This is not a process-ending exception because there are many reasons
+                        # like corrupted files or other problems that can cause some files to 
+                        # not process. But if users are running a long run, we do not want this
+                        # run to fail because of minor problems.
                         f"Error generating embeddings for {file}, skipping file.\nError: {e}"
                     )
                     pbar.update(1)

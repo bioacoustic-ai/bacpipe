@@ -364,8 +364,18 @@ class Loader:
                     )
                 ]
             )
-            logger.info(f"Found {num_files} embedding files.")
-            num_audio_files = len(self.get_audio_files(self.audio_dir))
+            if num_files == 0:
+                logger.info(
+                    f"\nNo embedding files were found. The directory {d} is empty and "
+                    "will therefore be deleted. \n"
+                )
+                import shutil
+
+                shutil.rmtree(d)
+                return
+            else:
+                logger.info(f"Found {num_files} embedding files.")
+                num_audio_files = len(self.get_audio_files(self.audio_dir))
         except AssertionError as e:
             self._get_metadata_dict(d)
             self.combination_already_exists = True

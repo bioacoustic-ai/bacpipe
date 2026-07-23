@@ -55,7 +55,7 @@ jobs:
 
       # 3. Install pytest and bacpipe source package
       - name: Install pytest and bacpipe (editable)
-        run: pip install -e .
+        run: pip install -r requirements_no_cuda.txt
 
       # 4. Run pytest specifically for the current matrix model
       - name: Run Embedding Creation Test

@@ -39,7 +39,7 @@ dependencies = [
     "transformers>=4.56.0, <5.0.0",
     "einops>=0.8.0, <1.0.0",
     "safetensors==0.4.5",
-    "onnxruntime",
+    "onnxruntime>=1.27.0, <2.0.0",
 
     # --- TensorFlow & JAX Ecosystem ---
     "tensorflow==2.20.0; sys_platform != 'win32'",

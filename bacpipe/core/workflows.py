@@ -420,6 +420,14 @@ def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
                 CustomModel=CustomModels[idx],
                 **kwargs,
             )
+            if (
+                hasattr(loader_dict[model_name], 'files') 
+                and len(loader_dict[model_name].files) == 0
+                ):
+                raise FileNotFoundError(
+                    "No embedding files were generated. Please consult the log "
+                    "to see what error is ocurring. Exiting bacpipe. "
+                )
         except AssertionError as e:
             remove_models_from_list.append(model_name)
             if not "already_computed" in kwargs:
@@ -817,5 +825,5 @@ def generate_embeddings(
 
         sys.exit()
         
-    except Exception as e:
-        logger.exception(e)
+    # except Exception as e:
+    #     logger.exception(e)
