@@ -1,6 +1,5 @@
 TF_MODELS = [
     "birdnet",
-    "perch_v2",
     "perch_bird",
     "google_whale",
     "surfperch",

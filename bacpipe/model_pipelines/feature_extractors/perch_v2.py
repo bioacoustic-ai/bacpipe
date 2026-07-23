@@ -1,14 +1,18 @@
-from bacpipe.model_pipelines.model_specific_utils.perch_v2.perch_hoplite.zoo.model_configs import (
-    load_model_by_name,
-)
-import tensorflow as tf
+import sys
+from pathlib import Path
+import numpy as np
+import torch
+import torch.nn as nn
+import onnxruntime as ort
+from huggingface_hub import hf_hub_download
+
 import numpy as np
 import pandas as pd
 import logging
 
 logger = logging.getLogger("bacpipe")
 
-tf.keras.backend.clear_session()
+# tf.keras.backend.clear_session()
 
 from ..model_utils import ModelBaseClass
 
@@ -19,71 +23,120 @@ LENGTH_IN_SAMPLES = 160000
 class Model(ModelBaseClass):
     def __init__(
         self,
-        model_choice="perch_v2_cpu",
         sr=SAMPLE_RATE,
         segment_length=LENGTH_IN_SAMPLES,
         **kwargs,
     ):
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
 
-        if model_choice == "vggish":
-            self.bool_classifier = False
-
-        if self.device == "cuda" and model_choice.startswith("perch_v2"):
-            if len(tf.config.list_physical_devices("GPU")) > 0:
-                model_choice = "perch_v2"
-        mod = load_model_by_name(model_choice)
-
-        self.model = mod.embed
-
-        if not hasattr(self, "class_label_key"):
-            self.class_label_key = "labels"
-
-        if model_choice in ["vggish"]:
-            return
-        elif not model_choice in ["multispecies_whale"]:
-            self.class_list = mod.class_list[self.class_label_key].classes
-            self.ebird2name = pd.read_csv(
-                self.model_utils_base_path
-                / "perch_v2/perch_hoplite/eBird2name.csv"
-            )
-            self.classes = self.class_list
-            self.classes = [
-                (
-                    self.ebird2name["English name"][
-                        self.ebird2name.species_code == cls
-                    ].iloc[0]
-                    if cls in self.ebird2name.species_code.values
-                    else cls
-                )
-                for cls in self.classes
-            ]
-        else:
-            self.class_list = mod.class_list
-
-        if model_choice.startswith("perch_v2"):
-            self.class_label_key = "label"
-
+        self.model = PerchV2ONNX()
+        self.classes = self.model.classes
+        
     def preprocess(self, audio):
-        audio = audio.cpu()
-        return tf.convert_to_tensor(audio, dtype=tf.float32)
+        return audio
 
     def __call__(self, input):
-        try:
-            self.results = self.model(input)
-        except Exception as e:
-            logger.exception(
-                "You are on a operating system that does not currently support this model. "
-                "Perch V2 is currently only supported on linux or other machines supporting "
-                "XLA deserialization. ",
-                e,
-            )
-            import sys
+        self.results = self.model(input)
 
-            sys.exit(0)
-
-        return self.results.embeddings
+        return self.results['embeddings']
 
     def classifier_predictions(self, embeddings):
-        inferece_results = self.results.logits[self.class_label_key]
-        return tf.nn.sigmoid(inferece_results).numpy()
+        inferece_results = self.results['logits']
+        return inferece_results
+
+
+
+class PerchV2ONNX(nn.Module):
+    """Perch v2 ONNX Model Wrapper with multi-platform GPU acceleration.
+    
+    Supports: Linux (CUDA/CPU), macOS (CoreML/CPU), Windows (CUDA/DirectML/CPU).
+    Input: Audio tensor of shape (batch_size, 160000) at 32kHz sample rate.
+    """
+
+    def __init__(self, device: str = "auto", load_labels: bool = True):
+        super().__init__()
+        
+        # 1. Download model weights
+        model_path = hf_hub_download(
+            repo_id="justinchuby/Perch-onnx",
+            filename="perch_v2_no_dft.onnx",
+        )
+        
+        # 2. Download taxonomy labels file (14,795 species)
+        self.classes = []
+        if load_labels:
+            try:
+                label_path = hf_hub_download(
+                    repo_id="tphakala/Perch-v2",
+                    filename="labels.txt",
+                )
+                with open(label_path, "r", encoding="utf-8") as f:
+                    self.classes = [line.strip() for line in f.readlines()][1:]
+            except Exception as e:
+                print(f"Notice: Could not load labels.txt ({e}). Species names will not be mapped.")
+
+        # 3. Configure execution providers
+        providers = self._get_execution_providers(device)
+
+        session_options = ort.SessionOptions()
+        session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        
+        self.session = ort.InferenceSession(
+            model_path,
+            sess_options=session_options,
+            providers=providers,
+        )
+        
+        self.active_providers = self.session.get_providers()
+        self.input_name = self.session.get_inputs()[0].name
+        
+        print(f"PerchV2 initialized using providers: {self.active_providers}")
+
+    def _get_execution_providers(self, requested_device: str) -> list[str]:
+        available = ort.get_available_providers()
+        providers = []
+
+        if requested_device.lower() in ("gpu", "cuda", "auto"):
+            if sys.platform == "darwin" and "CoreMLExecutionProvider" in available:
+                providers.append("CoreMLExecutionProvider")
+            elif "CUDAExecutionProvider" in available:
+                providers.append("CUDAExecutionProvider")
+            elif "DmlExecutionProvider" in available:
+                providers.append("DmlExecutionProvider")
+
+        providers.append("CPUExecutionProvider")
+        return providers
+
+    def forward(self, x: torch.Tensor, return_probabilities: bool = True) -> dict[str, torch.Tensor]:
+        """Runs inference on input audio tensor.
+        
+        Returns dict containing:
+          - 'embedding': (batch, 1536)
+          - 'spatial_embedding': (batch, 16, 4, 1536)
+          - 'spectrogram': (batch, 500, 128)
+          - 'logits': (batch, 14795)
+          - 'probabilities': (batch, 14795) [optional]
+        """
+        target_device = x.device
+        
+        if x.ndim == 1:
+            x = x.unsqueeze(0)
+            
+        x_np = x.detach().cpu().numpy().astype(np.float32)
+
+        # ONNX outputs: [0: embedding, 1: spatial_embedding, 2: spectrogram, 3: label]
+        outputs = self.session.run(None, {self.input_name: x_np})
+
+        logits = torch.from_numpy(outputs[3]).to(target_device)
+
+        results = {
+            "embeddings": torch.from_numpy(outputs[0]).to(target_device),
+            "spatial_embedding": torch.from_numpy(outputs[1]).to(target_device),
+            "spectrogram": torch.from_numpy(outputs[2]).to(target_device),
+            "logits": logits,
+        }
+
+        if return_probabilities:
+            results["probabilities"] = torch.sigmoid(logits)
+
+        return results

@@ -440,6 +440,11 @@ def load_metadata_file(folder):
     metadata_dict["embed_dir"] = ensure_windoof_path_to_posix(
         metadata_dict["embed_dir"]
     )
+    if len(metadata_dict['files']['audio_files']) == 0:
+        raise AssertionError(
+            f"The metadata file {folder.joinpath('metadata.yml')} is empty. "
+            f"Please manually remove the folder {folder}."
+        )
     return metadata_dict
 
 
