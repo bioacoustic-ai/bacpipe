@@ -39,7 +39,7 @@ jobs:
       - name: Run Embedding Creation Tests (Full)
         run: >-
           python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py
-          --models=avesecho_passt,birdmae,naturebeats
+          --models=avesecho_passt,birdnet,naturebeats
           --only_embed_annotations=False
           --device=cpu
 
