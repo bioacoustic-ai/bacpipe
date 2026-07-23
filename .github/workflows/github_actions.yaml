@@ -26,20 +26,19 @@ jobs:
           python-version: '3.11'
 
       # 3. Install requirements
-      - name: Install dependencies from requirements
-        run: pip install -r requirements-no-tf.txt
+      #- name: Install dependencies from requirements
+      #  run: pip install -r requirements-no-tf.txt
 
       # 4. Install Pytest and bacpipe package
       - name: Install pytest and bacpipe (editable)
         run: |
-          pip install pytest
-          pip install --no-deps -e .
+          pip install -e .
 
       # 5. Run embedding creation tests (only_embed_annotations=False)
       - name: Run Embedding Creation Tests (Full)
         run: >-
           python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py
-          --models=avesecho_passt,birdnet,naturebeats
+          --models=avesecho_passt,birdnet,perch_v2,naturebeats
           --only_embed_annotations=False
           --device=cpu
 
