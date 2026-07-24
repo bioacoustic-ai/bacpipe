@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Vincent S. Kather", email = "vkather@gmail.com" }
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.11, <3.13"
 
 dependencies = [
     # --- Core Audio & Evaluation Stack ---
