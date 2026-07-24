@@ -200,7 +200,7 @@ clust_configs:
 # Choose weather you want to display the embeddings 
 # in plots with 2 or 3 dimensions. Every other number
 # will fail. 
-visualization_dimensions: 3
+visualization_dimensions: 2
 
 # maximum number of discrete categories
 # This number determines how many categories will be shown
