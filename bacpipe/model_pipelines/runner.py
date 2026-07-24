@@ -655,7 +655,7 @@ class Classifier:
 
     @staticmethod
     def filter_top_k_classifications(
-        probabilities, class_names, class_indices, class_time_bins
+        probabilities, class_names, threshold
     ):
         """
         Generate a dictionary with the top k classes. By limiting the class number to
@@ -669,10 +669,8 @@ class Classifier:
             Probabilities for each class
         class_names : list
             class names
-        class_indices : np.array
-            class indices exceeding the threshold
-        class_time_bins : np.array
-            time bin indices exceeding the threshold
+        threshold : float
+            values to threshold probabilities with
 
         Returns
         -------
@@ -681,30 +679,24 @@ class Classifier:
         """
         if not bacpipe.settings.max_labels_per_timestamp is None:
             k = bacpipe.settings.max_labels_per_timestamp
+            
+        top_k_indices = np.argsort(np.array(probabilities), axis=0)[-k:][::-1]
+        top_k_probs = np.sort(probabilities, axis=0)[-k:][::-1]
         
-        classes, class_counts = np.unique(class_indices, return_counts=True)
-
-        cls_dict = {k: v for k, v in zip(classes, class_counts)}
-        cls_dict = dict(
-            sorted(cls_dict.items(), key=lambda x: x[1], reverse=True)
-        )
-        top_k_cls = {
-            key: v for i, (key, v) in enumerate(cls_dict.items()) if i < k
-        }
-
+        top_k_indices[top_k_probs <= threshold] = -1
+        unique_classes = np.unique(top_k_indices)
+        
         cls_results = {
-            class_names[cls]: {
-                "time_bins_exceeding_threshold": class_time_bins[
-                    class_indices == cls
-                ].tolist(),
+            class_names[one_class]: {
+                "time_bins_exceeding_threshold": np.where(
+                    top_k_indices==one_class
+                    )[-1].tolist(),
                 "classifier_predictions": np.array(
-                    probabilities[
-                        class_indices[class_indices == cls],
-                        class_time_bins[class_indices == cls],
-                    ]
+                    top_k_probs[top_k_indices==one_class]
                 ).tolist(),
             }
-            for cls in top_k_cls.keys()
+            for one_class in unique_classes
+            if one_class >= 0
         }
         return cls_results
 
@@ -713,10 +705,8 @@ class Classifier:
         if probabilities.shape[0] != len(classes):
             probabilities = probabilities.swapaxes(0, 1)
 
-        cls_idx, tmp_idx = np.where(probabilities > threshold)
-
         cls_results = Classifier.filter_top_k_classifications(
-            probabilities, classes, cls_idx, tmp_idx
+            probabilities, classes, threshold
         )
 
         cls_results["head"] = {
@@ -905,10 +895,17 @@ class Classifier:
             file.stem + "_" + self.model_name
         )
         raven_file_dest = str(raven_file_dest) + ".selection.table.txt"
+        
+        if not bacpipe.settings.max_labels_per_timestamp is None:
+            k = bacpipe.settings.max_labels_per_timestamp
+            
+        top_k_indices = np.argsort(np.array(self.predictions), axis=1)[:,-k:][:, ::-1]
+        top_k_probs = np.sort(np.array(self.predictions), axis=1)[:,-k:][:, ::-1]
+        
+        top_k_indices[top_k_probs <= self.classifier_threshold] = 0
 
-        timestamps, species = np.where(
-            self.predictions > self.classifier_threshold
-        )
+        timestamps = np.where(top_k_indices)[0]
+        species = top_k_indices[top_k_indices>0].flatten()
         probs = [
             np.array(self.predictions)[ts, sp]
             for ts, sp in zip(timestamps, species)
