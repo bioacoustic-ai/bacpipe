@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false  # Ensures all OS/model combinations finish even if one fails
       matrix:
-        os: [windows-latest]
+        os: [ubuntu-latest]
         model:
           - audiomae
           - audioprotopnet
@@ -24,15 +24,21 @@ jobs:
           - beats
           - birdaves_especies
           - biolingual
+          - birdnet
           - birdmae
           - convnext_birdset
+          - hbdet
           - insect66
           - insect459
           - mix2
           - naturebeats
+          - perch_bird
           - perch_v2
           - protoclr
           - rcl_fs_bsed
+          - surfperch
+          - google_whale
+          - vggish
           # Simply add more model keys here as you expand bacpipe!
 
     steps:
@@ -40,16 +46,30 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
 
+      # Cleanup unused pre-installed software on Ubuntu to free ~15 GB
+      - name: Free Disk Space (Ubuntu)
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+
       # 2. Set up Python 3.11 with PIP caching enabled
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.11'
           cache: 'pip'  # Caches PyPI packages to make re-runs blazingly fast
+
+      # ADD THIS NEW STEP:
+      - name: Install CPU PyTorch
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.6.0+cpu torchaudio==2.6.0+cpu torchvision==0.21.0+cpu --index-url https://download.pytorch.org/whl/cpu
 
       # 3. Install pytest and bacpipe source package
       - name: Install pytest and bacpipe (editable)
-        run: pip install -r requirements_no_tf.txt
+        run: pip install -r requirements_no_cuda.txt
 
       # 4. Run pytest specifically for the current matrix model
       - name: Run Embedding Creation Test
