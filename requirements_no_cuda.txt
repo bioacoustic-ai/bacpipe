@@ -22,9 +22,10 @@ fastparquet>=2026.5.0, <2027.0.0
 huggingface-hub>=0.34.4, <0.35.0
 
 # --- PyTorch Ecosystem ---
-torch==2.6
-torchaudio==2.6
-torchvision==0.21.0
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.6.0+cpu
+torchaudio==2.6.0+cpu
+torchvision==0.21.0+cpu
 timm==1.0.11
 transformers>=4.56.0
 einops>=0.8.0
