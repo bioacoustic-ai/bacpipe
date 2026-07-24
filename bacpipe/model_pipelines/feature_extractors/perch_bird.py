@@ -66,7 +66,7 @@ class Model(ModelBaseClass):
 
     def __call__(self, input):
         self.results = self.model(input)
-        return self.results.embeddings
+        return self.results.embeddings.squeeze(1)
 
     def classifier_predictions(self, embeddings):
         inferece_results = self.results.logits[self.class_label_key]
