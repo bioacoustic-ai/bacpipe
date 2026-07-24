@@ -89,7 +89,7 @@ def eval_clustering(
     clusterings,
     ground_truth=[],
     embeds=None,
-    default_labels=None,
+    metadata_labels=None,
     label_column=None,
     **kwargs,
 ):
@@ -102,8 +102,8 @@ def eval_clustering(
         dictionary with clusterings
     ground_truth : list
         ground truth labels
-    default_labels : dict
-        default labels for the dataset
+    metadata_labels : dict
+        metadata labels for the dataset
     label_column : string
         label type defined in annotations.csv file
 
@@ -119,9 +119,9 @@ def eval_clustering(
                 embeds = embeds[ground_truth != -1]
                 cl_labels = ground_truth[ground_truth != -1]
 
-        if default_labels and not hasattr(default_labels, "kmeans"):
-            default_labels["kmeans"] = clusterings["kmeans"]
-        if not default_labels:
+        if metadata_labels and not hasattr(metadata_labels, "kmeans"):
+            metadata_labels["kmeans"] = clusterings["kmeans"]
+        if not metadata_labels:
             results[f"AMI"][f"{cl_name}-ground_truth"] = AMI(
                 ground_truth, cl_labels
             )
@@ -129,7 +129,7 @@ def eval_clustering(
                 ground_truth, cl_labels
             )
         else:
-            for def_name, def_labels in default_labels.items():
+            for def_name, def_labels in metadata_labels.items():
                 if "no_noise" in cl_name:
                     def_labels = np.array(def_labels)[ground_truth != -1]
                 results[f"AMI"][f"{cl_name}-{def_name}"] = AMI(
@@ -294,7 +294,7 @@ def clustering_pipeline(
 
         cluster_configs = get_clustering_models(clust_params)
 
-        default_labels = le.create_default_labels(
+        metadata_labels = le.create_metadata_labels(
             paths.audio_dir, paths.clust_path.parent.stem, paths, **kwargs
         )
 
@@ -305,7 +305,7 @@ def clustering_pipeline(
             clusterings,
             ground_truth_1d,
             embeds,
-            default_labels,
+            metadata_labels,
             label_column,
             **kwargs,
         )

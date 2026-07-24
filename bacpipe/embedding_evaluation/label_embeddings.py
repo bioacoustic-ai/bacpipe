@@ -22,7 +22,7 @@ logger = logging.getLogger("bacpipe")
 class DefaultLabels:
     def __init__(self, paths, model, default_label_keys, **kwargs):
         """
-        Class to generate default labels based on audio files and
+        Class to generate metadata labels based on audio files and
         number of generated embeddings per file.
 
         Parameters
@@ -32,7 +32,7 @@ class DefaultLabels:
         model : str
             model name
         default_label_keys : list
-            list of default labels, see settings.yaml
+            list of metadata labels, see settings.yaml
 
         Raises
         ------
@@ -86,7 +86,7 @@ class DefaultLabels:
     def generate(self):
         self.default_label_dict = {}
         for default_label in tqdm(
-            self.default_label_keys, "Building default labels"
+            self.default_label_keys, "Building metadata labels"
         ):
             getattr(self, default_label)()
 
@@ -448,12 +448,12 @@ def load_metadata_file(folder):
     return metadata_dict
 
 
-def get_default_labels(model_name, **kwargs):
+def get_metadata_labels(model_name, **kwargs):
     """
-    Return dictionary of the default labels based on the files that were
+    Return dictionary of the metadata labels based on the files that were
     already processed and saved. This is model dependent, as the input length is
     model dependent and therefore this function requires a model name as input.
-    The default labels are calculated based on the default labels specified in the
+    The metadata labels are calculated based on the metadata labels specified in the
     settings.yaml file.
 
     Parameters
@@ -464,10 +464,10 @@ def get_default_labels(model_name, **kwargs):
     Returns
     -------
     dict
-        dictionary of default labels
+        dictionary of metadata labels
     """
     paths = get_paths(model_name)
-    return create_default_labels(paths.audio_dir, model_name, paths, **kwargs)
+    return create_metadata_labels(paths.audio_dir, model_name, paths, **kwargs)
 
 
 def get_ground_truth(model_name, file_path=None, return_type="dataframe"):
@@ -615,11 +615,11 @@ def model_specific_embedding_path(
     return embed_paths_for_this_model[-1]
 
 
-def create_default_labels(
+def create_metadata_labels(
     audio_dir=None, model=None, paths=None, overwrite=True, **kwargs
 ):
     """
-    Create default labels based on audio files and model timestamps to
+    Create metadata labels based on audio files and model timestamps to
     match the number of embeddings created per file for visualization
     and clustering purposes.
 
@@ -637,33 +637,39 @@ def create_default_labels(
     Returns
     -------
     dict
-        dictionary with default labels
+        dictionary with metadata labels
     """
     if paths is None:
         assign_global_get_paths_function(audio_dir)
         paths = get_paths(model)
     if (
         overwrite
+        or not paths.labels_path.joinpath("metadata_labels.npy").exists()
         or not paths.labels_path.joinpath("default_labels.npy").exists()
     ):
         if not kwargs.get("default_label_keys"):
             from bacpipe import settings as bacpipe_settings
 
             kwargs["default_label_keys"] = bacpipe_settings.default_label_keys
-        default_labels = DefaultLabels(
+        metadata_labels = DefaultLabels(
             paths, model=model, audio_dir=audio_dir, **kwargs
         )
-        default_labels.generate()
+        metadata_labels.generate()
 
-        def_labels = default_labels.default_label_dict
+        def_labels = metadata_labels.default_label_dict
         np.save(
-            paths.labels_path.joinpath("default_labels.npy"),
+            paths.labels_path.joinpath("metadata_labels.npy"),
             def_labels,
         )
     else:
-        def_labels = np.load(
-            paths.labels_path.joinpath("default_labels.npy"), allow_pickle=True
-        ).item()
+        if paths.labels_path.joinpath("metadata_labels.npy").exists():
+            def_labels = np.load(
+                paths.labels_path.joinpath("metadata_labels.npy"), allow_pickle=True
+            ).item()
+        elif paths.labels_path.joinpath("default_labels.npy").exists():
+            def_labels = np.load(
+                paths.labels_path.joinpath("default_labels.npy"), allow_pickle=True
+            ).item()
     return def_labels
 
 def fetch_annotation_file(audio_dir, annotations_filename, paths):

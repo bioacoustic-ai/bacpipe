@@ -58,10 +58,10 @@ from bacpipe.embedding_evaluation.benchmark import benchmark
 
 from bacpipe.embedding_evaluation.label_embeddings import (
     DefaultLabels,
-    get_default_labels,
+    get_metadata_labels,
     get_dt_filename,
     make_set_paths_func,
-    create_default_labels,
+    create_metadata_labels,
     ground_truth_by_model,
 )
 
@@ -99,9 +99,9 @@ __all__ = [
     get_audio_files,
     ## automatic creation of labels and ground truth
     DefaultLabels,
-    create_default_labels,
+    create_metadata_labels,
     ground_truth_by_model,
-    get_default_labels,
+    get_metadata_labels,
     get_dt_filename,
     ## probing functions
     probing_pipeline,

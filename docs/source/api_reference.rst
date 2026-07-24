@@ -52,9 +52,9 @@ Automatic creation of labels and ground truth
 --------------
 
 .. autofunction:: DefaultLabels 
-.. autofunction:: create_default_labels
+.. autofunction:: create_metadata_labels
 .. autofunction:: ground_truth_by_model
-.. autofunction:: get_default_labels
+.. autofunction:: get_metadata_labels
 .. autofunction:: get_dt_filename
 
 Probing functions

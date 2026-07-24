@@ -222,7 +222,7 @@ def plot_embeddings(
     model_name : str
         name of model
     label_by : str, optional
-        key of default_labels dict, by default "audio_file_name"
+        key of metadata_labels dict, by default "audio_file_name"
     paths : SimpleNamespace object, optional
         object with path attributes, defaults to None
     dim_reduction_model : str
@@ -308,7 +308,7 @@ def init_embed_figure(fig, axes, bool_3d=False, widget_idx=None, **kwargs):
 
 def get_labels_for_plot(model_name=None, **kwargs):
     labels = dict()
-    labels = le.get_default_labels(model_name, **kwargs)
+    labels = le.get_metadata_labels(model_name, **kwargs)
 
     ground_truth_files = list(
         le.get_paths(model_name).labels_path.glob("ground_truth*csv")

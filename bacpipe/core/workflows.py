@@ -642,7 +642,7 @@ def run_pipeline_for_single_model(
         set to False if you want to force recomputing of
         dimensionality reduced embeddings, by default True
     overwrite : bool, optional
-        set to True if you want default labels and
+        set to True if you want metadata labels and
         ground truth labels to be processed again, by default False
     testing : bool, optional
         set to True for testing, by default False

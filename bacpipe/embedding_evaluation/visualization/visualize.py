@@ -105,7 +105,7 @@ def clustering_overview(
     path_func : function
         function to return the paths when model name is given
     label_by : str
-        key of default_labels dict
+        key of metadata_labels dict
     no_noise : bool
         whether to plot the metrics with or without noise
     model_list : list
@@ -165,7 +165,7 @@ def plot_clusterings(
     model_name : str
         name of model
     label_by : str
-        key of default_labels dict
+        key of metadata_labels dict
     no_noise : bool
         whether to plot the metrics with or without noise
     fig : plt.plot object, optional
