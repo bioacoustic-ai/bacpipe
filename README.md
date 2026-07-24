@@ -10,8 +10,8 @@
 [![Tests](https://img.shields.io/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_312_linux.yaml?label=3.12&&logo=linux)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_312_linux.yaml)
 [![Tests](https://img.shields.io/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_311_apple.yaml?label=3.11&&logo=apple)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_311_apple.yaml)
 [![Tests](https://img.shields.io/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_312_apple.yaml?label=3.12&&logo=apple)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_312_apple.yaml)
-[![Tests](https://img.shields.io/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_311_windows.yaml?label=3.11&&logo=windows)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_311_windows.yaml)
-[![Tests](https://img.shields.io/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_312_windows.yaml?label=3.12&&logo=windows)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_312_windows.yaml)
+[![Tests](https://custom-icon-badges.demolab.com/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_312_windows.yaml?label=3.12&logo=windows11&logoColor=white)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_312_windows.yaml)
+[![Tests](https://custom-icon-badges.demolab.com/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_311_windows.yaml?label=3.11&logo=windows11&logoColor=white)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_311_windows.yaml)
 
 ![](src/bacpipe_logo.png)
 image by Nicole Allison
@@ -161,7 +161,7 @@ available_evaluation_tasks: [
 
 Once embeddings are generated, they can be easily visualized using a dashboard (built using `panel`) by simply setting the `dashboard` setting in the [config.yaml](bacpipe/config.yaml) file to `True`.
 
-Below you can see a gif showing the basic usage of the dashboard.
+Below you can see a gif showing the basic usage of the dashboard. Embeddings can also be visualized in 3 dimensions using the `visualization_dimensions` parameter in the [settings](bacpipe/settings.yaml) file.
 
 ![](src/bacpipe_demo.gif)
 
@@ -943,6 +943,7 @@ Perch_Bird is a EFficientNet B1 model trained on the entire Xeno-canto database.
 - trained on birds, amphibians, insects and mammals (xeno-canto, iNaturalis, Tierstimmenarchiv)
 
 Perch V2 or Perch 2.0 is the updated version of the Perch model from bioacousticians at Google. The model is a EfficientNetB3, trained on a very large database of various species. The classifier is able to distinguish 14795 different species. 
+**Bacpipe** uses the onnx implementation which allows the model to run through pytorch so it can be used with all operating systems and also supports cuda and mps accelleration.
 
 ### SurfPerch
 - CNN

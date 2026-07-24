@@ -273,7 +273,7 @@ def plot_embeddings(
         return axes, c_label_dict, points
     elif dashboard:
         return plot_embeddings_px(
-            embeds, labels, c_label_dict, label_by=label_by
+            embeds, labels, label_by=label_by
         )
     else:
         set_colorbar_or_legend(
@@ -750,7 +750,7 @@ def reorder_embeddings_by_clustering_performance(
 
 
 def plot_embeddings_px(
-    embeds, labels, c_label_dict, label_by="label", **kwargs
+    embeds, labels, label_by="label", **kwargs
 ):
     # 1. Prepare Data
     if len(np.array(embeds["x"]).shape) > 1:
@@ -758,6 +758,8 @@ def plot_embeddings_px(
         embeds["y"] = np.array(embeds["y"]).squeeze()
     x_data = embeds["x"]
     y_data = embeds["y"]
+    if not embeds.get('z') is None:
+        z_data = embeds.get('z')
 
     audiofilenames = embeds["metadata"]["audio_files"]
 
@@ -794,6 +796,10 @@ def plot_embeddings_px(
         "end": ends,
         "idx": embeds["index"],
     }
+    
+    if not embeds.get('z') is None:
+        data_dict['z'] = z_data
+        
     dlk = settings.default_label_keys
 
     df_lab = {}
@@ -833,20 +839,32 @@ def plot_embeddings_px(
 
     # 2. Setup Figure based on Label Count
     if n_labels > settings.max_nr_categories:
-        # if label_by in ['time_of_day', 'continuous_timestamp', 'day_of_year']:
-        # --- HIGH CARDINALITY: Use Colorbar ---
-        # We map color to 'label_id' (int) to force a continuous scale
-        fig = px.scatter(
-            df,
-            x="x",
-            y="y",
-            color="label_id",
-            hover_data=hover_data,
-            custom_data=custom_data,
-            title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
-            render_mode="webgl",
-            color_continuous_scale=kwargs.get("color_continuous"),
-        )
+        if not embeds.get('z') is None:
+            fig = px.scatter_3d(
+                df,
+                x="x",
+                y="y",
+                z="z",
+                size_max=1,
+                color="label_id",
+                hover_data=hover_data,
+                custom_data=custom_data,
+                title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
+                # render_mode="webgl",
+                color_continuous_scale=kwargs.get("color_continuous"),
+            )
+        else:
+            fig = px.scatter(
+                df,
+                x="x",
+                y="y",
+                color="label_id",
+                hover_data=hover_data,
+                custom_data=custom_data,
+                title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
+                render_mode="webgl",
+                color_continuous_scale=kwargs.get("color_continuous"),
+            )
 
         tick_vals = (
             np.linspace(0, n_labels - int(n_labels // 100 + 1), 6)
@@ -863,19 +881,33 @@ def plot_embeddings_px(
         )
 
     else:
-
-        # force a discrete legend
-        fig = px.scatter(
-            df,
-            x="x",
-            y="y",
-            color="label",
-            hover_data=hover_data,
-            custom_data=custom_data,
-            title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
-            render_mode="webgl",
-            color_discrete_sequence=COLOR_DISCRETE,
-        )
+        if not embeds.get('z') is None:
+            fig = px.scatter_3d(
+                df,
+                x="x",
+                y="y",
+                z="z",
+                size_max=1,
+                color="label",
+                hover_data=hover_data,
+                custom_data=custom_data,
+                title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
+                # render_mode="webgl",
+                color_discrete_sequence=COLOR_DISCRETE,
+            )
+        else:
+            # force a discrete legend
+            fig = px.scatter(
+                df,
+                x="x",
+                y="y",
+                color="label",
+                hover_data=hover_data,
+                custom_data=custom_data,
+                title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
+                render_mode="webgl",
+                color_discrete_sequence=COLOR_DISCRETE,
+            )
 
         # Configure the Discrete Legend
         fig.update_layout(
@@ -891,6 +923,8 @@ def plot_embeddings_px(
 
     fig.update_layout(
         # autosize=True,
+        uirevision=True,
+        scene=dict(uirevision=True),
         template="plotly_white",
         height=settings.embed_fig_height,
         clickmode="event",
@@ -900,9 +934,6 @@ def plot_embeddings_px(
         # Ensure selection tools are available
         modebar=dict(add=["lasso2d", "select2d"], remove=["autoScale2d"]),
     )
-    # fig.update_xaxes(visible=False, showticklabels=True) # Hide x axis ticks
-    # fig.update_yaxes(visible=False, showticklabels=True) # Hide y axis ticks
-
-    # Improve marker appearance
-    fig.update_traces(marker_size=8, marker_opacity=0.6)
+    marker_sz = 3 if embeds.get("z") is not None else 8
+    fig.update_traces(marker_size=marker_sz, marker_opacity=0.6)
     return fig

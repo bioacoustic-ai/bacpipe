@@ -182,7 +182,7 @@ class Embedder(AudioHandler):
             import tensorflow as tf
 
             return_embeds = tf.concat(embeds, axis=0).numpy()
-            if len(return_embeds.shape) > 2:
+            if len(return_embeds.shape) > 3:
                 return_embeds = return_embeds.squeeze()
             return return_embeds
 

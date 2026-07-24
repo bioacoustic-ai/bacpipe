@@ -197,6 +197,11 @@ clust_configs:
 #######   DASHBOARD SETTINGS   ############
 #######------------------------############
 
+# Choose weather you want to display the embeddings 
+# in plots with 2 or 3 dimensions. Every other number
+# will fail. 
+visualization_dimensions: 3
+
 # maximum number of discrete categories
 # This number determines how many categories will be shown
 # as distinct labels. If more categories than this number

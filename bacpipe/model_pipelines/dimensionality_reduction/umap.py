@@ -1,6 +1,7 @@
 from ..model_utils import ModelBaseClass
 import umap
 
+from bacpipe import settings
 # UMAP settings
 
 
@@ -9,7 +10,7 @@ class Model(ModelBaseClass):
         self.umap_config = {
             "n_neighbors": 15,
             "min_dist": 0.1,
-            "n_components": 2,
+            "n_components": settings.visualization_dimensions,
             "metric": "euclidean",
             "random_state": 42,
         }

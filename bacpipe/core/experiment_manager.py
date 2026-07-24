@@ -328,6 +328,11 @@ class Loader:
             # are we using a dimensionality reduction model?
             if self.dim_reduction_model:
                 if self.dim_reduction_model in d.stem:
+                    if (
+                        not settings.visualization_dimensions 
+                        == return_reduced_dimensions(d)
+                        ):
+                        continue
                     self.combination_already_exists = True
                     logger.info(
                         "\n### Embeddings already exist. "
@@ -1028,9 +1033,10 @@ class Loader:
         self, file_dest, embeds, input_len
     ):
         t_stamps = []
+        keys =  ["x", "y", "z"]
         d = {
-            var: embeds[:, i].tolist()
-            for i, var in zip(range(embeds.shape[1]), ["x", "y"])
+            keys[i]: embeds[:, i].tolist()
+            for i in range(embeds.shape[1])
         }
 
         if self.only_embed_annotations:
@@ -1081,7 +1087,7 @@ class Loader:
         with open(file_dest, "w") as f:
             json.dump(d, f, indent=2)
 
-        if embeds.shape[-1] > 2:
+        if embeds.shape[-1] > 3:
             embed_dict = {}
             acc_shape = 0
             for shape, file in zip(
@@ -1196,3 +1202,42 @@ def replace_default_kwargs_with_user_kwargs(remove_keys=None, **kwargs):
     for k, v in kwargs.items():
         replaced_kwargs[k] = v
     return replaced_kwargs
+
+
+
+def return_reduced_dimensions(directory):
+    """
+    Return the integer number of dimensions in the 
+    reduced embeddings. This is done by only looking
+    for the keys of the json file, thereby loading 
+    times should be kept minimal. If the key "z" is 
+    found, it indicates that the embeddings have been
+    reduced to 3 dimensions. If not, they have been 
+    reduced to 2 dimensions. 
+
+    Parameters
+    ----------
+    directory : pathlib.Path object
+        path to reduced dimensionality embeddings
+
+    Returns
+    -------
+    int
+        2 or 3 depending on if z is in the json or not
+    """
+    umap_dims = 2
+    import ijson
+    try:
+        file = list(directory.glob('*.json'))[0]
+        with open(file, "rb") as f:
+            parser = ijson.parse(f)
+
+            for prefix, _, _ in parser:
+                if prefix == "z":
+                    umap_dims = 3
+                    break
+    except Exception as e:
+        logger.warning(
+            "Couldn't find out umap dimensions of saved files."
+        )
+    return umap_dims

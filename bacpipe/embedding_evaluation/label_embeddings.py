@@ -594,11 +594,16 @@ def model_specific_embedding_path(
         if d.is_dir() and model in d.stem.split("___")[-1].split("-")
     ]
     if not dim_reduction_model in [None, "None", "", []]:
+        from bacpipe.core.experiment_manager import return_reduced_dimensions
         embed_paths_for_this_model = [
             d
             for d in embed_paths_for_this_model
-            if dim_reduction_model in d.stem
+            if (
+                dim_reduction_model in d.stem
+                and return_reduced_dimensions(d) == bacpipe.settings.visualization_dimensions
+                )
         ]
+        
     embed_paths_for_this_model.sort()
     if len(embed_paths_for_this_model) == 0:
         error = (

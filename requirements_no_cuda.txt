@@ -20,6 +20,7 @@ sounddevice>=0.5.5, <0.6.0
 pyarrow>=25.0.0, <26.0.0
 fastparquet>=2026.5.0, <2027.0.0
 huggingface-hub>=0.34.4, <0.35.0
+ijson>=3.5.1, <4.0.0
 
 # --- PyTorch Ecosystem ---
 --extra-index-url https://download.pytorch.org/whl/cpu

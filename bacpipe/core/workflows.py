@@ -13,6 +13,7 @@ from bacpipe.core.experiment_manager import (
     Loader,
     save_logs,
     replace_default_kwargs_with_user_kwargs,
+    return_reduced_dimensions
 )
 from bacpipe.model_pipelines.runner import Embedder
 
@@ -323,12 +324,12 @@ def evaluation_with_settings_already_exists(
             return False
         else:
             bool_dim_reducs = [
-                True
+                settings.visualization_dimensions == return_reduced_dimensions(d)
                 for d in paths.dim_reduc_parent_dir.rglob(
                     f"*{dim_reduction_model}*{model_name}*"
                 )
             ]
-            bool_dim_reducs = len(bool_dim_reducs) > 0 and all(bool_dim_reducs)
+            bool_dim_reducs = len(bool_dim_reducs) > 0 and any(bool_dim_reducs)
         if not bool_dim_reducs:
             return False
     return True
