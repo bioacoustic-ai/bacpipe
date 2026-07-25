@@ -831,31 +831,39 @@ def plot_embeddings_px(
                 except:
                     all_preds = None
         if not all_preds is None:
-            ## now filter the df so we only have the top 5 preds
-            just_labels = all_preds.drop(columns=['audiofilename', 'start', 'end', 'simultaneous_labels'])
-            if 'Unnamed: 0' in just_labels.columns:
-                just_labels = just_labels.drop(columns=['Unnamed: 0'])
-            np_labels = just_labels.values.T
-            k=5
-            top_k_indices = np.argsort(np.array(np_labels), axis=0)[-k:][::-1]
-            top_k_probs = np.sort(np_labels, axis=0)[-k:][::-1]
-            top_k_species = just_labels.columns.values[top_k_indices].T
-            
-            top_k_probs = top_k_probs.T
-            top_k_species[top_k_probs == 0] = ''
-            
-            i = 0
-            species, probs = [], []
-            for idx, label in enumerate(labels['default_classifier']):
-                if label == 'below_thresh':
-                    species.append([])
-                    probs.append([])
-                else:
-                    species.append(top_k_species[i].tolist())
-                    probs.append(top_k_probs[i].tolist())
-                    i += 1
-            df_lab[f'top_{k}_species'] = species
-            df_lab[f'top_{k}_probs'] = probs
+            try:
+                ## now filter the df so we only have the top 5 preds
+                just_labels = all_preds.drop(columns=['audiofilename', 'start', 'end', 'simultaneous_labels'])
+                if 'Unnamed: 0' in just_labels.columns:
+                    just_labels = just_labels.drop(columns=['Unnamed: 0'])
+                np_labels = just_labels.values.T
+                k=5
+                top_k_indices = np.argsort(np.array(np_labels), axis=0)[-k:][::-1]
+                top_k_probs = np.sort(np_labels, axis=0)[-k:][::-1]
+                top_k_species = just_labels.columns.values[top_k_indices].T
+                
+                top_k_probs = top_k_probs.T
+                top_k_species[top_k_probs == 0] = ''
+                
+                i = 0
+                species, probs = [], []
+                for idx, label in enumerate(labels['default_classifier']):
+                    if label == 'below_thresh':
+                        species.append([])
+                        probs.append([])
+                    else:
+                        species.append(top_k_species[i].tolist())
+                        probs.append(top_k_probs[i].tolist())
+                        i += 1
+                df_lab[f'top_{k}_species'] = species
+                df_lab[f'top_{k}_probs'] = probs
+            except Exception as e:
+                logger.info(
+                    f"\nTop {k} predictions for display could not be loaded. "
+                    "The reason could be that a previous run failed and not all "
+                    "predictions were saved. Regenerating the embeddings is the "
+                    f"best chance of getting this to work. {e}"
+                )
                     
             
     # Pack variable labels as JSON string to preserve order and labels
