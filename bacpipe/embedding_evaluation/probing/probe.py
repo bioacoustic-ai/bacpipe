@@ -15,7 +15,7 @@ from .dataset_probe import generate_annotations_for_probing_task
 
 
 def embeds_array_without_noise(embeds, ground_truth, df, **kwargs):
-    bool_array_gt = (ground_truth.species_richness == 1).values
+    bool_array_gt = (ground_truth.simultaneous_labels == 1).values
 
     bool_array_probing = df.predefined_set.isin(
         ["train", "val", "test"]

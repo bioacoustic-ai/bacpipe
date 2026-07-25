@@ -169,6 +169,29 @@ class DefaultLabels:
                     timestamp.strftime("%H-%M-%S")
                 )
 
+    def week_of_year(self):
+        self.get_datetimes()
+        week_of_year_per_file = {}
+        for file, datetime_of_file in tqdm(
+            self.timestamp_per_file.items(), "getting week of year"
+        ):
+            date = datetime_of_file.date()
+            week_of_day = (
+                date.year, date.isocalendar().week
+                )
+            week_of_year_per_file.update({file: week_of_day})
+
+        self.week_of_year_per_embedding = []
+        for file_idx, (file, week_of_year) in enumerate(
+            week_of_year_per_file.items()
+        ):
+            self.week_of_year_per_embedding.extend(
+                np.repeat(
+                    "--".join([str(a) for a in week_of_year]),
+                    self.nr_embeds_per_file[file_idx],
+                )
+            )
+
     def day_of_year(self):
         self.get_datetimes()
         day_of_year_per_file = {}
@@ -176,7 +199,7 @@ class DefaultLabels:
             self.timestamp_per_file.items(), "getting day of year"
         ):
             time_of_day = dt.datetime(
-                2000, datetime_of_file.month, datetime_of_file.day
+                datetime_of_file.year, datetime_of_file.month, datetime_of_file.day
             )
             day_of_year_per_file.update({file: time_of_day})
 
@@ -649,8 +672,14 @@ def create_metadata_labels(
         paths = get_paths(model)
     if (
         overwrite
-        or not paths.labels_path.joinpath("metadata_labels.npy").exists()
-        or not paths.labels_path.joinpath("default_labels.npy").exists()
+        or (
+            not (paths.labels_path / "metadata_labels.parquet").exists()
+            and not (paths.labels_path / "metadata_labels.csv").exists()
+            # these two are old versions of bacpipe that will 
+            # still be supported until the next major version
+            and not (paths.labels_path / "metadata_labels.npy").exists()
+            and not (paths.labels_path / "default_labels.npy").exists()
+            )
     ):
         if not kwargs.get("default_label_keys"):
             from bacpipe import settings as bacpipe_settings
@@ -661,20 +690,33 @@ def create_metadata_labels(
         )
         metadata_labels.generate()
 
-        def_labels = metadata_labels.default_label_dict
-        np.save(
-            paths.labels_path.joinpath("metadata_labels.npy"),
-            def_labels,
-        )
+        df_labels = pd.DataFrame(metadata_labels.default_label_dict)
+        
+        if len(df_labels) * len(df_labels.T) > 3_000_000:
+            df_labels.to_parquet(paths.labels_path / "metadata_labels.parquet", index=False)
+        else:
+            df_labels.to_csv(paths.labels_path / "metadata_labels.csv", index=False)
+
+        def_labels = df_labels.to_dict('list')
     else:
-        if paths.labels_path.joinpath("metadata_labels.npy").exists():
+        if (paths.labels_path / "metadata_labels.parquet").exists():
+            df_labels  = pd.read_parquet(paths.labels_path / "metadata_labels.parquet", index_col=False)
+            def_labels = df_labels.to_dict('list')
+            
+        elif (paths.labels_path / "metadata_labels.csv").exists():
+            df_labels  = pd.read_csv(paths.labels_path / "metadata_labels.csv", index_col=False)
+            def_labels = df_labels.to_dict('list')
+            
+        elif paths.labels_path.joinpath("metadata_labels.npy").exists():
             def_labels = np.load(
                 paths.labels_path.joinpath("metadata_labels.npy"), allow_pickle=True
             ).item()
+            
         elif paths.labels_path.joinpath("default_labels.npy").exists():
             def_labels = np.load(
                 paths.labels_path.joinpath("default_labels.npy"), allow_pickle=True
             ).item()
+            
     return def_labels
 
 def fetch_annotation_file(audio_dir, annotations_filename, paths):
@@ -820,17 +862,17 @@ def fit_labels_to_embedding_timestamps(
                     "modify the value in the settings file."
                 )
                 
-    df_fitted_gt["species_richness"] = df_fitted_gt.drop(
-        columns=["starts", "ends", "audiofilename", "species_richness"]
+    df_fitted_gt["simultaneous_labels"] = df_fitted_gt.drop(
+        columns=["starts", "ends", "audiofilename", "simultaneous_labels"]
         ).sum(axis=1)
-    if df_fitted_gt["species_richness"].max() > 1:
+    if df_fitted_gt["simultaneous_labels"].max() > 1:
         logger.warning(
             "The species richness column of the ground truth has "
             "values exceeding 1. This means you have multi-label "
             "ground truth annotations. If this should not be "
             "happening ensure the ground truth is created correcly."
         )
-    elif df_fitted_gt["species_richness"].max() == 0:
+    elif df_fitted_gt["simultaneous_labels"].max() == 0:
         logger.warning(
             "The species richness column of the ground truth has a "
             "maximum value of 0. This means no annotations have been"
@@ -946,7 +988,7 @@ def initialize_ground_truth_df(label_df, label_column):
     return pd.DataFrame(
         {
             **{col: pd.Series(dtype="int8") for col in species_cols},
-            "species_richness": pd.Series(dtype="int8"),
+            "simultaneous_labels": pd.Series(dtype="int8"),
             "audiofilename": pd.Series(
                 dtype="string"
             ),

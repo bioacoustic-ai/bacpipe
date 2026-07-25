@@ -98,6 +98,7 @@ only_embed_annotations: False
 # corresponding code in label_embeddings.py
 default_label_keys: [
   "time_of_day",
+  "week_of_year",
   "day_of_year",
   "continuous_timestamp",
   "parent_directory",

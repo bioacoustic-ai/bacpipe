@@ -269,7 +269,7 @@ def clustering_pipeline(
             kwargs.pop("audio_dir")
 
         if not ground_truth is None and len(ground_truth) > 0:
-            if max(ground_truth.species_richness) > 0:
+            if max(ground_truth.simultaneous_labels) > 0:
                 logger.warning(
                     "You have passed a multi-label ground truth array. "
                     "However bacpipe only supports single label clustering "
@@ -280,7 +280,7 @@ def clustering_pipeline(
                     "starts",
                     "ends",
                     "audiofilename",
-                    "species_richness",
+                    "simultaneous_labels",
                 ]
                 gt_without_metadata = ground_truth.drop(
                     columns=non_species_labels

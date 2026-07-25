@@ -91,7 +91,10 @@ class SpectrogramPlot:
 
                 var_labels_dict = json.loads(variable_labels_json)
                 for key, value in var_labels_dict.items():
-                    variable_labels_html += f"<b>{key}</b> = {value}; "
+                    if not 'top' in key:
+                        variable_labels_html += f"<b>{key}</b> = {value}; "
+                    else:
+                        variable_labels_html += f"<br><b>{key}</b> = {value}; "
             except:
                 pass
 

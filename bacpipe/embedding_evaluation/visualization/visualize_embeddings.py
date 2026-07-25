@@ -319,13 +319,15 @@ def get_labels_for_plot(model_name=None, **kwargs):
                 model_name, file_path=gt_file, return_type="dataframe"
             )
             label = gt_file.stem.split("_")[-1]
+            if 'species_richness' in ground_truth_df.columns:
+                ground_truth_df.rename(columns={'species_richness': 'simultaneous_labels'}, inplace=True)
 
             # inv = {v: k for k, v in ground_truth[f"label_dict:{label}"].items()}
             # inv[-1.0] = "noise"
             # inv[-2.0] = "noise"
             # technically -2.0 is not noise, but corresponds to sections
             # with multiple sources vocalizing simultaneously
-            if max(ground_truth_df.species_richness) > 1:
+            if max(ground_truth_df.simultaneous_labels) > 1:
                 logger.warning(
                     "You have passed a multi-label ground truth array. "
                     "However for visualization only one label will be displayed."
@@ -335,7 +337,7 @@ def get_labels_for_plot(model_name=None, **kwargs):
                 "starts",
                 "ends",
                 "audiofilename",
-                "species_richness",
+                "simultaneous_labels",
             ]
             gt_without_metadata = ground_truth_df.drop(
                 columns=non_species_labels
@@ -807,7 +809,55 @@ def plot_embeddings_px(
         if not k in dlk and not "kmeans" in k and not k == label_by:
             df_lab[k] = list(v)
     [df_lab.pop(k) for k in data_dict.keys() if k in df_lab.keys()]
-
+    
+    if 'default_classifier' in labels:
+        file_paths = list((
+            Path(embeds['metadata']['embed_dir'])
+            .parent
+            .parent
+            / settings.evaluations_dir
+            / embeds['metadata']['model_name']
+            / 'predictions'
+            ).glob('*all_predictions*'))
+        if len(file_paths) > 0:
+            if 'csv' in str(file_paths[0]):
+                try:
+                    all_preds = pd.read_csv(file_paths[0], index_col=False)
+                except:
+                    all_preds = None
+            elif 'parquet' in str(file_paths[0]):
+                try:
+                    all_preds = pd.read_parquet(file_paths[0], index_col=False)
+                except:
+                    all_preds = None
+        if not all_preds is None:
+            ## now filter the df so we only have the top 5 preds
+            just_labels = all_preds.drop(columns=['audiofilename', 'start', 'end', 'simultaneous_labels'])
+            if 'Unnamed: 0' in just_labels.columns:
+                just_labels = just_labels.drop(columns=['Unnamed: 0'])
+            np_labels = just_labels.values.T
+            k=5
+            top_k_indices = np.argsort(np.array(np_labels), axis=0)[-k:][::-1]
+            top_k_probs = np.sort(np_labels, axis=0)[-k:][::-1]
+            top_k_species = just_labels.columns.values[top_k_indices].T
+            
+            top_k_probs = top_k_probs.T
+            top_k_species[top_k_probs == 0] = ''
+            
+            i = 0
+            species, probs = [], []
+            for idx, label in enumerate(labels['default_classifier']):
+                if label == 'below_thresh':
+                    species.append([])
+                    probs.append([])
+                else:
+                    species.append(top_k_species[i].tolist())
+                    probs.append(top_k_probs[i].tolist())
+                    i += 1
+            df_lab[f'top_{k}_species'] = species
+            df_lab[f'top_{k}_probs'] = probs
+                    
+            
     # Pack variable labels as JSON string to preserve order and labels
     data_dict["variable_labels_json"] = (
         [

@@ -839,9 +839,9 @@ class Loader:
             df = pd.DataFrame(
                 cl_array[:, active_bins_global].T, columns=keys2idx.keys()
             )
-            df["species_richness"] = df.astype(bool).sum(axis=1)
-            df["start"] = df_dict["start"]
+            df["simultaneous_labels"] = df.astype(bool).sum(axis=1)
             df["end"] = df_dict["end"]
+            df["start"] = df_dict["start"]
             df["audiofilename"] = df_dict["audiofilename"]
             cols = list(df.columns)
             cols.reverse()

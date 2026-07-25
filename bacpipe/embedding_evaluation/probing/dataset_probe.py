@@ -138,11 +138,11 @@ def generate_annotations_for_probing_task(
             "starts",
             "ends",
             "audiofilename",
-            "species_richness",
+            "simultaneous_labels",
         ]
         species = ground_truth.drop(columns=non_species_labels).columns
 
-        active_starts = ground_truth.species_richness == 1
+        active_starts = ground_truth.simultaneous_labels == 1
         gt_4_probing = ground_truth[active_starts.values]
         gt_4_probing.index = range(len(gt_4_probing))
 

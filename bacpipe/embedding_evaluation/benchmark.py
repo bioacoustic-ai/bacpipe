@@ -291,7 +291,7 @@ def benchmark(
         "starts",
         "ends",
         "audiofilename",
-        "species_richness",
+        "simultaneous_labels",
     ]
     gt_species_cols = [
         col for col in gt.columns if col not in non_species_labels
