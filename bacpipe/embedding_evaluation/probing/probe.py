@@ -94,7 +94,7 @@ def probing_pipeline(
             return None
 
         bool_noise = get_boolean_array_for_annotated_embeddings(
-            ground_truth, paths, model_name, overwrite=overwrite
+            ground_truth, paths, model_name, overwrite=overwrite, **kwargs
             )
         df, embeds = embeds_array_where_single_label(
             embeds, ground_truth, bool_noise, df, **kwargs

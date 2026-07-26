@@ -90,7 +90,7 @@ class DashBoard(DashBoardHelper):
                             file_path=gt_file,
                             return_type="array",
                         )
-                    labels.append(gt_file.stem.split("_")[-1])
+                    labels.append(gt_file.stem.replace("ground_truth_", ""))
             self.ground_truth = True
             self.label_by += labels
 

@@ -311,7 +311,7 @@ def init_embed_figure(fig, axes, bool_3d=False, widget_idx=None, **kwargs):
 def get_boolean_array_for_annotated_embeddings(
     df_ground_truth, paths, model_name, 
     ground_truth_files=None, gt_file=None,
-    overwrite=False
+    overwrite=False, **kwargs
 ):
     if not gt_file is None and not ground_truth_files is None:
         if (
@@ -340,9 +340,9 @@ def get_boolean_array_for_annotated_embeddings(
         )
         
     df_metadata_labels = le.create_metadata_labels(
-        paths.audio_dir, model=model_name, 
+        model=model_name, 
         paths=paths, overwrite=overwrite,
-        return_type='dataframe'
+        return_type='dataframe', **kwargs
         )
     df_metadata_labels['audiofilename'] = df_metadata_labels['audio_file_name']
     
