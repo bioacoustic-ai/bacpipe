@@ -589,6 +589,21 @@ class PredictionsLoader:
 
                     total_length += current_time_bins
                 self.progress_bar.value = int((idx + 1) / len(files) * 100)
+            if len(keys2idx) == 0:
+                error_string = (
+                    "\nNo predictions have been found in the provdided data "
+                    "using this model. Please try again with a different "
+                    "threshold or different model. \n"
+                    "Simply changing the threshold will not change this, "
+                    "given that there were no predictions with the minimum "
+                    "threshold, the classifications need to be recomputed. "
+                    "The easiest way to do this is to delete the generated "
+                    "classifications which will force a recomputation."
+                )
+                logger.exception(error_string)
+                raise ValueError(
+                    error_string
+                )
             import pandas as pd
 
             probs_array = np.array(list(cl_dict.values())).T
