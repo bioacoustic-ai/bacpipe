@@ -203,6 +203,14 @@ clust_configs:
 # will fail. 
 visualization_dimensions: 2
 
+
+# This parameter controls how many classifier predictions 
+# are displayed above the spectrogram. Only predictions
+# exceeding the threshold are displayed. Predictions
+# are displayed along with their respective confidence
+# scores.
+nr_predictions_to_display: 3
+
 # maximum number of discrete categories
 # This number determines how many categories will be shown
 # as distinct labels. If more categories than this number

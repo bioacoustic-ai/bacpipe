@@ -712,6 +712,72 @@ def plot_comparison(
         plt.close(fig)
     else:
         return fig
+    
+def get_arrays_for_spectrogram_text(labels, label_by, data_dict, embeds):
+    dlk = settings.default_label_keys
+        
+    df_lab = {}
+    for k, v in labels.items():
+        if not k in dlk and not "kmeans" in k and not k == label_by:
+            df_lab[k] = list(v)
+    [df_lab.pop(k) for k in data_dict.keys() if k in df_lab.keys()]
+    
+    if 'default_classifier' in labels:
+        file_paths = list((
+            Path(embeds['metadata']['embed_dir'])
+            .parent
+            .parent
+            / settings.evaluations_dir
+            / embeds['metadata']['model_name']
+            / 'predictions'
+            ).glob('*all_predictions*'))
+        if len(file_paths) > 0:
+            if 'csv' in str(file_paths[0]):
+                try:
+                    all_preds = pd.read_csv(file_paths[0], index_col=False)
+                except:
+                    all_preds = None
+            elif 'parquet' in str(file_paths[0]):
+                try:
+                    all_preds = pd.read_parquet(file_paths[0], index_col=False)
+                except:
+                    all_preds = None
+        if not all_preds is None:
+            try:
+                ## now filter the df so we only have the top 5 preds
+                just_labels = all_preds.drop(columns=['audiofilename', 'start', 'end', 'simultaneous_labels'])
+                if 'Unnamed: 0' in just_labels.columns:
+                    just_labels = just_labels.drop(columns=['Unnamed: 0'])
+                np_labels = just_labels.values.T
+                
+                k=settings.nr_predictions_to_display
+                top_k_indices = np.argsort(np.array(np_labels), axis=0)[-k:][::-1]
+                top_k_probs = np.sort(np_labels, axis=0)[-k:][::-1]
+                top_k_species = just_labels.columns.values[top_k_indices].T
+                
+                top_k_probs = top_k_probs.T
+                top_k_species[top_k_probs == 0] = ''
+                
+                i = 0
+                species, probs = [], []
+                for idx, label in enumerate(labels['default_classifier']):
+                    if label == 'below_thresh':
+                        species.append([])
+                        probs.append([])
+                    else:
+                        species.append(top_k_species[i].tolist())
+                        probs.append(top_k_probs[i].tolist())
+                        i += 1
+                df_lab[f'top_{k}_species'] = species
+                df_lab[f'top_{k}_confidence'] = probs
+            except Exception as e:
+                logger.info(
+                    f"\nTop {k} predictions for display could not be loaded. "
+                    "The reason could be that a previous run failed and not all "
+                    "predictions were saved. Regenerating the embeddings is the "
+                    f"best chance of getting this to work. {e}"
+                )
+    return df_lab
 
 
 def reorder_embeddings_by_clustering_performance(
@@ -802,70 +868,10 @@ def plot_embeddings_px(
     if not embeds.get('z') is None:
         data_dict['z'] = z_data
         
-    dlk = settings.default_label_keys
-
-    df_lab = {}
-    for k, v in labels.items():
-        if not k in dlk and not "kmeans" in k and not k == label_by:
-            df_lab[k] = list(v)
-    [df_lab.pop(k) for k in data_dict.keys() if k in df_lab.keys()]
-    
-    if 'default_classifier' in labels:
-        file_paths = list((
-            Path(embeds['metadata']['embed_dir'])
-            .parent
-            .parent
-            / settings.evaluations_dir
-            / embeds['metadata']['model_name']
-            / 'predictions'
-            ).glob('*all_predictions*'))
-        if len(file_paths) > 0:
-            if 'csv' in str(file_paths[0]):
-                try:
-                    all_preds = pd.read_csv(file_paths[0], index_col=False)
-                except:
-                    all_preds = None
-            elif 'parquet' in str(file_paths[0]):
-                try:
-                    all_preds = pd.read_parquet(file_paths[0], index_col=False)
-                except:
-                    all_preds = None
-        if not all_preds is None:
-            try:
-                ## now filter the df so we only have the top 5 preds
-                just_labels = all_preds.drop(columns=['audiofilename', 'start', 'end', 'simultaneous_labels'])
-                if 'Unnamed: 0' in just_labels.columns:
-                    just_labels = just_labels.drop(columns=['Unnamed: 0'])
-                np_labels = just_labels.values.T
-                k=5
-                top_k_indices = np.argsort(np.array(np_labels), axis=0)[-k:][::-1]
-                top_k_probs = np.sort(np_labels, axis=0)[-k:][::-1]
-                top_k_species = just_labels.columns.values[top_k_indices].T
-                
-                top_k_probs = top_k_probs.T
-                top_k_species[top_k_probs == 0] = ''
-                
-                i = 0
-                species, probs = [], []
-                for idx, label in enumerate(labels['default_classifier']):
-                    if label == 'below_thresh':
-                        species.append([])
-                        probs.append([])
-                    else:
-                        species.append(top_k_species[i].tolist())
-                        probs.append(top_k_probs[i].tolist())
-                        i += 1
-                df_lab[f'top_{k}_species'] = species
-                df_lab[f'top_{k}_probs'] = probs
-            except Exception as e:
-                logger.info(
-                    f"\nTop {k} predictions for display could not be loaded. "
-                    "The reason could be that a previous run failed and not all "
-                    "predictions were saved. Regenerating the embeddings is the "
-                    f"best chance of getting this to work. {e}"
-                )
+    df_lab = get_arrays_for_spectrogram_text(
+        labels, label_by, data_dict, embeds
+        )
                     
-            
     # Pack variable labels as JSON string to preserve order and labels
     data_dict["variable_labels_json"] = (
         [

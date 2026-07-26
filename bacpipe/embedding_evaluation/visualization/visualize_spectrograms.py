@@ -77,9 +77,7 @@ class SpectrogramPlot:
 
         return spec_fig
 
-    # pd.read_csv(
-    #     '/mnt/swap/Work/Data/Min/bacpipe_results/bacpipe_audio_MK_1/evaluations/birdnet/labels/ground_truth_id.csv',
-    #     skiprows=180, nrows=1)[0]
+    
     def update_text(
         self, start_s, end_s, audiofilename, label, variable_labels_json=None
     ):
@@ -91,10 +89,14 @@ class SpectrogramPlot:
 
                 var_labels_dict = json.loads(variable_labels_json)
                 for key, value in var_labels_dict.items():
-                    if not 'top' in key:
-                        variable_labels_html += f"<b>{key}</b> = {value}; "
+                    if '_species' in key:
+                        clean_species = [v for v in value if not v == '']
+                        variable_labels_html += f"<br><b>{key}</b> = {', '.join(clean_species)}; "
+                    elif '_confidence' in key:
+                        clean_conf = [f'{v:.3f}' for v in value if not v == 0]
+                        variable_labels_html += f"<br><b>{key}</b> = {', '.join(clean_conf)}; "
                     else:
-                        variable_labels_html += f"<br><b>{key}</b> = {value}; "
+                        variable_labels_html += f"<b>{key}</b> = {value}; "
             except:
                 pass
 
