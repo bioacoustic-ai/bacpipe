@@ -187,7 +187,7 @@ def ensure_models_exist(
     [model_names.remove(l) for l in remove_from_list]
     return model_base_path.parent / "model_checkpoints"
 
-def confirm_model_name(model_name):
+def confirm_model_name(model_name, **kwargs):
     """
     Confirm that the model name is supported by bacpipe.
 
@@ -203,6 +203,12 @@ def confirm_model_name(model_name):
     NameError
         If model name not supported by bacpipe raise NameError.
     """
+    if isinstance(kwargs.get('CustomModel'), list):
+        if not kwargs.get('CustomModel')[0] is None:
+            return model_name
+    elif not kwargs.get('CustomModel') is None:
+        return model_name
+    
     if not isinstance(model_name, str):
         raise ValueError(
             f"You provided a model_name of type {type(model_name)}, "
@@ -395,9 +401,9 @@ def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
         dictionary containing the loader objects for each model
     """
     if isinstance(models, list):
-        models = [confirm_model_name(model) for model in models]
+        models = [confirm_model_name(model, **kwargs) for model in models]
     else:
-        models = [confirm_model_name(model) for model in [models]]
+        models = [confirm_model_name(model, **kwargs) for model in [models]]
     loader_dict = {}
     remove_models_from_list = []
     if "CustomModels" in kwargs:
@@ -587,7 +593,7 @@ def cross_model_evaluation(
     models : list
         embedding models
     """
-    models = [confirm_model_name(model) for model in models]
+    models = [confirm_model_name(model, **kwargs) for model in models]
     if len(models) > 1:
         plot_path = get_paths(models[0]).plot_path.parent.parent.joinpath(
             "overview"
@@ -653,7 +659,7 @@ def run_pipeline_for_single_model(
     bacpipe.Loader
         object to processed embeddings and classifier predictions
     """
-    model_name = confirm_model_name(model_name)
+    model_name = confirm_model_name(model_name, **kwargs)
         
     kwargs = replace_default_kwargs_with_user_kwargs(
         remove_keys=["audio_dir", "dim_reduction_model", "testing"], **kwargs
@@ -746,7 +752,7 @@ def generate_embeddings(
     bacpipe.Loader
         loader object to access embeddings and classifier predictions
     """
-    model_name = confirm_model_name(model_name)
+    model_name = confirm_model_name(model_name, **kwargs)
     if "dim_reduction_model" in kwargs:
         logger.info(
             f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"

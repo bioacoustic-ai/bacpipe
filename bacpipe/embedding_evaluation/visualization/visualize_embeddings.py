@@ -309,7 +309,7 @@ def init_embed_figure(fig, axes, bool_3d=False, widget_idx=None, **kwargs):
 
 
 def get_boolean_array_for_annotated_embeddings(
-    df_ground_truth, paths, model_name, 
+    df_ground_truth, model_name, 
     ground_truth_files=None, gt_file=None,
     overwrite=False, **kwargs
 ):
@@ -340,8 +340,7 @@ def get_boolean_array_for_annotated_embeddings(
         )
         
     df_metadata_labels = le.create_metadata_labels(
-        model=model_name, 
-        paths=paths, overwrite=overwrite,
+        model=model_name, overwrite=overwrite,
         return_type='dataframe', **kwargs
         )
     df_metadata_labels['audiofilename'] = df_metadata_labels['audio_file_name']
@@ -414,7 +413,7 @@ def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
                 )
                 
                 bool_noise = get_boolean_array_for_annotated_embeddings(
-                    ground_truth_df, paths, model_name,
+                    ground_truth_df, model_name,
                     gt_file=gt_file, ground_truth_files=ground_truth_files, 
                 )
                 label = gt_file.stem.replace("ground_truth_", "")
@@ -427,6 +426,7 @@ def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
                     "Building of ground truth labels for plots failed "
                     f"due to {str(e)}. Continuing without ground truth labels. "
                 )
+                bool_noise = np.array([False] * len(list(labels.values())[0]))
                 
 
         
