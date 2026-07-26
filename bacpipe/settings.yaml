@@ -89,6 +89,13 @@ annotations_filename :  annotations.csv
 # padding specified below (see `padding`).
 only_embed_annotations: False
 
+# Specify a minimum duration in seconds that a annotation has to 
+# be to include it in the ground truth. This can be helpful
+# if you want to avoid taking into account very short annotations
+# in which the embedding is likely to be dominated by other 
+# acoustic features than the annotated one.
+min_annotation_length: 0
+
 ##########-----------------------------#################
 ##########   METADATA LABELS SETTINGS   #################
 ##########-----------------------------#################

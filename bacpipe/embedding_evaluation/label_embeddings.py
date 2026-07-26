@@ -824,7 +824,6 @@ def fit_labels_to_embedding_timestamps(
     num_embeds,
     segment_s,
     label_column=None,
-    min_annotation_length=0.65,
     only_embed_annotations=False,
     **kwargs,
 ):
@@ -852,13 +851,13 @@ def fit_labels_to_embedding_timestamps(
         for idx in range(start_at_embed_nr, end_at_embed_nr):
 
             # check if the annotation length is longer that the specified min_annotation_length
-            if (row.end - row.start > min_annotation_length):
+            if (row.end - row.start > bacpipe.settings.min_annotation_length):
                 df_fitted_gt.loc[idx, row[f"label:{label_column}"]] = 1
             else:
                 logger.info(
                     f"\nSkipping annotation from {row.start} to {row.end} with "
                     f"label {row['label:species']} because the annotation is "
-                    f"shorter than {min_annotation_length=}. To change this, "
+                    f"shorter than {bacpipe.settings.min_annotation_length=}. To change this, "
                     "modify the value in the settings file."
                 )
                 
@@ -867,14 +866,14 @@ def fit_labels_to_embedding_timestamps(
         ).sum(axis=1)
     if df_fitted_gt["simultaneous_labels"].max() > 1:
         logger.warning(
-            "The species richness column of the ground truth has "
+            "The simultaneous labels column of the ground truth has "
             "values exceeding 1. This means you have multi-label "
             "ground truth annotations. If this should not be "
             "happening ensure the ground truth is created correcly."
         )
     elif df_fitted_gt["simultaneous_labels"].max() == 0:
         logger.warning(
-            "The species richness column of the ground truth has a "
+            "The simultaneous labels column of the ground truth has a "
             "maximum value of 0. This means no annotations have been"
             "found for your data. Something failed in building the "
             "ground truth array. Please ensure the audio filenames "
