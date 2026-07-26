@@ -9,6 +9,10 @@ from sklearn.metrics import adjusted_mutual_info_score as AMI
 
 import bacpipe.embedding_evaluation.label_embeddings as le
 import bacpipe
+from bacpipe.embedding_evaluation.visualization.visualize_embeddings import (
+    get_boolean_array_for_annotated_embeddings,
+    get_single_label_gt_labels
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -75,12 +79,12 @@ def run_clustering(
         clusterings[name] = clusterer.fit_predict(embeds)
         if len(ground_truth) > 0:
             clusterings[name + "_no_noise"] = clusterer.fit_predict(
-                embeds[ground_truth != -1]
+                embeds[ground_truth != 'noise']
             )
     if len(ground_truth) > 0 and label_column:
         clusterings[label_column] = ground_truth
         clusterings[f"{label_column}_no_noise"] = ground_truth[
-            ground_truth != -1
+            ground_truth != 'noise'
         ]
     return clusterings
 
@@ -115,9 +119,9 @@ def eval_clustering(
     results = {"AMI": dict(), "ARI": dict()}
     for cl_name, cl_labels in clusterings.items():
         if cl_name == f"{label_column}_no_noise":
-            if -1 in ground_truth:
-                embeds = embeds[ground_truth != -1]
-                cl_labels = ground_truth[ground_truth != -1]
+            if 'noise' in ground_truth:
+                embeds = embeds[ground_truth != 'noise']
+                cl_labels = ground_truth[ground_truth != 'noise']
 
         if metadata_labels and not hasattr(metadata_labels, "kmeans"):
             metadata_labels["kmeans"] = clusterings["kmeans"]
@@ -131,7 +135,7 @@ def eval_clustering(
         else:
             for def_name, def_labels in metadata_labels.items():
                 if "no_noise" in cl_name:
-                    def_labels = np.array(def_labels)[ground_truth != -1]
+                    def_labels = np.array(def_labels)[ground_truth != 'noise']
                 results[f"AMI"][f"{cl_name}-{def_name}"] = AMI(
                     def_labels, cl_labels
                 )
@@ -213,13 +217,17 @@ def get_nr_of_clusters(labels, clust_configs, **kwargs):
     clust_params = {}
     for config in clust_configs.values():
         if config["name"] == "kmeans":
-            if len(labels) > 0:
-                nr_of_classes = len(np.unique(labels))
+            if not config["params"]['n_clusters'] in ["None", None]:
+                clust_params[config["name"]] = config["params"]
+            elif len(labels) > 0:
+                nr_of_classes = len(set(labels))
                 clust_params[config["name"]] = {
                     "n_clusters": nr_of_classes,
                 }
             else:
-                clust_params[config["name"]] = config["params"]
+                clust_params[config["name"]] = {
+                    "n_clusters": 42,
+                }
         else:
             if config["bool"]:
                 clust_params[config["name"]] = config["params"]
@@ -269,25 +277,15 @@ def clustering_pipeline(
             kwargs.pop("audio_dir")
 
         if not ground_truth is None and len(ground_truth) > 0:
-            if max(ground_truth.simultaneous_labels) > 0:
-                logger.warning(
-                    "You have passed a multi-label ground truth array. "
-                    "However bacpipe only supports single label clustering "
-                    "and will therefore only take one species for each timestamp."
+            
+            bool_noise = get_boolean_array_for_annotated_embeddings(
+                ground_truth, paths, model_name
                 )
-
-                non_species_labels = [
-                    "starts",
-                    "ends",
-                    "audiofilename",
-                    "simultaneous_labels",
-                ]
-                gt_without_metadata = ground_truth.drop(
-                    columns=non_species_labels
-                )
-                ground_truth_1d = gt_without_metadata.idxmax(axis=1).values
-
+            ground_truth_1d = get_single_label_gt_labels(
+                ground_truth, bool_noise
+            )
         else:
+            bool_noise = []
             ground_truth_1d = []
 
         clust_params = get_nr_of_clusters(ground_truth_1d, **kwargs)
@@ -295,8 +293,10 @@ def clustering_pipeline(
         cluster_configs = get_clustering_models(clust_params)
 
         metadata_labels = le.create_metadata_labels(
-            paths.audio_dir, paths.clust_path.parent.stem, paths, **kwargs
+            paths.audio_dir, paths.clust_path.parent.stem, paths, overwrite=False,
+            **kwargs
         )
+        
 
         clusterings = run_clustering(
             embeds, cluster_configs, label_column, ground_truth_1d

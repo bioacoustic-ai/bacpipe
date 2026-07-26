@@ -12,20 +12,28 @@ logger = logging.getLogger(__name__)
 from .train_probe import train_probe, LinearProbe
 from .evaluate_probe import eval_probe
 from .dataset_probe import generate_annotations_for_probing_task
+from bacpipe.embedding_evaluation.visualization.visualize_embeddings import (
+    get_boolean_array_for_annotated_embeddings
+    )
 
 
-def embeds_array_without_noise(embeds, ground_truth, df, **kwargs):
-    bool_array_gt = (ground_truth.simultaneous_labels == 1).values
-
+def embeds_array_where_single_label(embeds, ground_truth, bool_noise, df, **kwargs):
+    # first extract the segments that have annotations
+    ground_truth = ground_truth[ground_truth.simultaneous_labels > 0]
+    
+    # now get the segments that have exactly one label
+    bool_single_label = (ground_truth.simultaneous_labels == 1).values
+    
     bool_array_probing = df.predefined_set.isin(
         ["train", "val", "test"]
-    ).values
+        ).values
 
     df = df[bool_array_probing]
     df.index = range(len(df))
 
     if isinstance(embeds, np.ndarray):
-        embeds = embeds[bool_array_gt]
+        embeds = embeds[~bool_noise]
+        embeds = embeds[bool_single_label]
         return df, embeds[bool_array_probing]
 
 
@@ -85,8 +93,11 @@ def probing_pipeline(
             )
             return None
 
-        df, embeds = embeds_array_without_noise(
-            embeds, ground_truth, df, **kwargs
+        bool_noise = get_boolean_array_for_annotated_embeddings(
+            ground_truth, paths, model_name, overwrite=overwrite
+            )
+        df, embeds = embeds_array_where_single_label(
+            embeds, ground_truth, bool_noise, df, **kwargs
         )
         if not len(df) == embeds.shape[0]:
             error = (

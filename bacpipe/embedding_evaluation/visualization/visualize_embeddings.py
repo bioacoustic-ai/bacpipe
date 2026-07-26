@@ -119,6 +119,8 @@ class EmbedAndLabelLoader:
     def get_data(self, model_name, label_by, remove_noise=False, **kwargs):
         if not model_name in self.labels.keys():
 
+            if not kwargs.get('widget_idx') is None and 'overwrite' in self.kwargs:
+                self.kwargs['overwrite'] = False
             tup = get_labels_for_plot(model_name, **self.kwargs)
             self.labels[model_name], self.bool_noise[model_name] = tup
 
@@ -306,44 +308,128 @@ def init_embed_figure(fig, axes, bool_3d=False, widget_idx=None, **kwargs):
     return fig, axes, return_axes
 
 
-def get_labels_for_plot(model_name=None, **kwargs):
+def get_boolean_array_for_annotated_embeddings(
+    df_ground_truth, paths, model_name, 
+    ground_truth_files=None, gt_file=None,
+    overwrite=False
+):
+    if not gt_file is None and not ground_truth_files is None:
+        if (
+            settings.label_column in str(gt_file) 
+            or len(ground_truth_files) == 1
+            ): 
+            logger.info(
+                f"Using {gt_file} to calculate the boolean "
+                "mask to enable filtering of only annotated "
+                "embeddings."
+            )
+        else:
+            logger.info(
+                "\nThere are multiple ground truth files: "
+                "Since the label does not fit to the label "
+                "label_column in settings.yaml It is unclear "
+                "which one bacpipe should use "
+                "to filter. Therefore the first file "
+                f"{str(ground_truth_files[0])=} is selected. \n"
+            )
+        
+    if max(df_ground_truth.simultaneous_labels) > 1:
+        logger.warning(
+            "You have passed a multi-label ground truth array. "
+            "However for visualization only one label will be displayed."
+        )
+        
+    df_metadata_labels = le.create_metadata_labels(
+        paths.audio_dir, model=model_name, 
+        paths=paths, overwrite=overwrite,
+        return_type='dataframe'
+        )
+    df_metadata_labels['audiofilename'] = df_metadata_labels['audio_file_name']
+    
+
+    df_ground_truth = df_ground_truth[df_ground_truth.simultaneous_labels > 0]
+    
+    df_metadata_labels['start'] = [np.round(v, 4) for v in df_metadata_labels['start']]
+    df_ground_truth['start'] = [np.round(v, 4) for v in df_ground_truth['start']]
+    
+    # Create multi-indexes for exact row matching
+    meta_idx = pd.MultiIndex.from_frame(df_metadata_labels[['audiofilename', 'start']])
+    gt_idx = pd.MultiIndex.from_frame(df_ground_truth[['audiofilename', 'start']])
+
+    # Get your exact boolean mask
+    is_in_ground_truth = meta_idx.isin(gt_idx)
+    is_noise = ~is_in_ground_truth
+    return is_noise
+
+
+def get_single_label_gt_labels(df_ground_truth, bool_noise):
+    if 'species_richness' in df_ground_truth.columns:
+        df_ground_truth.rename(columns={'species_richness': 'simultaneous_labels'}, inplace=True)
+        
+    
+    non_species_labels = [
+        "start",
+        "end",
+        "audiofilename",
+        "simultaneous_labels",
+    ]
+    
+    # ensure that all segments where no annotations were associated with timestamps
+    # are dropped
+    df_ground_truth = df_ground_truth[df_ground_truth.simultaneous_labels > 0]
+    
+    # now filter the dataframe to only contain the species columns
+    gt_without_metadata = df_ground_truth.drop(columns=non_species_labels)
+    
+    single_label = np.array(['noise'] * len(bool_noise), dtype='U50')
+    
+    # Now we need to ensure the length matches the other labels:
+    assert (
+        len(single_label[~bool_noise]) == len(gt_without_metadata.idxmax(axis=1).values)
+        ), (
+        "The lengths of the boolean array and the ground_truth arrays don't match. "
+        "Try rerunning the script with overwrite=True."
+        )
+    
+    # extract the species of the maximum index. now this is a bit
+    # of a random selection becaues annotations are binary values
+    # and so if there are 5 species present they are all equally
+    # likely to be selected here
+    single_label[~bool_noise] = gt_without_metadata.idxmax(axis=1).values
+    return single_label
+
+def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
     labels = dict()
-    labels = le.get_metadata_labels(model_name, **kwargs)
+    labels = le.get_metadata_labels(model_name, overwrite=overwrite, **kwargs)
 
+    paths = le.get_paths(model_name)
     ground_truth_files = list(
-        le.get_paths(model_name).labels_path.glob("ground_truth*csv")
+        paths.labels_path.glob("ground_truth*csv")
     )
-    if len(ground_truth_files) > 0:
+    if len(ground_truth_files) > 0:        
         for gt_file in ground_truth_files:
-            ground_truth_df = le.get_ground_truth(
-                model_name, file_path=gt_file, return_type="dataframe"
-            )
-            label = gt_file.stem.split("_")[-1]
-            if 'species_richness' in ground_truth_df.columns:
-                ground_truth_df.rename(columns={'species_richness': 'simultaneous_labels'}, inplace=True)
-
-            # inv = {v: k for k, v in ground_truth[f"label_dict:{label}"].items()}
-            # inv[-1.0] = "noise"
-            # inv[-2.0] = "noise"
-            # technically -2.0 is not noise, but corresponds to sections
-            # with multiple sources vocalizing simultaneously
-            if max(ground_truth_df.simultaneous_labels) > 1:
-                logger.warning(
-                    "You have passed a multi-label ground truth array. "
-                    "However for visualization only one label will be displayed."
+            try:
+                ground_truth_df = le.get_ground_truth(
+                    model_name, file_path=gt_file, return_type="dataframe"
                 )
+                
+                bool_noise = get_boolean_array_for_annotated_embeddings(
+                    ground_truth_df, paths, model_name,
+                    gt_file=gt_file, ground_truth_files=ground_truth_files, 
+                )
+                label = gt_file.stem.replace("ground_truth_", "")
+                
+                labels[label] = get_single_label_gt_labels(
+                    ground_truth_df, bool_noise
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Building of ground truth labels for plots failed "
+                    f"due to {str(e)}. Continuing without ground truth labels. "
+                )
+                
 
-            non_species_labels = [
-                "starts",
-                "ends",
-                "audiofilename",
-                "simultaneous_labels",
-            ]
-            gt_without_metadata = ground_truth_df.drop(
-                columns=non_species_labels
-            )
-            labels[label] = gt_without_metadata.idxmax(axis=1).values
-            bool_noise = np.array(labels[label]) == "noise"
+        
     else:
         bool_noise = np.array([False] * len(list(labels.values())[0]))
     if len(list(le.get_paths(model_name).clust_path.glob("*.npy"))) > 0:
@@ -359,7 +445,6 @@ def get_labels_for_plot(model_name=None, **kwargs):
                     labels[name] = np.array(
                         ["noise"] * len(bool_noise), dtype=object
                     )
-                    labels[name][~bool_noise] = [inv[v] for v in values]
 
     return labels, bool_noise
 
@@ -775,7 +860,7 @@ def get_arrays_for_spectrogram_text(labels, label_by, data_dict, embeds):
                     f"\nTop {k} predictions for display could not be loaded. "
                     "The reason could be that a previous run failed and not all "
                     "predictions were saved. Regenerating the embeddings is the "
-                    f"best chance of getting this to work. {e}"
+                    f"best chance of getting this to work. {str(e)}"
                 )
     return df_lab
 
@@ -914,7 +999,6 @@ def plot_embeddings_px(
                 hover_data=hover_data,
                 custom_data=custom_data,
                 title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
-                # render_mode="webgl",
                 color_continuous_scale=kwargs.get("color_continuous"),
             )
         else:
@@ -956,7 +1040,6 @@ def plot_embeddings_px(
                 hover_data=hover_data,
                 custom_data=custom_data,
                 title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
-                # render_mode="webgl",
                 color_discrete_sequence=COLOR_DISCRETE,
             )
         else:

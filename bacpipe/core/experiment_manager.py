@@ -236,7 +236,7 @@ class Loader:
             except Exception as e:
                 logger.exception(
                     f"Unable to load file {file}. Continuing with the "
-                    f"next file. {e}"
+                    f"next file. {str(e)}"
                 )
                 continue
             self.metadata_dict["files"]["audio_files"].append(
@@ -385,7 +385,7 @@ class Loader:
             self._get_metadata_dict(d)
             self.combination_already_exists = True
             logger.info(
-                f"\nError: {e}. "
+                f"\nError: {str(e)}. "
                 "Will proceed without veryfying if the number of embeddings "
                 "is the same as the number of audio files."
             )

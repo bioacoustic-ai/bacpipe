@@ -191,7 +191,9 @@ clust_configs:
     # number of clusters is set to a default value of 18
     # this is the default value can be adjusted as needed
     params:
-      n_clusters: 18
+      # if this is set to None, it will default to the number of
+      # unique labels found in the ground truth
+      n_clusters: None
   config_2:
     bool: False
     name: "hdbscan" # not that this will require installing the hdbscan package

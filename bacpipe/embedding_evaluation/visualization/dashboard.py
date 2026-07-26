@@ -807,7 +807,7 @@ def visualize_using_dashboard(
         dashboard.build_layout()
     except Exception as e:
         logger.exception(
-            f"\nError building dashboard layout: {e}\n \n "
+            f"\nError building dashboard layout: {str(e)}\n \n "
             "Are you sure all the evaluations have been performed? "
             "If not, rerun the pipeline with `overwrite=True`.\n \n "
         )

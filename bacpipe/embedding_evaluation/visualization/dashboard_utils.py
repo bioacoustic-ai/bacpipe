@@ -42,7 +42,7 @@ class DashBoardHelper:
             logger.info(f"First 5 files: {points['audiofilename'][:5]}")
 
         except Exception as e:
-            logger.info(f"Error handling selection: {e}")
+            logger.info(f"Error handling selection: {str(e)}")
 
     def save_selected_points(self, event, dialogue_panel, widget_idx):
         if not hasattr(self.spec_plot_obj[widget_idx], "selected_points"):
@@ -91,7 +91,7 @@ class DashBoardHelper:
                 self.spec_plot_obj[widget_idx].play_audio(event=None)
 
         except Exception as e:
-            logger.info(f"Error handling click: {e}")
+            logger.info(f"Error handling click: {str(e)}")
 
     def init_interactive_embed_plot(self, widget_idx):
         """Initialize interactive embedding plot with dummy figure"""
@@ -136,7 +136,7 @@ class DashBoardHelper:
                 f"✓ Saved to: {save_path}"
             )
         except Exception as e:
-            self.embed_notification[widget_idx].object = f"✗ Error: {e}"
+            self.embed_notification[widget_idx].object = f"✗ Error: {str(e)}"
 
     def update_main_plot(self, p_type, plot_func, widget_idx, **kwargs):
         """Update existing plot by just updating the .object"""
@@ -254,8 +254,8 @@ class DashBoardHelper:
                 else:
                     fig.savefig(save_path, dpi=300, bbox_inches="tight")
             except Exception as e:
-                logger.error(f"Error saving figure: {e}")
-                notification.object = f"✗ Error saving: {e}"
+                logger.error(f"Error saving figure: {str(e)}")
+                notification.object = f"✗ Error saving: {str(e)}"
                 return
 
             notification.object = f"✓ Figure saved to: {save_path}"

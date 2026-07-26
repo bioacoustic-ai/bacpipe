@@ -96,7 +96,7 @@ class AudioHandler:
             audio = audio.reshape(1, -1)
         except Exception as e:
             logger.exception(
-                f"\nError loading audio. Skipping {str(path)}." f"Error: {e}"
+                f"\nError loading audio. Skipping {str(path)}." f"Error: {str(e)}"
             )
             raise e
         if len(audio) == 0:
@@ -136,7 +136,7 @@ class AudioHandler:
             s, e = int(s), int(e)
             if s > len(audio):
                 logger.warning(
-                    f"Annotation with start {s} and end {e} is outside of "
+                    f"Annotation with start {s} and end {str(e)} is outside of "
                     f"range of {file_path}. Skipping annotation."
                 )
                 continue
@@ -171,7 +171,7 @@ class AudioHandler:
             s, e = int(s), int(e)
             if s > len(audio):
                 logger.warning(
-                    f"Annotation with start {s} and end {e} is outside of "
+                    f"Annotation with start {s} and end {str(e)} is outside of "
                     f"range of {file_path}. Skipping annotation."
                 )
                 continue

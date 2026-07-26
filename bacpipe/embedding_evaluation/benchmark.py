@@ -288,8 +288,8 @@ def benchmark(
 
     # Isolate species columns from metadata
     non_species_labels = [
-        "starts",
-        "ends",
+        "start",
+        "end",
         "audiofilename",
         "simultaneous_labels",
     ]

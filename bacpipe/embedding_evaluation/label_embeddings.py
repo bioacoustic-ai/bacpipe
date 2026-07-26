@@ -644,7 +644,8 @@ def model_specific_embedding_path(
 
 
 def create_metadata_labels(
-    audio_dir=None, model=None, paths=None, overwrite=True, **kwargs
+    audio_dir=None, model=None, paths=None, 
+    overwrite=True, return_type='dict', **kwargs
 ):
     """
     Create metadata labels based on audio files and model timestamps to
@@ -661,6 +662,8 @@ def create_metadata_labels(
         convenient object for path handling, by default None
     overwrite : bool, optional
         if True labels are overwritten, by default True
+    return_type : string, optional
+        return data as dict or dataframe, defaults to dict
 
     Returns
     -------
@@ -691,6 +694,30 @@ def create_metadata_labels(
         metadata_labels.generate()
 
         df_labels = pd.DataFrame(metadata_labels.default_label_dict)
+        input_length = (
+            metadata_labels.metadata['segment_length (samples)']
+            / metadata_labels.metadata['sample_rate (Hz)']
+            )
+        if not bacpipe.settings.only_embed_annotations:
+            start = []
+            [
+                start.extend([embed_idx * input_length for embed_idx in 
+                np.arange(nr_of_embeds)])
+                for nr_of_embeds in 
+                metadata_labels.nr_embeds_per_file
+            ]
+            df_labels['start'] = start
+            df_labels['end'] = df_labels['start'] + input_length
+        else:
+            df_gt = ground_truth_by_model(
+                model, 
+                audio_dir, 
+                annotations_filename=bacpipe.settings.annotations_filename, 
+                only_embed_annotations=True, 
+                overwrite=False
+                )
+            df_labels['start'] = df_gt['start']
+            df_labels['end'] = df_gt['end']
         
         if len(df_labels) * len(df_labels.T) > 3_000_000:
             df_labels.to_parquet(paths.labels_path / "metadata_labels.parquet", index=False)
@@ -711,13 +738,17 @@ def create_metadata_labels(
             def_labels = np.load(
                 paths.labels_path.joinpath("metadata_labels.npy"), allow_pickle=True
             ).item()
+            df_labels = pd.DataFrame(def_labels)
             
         elif paths.labels_path.joinpath("default_labels.npy").exists():
             def_labels = np.load(
                 paths.labels_path.joinpath("default_labels.npy"), allow_pickle=True
             ).item()
-            
-    return def_labels
+            df_labels = pd.DataFrame(def_labels)
+    if return_type == 'dict':
+        return def_labels
+    elif return_type == 'dataframe':
+        return df_labels
 
 def fetch_annotation_file(audio_dir, annotations_filename, paths):
     if annotations_filename is None:
@@ -832,22 +863,22 @@ def fit_labels_to_embedding_timestamps(
     df = df.sort_values("start")
 
     if not only_embed_annotations:
-        df_fitted_gt["starts"] = np.arange(num_embeds) * segment_s
-        df_fitted_gt["ends"] = df_fitted_gt["starts"] + segment_s
+        df_fitted_gt["start"] = np.arange(num_embeds) * segment_s
+        df_fitted_gt["end"] = df_fitted_gt["start"] + segment_s
     else:
-        df_fitted_gt["starts"] = df["start"].values
-        df_fitted_gt["ends"] = df["end"].values
+        df_fitted_gt["start"] = df["start"].values
+        df_fitted_gt["end"] = df["end"].values
 
     df.index = range(len(df))
     for _, row in df.iterrows():
         start_at_embed_nr = np.where(
-            df_fitted_gt["starts"] - row.start <= 0
+            df_fitted_gt["start"] - row.start <= 0
             )[0][-1]
-        end_at_embed_nr = np.where(df_fitted_gt["starts"] - row.end >= 0)[0]
+        end_at_embed_nr = np.where(df_fitted_gt["start"] - row.end >= 0)[0]
         if len(end_at_embed_nr) > 0:
             end_at_embed_nr = end_at_embed_nr[0]
         else:
-            end_at_embed_nr = len(df_fitted_gt["starts"])
+            end_at_embed_nr = len(df_fitted_gt["start"])
         for idx in range(start_at_embed_nr, end_at_embed_nr):
 
             # check if the annotation length is longer that the specified min_annotation_length
@@ -862,23 +893,8 @@ def fit_labels_to_embedding_timestamps(
                 )
                 
     df_fitted_gt["simultaneous_labels"] = df_fitted_gt.drop(
-        columns=["starts", "ends", "audiofilename", "simultaneous_labels"]
+        columns=["start", "end", "audiofilename", "simultaneous_labels"]
         ).sum(axis=1)
-    if df_fitted_gt["simultaneous_labels"].max() > 1:
-        logger.warning(
-            "The simultaneous labels column of the ground truth has "
-            "values exceeding 1. This means you have multi-label "
-            "ground truth annotations. If this should not be "
-            "happening ensure the ground truth is created correcly."
-        )
-    elif df_fitted_gt["simultaneous_labels"].max() == 0:
-        logger.warning(
-            "The simultaneous labels column of the ground truth has a "
-            "maximum value of 0. This means no annotations have been"
-            "found for your data. Something failed in building the "
-            "ground truth array. Please ensure the audio filenames "
-            "match the names in the names in the annotations file."
-        )
     return df_fitted_gt
 
 
@@ -892,30 +908,50 @@ def build_ground_truth_labels_by_file(
     all_labels,
     label_df=None,
     label_column=None,
+    filename_array=None,
     only_embed_annotations=False,
     **kwargs,
 ):
     audio_file = metadata["files"]["audio_files"][ind]
-    df = filter_df_by_filename(label_df, audio_file, model=model)
-
-    file_labels = pd.DataFrame(columns=all_labels.columns)
-    file_labels = fit_labels_to_embedding_timestamps(
-        df,
-        file_labels,
-        num_embeds,
-        segment_s,
-        label_column=label_column,
-        only_embed_annotations=only_embed_annotations,
-        **kwargs,
-    )
-    file_labels["audiofilename"] = audio_file
-    all_labels = pd.concat([all_labels, file_labels])
+    df = filter_df_by_filename(label_df, audio_file, filename_array=filename_array, model=model)
+    if len(df) == 0:
+        logger.info(
+            f"\nNo annotations found for {audio_file=}. "
+            "Continuing with next file."
+        )
+    else:
+        file_labels = pd.DataFrame(columns=all_labels.columns)
+        file_labels = fit_labels_to_embedding_timestamps(
+            df,
+            file_labels,
+            num_embeds,
+            segment_s,
+            label_column=label_column,
+            only_embed_annotations=only_embed_annotations,
+            **kwargs,
+        )
+        if file_labels["simultaneous_labels"].max() == 0:
+            logger.warning(
+                "The simultaneous labels column of the ground truth has a "
+                "maximum value of 0 for annotations corresponding to "
+                f"{audio_file=}. This means no annotations have been"
+                "found for your data. Something failed in building the "
+                "ground truth array. Please ensure the audio filenames "
+                "match the names in the names in the annotations file."
+            )
+        file_labels["audiofilename"] = audio_file
+        all_labels = pd.concat([all_labels, file_labels])
     return all_labels
 
 
+        
+        
 def filter_df_by_filename(
-    df_to_filter, file_name, file_name_column="audiofilename", model=None
+    df_to_filter, file_name, filename_array=None,
+    file_name_column="audiofilename", model=None
 ):
+    if filename_array is None:
+        filename_array = get_filename_array(df_to_filter, file_name_column)
     df = df_to_filter[
         df_to_filter[file_name_column] == Path(file_name).as_posix()
     ]
@@ -927,23 +963,14 @@ def filter_df_by_filename(
         
     # if no files are found, ensure parent path is not the cause
     if len(df) == 0:
-        df = df_to_filter[
-            np.array([
-                Path(f).stem + Path(f).suffix 
-                for f in df_to_filter[file_name_column]
-                ]) 
-            == file_name
-        ]
+        df = df_to_filter[filename_array == file_name]
         
     # if no files are found, ensure parent path is not the cause
     if len(df) == 0:
         df = df_to_filter[
-            np.array([
-                Path(f).stem + Path(f).suffix 
-                for f in df_to_filter[file_name_column]
-                ]) 
+            filename_array 
             == (Path(file_name).stem + Path(file_name).suffix)
-        ]
+            ]
         
     # if no files are found, match by classifier_prediction files
     if len(df) == 0:
@@ -991,10 +1018,15 @@ def initialize_ground_truth_df(label_df, label_column):
             "audiofilename": pd.Series(
                 dtype="string"
             ),
-            "ends": pd.Series(dtype="int8"),
-            "starts": pd.Series(dtype="int8"),
+            "end": pd.Series(dtype="int8"),
+            "start": pd.Series(dtype="int8"),
         }
     )
+
+def get_filename_array(label_df, label_column):
+    return np.array([
+        Path(f).stem + Path(f).suffix for f in label_df[f'label:{label_column}']
+        ]) 
 
 def collect_ground_truth_labels(
     files,
@@ -1006,6 +1038,7 @@ def collect_ground_truth_labels(
     **kwargs,
 ):
     ground_truth = initialize_ground_truth_df(label_df, label_column)
+    filename_array = get_filename_array(label_df, label_column)
     
     for ind, file in tqdm(
         enumerate(files),
@@ -1024,8 +1057,17 @@ def collect_ground_truth_labels(
             metadata,
             ground_truth,
             label_df,
+            filename_array=filename_array,
             label_column=label_column,
             **kwargs,
+        )
+    
+    if ground_truth["simultaneous_labels"].max() > 1:
+        logger.warning(
+            "The simultaneous labels column of the ground truth has "
+            "values exceeding 1. This means you have multi-label "
+            "ground truth annotations. If this should not be "
+            "happening ensure the ground truth is created correcly."
         )
     return ground_truth
 
@@ -1121,7 +1163,7 @@ def ground_truth_by_model(
         try:
             path = model_specific_embedding_path(paths.main_embeds_path, model)
         except Exception as e:
-            logger.warning(f"No embeddings directory seems to exist. {e}")
+            logger.warning(f"No embeddings directory seems to exist. {str(e)}")
             path = None
 
         # get annotations is not provided
@@ -1179,7 +1221,7 @@ def ground_truth_by_model(
             cols = list(ground_truth.columns)[::-1]
             ground_truth = ground_truth[cols]
             ground_truth = ground_truth.sort_values(
-                by=["audiofilename", "starts"]
+                by=["audiofilename", "start"]
             )
             ground_truth.to_csv(
                 paths.labels_path.joinpath(

@@ -161,7 +161,7 @@ class Embedder(AudioHandler):
                         self.classifier.classify(embeddings)
                     except Exception as e:
                         logger.exception(
-                            f"\nEmbeddings were created but classification failed due to error, {e}"
+                            f"\nEmbeddings were created but classification failed due to error, {str(e)}"
                         )
 
             if isinstance(embeddings, torch.Tensor) and embeddings.dim() == 1:
@@ -295,7 +295,7 @@ class Embedder(AudioHandler):
                     "there was an error when initially calculating embeddings. See the error "
                     "logs in the `logs` directory or previous error messages in the terminal. \n"
                 )
-                logger.exception(f"error_string {e}")
+                logger.exception(f"error_string {str(e)}")
                 raise NameError(error_string)
 
         self.loader.save_embedding_file(file, dim_reduced_embeddings)
@@ -385,7 +385,7 @@ class Embedder(AudioHandler):
                         "grabs all the VRAM and subsequently pytorch doesn't have enough. If this "
                         "is the case, simply rerunning bacpipe without the tensorflow model should "
                         "do the trick. If you simply don't have enough VRAM, you can reduce the global "
-                        f"batch size in the settings file. Or just compute on the cpu. {e}"
+                        f"batch size in the settings file. Or just compute on the cpu. {str(e)}"
                     )
                 except AttributeError as e:
                     logger.warning(
@@ -395,7 +395,7 @@ class Embedder(AudioHandler):
                     pbar.update(1)
                 except Exception as e:
                     logger.warning(
-                        f"Error generating embeddings for audio, skipping file.\nError: {e}"
+                        f"Error generating embeddings for audio, skipping file.\nError: {str(e)}"
                     )
                     pbar.update(1)
                     continue
@@ -438,7 +438,7 @@ class Embedder(AudioHandler):
                 try:
                     preprocessed = self.prepare_audio(file)
                     task_queue.put((idx, file, preprocessed))
-
+                
                 except torch.cuda.OutOfMemoryError:
                     logger.error(
                         "\nCuda device is out of memory. Your Vram doesn't seem to be "
@@ -450,6 +450,17 @@ class Embedder(AudioHandler):
                     )
                     os._exit(1)
                 except Exception as e:
+                    if 'JIT compilation failed' in str(e):
+                        error_str = (
+                            "There was an error that is most likely caused by "
+                            "using cuda and first running a pytorch and then a "
+                            "tensorflow model. You have to run them in individual "
+                            "sessions, then this error shouldn't occur."
+                        )
+                        logger.exception(
+                            error_str
+                        )
+                        raise MemoryError(error_str)
                     task_queue.put((idx, file, e))
             task_queue.put(None)  # sentinel = done
 
@@ -493,7 +504,7 @@ class Embedder(AudioHandler):
                         "grabs all the VRAM and subsequently pytorch doesn't have enough. If this "
                         "is the case, simply rerunning bacpipe without the tensorflow model should "
                         "do the trick. If you simply don't have enough VRAM, you can reduce the global "
-                        f"batch size in the settings file. Or just compute on the cpu. {e}"
+                        f"batch size in the settings file. Or just compute on the cpu. {str(e)}"
                     )
                 except AttributeError as e:
                     logger.warning(
@@ -507,7 +518,7 @@ class Embedder(AudioHandler):
                         # like corrupted files or other problems that can cause some files to 
                         # not process. But if users are running a long run, we do not want this
                         # run to fail because of minor problems.
-                        f"Error generating embeddings for {file}, skipping file.\nError: {e}"
+                        f"Error generating embeddings for {file}, skipping file.\nError: {str(e)}"
                     )
                     pbar.update(1)
                     continue
@@ -529,13 +540,13 @@ class Embedder(AudioHandler):
                 except soundfile.LibsndfileError as e:
                     logger.warning(
                         f"\n Error loading audio, skipping file. \n"
-                        f"Error: {e}"
+                        f"Error: {str(e)}"
                     )
                     continue
             except Exception as e:
                 logger.warning(
                     f"\n Error generating embeddings, skipping file. \n"
-                    f"Error: {e}"
+                    f"Error: {str(e)}"
                 )
                 continue
 

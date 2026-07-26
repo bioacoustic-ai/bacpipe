@@ -135,8 +135,8 @@ def generate_annotations_for_probing_task(
         rng = np.random.default_rng(seed=seed)
 
         non_species_labels = [
-            "starts",
-            "ends",
+            "start",
+            "end",
             "audiofilename",
             "simultaneous_labels",
         ]
@@ -156,10 +156,10 @@ def generate_annotations_for_probing_task(
 
         if not paths is None:
             filenames = gt_4_probing["audiofilename"]
-            starts, ends = gt_4_probing["starts"], gt_4_probing["ends"]
+            starts, ends = gt_4_probing["start"], gt_4_probing["end"]
             df["audiofilename"] = filenames
-            df["starts"] = starts
-            df["ends"] = ends
+            df["start"] = starts
+            df["end"] = ends
 
         df["label"] = active_labels
         df.index = range(len(df))
@@ -183,7 +183,7 @@ def generate_annotations_for_probing_task(
             df.loc[te_ar, "predefined_set"] = "test"
             df.loc[va_ar, "predefined_set"] = "val"
 
-        df = df.sort_values(by=["audiofilename", "starts"])
+        df = df.sort_values(by=["audiofilename", "start"])
 
         if paths is None:
             df.to_csv(dataset_csv_path, index=False)

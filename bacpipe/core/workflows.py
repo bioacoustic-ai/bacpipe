@@ -438,7 +438,7 @@ def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
             kwargs
             if kwargs["already_computed"]:
                 logger.exception(
-                    f"Bacpipe was not able to process {model_name} because {e}. "
+                    f"Bacpipe was not able to process {model_name} because {str(e)}. "
                     f"Because `already_computed` is True, it looks like {model_name} "
                     "didn't fully finish on the last run. "
                     "Bacpipe will continue without this model so that the rest of "
@@ -447,7 +447,7 @@ def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
                 )
             else:
                 logger.exception(
-                    f"Bacpipe was not able to process {model_name} because {e}."
+                    f"Bacpipe was not able to process {model_name} because {str(e)}."
                 )
     if len(remove_models_from_list) > 0:
         for model in remove_models_from_list:
@@ -525,7 +525,7 @@ def model_specific_evaluation(
             )
             ground_truth = None
         except IndexError as e:
-            logger.exception(f"unable to process ground truth, {e}")
+            logger.exception(f"unable to process ground truth, {str(e)}")
             ground_truth = None
 
         ####################################################################
@@ -711,7 +711,7 @@ def run_pipeline_for_single_model(
             except AssertionError as e:
                 logger.exception(
                     "Plotting of embeddings has failed. Continuing with processing "
-                    f"embeddings, but this will cause evaluation problems later on. {e}"
+                    f"embeddings, but this will cause evaluation problems later on. {str(e)}"
                 )
 
     return loader_embeddings
@@ -786,7 +786,7 @@ def generate_embeddings(
                 except Exception as e:
                     logger.warning(
                         "Error when trying to save classifier predictions. "
-                        f"Continuing but only embeddings will be saved. {e}"
+                        f"Continuing but only embeddings will be saved. {str(e)}"
                     )
             ld.write_metadata_file()
             ld.update_files()
