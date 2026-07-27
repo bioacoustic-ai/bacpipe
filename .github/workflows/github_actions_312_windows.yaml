@@ -1,0 +1,68 @@
+name: Model Testing Pipeline
+
+on: [push]
+
+jobs:
+  test-models:
+    name: ${{ matrix.model }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash  # Guarantees identical execution across Linux, Mac, and Windows
+    strategy:
+      fail-fast: false  # Ensures all OS/model combinations finish even if one fails
+      matrix:
+        os: [windows-latest]
+        model:
+          - audiomae
+          - audioprotopnet
+          - avesecho_passt
+          - aves_especies
+          - bat
+          - batdetect2_clip_avg
+          - batdetect2_dets_avg
+          - beats
+          - birdaves_especies
+          - biolingual
+          - birdmae
+          - convnext_birdset
+          - insect66
+          - insect459
+          - mix2
+          - naturebeats
+          - perch_v2
+          - protoclr
+          - rcl_fs_bsed
+          # Simply add more model keys here as you expand bacpipe!
+
+    steps:
+      # 1. Clone repository code
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      # 2. Set up Python 3.11 with PIP caching enabled
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'  # Caches PyPI packages to make re-runs blazingly fast
+
+      # 3. Install pytest and bacpipe source package
+      - name: Install pytest and bacpipe (editable)
+        run: pip install -r requirements_no_tf.txt
+
+      # 4. Run pytest specifically for the current matrix model
+      - name: Run Embedding Creation Test
+        run: >-
+          python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py
+          --models=${{ matrix.model }}
+          --only_embed_annotations=False
+          --device=cpu
+
+      # 5. Run embedding creation tests (only_embed_annotations=True)
+      - name: Run Embedding Creation Tests (Annotations Only)
+        run: >-
+          python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py
+          --models=${{ matrix.model }}
+          --only_embed_annotations=True
+          --device=cpu

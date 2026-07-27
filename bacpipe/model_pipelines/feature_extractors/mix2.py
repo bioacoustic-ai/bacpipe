@@ -1,5 +1,8 @@
 from torchaudio.transforms import MelSpectrogram, AmplitudeToDB
-from bacpipe.model_pipelines.model_specific_utils.mix2.mobile_net_v3 import mobilenetv3, MinMaxNorm
+from bacpipe.model_pipelines.model_specific_utils.mix2.mobile_net_v3 import (
+    mobilenetv3,
+    MinMaxNorm,
+)
 import torch
 
 SAMPLE_RATE = 16000
@@ -10,7 +13,9 @@ from ..model_utils import ModelBaseClass
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
+        super().__init__(
+            sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
+        )
         self.model = mobilenetv3()
         dict = torch.load(
             self.model_base_path / "mix2/mix2.pth",

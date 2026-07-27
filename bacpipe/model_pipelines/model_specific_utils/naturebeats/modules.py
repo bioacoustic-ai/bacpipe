@@ -50,7 +50,9 @@ class Swish(nn.Module):
 
 
 class GLU_Linear(nn.Module):
-    def __init__(self, input_dim, output_dim, glu_type="sigmoid", bias_in_glu=True):
+    def __init__(
+        self, input_dim, output_dim, glu_type="sigmoid", bias_in_glu=True
+    ):
         super(GLU_Linear, self).__init__()
 
         self.glu_type = glu_type
@@ -91,7 +93,9 @@ def gelu_accurate(x):
     if not hasattr(gelu_accurate, "_a"):
         gelu_accurate._a = math.sqrt(2 / math.pi)
     return (
-        0.5 * x * (1 + torch.tanh(gelu_accurate._a * (x + 0.044715 * torch.pow(x, 3))))
+        0.5
+        * x
+        * (1 + torch.tanh(gelu_accurate._a * (x + 0.044715 * torch.pow(x, 3))))
     )
 
 
@@ -107,7 +111,9 @@ def get_activation_fn(activation: str):
     elif activation == "gelu":
         return gelu
     elif activation == "gelu_fast":
-        warnings.warn("--activation-fn=gelu_fast has been renamed to gelu_accurate")
+        warnings.warn(
+            "--activation-fn=gelu_fast has been renamed to gelu_accurate"
+        )
         return gelu_accurate
     elif activation == "gelu_accurate":
         return gelu_accurate
@@ -118,7 +124,9 @@ def get_activation_fn(activation: str):
     elif activation == "glu":
         return lambda x: x
     else:
-        raise RuntimeError("--activation-fn {} not supported".format(activation))
+        raise RuntimeError(
+            "--activation-fn {} not supported".format(activation)
+        )
 
 
 def quant_noise(module, p, block_size):
@@ -167,7 +175,9 @@ def quant_noise(module, p, block_size):
         # regular convolutions
         else:
             k = module.kernel_size[0] * module.kernel_size[1]
-            assert k % block_size == 0, "Kernel size must be a multiple of block size"
+            assert (
+                k % block_size == 0
+            ), "Kernel size must be a multiple of block size"
 
     def _forward_pre_hook(mod, input):
         # no noise for evaluation
@@ -180,10 +190,13 @@ def quant_noise(module, p, block_size):
 
                 # split weight matrix into blocks and randomly drop selected blocks
                 mask = torch.zeros(
-                    in_features // block_size * out_features, device=weight.device
+                    in_features // block_size * out_features,
+                    device=weight.device,
                 )
                 mask.bernoulli_(p)
-                mask = mask.repeat_interleave(block_size, -1).view(-1, in_features)
+                mask = mask.repeat_interleave(block_size, -1).view(
+                    -1, in_features
+                )
 
             else:
                 # gather weight and sizes
@@ -198,7 +211,9 @@ def quant_noise(module, p, block_size):
                         device=weight.device,
                     )
                     mask.bernoulli_(p)
-                    mask = mask.repeat_interleave(block_size, -1).view(-1, in_channels)
+                    mask = mask.repeat_interleave(block_size, -1).view(
+                        -1, in_channels
+                    )
                 else:
                     mask = torch.zeros(
                         weight.size(0), weight.size(1), device=weight.device

@@ -24,7 +24,9 @@ from enum import Enum
 try:
     from torch.hub import load_state_dict_from_url  # noqa: 401
 except ImportError:
-    from torch.utils.model_zoo import load_url as load_state_dict_from_url  # noqa: 401
+    from torch.utils.model_zoo import (
+        load_url as load_state_dict_from_url,
+    )  # noqa: 401
 
 __all__ = [
     "MobileNetV3",
@@ -37,7 +39,9 @@ __all__ = [
 V = TypeVar("V")
 
 
-def _ovewrite_named_param(kwargs: Dict[str, Any], param: str, new_value: V) -> None:
+def _ovewrite_named_param(
+    kwargs: Dict[str, Any], param: str, new_value: V
+) -> None:
     if param in kwargs:
         if kwargs[param] != new_value:
             raise ValueError(
@@ -102,7 +106,9 @@ def _make_ntuple(x: Any, n: int) -> Tuple[Any, ...]:
     return tuple(repeat(x, n))
 
 
-def _make_divisible(v: float, divisor: int, min_value: Optional[int] = None) -> int:
+def _make_divisible(
+    v: float, divisor: int, min_value: Optional[int] = None
+) -> int:
     """
     This function is taken from the original tf repo.
     It ensures that all layers have a channel number that is divisible by 8
@@ -134,7 +140,9 @@ class InvertedResidualConfig:
     ):
         self.input_channels = self.adjust_channels(input_channels, width_mult)
         self.kernel = kernel
-        self.expanded_channels = self.adjust_channels(expanded_channels, width_mult)
+        self.expanded_channels = self.adjust_channels(
+            expanded_channels, width_mult
+        )
         self.out_channels = self.adjust_channels(out_channels, width_mult)
         self.use_se = use_se
         self.use_hs = activation == "HS"
@@ -220,8 +228,12 @@ class ConvNormActivation(torch.nn.Sequential):
         stride: Union[int, Tuple[int, ...]] = 1,
         padding: Optional[Union[int, Tuple[int, ...], str]] = None,
         groups: int = 1,
-        norm_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.BatchNorm2d,
-        activation_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.ReLU,
+        norm_layer: Optional[
+            Callable[..., torch.nn.Module]
+        ] = torch.nn.BatchNorm2d,
+        activation_layer: Optional[
+            Callable[..., torch.nn.Module]
+        ] = torch.nn.ReLU,
         dilation: Union[int, Tuple[int, ...]] = 1,
         inplace: Optional[bool] = True,
         bias: Optional[bool] = None,
@@ -240,7 +252,8 @@ class ConvNormActivation(torch.nn.Sequential):
                 kernel_size = _make_ntuple(kernel_size, _conv_dim)
                 dilation = _make_ntuple(dilation, _conv_dim)
                 padding = tuple(
-                    (kernel_size[i] - 1) // 2 * dilation[i] for i in range(_conv_dim)
+                    (kernel_size[i] - 1) // 2 * dilation[i]
+                    for i in range(_conv_dim)
                 )
         if bias is None:
             bias = norm_layer is None
@@ -301,8 +314,12 @@ class Conv2dNormActivation(ConvNormActivation):
         stride: Union[int, Tuple[int, int]] = 1,
         padding: Optional[Union[int, Tuple[int, int], str]] = None,
         groups: int = 1,
-        norm_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.BatchNorm2d,
-        activation_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.ReLU,
+        norm_layer: Optional[
+            Callable[..., torch.nn.Module]
+        ] = torch.nn.BatchNorm2d,
+        activation_layer: Optional[
+            Callable[..., torch.nn.Module]
+        ] = torch.nn.ReLU,
         dilation: Union[int, Tuple[int, int]] = 1,
         inplace: Optional[bool] = True,
         bias: Optional[bool] = None,
@@ -424,7 +441,9 @@ class MobileNetV3(nn.Module):
         _log_api_usage_once(self)
 
         if not inverted_residual_setting:
-            raise ValueError("The inverted_residual_setting should not be empty")
+            raise ValueError(
+                "The inverted_residual_setting should not be empty"
+            )
         elif not (
             isinstance(inverted_residual_setting, Sequence)
             and all(
@@ -511,7 +530,7 @@ class MobileNetV3(nn.Module):
         """
 
         x = torch.mean(x, dim=-2)
-        (x1, _) = torch.max(x, dim=-1)
+        x1, _ = torch.max(x, dim=-1)
         x2 = torch.mean(x, dim=-1)
         x = x1 + x2
 
@@ -587,7 +606,9 @@ def _mobilenet_v3_conf(
             bneck_conf(40, 5, 240, 40, True, "HS", 1, 1),
             bneck_conf(40, 5, 120, 48, True, "HS", 1, 1),
             bneck_conf(48, 5, 144, 48, True, "HS", 1, 1),
-            bneck_conf(48, 5, 288, 96 // reduce_divider, True, "HS", 2, dilation),  # C4
+            bneck_conf(
+                48, 5, 288, 96 // reduce_divider, True, "HS", 2, dilation
+            ),  # C4
             bneck_conf(
                 96 // reduce_divider,
                 5,
@@ -624,7 +645,9 @@ def _mobilenet_v3(
     **kwargs: Any,
 ) -> MobileNetV3:
     if weights is not None:
-        _ovewrite_named_param(kwargs, "num_classes", len(weights.meta["categories"]))
+        _ovewrite_named_param(
+            kwargs, "num_classes", len(weights.meta["categories"])
+        )
 
     model = MobileNetV3(inverted_residual_setting, last_channel, **kwargs)
 

@@ -1,6 +1,8 @@
-sphinx>=5.0
-sphinx-rtd-theme
+# docs/requirements.txt
+sphinx
+sphinx_rtd_theme
 sphinx-autodoc-typehints
-sphinxcontrib-napoleon
 myst-parser
-
+nbsphinx
+ipython
+pygments

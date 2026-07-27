@@ -1,9 +1,10 @@
 import numpy as np
 
-from .perch_v2 import Model
+from .perch_bird import Model
 
 SAMPLE_RATE = 24_000
 LENGTH_IN_SAMPLES = 50_000
+
 
 class Model(Model):
     def __init__(self, **kwargs):
@@ -11,7 +12,7 @@ class Model(Model):
             sr=SAMPLE_RATE,
             segment_length=LENGTH_IN_SAMPLES,
             model_choice="multispecies_whale",
-            **kwargs
+            **kwargs,
         )
 
         self.abbrev2label = {
@@ -29,10 +30,7 @@ class Model(Model):
             "Call": "Orca call",
         }
         self.class_label_key = "multispecies_whale"
-        self.classes = [
-            self.abbrev2label[v] 
-            for v in self.class_list.classes
-            ]
+        self.classes = [self.abbrev2label[v] for v in self.class_list.classes]
 
     def __call__(self, input, return_class_results=False):
         # if return_class_results:

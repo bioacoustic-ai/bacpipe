@@ -1,6 +1,8 @@
 import torch
 from torchaudio import transforms as T
-from bacpipe.model_pipelines.model_specific_utils.rcl_fs_bsed.resnet import ResNet
+from bacpipe.model_pipelines.model_specific_utils.rcl_fs_bsed.resnet import (
+    ResNet,
+)
 from ..model_utils import ModelBaseClass
 
 SAMPLE_RATE = 22050
@@ -16,7 +18,9 @@ N_MELS = 128
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
+        super().__init__(
+            sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
+        )
         self.model = ResNet()
         state_dict = torch.load(
             self.model_base_path / "rcl_fs_bsed/bioacoustics_model.pth",
@@ -24,7 +28,12 @@ class Model(ModelBaseClass):
             map_location=self.device,
         )
         enc_sd = state_dict["encoder"]
-        drop_keys = ["lin.0.weight", "lin.0.bias", "lin.2.weight", "lin.2.bias"]
+        drop_keys = [
+            "lin.0.weight",
+            "lin.0.bias",
+            "lin.2.weight",
+            "lin.2.bias",
+        ]
         enc_sd = {k: v for k, v in enc_sd.items() if k not in drop_keys}
         self.model.load_state_dict(enc_sd)
         self.mel = T.MelSpectrogram(

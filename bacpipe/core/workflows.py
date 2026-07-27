@@ -10,12 +10,15 @@ import tarfile
 import numpy as np
 
 from bacpipe.core.experiment_manager import (
-    Loader, save_logs, replace_default_kwargs_with_user_kwargs
-    )
+    Loader,
+    save_logs,
+    replace_default_kwargs_with_user_kwargs,
+    return_reduced_dimensions
+)
 from bacpipe.model_pipelines.runner import Embedder
 
 from bacpipe.embedding_evaluation.visualization.dashboard import (
-    visualize_using_dashboard
+    visualize_using_dashboard,
 )
 
 from bacpipe.embedding_evaluation.visualization.visualize import (
@@ -30,15 +33,14 @@ from bacpipe.embedding_evaluation.label_embeddings import (
     make_set_paths_func,
     ground_truth_by_model,
 )
-from bacpipe.embedding_evaluation.probing.probe import (
-    probing_pipeline
-    )
+from bacpipe.embedding_evaluation.probing.probe import probing_pipeline
 from bacpipe.embedding_evaluation.clustering.cluster import clustering_pipeline
 
 from bacpipe.core.constants import TF_MODELS, NEEDS_CHECKPOINT
 from bacpipe import config, settings
 
 logger = logging.getLogger("bacpipe")
+
 
 def play(bool_save_logs=False, **kwargs):
     """
@@ -63,19 +65,22 @@ def play(bool_save_logs=False, **kwargs):
         sure the path is correct :)
     """
     kwargs = replace_default_kwargs_with_user_kwargs(**kwargs)
-    
-    kwargs['model_base_path'] = ensure_models_exist(
-        Path(kwargs.get('model_base_path')), 
-        model_names=kwargs.get('models')
-        )
-    overwrite, dashboard = kwargs.get('overwrite'), kwargs.get('dashboard')
 
-    if kwargs.get('audio_dir') == 'bacpipe/tests/test_data' or kwargs.get('testing'):
-        with pkg_resources.path(
-            __package__.split('.')[0] + ".tests.test_data", ""
-            ) as audio_dir:
+    kwargs["model_base_path"] = ensure_models_exist(
+        Path(kwargs.get("model_base_path")), model_names=kwargs.get("models")
+    )
+    overwrite, dashboard = kwargs.get("overwrite"), kwargs.get("dashboard")
+
+    if kwargs.get("audio_dir") == "bacpipe/tests/test_data" or kwargs.get(
+        "testing"
+    ):
+        root_pkg = __package__.split(".")[0]
+
+        resource_path = pkg_resources.files(root_pkg) / "tests" / "test_data"
+
+        with pkg_resources.as_file(resource_path) as audio_dir:
             audio_dir = Path(audio_dir)
-
+      
         if not audio_dir.exists():
             error = (
                 f"\nAudio directory {kwargs.get('audio_dir')} does not exist. Please check the path. "
@@ -85,7 +90,7 @@ def play(bool_save_logs=False, **kwargs):
             logger.exception(error)
             raise FileNotFoundError(error)
         else:
-            kwargs['audio_dir'] = audio_dir
+            kwargs["audio_dir"] = audio_dir
 
         # ----------------------------------------------------------------
     # Setup logging to file if requested
@@ -93,7 +98,7 @@ def play(bool_save_logs=False, **kwargs):
     if bool_save_logs:
         save_logs()
 
-    kwargs['models'] = get_model_names(**kwargs)
+    kwargs["models"] = get_model_names(**kwargs)
 
     if overwrite or not evaluation_with_settings_already_exists(**kwargs):
 
@@ -107,9 +112,9 @@ def play(bool_save_logs=False, **kwargs):
         visualize_using_dashboard(**kwargs)
 
 
-
-
-def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_models"):
+def ensure_models_exist(
+    model_base_path, model_names, repo_id="vskode/bacpipe_models"
+):
     """
     Ensure that the model checkpoints for the selected models are
     available locally. Downloads from Hugging Face Hub if missing.
@@ -130,40 +135,45 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
     """
     if isinstance(model_names, str):
         model_names = [model_names]
+        
+    # always use lower case model name
+    model_names = [confirm_model_name(model) for model in model_names]
 
     model_base_path = Path(model_base_path)
     model_base_path.parent.mkdir(exist_ok=True, parents=True)
-    
+
     logger.info(
         "Checking if the selected models require a checkpoint, and if so, "
         "if the checkpoint already exists.\n"
     )
     remove_from_list = []
-    if 'naturebeats' in model_names and not 'beats' in model_names:
-        model_names.append('beats')
-        remove_from_list = ['beats']
-        
+    if "naturebeats" in model_names and not "beats" in model_names:
+        model_names.append("beats")
+        remove_from_list = ["beats"]
+
     for model_name in model_names:
         if model_name in NEEDS_CHECKPOINT:
-            if ((model_base_path / model_name).exists()
-                and len(list((model_base_path / model_name).iterdir())) > 0):
-                logger.info(f"{model_name} checkpoint exists.\n")    
+            if (model_base_path / model_name).exists() and len(
+                list((model_base_path / model_name).iterdir())
+            ) > 0:
+                logger.info(f"{model_name} checkpoint exists.\n")
                 continue
-            else:   
-                if model_name == 'birdnet':
+            else:
+                if model_name == "birdnet":
                     import tensorflow as tf
-                    if tf.__version__ == '2.15.1':
+
+                    if tf.__version__ == "2.15.1":
                         hf_url = f"{model_name}/{model_name}_tf215.tar.xz"
                     else:
                         hf_url = f"{model_name}/{model_name}.tar.xz"
                 else:
                     hf_url = f"{model_name}/{model_name}.tar.xz"
-                    
+
                 logger.info(
                     f"{model_name} checkpoint does not exists. "
                     "Downloading the model from "
                     f"https://huggingface.co/datasets/{repo_id}/blob/main/{hf_url}\n"
-                    )    
+                )
                 hf_hub_download(
                     repo_id=repo_id,
                     filename=hf_url,
@@ -173,11 +183,45 @@ def ensure_models_exist(model_base_path, model_names, repo_id="vskode/bacpipe_mo
                 tar = tarfile.open(model_base_path / hf_url)
                 tar.extractall(path=model_base_path)
                 tar.close()
-                
+
     [model_names.remove(l) for l in remove_from_list]
     return model_base_path.parent / "model_checkpoints"
 
+def confirm_model_name(model_name, **kwargs):
+    """
+    Confirm that the model name is supported by bacpipe.
 
+    Parameters
+    ----------
+    model_name : str
+        name of model to use for processing
+
+    Raises
+    ------
+    ValueError
+        If model name is not of type str.
+    NameError
+        If model name not supported by bacpipe raise NameError.
+    """
+    if isinstance(kwargs.get('CustomModel'), list):
+        if not kwargs.get('CustomModel')[0] is None:
+            return model_name
+    elif not kwargs.get('CustomModel') is None:
+        return model_name
+    
+    if not isinstance(model_name, str):
+        raise ValueError(
+            f"You provided a model_name of type {type(model_name)}, "
+            "please provide a string of a single model."
+        )
+    model_name = model_name.lower()
+    from bacpipe import supported_models
+    if not model_name in supported_models:
+        raise NameError(
+            f"The provided {model_name=} is not included in the {supported_models=}."
+        )
+    else:
+        return model_name
 
 def get_model_names(
     models,
@@ -217,7 +261,9 @@ def get_model_names(
 
         dataset_name = Path(audio_dir).stem
         main_results_path = (
-            Path(main_results_dir).joinpath(dataset_name).joinpath(embed_parent_dir)
+            Path(main_results_dir)
+            .joinpath(dataset_name)
+            .joinpath(embed_parent_dir)
         )
         model_names = [
             d.stem.split("___")[-1].split("-")[0]
@@ -237,6 +283,7 @@ def get_model_names(
         else:
             return np.unique(model_names).tolist()
     else:
+        models = [confirm_model_name(model) for model in models]
         return models
 
 
@@ -283,23 +330,18 @@ def evaluation_with_settings_already_exists(
             return False
         else:
             bool_dim_reducs = [
-                True
+                settings.visualization_dimensions == return_reduced_dimensions(d)
                 for d in paths.dim_reduc_parent_dir.rglob(
                     f"*{dim_reduction_model}*{model_name}*"
                 )
             ]
-            bool_dim_reducs = len(bool_dim_reducs) > 0 and all(bool_dim_reducs)
+            bool_dim_reducs = len(bool_dim_reducs) > 0 and any(bool_dim_reducs)
         if not bool_dim_reducs:
             return False
     return True
 
 
-def run_pipeline_for_models(
-    models, 
-    audio_dir, 
-    dim_reduction_model, 
-    **kwargs
-    ):
+def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
     """
     Generate embeddings for each model in the list of model names.
     The embeddings are generated using the generate_embeddings function
@@ -307,10 +349,10 @@ def run_pipeline_for_models(
     in the directory specified by the audio_dir parameter. The
     function returns a dictionary containing the loader objects
     for each model, by which metadata and paths are stored.
-    kwargs that are not specifically passed will be taken from 
+    kwargs that are not specifically passed will be taken from
     bacpipe.config and bacpipe.settings.
-    
-        
+
+
     code example:
     ```
     loader = bacpipe.run_pipeline_for_models(
@@ -324,7 +366,7 @@ def run_pipeline_for_models(
     # be ready to load them. The loader keys will be the model name and the values will
     # be the loader objects for each model. Each object contains all the information
     # on the generated embeddings. To name access them:
-    loader['birdnet'].embeddings() 
+    loader['birdnet'].embeddings()
     # this will give you a dictionary with the keys corresponding to embedding files
     # and the values corresponding to the embeddings as numpy arrays
 
@@ -332,8 +374,8 @@ def run_pipeline_for_models(
     # This will give you a dictionary overview of:
     # - where the audio data came from,
     # - where the embeddings were saved
-    # - all the audio files, 
-    # - the embedding size of the model, 
+    # - all the audio files,
+    # - the embedding size of the model,
     # - the audio file lengths,
     # - the number of embeddings for each audio files
     # - the sample rate
@@ -358,18 +400,22 @@ def run_pipeline_for_models(
     loader_dict : dict
         dictionary containing the loader objects for each model
     """
+    if isinstance(models, list):
+        models = [confirm_model_name(model, **kwargs) for model in models]
+    else:
+        models = [confirm_model_name(model, **kwargs) for model in [models]]
     loader_dict = {}
     remove_models_from_list = []
-    if 'CustomModels' in kwargs:
-        assert (len(kwargs['CustomModels']) == len(models)) , (
+    if "CustomModels" in kwargs:
+        assert len(kwargs["CustomModels"]) == len(models), (
             "If you provide custom models, the array needs to be the "
             "same length as the model name array. That way the association "
             "is clear. \n For example: models = ['birdnet', 'perch_v2', 'my_model] "
             "and CustomModels=[None, None, MyModel]. That way for models 0 and 1 "
             "the integrated models are loaded and for my_model the model class "
             "MyModel is loaded."
-            )
-        CustomModels = kwargs.pop('CustomModels')
+        )
+        CustomModels = kwargs.pop("CustomModels")
     else:
         CustomModels = [None] * len(models)
     for idx, model_name in enumerate(models):
@@ -381,33 +427,47 @@ def run_pipeline_for_models(
                 CustomModel=CustomModels[idx],
                 **kwargs,
             )
+            if (
+                hasattr(loader_dict[model_name], 'files') 
+                and len(loader_dict[model_name].files) == 0
+                ):
+                raise FileNotFoundError(
+                    "No embedding files were generated. Please consult the log "
+                    "to see what error is ocurring. Exiting bacpipe. "
+                )
         except AssertionError as e:
             remove_models_from_list.append(model_name)
-            if not 'already_computed' in kwargs:
+            if not "already_computed" in kwargs:
                 from bacpipe import config
-                kwargs['already_computed'] = config.already_computed
+
+                kwargs["already_computed"] = config.already_computed
             kwargs
-            if kwargs['already_computed']:
+            if kwargs["already_computed"]:
                 logger.exception(
-                    f"Bacpipe was not able to process {model_name} because {e}. "
+                    f"Bacpipe was not able to process {model_name} because {str(e)}. "
                     f"Because `already_computed` is True, it looks like {model_name} "
                     "didn't fully finish on the last run. "
                     "Bacpipe will continue without this model so that the rest of "
                     "the processing can still be completed. "
                     "To ensure this model get's processed, set `already_computed` to False."
-                    )
+                )
             else:
                 logger.exception(
-                    f"Bacpipe was not able to process {model_name} because {e}."
+                    f"Bacpipe was not able to process {model_name} because {str(e)}."
                 )
     if len(remove_models_from_list) > 0:
         for model in remove_models_from_list:
             models.remove(model)
     return loader_dict
 
+
 def model_specific_evaluation(
-    loader_dict, evaluation_task, probe_configs, 
-    models, dim_reduction_model=False, **kwargs
+    loader_dict,
+    evaluation_task,
+    probe_configs,
+    models,
+    dim_reduction_model=False,
+    **kwargs,
 ):
     """
     Perform evaluation of the embeddings using the specified
@@ -416,7 +476,7 @@ def model_specific_evaluation(
     The evaluation is performed using the functions from
     the probing and clustering modules.
     The results of the evaluation are saved in the directory
-    specified by the audio_dir parameter. 
+    specified by the audio_dir parameter.
 
     Parameters
     ----------
@@ -431,64 +491,61 @@ def model_specific_evaluation(
     models : list
         embedding models
     """
-    if 'CustomModels' in kwargs:
-        assert (len(kwargs['CustomModels']) == len(models)) , (
+    if "CustomModels" in kwargs:
+        assert len(kwargs["CustomModels"]) == len(models), (
             "If you provide custom models, the array needs to be the "
             "same length as the model name array. That way the association "
             "is clear. \n For example: models = ['birdnet', 'perch_v2', 'my_model] "
             "and CustomModels=[None, None, MyModel]. That way for models 0 and 1 "
             "the integrated models are loaded and for my_model the model class "
             "MyModel is loaded."
-            )
-        CustomModels = kwargs.pop('CustomModels')
+        )
+        CustomModels = kwargs.pop("CustomModels")
     else:
         CustomModels = [None] * len(models)
     ensure_models_exist(settings.model_base_path, models)
-    
+
     for idx, model_name in enumerate(models):
         paths = get_paths(model_name)
-        if loader_dict[model_name].classifier_should_be_run(paths, **kwargs):
+        if loader_dict[model_name].classifier_should_be_run(**kwargs):
             embed = Embedder(
-                model_name, 
-                loader_dict[model_name], 
+                model_name,
+                loader_dict[model_name],
                 CustomModel=CustomModels[idx],
-                **kwargs
-                )
-            if hasattr(embed.model, 'classifier_predictions'):
+                **kwargs,
+            )
+            if hasattr(embed.model, "classifier_predictions"):
                 embed.classifier.run_default_classifier(
                     loader_dict[model_name]
-                    )
-                
+                )
+
         # if not evaluation_task in ["None", [], None, False]:
-        embeds = loader_dict[model_name].embeddings()
+        embeds = loader_dict[model_name].embeddings(return_type="array")
         try:
             ground_truth = ground_truth_by_model(
-                model_name, paths=paths, single_label=True, **kwargs
-                )
+                model_name, paths=paths, **kwargs
+            )
         except FileNotFoundError as e:
             logger.exception(
                 f"unable to process ground truth, no annotations file found."
             )
             ground_truth = None
         except IndexError as e:
-            logger.exception(
-                f"unable to process ground truth, {e}"
-            )
+            logger.exception(f"unable to process ground truth, {str(e)}")
             ground_truth = None
-
-
 
         ####################################################################
         ############      PROBING OF EMBEDDINGS THROUGH       ##############
         ############      LINEAR AND KNN CLASSIFICATION       ##############
         ############            SEE SETTINGS.YAML             ##############
         ####################################################################
-        
+
         if "probing" in evaluation_task and not ground_truth is None:
             logger.info(
-                "\nTraining probe to evaluate " f"{model_name.upper()} embeddings"
+                "\nTraining probe to evaluate "
+                f"{model_name.upper()} embeddings"
             )
-            
+
             assert len(embeds) > 1, (
                 "Too few files to evaluate embeddings with probing. "
                 "Are you sure you have selected the right data?"
@@ -497,26 +554,33 @@ def model_specific_evaluation(
             for class_config in probe_configs.values():
                 if class_config["bool"]:
                     probing_pipeline(
-                        model_name, 
-                        ground_truth, embeds, 
-                        paths, **class_config, **kwargs
+                        model_name,
+                        ground_truth,
+                        embeds,
+                        paths,
+                        **class_config,
+                        **kwargs,
                     )
 
         ####################################################################
         ############      CLUSTERING OF EMBEDDINGS THROUGH    ##############
         ######      KMEANS (AND WHATEVER SPECIFIED IN SETTINGS.YAML)   #####
         ####################################################################
-                    
+
         if "clustering" in evaluation_task:
             logger.info(
                 "\nGenerating clusterings to evaluate "
                 f"{model_name.upper()} embeddings"
             )
 
-            embeds_array = np.concatenate(list(embeds.values()))
-            clustering_pipeline(model_name, ground_truth, embeds_array, paths, **kwargs)
+            clustering_pipeline(
+                model_name, ground_truth, embeds, paths, **kwargs
+            )
 
-def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwargs):
+
+def cross_model_evaluation(
+    dim_reduction_model, evaluation_task, models, **kwargs
+):
     """
     Generate plots to compare models by the specified tasks.
 
@@ -529,15 +593,19 @@ def cross_model_evaluation(dim_reduction_model, evaluation_task, models, **kwarg
     models : list
         embedding models
     """
+    models = [confirm_model_name(model, **kwargs) for model in models]
     if len(models) > 1:
-        plot_path = get_paths(models[0]).plot_path.parent.parent.joinpath("overview")
+        plot_path = get_paths(models[0]).plot_path.parent.parent.joinpath(
+            "overview"
+        )
         plot_path.mkdir(exist_ok=True, parents=True)
         if not len(evaluation_task) == 0:
             for task in evaluation_task:
                 visualise_results_across_models(plot_path, task, models)
         if not dim_reduction_model == "None":
             kwargs.pop("dashboard")
-            if "audio_dir" in kwargs: kwargs.pop("audio_dir")
+            if "audio_dir" in kwargs:
+                kwargs.pop("audio_dir")
             plot_comparison(
                 plot_path,
                 models,
@@ -552,7 +620,7 @@ def run_pipeline_for_single_model(
     model_name,
     audio_dir,
     dim_reduction_model="None",
-    check_if_already_processed=True,
+    check_if_already_processed=False,
     check_if_already_dim_reduced=True,
     testing=False,
     **kwargs,
@@ -560,10 +628,10 @@ def run_pipeline_for_single_model(
     """
     Run the bacpipe pipeline, including embedding generation, classification
     using the pretrained classifier (if included), dimensionality reduction (if passed),
-    and plotting of visualization to files. 
+    and plotting of visualization to files.
     All of this will be done for one model. The predefined folder structure will be created
-    so that subsequent processing runs will be very fast, as they then only load the data. 
-    kwargs that are not specifically passed will be taken from 
+    so that subsequent processing runs will be very fast, as they then only load the data.
+    kwargs that are not specifically passed will be taken from
     bacpipe.config and bacpipe.settings.
 
     Parameters
@@ -575,13 +643,13 @@ def run_pipeline_for_single_model(
     dim_reduction_model : str, optional
         name of dimensionality reduction model, by default "None"
     check_if_already_processed : bool, optional
-        set to False if you want to force recomputing 
+        set to False if you want to force recomputing
         of embeddings, by default True
     check_if_already_dim_reduced : bool, optional
-        set to False if you want to force recomputing of 
+        set to False if you want to force recomputing of
         dimensionality reduced embeddings, by default True
     overwrite : bool, optional
-        set to True if you want default labels and 
+        set to True if you want metadata labels and
         ground truth labels to be processed again, by default False
     testing : bool, optional
         set to True for testing, by default False
@@ -591,10 +659,11 @@ def run_pipeline_for_single_model(
     bacpipe.Loader
         object to processed embeddings and classifier predictions
     """
+    model_name = confirm_model_name(model_name, **kwargs)
+        
     kwargs = replace_default_kwargs_with_user_kwargs(
-        remove_keys=['audio_dir', 'dim_reduction_model', 'testing'], 
-        **kwargs
-        )
+        remove_keys=["audio_dir", "dim_reduction_model", "testing"], **kwargs
+    )
     global get_paths
     get_paths = make_set_paths_func(audio_dir, testing=testing, **kwargs)
     paths = get_paths(model_name)
@@ -648,24 +717,33 @@ def run_pipeline_for_single_model(
             except AssertionError as e:
                 logger.exception(
                     "Plotting of embeddings has failed. Continuing with processing "
-                    f"embeddings, but this will cause evaluation problems later on. {e}"
+                    f"embeddings, but this will cause evaluation problems later on. {str(e)}"
                 )
-                
+
     return loader_embeddings
 
 
-def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
+def generate_embeddings(
+    model_name,
+    audio_dir,
+    avoid_pipelined_gpu_inference=False, 
+    **kwargs
+    ):
     """
     Run the embedding generation pipeline including classification
     using the pretrained classifier (if included).
     All of this will be done for one model. The predefined folder structure will be created
-    so that subsequent processing runs will be very fast, as they then only load the data. 
-    kwargs that are not specifically passed will be taken from 
+    so that subsequent processing runs will be very fast, as they then only load the data.
+    kwargs that are not specifically passed will be taken from
     bacpipe.config and bacpipe.settings.
 
 
     Parameters
     ----------
+    model_name : str
+        name of model to use for processing
+    audio_dir : string or pathlib.Path
+        path to audio data
     avoid_pipelined_gpu_inference : bool, optional
         set to True to avoid multiprocessing, by default False
 
@@ -673,30 +751,27 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
     -------
     bacpipe.Loader
         loader object to access embeddings and classifier predictions
-
-    Raises
-    ------
-    ValueError
-        if not model name is provided
     """
+    model_name = confirm_model_name(model_name, **kwargs)
     if "dim_reduction_model" in kwargs:
         logger.info(
             f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"
         )
-    elif "model_name" in kwargs:
+    elif not model_name is None:
         logger.info(
-            f"\n\n\n###### Generating embeddings using {kwargs['model_name'].upper()} ######\n"
+            f"\n\n\n###### Generating embeddings using {model_name.upper()} ######\n"
         )
-    else:
-        error = "\nmodel_name not provided in kwargs."
-        logger.exception(error)
-        raise ValueError(error)
     try:
         start = time.time()
-        ld = Loader(use_folder_structure=True, **kwargs)
+        ld = Loader(
+            use_folder_structure=True, 
+            audio_dir=audio_dir,
+            model_name=model_name, 
+            **kwargs
+            )
         logger.debug(f"Loading the data took {time.time()-start:.2f}s.")
         if not ld.combination_already_exists:
-            embed = Embedder(loader=ld, **kwargs)
+            embed = Embedder(loader=ld, model_name=model_name, **kwargs)
 
             if ld.dim_reduction_model:
                 # (1) Dimensionality reduction stage
@@ -717,35 +792,45 @@ def generate_embeddings(avoid_pipelined_gpu_inference=False, **kwargs):
                 except Exception as e:
                     logger.warning(
                         "Error when trying to save classifier predictions. "
-                        f"Continuing but only embeddings will be saved. {e}"
+                        f"Continuing but only embeddings will be saved. {str(e)}"
                     )
             ld.write_metadata_file()
             ld.update_files()
-        
+
             # clear GPU
             del embed
-            
-            if kwargs['model_name'] in TF_MODELS:
+
+            if model_name in TF_MODELS:
                 import tensorflow as tf
+
                 tf.keras.backend.clear_session()
-                
-        elif hasattr(kwargs, 'paths') and ld.classifier_should_be_run(**kwargs):
-            embed = Embedder(loader=ld, **kwargs)
-            if hasattr(embed.model, 'classifier_predictions'):
-                embed.classifier.run_default_classifier(ld)
+
+        elif ld.classifier_should_be_run(**kwargs):
+            if hasattr(kwargs, "paths"):
+                embed = Embedder(loader=ld, model_name=model_name, **kwargs)
+                if hasattr(embed.model, "classifier_predictions"):
+                    embed.classifier.run_default_classifier(ld)
         return ld
     except KeyboardInterrupt:
         try:
             if ld.embed_dir.exists() and ld.rm_embedding_on_keyboard_interrupt:
-                all_files = list(Path(ld.embed_dir).rglob('*'))
+                all_files = list(Path(ld.embed_dir).rglob("*"))
                 if len(all_files) < 15:
-                    logger.info(f"KeyboardInterrupt: Exiting and deleting created {ld.embed_dir}.")
+                    logger.info(
+                        f"KeyboardInterrupt: Exiting and deleting created {ld.embed_dir}."
+                    )
                     import shutil
 
                     shutil.rmtree(ld.embed_dir)
                 else:
-                    logger.info(f"KeyboardInterrupt: Exiting but not deleting {ld.embed_dir}.")
+                    logger.info(
+                        f"KeyboardInterrupt: Exiting but not deleting {ld.embed_dir}."
+                    )
         except NameError:
             logger.info("Bacpipe exiting.")
         import sys
+
         sys.exit()
+        
+    # except Exception as e:
+    #     logger.exception(e)

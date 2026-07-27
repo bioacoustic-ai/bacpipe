@@ -20,14 +20,15 @@ from timm.models.layers import to_2tuple
 
 
 import bacpipe.model_pipelines.model_specific_utils.audiomae.models_vit as models_vit
-from bacpipe.model_pipelines.model_specific_utils.audiomae.dataset import AudiosetDataset
+from bacpipe.model_pipelines.model_specific_utils.audiomae.dataset import (
+    AudiosetDataset,
+)
 from ..model_utils import ModelBaseClass
 
 BATCH_SIZE = 8  # important to lower this if run on laptop cpu
 
 SAMPLE_RATE = 16000
 LENGTH_IN_SAMPLES = int(10 * SAMPLE_RATE)
-
 
 
 class PatchEmbed_new(nn.Module):
@@ -71,7 +72,9 @@ class PatchEmbed_new(nn.Module):
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
+        super().__init__(
+            sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
+        )
         self.nb_classes = 527
         self.model = "vit_base_patch16"
         self.model_path = self.model_base_path / "audiomae/finetuned.pth"
@@ -117,35 +120,37 @@ class Model(ModelBaseClass):
         self.model.pos_embed = nn.Parameter(
             torch.zeros(1, num_patches + 1, self.emb_dim), requires_grad=False
         )  # fixed sin-cos embedding
-        
-
 
         if isinstance(self.model_path, pathlib.WindowsPath):
             try:
                 # Save original PosixPath
                 original_posix_path = pathlib.PosixPath
-                
+
                 # patch PosixPath to return str or WindowsPath
-                pathlib.PosixPath = pathlib.WindowsPath 
-                
+                pathlib.PosixPath = pathlib.WindowsPath
+
                 checkpoint = torch.load(
-                    self.model_path, map_location=self.device, weights_only=False
+                    self.model_path,
+                    map_location=self.device,
+                    weights_only=False,
                 )
             finally:
                 # Restore original PosixPath to avoid side effects
                 pathlib.PosixPath = original_posix_path
         else:
-                checkpoint = torch.load(
-                    self.model_path, map_location=self.device, weights_only=False
-                )
-        
+            checkpoint = torch.load(
+                self.model_path, map_location=self.device, weights_only=False
+            )
+
         checkpoint_model = checkpoint["model"]
         # load pre-trained model
         self.model.load_state_dict(checkpoint_model)
         # manually initialize fc layer
         trunc_normal_(self.model.head.weight, std=2e-5)
 
-        self.audio_obj = AudiosetDataset(sr=SAMPLE_RATE, audio_conf=self.audio_conf_val)
+        self.audio_obj = AudiosetDataset(
+            sr=SAMPLE_RATE, audio_conf=self.audio_conf_val
+        )
 
     def preprocess(self, audio):
         processed_frame = []

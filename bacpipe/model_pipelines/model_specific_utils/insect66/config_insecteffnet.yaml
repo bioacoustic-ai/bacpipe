@@ -1,0 +1,52 @@
+
+has_test_audio: true   # set this to False if you don't have access to the test audio (i.e. training and validation only)
+has_test_labels: true   # set this to False if you don't have access to the test labels
+
+wav_crop_len: 5     # Length of cropped files in seconds
+data_path_base: ../data/production_data
+n_classes: 66       # Number of classes
+pretrained: true    # Use pretrained model
+backbone: tf_efficientnetv2_s.in21k     # image classification model (from list_models)
+in_chans: 1
+num_workers: 4      # Number of parallelized CPUs
+include_val: true   # Validation-set included / excluded
+max_amp: false      # Experimental feature
+
+
+# Training Hyperparameters
+n_epochs: 18                 # Number of epochs
+lr: 0.0017                   # Learning rate
+weight_decay: 1.0e-05        # Weight decay
+label_smoothing: 0.1         # Label smoothing
+batch_size: 32               # Batch size
+sample_rate: 44100           # Sample rate
+
+# Mel Spectrogram Hyperparameters
+# see Torchaudio Documentation to understand these
+n_mels: 128
+n_fft: 2048
+fmin: 400
+fmax: 22000
+power: 2
+top_db: 80.0
+
+win_length: 2048
+hop_length: 1024
+
+# Normalization
+mel_normalized: true         # Mel normalization as documented in Torchaudio (normalized=True)
+minmax_norm: false           # Apply minmax normalization on spectrograms
+
+# Augmentation Parameters
+impulse_prob: 0.15           # Impulse probability
+noise_prob: 0.15             # Noise probability
+
+max_noise: 0.04              # Noiseinjection amplitude
+min_snr: 5                   # signal-noise ratio (Gaussian & Pink Noise)
+max_snr: 20
+
+mixup: false                 # Apply mixup augmentation
+specaug: false               # Apply OneOf(MaskFrequency, MaskTime)
+specaug_prob: 0.25           # Probability to apply spectrogram augmentation
+mixup_prob: 1                # Parameter of a symmetric Beta distribution, 1=uniform distribution
+

@@ -1,14 +1,18 @@
 import torch
 
-from bacpipe.model_pipelines.model_specific_utils.naturebeats.BEATs import BEATs, BEATsConfig
+from bacpipe.model_pipelines.model_specific_utils.naturebeats.BEATs import (
+    BEATs,
+    BEATsConfig,
+)
 from ..model_utils import ModelBaseClass
-
 
 SAMPLE_RATE = 16_000
 LENGTH_IN_SAMPLES = int(5 * SAMPLE_RATE)
 
 
-BEATS_PRETRAINED_PATH_FT = "beats/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt1.pt"
+BEATS_PRETRAINED_PATH_FT = (
+    "beats/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt1.pt"
+)
 
 
 class BeatsModel:
@@ -67,7 +71,9 @@ class BeatsModel:
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
+        super().__init__(
+            sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
+        )
 
         self.model = BeatsModel(
             checkpoint_path=self.model_base_path / BEATS_PRETRAINED_PATH_FT
