@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath("../../"))  # root so `import bacpipe` works
 project = "bacpipe"
 author = "Vincent S. Kather"
 copyright = f"{datetime.now().year}, {author}"
-release = "1.3.3.dev3"
+release = "1.3.3"
 
 # -- General configuration ---------------------------------------------------
 extensions = [
