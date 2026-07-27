@@ -4,6 +4,7 @@ import re
 import logging
 from pathlib import Path
 import pandas as pd
+import importlib.resources as pkg_resources
 
 logger = logging.getLogger("bacpipe")
 from sklearn.metrics import classification_report, average_precision_score
@@ -25,7 +26,7 @@ def associate_labels_to_eBird_Codes(gt_species_cols, gt_without_metadata):
         "annotated species are eBird Codes and converting them to common name."
     )
     # check if in eBird Codes
-    ebird_path = Path('bacpipe/embedding_evaluation/eBird_taxonomy_v2025-4.csv')
+    ebird_path = Path(pkg_resources.files('bacpipe') / 'embedding_evaluation/eBird_taxonomy_v2025-4.csv')
     ebird_df = pd.read_csv(ebird_path)
     gt_ebird2common = {}
     for idx, gt_label in enumerate(gt_species_cols):

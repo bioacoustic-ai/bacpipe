@@ -12,7 +12,7 @@ evaluations_dir :       evaluations
 
 # fixed path, model checkpoints are/should be stored here
 # this is also where bacpipe will look for existing checkpoints
-model_base_path: bacpipe/model_checkpoints
+model_base_path: bacpipe_model_checkpoints
 
 
 #########-----------------------------------############
