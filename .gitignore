@@ -33,3 +33,12 @@ bacpipe/tests/results_files/*
 exploration/*
 !exploration/explore_embeds.py
 !exploration/explore_dashboard.py
+
+*.npy
+*.png
+*.html
+*.xz
+*.pt
+*.pth
+*.pb
+*model_checkpoints*

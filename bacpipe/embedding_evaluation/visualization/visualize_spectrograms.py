@@ -120,7 +120,7 @@ class SpectrogramPlot:
             return
         audio = tukey(len(self.audio), alpha=0.01) * self.audio
         
-        sd.play(audio, self.sample_rate)#int(self.orig_sr / self.kwargs.get('slowdown_rate')))
+        sd.play(audio, self.kwargs['constant_sr'])#self.sample_rate)#int(self.orig_sr / self.kwargs.get('slowdown_rate')))
         
     def load_audio(self, start, end, filename):
         path = Path(self.audio_dir) / filename
@@ -166,8 +166,10 @@ class SpectrogramPlot:
         return return_audio, path.stem
     
     def set_axis_lims_dep_sr(self, S_dB):
-        f_max = self.sample_rate / 2
-        reduce = self.sample_rate / (f_max * 2)
+        # f_max = self.sample_rate / 2
+        # reduce = self.sample_rate / (f_max * 2)
+        f_max = 44_100 / 2
+        reduce = 44_100 / (f_max * 2)
         S_dB = S_dB[:int(S_dB.shape[0] / reduce), :]
         return f_max, S_dB
 

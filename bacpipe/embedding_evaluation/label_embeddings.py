@@ -926,6 +926,7 @@ def build_ground_truth_labels_by_file(
 
     audio_file = metadata["files"]["audio_files"][ind]
     df = filter_df_by_filename(label_df, audio_file, model=model)
+    df = df[df.model == model]
         
     # if df.empty:
     #     logger.info(
@@ -1204,56 +1205,60 @@ def ground_truth_by_model(
         assign_global_get_paths_function(audio_dir, **kwargs)
         paths = get_paths(model)
         
-    if (
-        overwrite 
-        or not paths.labels_path.joinpath(f"ground_truth_species.csv").exists()
-        ):
+    # if (
+    #     overwrite
+    #     or len(list(paths.labels_path.glob(f"ground_truth*.csv"))) == 0
+    #     ):
 
-        # check if embeddings exist
-        try:    
-            path = model_specific_embedding_path(paths.main_embeds_path, model)
-        except Exception as e:
-            logger.warning(
-                f"No embeddings directory seems to exist. {e}"
-            )
-            path = None
+    # check if embeddings exist
+    try:    
+        path = model_specific_embedding_path(paths.main_embeds_path, model)
+    except Exception as e:
+        logger.warning(
+            f"No embeddings directory seems to exist. {e}"
+        )
+        path = None
 
-        # get annotations is not provided
-        if label_df is None:
-            if not 'label:' in label_column:
-                label_column = 'label:' + label_column
-            if kwargs.get('testing'):
-                annotations_filename='annotations.csv'
-            label_df, label_idx_dict = load_labels_and_build_dict(
-                paths, annotations_filename, 
-                main_label_column=label_column, 
-                audio_dir=audio_dir, 
-                bool_filter_labels=bool_filter_labels,
-                **kwargs
-            )
+    # get annotations is not provided
+    if label_df is None:
+        if not 'label:' in label_column:
+            label_column = 'label:' + label_column
+        if kwargs.get('testing'):
+            annotations_filename='annotations.csv'
+        label_df, label_idx_dict = load_labels_and_build_dict(
+            paths, annotations_filename, 
+            main_label_column=label_column, 
+            audio_dir=audio_dir, 
+            bool_filter_labels=bool_filter_labels,
+            **kwargs
+        )
 
-        # build files, segment_s and metadata variables
-        # depending if embeddings exist or not
-        if path is not None and len(list(path.iterdir())) > 0:
-            files = list(path.rglob("*.npy"))
-            files.sort()
-            
-            metadata = load_metadata_file(path)
-            segment_s = (
-                metadata["segment_length (samples)"] 
-                / metadata["sample_rate (Hz)"]
-                )
-        else:
-            files, segment_s, metadata = get_files_if_no_embeds(
-                audio_dir, model, label_df
-                )
-            
-        # find all label columns
-        label_columns = [col for col in label_df.columns if "label:" in col]
+    # build files, segment_s and metadata variables
+    # depending if embeddings exist or not
+    if path is not None and len(list(path.iterdir())) > 0:
+        files = list(path.rglob("*.npy"))
+        files.sort()
         
-        # collect all the ground truth for all the label columns 
-        for label_col in label_columns:
-            clean_label_column = label_col.split("label:")[-1]
+        metadata = load_metadata_file(path)
+        segment_s = (
+            metadata["segment_length (samples)"] 
+            / metadata["sample_rate (Hz)"]
+            )
+    else:
+        files, segment_s, metadata = get_files_if_no_embeds(
+            audio_dir, model, label_df
+            )
+        
+    # find all label columns
+    label_columns = [col for col in label_df.columns if "label:" in col]
+    
+    # collect all the ground truth for all the label columns 
+    for label_col in label_columns:
+        clean_label_column = label_col.split("label:")[-1]
+        if (
+            overwrite 
+            or not paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv").exists()
+            ):
             ground_truth = collect_ground_truth_labels(
                 paths,
                 files,
@@ -1270,32 +1275,37 @@ def ground_truth_by_model(
             ground_truth = ground_truth[cols]
             ground_truth = ground_truth.sort_values(by=['audiofilename', 'starts'])
             ground_truth.to_csv(paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv"), index=False)
-        if not clean_label_column == label_column and not clean_label_column in label_column:
-            if ':' in label_column:
-                label_column = label_column.split(':')[-1]
-                
-            ground_truth = pd.read_csv(
-                paths.labels_path.joinpath(f"ground_truth_{label_column}.csv"), 
-                index_col=False
-                )
-            
-    else:
-        if label_df is None:
-            clean_label_column = label_column.split("label:")[-1]
+        else:
             ground_truth = pd.read_csv(
                 paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv"), 
                 index_col=False
                 )
-        else:    
-            label_columns = [col for col in label_df.columns if "label:" in col]
+    if not clean_label_column == label_column and not clean_label_column in label_column:
+        if ':' in label_column:
+            label_column = label_column.split(':')[-1]
             
-            # collect all the ground truth for all the label columns 
-            for label_col in label_columns:
-                clean_label_column = label_column.split("label:")[-1]
-                ground_truth = pd.read_csv(
-                    paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv"), 
-                    index_col=False
-                    )
+        ground_truth = pd.read_csv(
+            paths.labels_path.joinpath(f"ground_truth_{label_column}.csv"), 
+            index_col=False
+            )
+            
+    # else:
+    #     if label_df is None:
+    #         clean_label_column = label_column.split("label:")[-1]
+    #         ground_truth = pd.read_csv(
+    #             paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv"), 
+    #             index_col=False
+    #             )
+    #     else:    
+    #         label_columns = [col for col in label_df.columns if "label:" in col]
+            
+    #         # collect all the ground truth for all the label columns 
+    #         for label_col in label_columns:
+    #             clean_label_column = label_column.split("label:")[-1]
+    #             ground_truth = pd.read_csv(
+    #                 paths.labels_path.joinpath(f"ground_truth_{clean_label_column}.csv"), 
+    #                 index_col=False
+    #                 )
                 
     return ground_truth
 

@@ -322,6 +322,8 @@ class Embedder(AudioHandler):
                 try:
                     audio = windowed_audios[audio_idx_range:audio_idx_range+self.model.batch_size].squeeze()
                     audio.to(self.model.device)
+                    if len(audio.shape) == 1:
+                        audio = audio.unsqueeze(0)
                     preprocessed = self.model.preprocess(audio)
                     task_queue.put((idx, preprocessed))
                                     

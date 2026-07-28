@@ -72,7 +72,11 @@ class DashBoard(DashBoardHelper):
         self.dim_reduc_parent_dir = dim_reduc_parent_dir
 
         self.ground_truth = None
-        ground_truth_files = list(le.get_paths(model_names[0]).labels_path.glob("ground_truth*"))
+        all_gt_files = []
+        [all_gt_files.extend(list(le.get_paths(m).labels_path.glob("ground_truth*"))) for m in model_names]
+        _, unique_stem_idxs = np.unique([f.stem for f in all_gt_files], return_index=True)
+        
+        ground_truth_files = np.array(all_gt_files)[unique_stem_idxs]
         if len(ground_truth_files) > 0:
             labels = []
             if len(ground_truth_files) > 0:

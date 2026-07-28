@@ -25,16 +25,18 @@ from bacpipe.embedding_evaluation.label_embeddings import DefaultLabels as Label
 
 from bacpipe import Embedder, Loader, get_audio_files, visualize_using_dashboard, settings, config, ground_truth_by_model
 
+from cluster_algos import MiniBatchkMeans_w_DBSCAN
+
 from create_dataset import read_dataset
 
-def get_embeddings(path):
+def get_embeddings(path, models):
     embeds_snr, umaps = {}, {}
     audio_dir = Path(path)
 
-    for model_name in ['birdnet', 'audioprotopnet', 'perch_v2']:#
+    for model_name in tqdm(models):#
         embeds_snr[model_name] = {}
         umaps[model_name] = {}
-        for snr_dir in audio_dir.iterdir():
+        for snr_dir in tqdm(audio_dir.iterdir()):
             snr_string = snr_dir.stem if snr_dir.is_dir() else False
             if not snr_string:
                 continue
@@ -85,6 +87,7 @@ def get_embeddings(path):
                 umap_embed_obj = Embedder(model_name, loader=loader_dr, device='cuda', padding='wrap', dim_reduction_model='umap')
                 umap_embed_obj.run_dimensionality_reduction_pipeline()
                 loader_dr.write_metadata_file()
+            # break
     return embeds_snr, umaps
 
 def collect_noise_dfs(path):
@@ -98,14 +101,275 @@ def collect_noise_dfs(path):
         noise_df = pd.concat([noise_df, df_noise_tmp])
     return noise_df
 
+
+
+def fetch_clustering(embeds, clustering_dict, overwrite=False):
+    if overwrite:
+        cluster_booleans = df.copy()
+        clust_df = df.copy()
+
+
+        clust_results = {}
+        for model_name, embed_dict in tqdm(embeds.items(), 'iterating through models', total=len(embeds), position=0):
+            if overwrite or not (main_results_path / f'{model_name}_df_with_clusters.csv').exists():
+                for snr_file, embed_array in tqdm(embed_dict.items(), "iterating through snr's", total=len(embed_dict), position=1):
+                    print('\n ')
+                    
+                    snr_val = float(snr_file.replace(',', '.').split('snr=')[-1])
+                    indices = df[df.snr.isin([snr_val, -1]).values & (df.model==model_name).values].index.values
+
+                    for clust_name, clust_algo in clustering_dict.items():
+                    
+                        clust_df[f"{model_name}_{snr_val}_{clust_name}"] = np.nan
+                        clust_df.loc[indices, f"{model_name}_{snr_val}_{clust_name}"] = clust_algo.fit_predict(embed_array)
+                clust_df.to_csv(main_results_path / f'{model_name}_df_with_clusters.csv', index=False)
+            else:
+                clust_df = pd.read_csv(main_results_path / f'{model_name}_df_with_clusters.csv', index_col=False)
+            # clust_dict[model_name]['spec'] = spec.fit_predict(embeds[model_name])
+
+            clust_results[model_name] = {}
+
+            # 1. Use a dictionary to collect boolean data instead of a fragmented DataFrame
+            boolean_dict = {}
+
+            for snr in tqdm(df.snr.unique(), 'evaluating clusters by snr', total=len(df.snr.unique())):
+                if snr < 0:
+                    continue
+                else:
+                    snr = str(snr)
+                clust_results[model_name][snr] = {}
+                
+                for clust_name, clust_algo in clustering_dict.items():
+                    clust_results[model_name][snr][clust_name] = {}
+                    
+                    evaluation_cases = ['species_vs_species', 'species_vs_infile_noise', 'species_vs_other_noise', 'species_vs_all']
+                
+                    for eval_name in evaluation_cases:
+                        clust_results[model_name][snr][clust_name][eval_name] = {}
+                        
+                        for noise_env in df.noise_env.unique():
+                            clust_results[model_name][snr][clust_name][eval_name][noise_env] = {}
+                            
+                            for species in df.species.unique():
+                                if species == '':
+                                    continue
+                                
+                                # Pre-calculate base masks to keep code readable
+                                m_model = df.model == model_name
+                                m_env = df.noise_env == noise_env
+                                m_snr_match = df.snr == float(snr)
+                                m_snr_all = df.snr.isin([float(snr), -1])
+                            
+                                # 2. Fix the Chained Indexing Warning by combining masks with &
+                                if eval_name == 'species_vs_all':
+                                    df_tmp = df.loc[m_env & m_snr_all & m_model]
+                                    
+                                elif eval_name == 'species_vs_species':
+                                    df_tmp = df.loc[m_env & m_snr_match & m_model]
+                                    
+                                elif eval_name == 'species_vs_infile_noise':
+                                    m_spec = df.species.isin([species, ''])
+                                    df_tmp = df.loc[m_env & m_snr_all & m_spec & m_model]
+                                    
+                                elif eval_name == 'species_vs_other_noise':
+                                    m_not_env = df.noise_env != noise_env
+                                    m_not_spec = df.species != species
+                                    df_tmp = df.loc[m_not_env & m_snr_all & m_not_spec & m_model]
+                                
+                                # 3. Fix Performance Warning: Save to dict instead of .loc
+                                col_name = f"{snr}_{eval_name}_{species}_{noise_env}"
+                                # Create a series initialized with False, set true values where index matches
+                                col_series = pd.Series(False, index=df.index)
+                                col_series.loc[df_tmp.index] = True
+                                boolean_dict[col_name] = col_series
+                                
+                                # Ground truth and evaluation processing
+                                ground_truth = [1 if l == species else 0 for l in df_tmp.species]
+                                clusters = clust_df[f"{model_name}_{snr}_{clust_name}"][df_tmp.index]
+                                
+                                clust_results[model_name][snr][clust_name][eval_name][noise_env].update({
+                                    species: HS(clusters, ground_truth)
+                                })
+                                
+                                # Calculate average safely
+                                vals = list(clust_results[model_name][snr][clust_name][eval_name][noise_env].values())
+                                clust_results[model_name][snr][clust_name][eval_name][noise_env]['avg'] = np.mean(vals)
+
+            # 4. Once the loops are finished, build/merge the DataFrames instantly
+            new_booleans = pd.DataFrame(boolean_dict)
+            # If cluster_booleans already exists, combine them; otherwise, assign it directly
+            cluster_booleans = pd.concat([cluster_booleans, new_booleans], axis=1)
+
+        clust_df.to_csv(main_results_path / 'clusters.csv', index=False)
+        cluster_booleans.to_csv(main_results_path / 'cluster_booleans.csv', index=False)
+        
+        with open(main_results_path / 'clust_results.json', 'w') as f:
+            json.dump(clust_results, f)
+    else:
+        cluster_booleans = pd.read_csv(main_results_path / 'cluster_booleans.csv', index_col=False)
+        clust_df = pd.read_csv(main_results_path / 'clusters.csv', index_col=False)
+        
+        with open(main_results_path / 'clust_results.json', 'r') as f:
+            clust_results = json.load(f)
+    return clust_df, cluster_booleans, clust_results
+        
+def fetch_visualization_df(clust_df, path, clustering_dict, overwrite=True):
+    if overwrite or not (path / 'visualization_dataframe.csv').exists():
+        df_vis = clust_df.copy()
+        df_vis = df_vis.sort_values(['noise_env', 'snr'])
+        cols2rename = [c for c in df_vis.columns if not c in ['audiofilename', 'start' ,'end', 'noise_start', 'noise_end', 'species_end', 'noise_filename', 'model', 'snr']]
+        df_vis = df_vis.rename(columns={k: f'label:{k}' for k in cols2rename})
+        
+        for model in umaps:
+            for snr_str in umaps[model]:
+                snr_val = float(snr_str.split('=')[-1].replace(',', '.'))
+                snr_model_df = pd.DataFrame()
+                for h5_file in umaps[model][snr_str]['metadata']['audio_files']:
+                    df_tmp, audio = read_dataset(path / snr_str.split('_')[0] / h5_file, return_audio=False)   
+                    df_tmp['audiofilename'] = h5_file
+                    input_length = (
+                        # umaps[model][snr_str]['metadata']['segment_length (samples)']
+                        # / umaps[model][snr_str]['metadata']['sample_rate (Hz)']
+                        3 # this needs to corrspond to the original file, not the model
+                    )
+                    df_tmp['start'] = np.arange(len(df_tmp)) * input_length
+                    df_tmp['end'] = df_tmp['start'] + input_length
+                    snr_model_df = pd.concat([snr_model_df, df_tmp])
+                    
+                snr_model_df = snr_model_df.sort_values(['noise_env', 'snr'])
+                for col in ['audiofilename', 'start', 'end']:
+                    df_vis.loc[(df_vis.snr.isin([snr_val, -1])).values & (df_vis.model==model).values, col] = snr_model_df.loc[:, col].values
+
+                key = list(clustering_dict.keys())[-1]
+                clust_df_equiv = clust_df[clust_df.snr.isin([snr_val, -1]).values & (clust_df[f'{model}_{snr_val}_{key}'] >-3).values]
+
+                for col in clust_df_equiv.columns:
+                    if model in col and str(snr_val) in col:
+                        df_vis[f'label:{col}'] = clust_df_equiv[col]
+                        
+                gt_df = df_vis.copy()
+                drop_cols = [c for c in gt_df.columns if '.' in c and (not model in c or not str(snr_val) in c)]
+                
+                for col in drop_cols:
+                    gt_df.pop(col)
+                
+                
+                ground_truth_by_model(
+                    model=model,
+                    main_results_dir = Path(settings.main_results_dir) / path.stem,
+                    audio_dir=path / snr_str,
+                    label_df=gt_df,
+                    overwrite=overwrite,
+                    only_embed_annotations=True
+                    # label_idx_dict=None,
+                    # label_column='label:species',
+                )
+        df_vis.to_csv(path / 'visualization_dataframe.csv', index=False)
+    else:
+        df_vis = pd.read_csv(path / 'visualization_dataframe.csv', index_col=False)
+        
+    return df_vis
+
+
+def plot_clusterings(clust_results, df, model, clust_name, eval_name, save_path):
+    plot_data= {}
+    for species in df.species.unique():
+        if species == '':
+            continue
+        plot_data[species] = {}
+        for noise_env in df.noise_env.unique():
+            plot_data[species][noise_env] = [clust_results[model][str(snr)][clust_name][eval_name][noise_env][species] for snr in np.sort(df.snr.unique()) if snr >= 0]
+
+
+    fig = plt.figure(figsize=[14, 8])
+    ax = fig.subplots((len(df.species.unique())-1)//2, 2)
+    idx = 0
+    for species in df.species.unique():
+        if species == '':
+            continue
+        for noise_env in df.noise_env.unique():
+            ax[idx%3, idx//3].plot([s for s in np.sort(df.snr.unique()) if s >= 0], plot_data[species][noise_env], label=noise_env)
+        ax[idx%3, idx//3].set_title(species)
+        
+        if (
+            not eval_name == 'species_vs_infile_noise' 
+            and not np.max(list(plot_data[species].values())) > 0.5
+            ):
+            
+            ax[idx%3, idx//3].set_ylim([0, 0.5])
+        else:
+            ax[idx%3, idx//3].set_ylim([0, 1])
+        
+        ax[idx%3, idx//3].set_xticks([s for s in df.snr.unique() if s >= 0], [str(s) for s in df.snr.unique() if s >= 0])
+        idx += 1
+    ax[0, 0].set_ylabel('Homogeneity Score')
+    ax[-1, 0].set_ylabel('Homogeneity Score')
+    ax[-1, 0].legend()
+    ax[-1, 0].set_xlabel('SNR')
+    fig.suptitle(f'{clust_name} {eval_name} {model}')
+    fig.tight_layout()
+    fig.savefig(save_path / f'{clust_name}_{eval_name}_{model}.png')
+    plt.close(fig)
+
+
+def listen_to_index(idx, file_path = None):
+    import sounddevice as sd
+    import h5py
+    from pathlib import Path
+    import matplotlib.pyplot as plt
+    import librosa as lb
+    import numpy as np
+    
+    main_path = Path('/media/siriussound/Extreme SSD/identifying_unknown_sounds')
+    snr = 3
+    if file_path is None:
+        
+        path = main_path / Path('data_h5_files/6_ratio-n2t_10_cleaned')
+        
+        file_name = f'snr={snr}/unknown_sounds_len_3_sr_32000_repetitions_{path.stem.split("_cleaned")[0]}_snr={snr}.h5'
+        file_path = Path(path / file_name)
+        
+        file_path.exists()
+    
+    
+    plt.figure(figsize=[10, 8])
+    
+    with h5py.File(file_path, 'r') as data:
+        audio = data['audio'][idx]
+    
+    SR1 = 32_000
+    SR = 48_000
+    sd.play(audio, samplerate=SR1)
+    S = lb.feature.melspectrogram(y=np.array(audio), sr=SR, n_mels=128,
+                                    fmax=SR // 2)
+    S_dB = lb.power_to_db(S, ref=np.max)
+    img = lb.display.specshow(S_dB, x_axis='time',
+                            y_axis='mel', sr=SR,
+                            fmax=SR // 2)
+    plt.colorbar(img, format='%+2.0f dB')
+
+    path_snr = main_path / f'data/figures/snr_{snr}'
+
+    path_snr.mkdir(exist_ok=True, parents=True)
+    plt.savefig(path_snr / f'{idx}.png')
+    plt.close()
+
+
+###############################################################################################################################################
+
 # main_path = Path('/mnt/swap/Work/Data/identifying_unknown_sounds_data')
 # main_path = Path('/media/siriussound/Extreme SSD/identifying_unknown_sounds')
 main_path = Path('/media/siriussound/Extreme SSD/identifying_unknown_sounds')
 path = main_path / Path('data_h5_files/6_ratio-n2t_10')
+# path = main_path / Path('data_h5_files/6_ratio-n2t_10_cleaned')
 # file_name = 'unknown_sounds_len_3_sr_32000_repetitions_6_ratio-n2t_4.h5'
-file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem}.h5'
+# file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem}.h5'
+file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem+"_snr=0"}.h5'#.split("_cleaned")[0]+
 
-embeds, umaps = get_embeddings(path)
+models = ['birdnet'] #, 'audioprotopnet', 'perch_v2'
+
+
+embeds, umaps = get_embeddings(path, models)
 
 
 df = pd.DataFrame()
@@ -125,189 +389,59 @@ for model in embeds:
 df.index = range(len(df))
 
 
-
-
-
-
 main_results_path = main_path / Path('data') / 'clusterings' / path.stem
 main_results_path.mkdir(exist_ok=True, parents=True)
 
 
-if False:
-    cluster_booleans = df.copy()
-    clust_df = df.copy()
 
-    ## compute clusterings
+## compute clusterings
+n_centroids = embeds['birdnet']['snr=12'].shape[0]//100
+max_clust = 80
+clustering_dict = {
+    # 'kmeans': KMeans(n_clusters=80), # because 15 species + noise for the within and diff file ...?
+    # 'hdb': HDBSCAN(min_cluster_size=10, min_samples=None),
+    # 'spec': SpectralClustering(n_clusters=16),
+    # f'minibatchkmeans_w_dbscan_{max_clust}': MiniBatchkMeans_w_DBSCAN(
+    #     max_cluster_size=max_clust,
+    #     n_centroids=n_centroids
+    #     ),
+    f'kmeans_umap-init_w_dbscan_{max_clust}': MiniBatchkMeans_w_DBSCAN(
+        max_cluster_size=max_clust,
+        n_centroids=n_centroids, 
+        initial_clustering='kmeans'
+        ),
+    f'kmeans_umap-init_half_w_dbscan_{max_clust}': MiniBatchkMeans_w_DBSCAN(
+        max_cluster_size=max_clust,
+        n_centroids=2, 
+        initial_clustering='kmeans'
+        )
+}
 
-    # kmeans
+clust_df, cluster_booleans, clust_results = fetch_clustering(embeds, clustering_dict, overwrite=False)
 
-    kmeans = KMeans(n_clusters=4) # because 15 species + noise for the within and diff file ...?
-    hdb = HDBSCAN(min_cluster_size=10, min_samples=None)
-    spec = SpectralClustering(n_clusters=16)
 
-    clust_results = {}
-    for model_name, embed_dict in tqdm(embeds.items(), 'iterating through models', total=len(embeds), position=0):
-        if not (main_results_path / f'{model_name}_df_with_clusters.csv').exists():
-            for snr_file, embed_array in tqdm(embed_dict.items(), "iterating through snr's", total=len(embed_dict), position=1):
-                print('\n ')
-                
-                snr_val = float(snr_file.split('snr=')[-1])
-                indices = df[df.snr.isin([snr_val, -1]).values & (df.model==model_name).values].index.values
+print(clust_results)
 
-                for clust_name in ['kmeans', 'hdb']:
-                
-                    clust_df[f"{model_name}_{snr_val}_{clust_name}"] = np.nan
-                    clust_df.loc[indices, f"{model_name}_{snr_val}_{clust_name}"] = vars().get(clust_name).fit_predict(embed_array)
-            clust_df.to_csv(main_results_path / f'{model_name}_df_with_clusters.csv', index=False)
-        else:
-            clust_df = pd.read_csv(main_results_path / f'{model_name}_df_with_clusters.csv', index_col=False)
-        # clust_dict[model_name]['spec'] = spec.fit_predict(embeds[model_name])
+for model in models:
+    for clust_name in clustering_dict.keys():
+        for eval_name in [
+            'species_vs_infile_noise',
+            'species_vs_all',
+            'species_vs_species',
+            'species_vs_other_noise'
+            ]:
+            save_path = main_results_path / f'{clust_name}_{model}'
+            save_path.mkdir(exist_ok=True)
+            plot_clusterings(clust_results, df, model, clust_name, eval_name, save_path)
 
-        clust_results[model_name] = {}
+df_vis = fetch_visualization_df(clust_df, path, clustering_dict, overwrite=False)
 
-        # 1. Use a dictionary to collect boolean data instead of a fragmented DataFrame
-        boolean_dict = {}
-
-        for snr in tqdm(df.snr.unique(), 'evaluating clusters by snr', total=len(df.snr.unique())):
-            if snr < 0:
-                continue
-            else:
-                snr = str(snr)
-            clust_results[model_name][snr] = {}
-            
-            for clust_name in ['kmeans', 'hdb']:
-                clust_results[model_name][snr][clust_name] = {}
-                
-                evaluation_cases = ['species_vs_species', 'species_vs_infile_noise', 'species_vs_other_noise', 'species_vs_all']
-            
-                for eval_name in evaluation_cases:
-                    clust_results[model_name][snr][clust_name][eval_name] = {}
-                    
-                    for noise_env in df.noise_env.unique():
-                        clust_results[model_name][snr][clust_name][eval_name][noise_env] = {}
-                        
-                        for species in df.species.unique():
-                            if species == '':
-                                continue
-                            
-                            # Pre-calculate base masks to keep code readable
-                            m_model = df.model == model_name
-                            m_env = df.noise_env == noise_env
-                            m_snr_match = df.snr == float(snr)
-                            m_snr_all = df.snr.isin([float(snr), -1])
-                        
-                            # 2. Fix the Chained Indexing Warning by combining masks with &
-                            if eval_name == 'species_vs_all':
-                                df_tmp = df.loc[m_env & m_snr_all & m_model]
-                                
-                            elif eval_name == 'species_vs_species':
-                                df_tmp = df.loc[m_env & m_snr_match & m_model]
-                                
-                            elif eval_name == 'species_vs_infile_noise':
-                                m_spec = df.species.isin([species, ''])
-                                df_tmp = df.loc[m_env & m_snr_all & m_spec & m_model]
-                                
-                            elif eval_name == 'species_vs_other_noise':
-                                m_not_env = df.noise_env != noise_env
-                                m_not_spec = df.species != species
-                                df_tmp = df.loc[m_not_env & m_snr_all & m_not_spec & m_model]
-                            
-                            # 3. Fix Performance Warning: Save to dict instead of .loc
-                            col_name = f"{snr}_{eval_name}_{species}_{noise_env}"
-                            # Create a series initialized with False, set true values where index matches
-                            col_series = pd.Series(False, index=df.index)
-                            col_series.loc[df_tmp.index] = True
-                            boolean_dict[col_name] = col_series
-                            
-                            # Ground truth and evaluation processing
-                            ground_truth = [1 if l == species else 0 for l in df_tmp.species]
-                            clusters = clust_df[f"{model_name}_{snr}_{clust_name}"][df_tmp.index]
-                            
-                            clust_results[model_name][snr][clust_name][eval_name][noise_env].update({
-                                species: HS(clusters, ground_truth)
-                            })
-                            
-                            # Calculate average safely
-                            vals = list(clust_results[model_name][snr][clust_name][eval_name][noise_env].values())
-                            clust_results[model_name][snr][clust_name][eval_name][noise_env]['avg'] = np.mean(vals)
-
-        # 4. Once the loops are finished, build/merge the DataFrames instantly
-        new_booleans = pd.DataFrame(boolean_dict)
-        # If cluster_booleans already exists, combine them; otherwise, assign it directly
-        cluster_booleans = pd.concat([cluster_booleans, new_booleans], axis=1)
-
-    clust_df.to_csv(main_results_path / 'clusters.csv', index=False)
-    cluster_booleans.to_csv(main_results_path / 'cluster_booleans.csv', index=False)
-    
-    with open(main_results_path / 'clust_results.json', 'w') as f:
-        json.dump(clust_results, f)
-else:
-    cluster_booleans = pd.read_csv(main_results_path / 'cluster_booleans.csv', index_col=False)
-    clust_df = pd.read_csv(main_results_path / 'clusters.csv', index_col=False)
-    
-    with open(main_results_path / 'clust_results.json', 'r') as f:
-        clust_results = json.load(f)
-        
-if not (path / 'visualization_dataframe.csv').exists():
-    df_vis = clust_df.copy()
-    df_vis = df_vis.sort_values(['noise_env', 'snr'])
-    cols2rename = [c for c in df_vis.columns if not c in ['audiofilename', 'start' ,'end', 'noise_start', 'noise_end', 'species_end', 'noise_filename', 'model', 'snr']]
-    df_vis = df_vis.rename(columns={k: f'label:{k}' for k in cols2rename})
-    
-    for model in umaps:
-        for snr_str in umaps[model]:
-            snr_val = float(snr_str.split('=')[-1].replace(',', '.'))
-            snr_model_df = pd.DataFrame()
-            for h5_file in umaps[model][snr_str]['metadata']['audio_files']:
-                df_tmp, audio = read_dataset(path / snr_str.split('_')[0] / h5_file, return_audio=False)   
-                df_tmp['audiofilename'] = h5_file
-                input_length = (
-                    umaps[model][snr_str]['metadata']['segment_length (samples)']
-                    / umaps[model][snr_str]['metadata']['sample_rate (Hz)']
-                )
-                df_tmp['start'] = np.arange(len(df_tmp)) * input_length
-                df_tmp['end'] = df_tmp['start'] + input_length
-                snr_model_df = pd.concat([snr_model_df, df_tmp])
-                
-            snr_model_df = snr_model_df.sort_values(['noise_env', 'snr'])
-            for col in ['audiofilename', 'start', 'end']:
-                df_vis.loc[(df_vis.snr.isin([snr_val, -1])).values & (df_vis.model==model).values, col] = snr_model_df.loc[:, col].values
-
-            
-            clust_df_equiv = clust_df[clust_df.snr.isin([snr_val, -1]).values & (clust_df[f'{model}_{snr_val}_hdb'] >-3).values]
-
-            for col in clust_df_equiv.columns:
-                if model in col and str(snr_val) in col:
-                    df_vis[f'label:{col}'] = clust_df_equiv[col]
-                    
-            gt_df = df_vis.copy()
-            drop_cols = [c for c in gt_df.columns if '.' in c and (not model in c or not str(snr_val) in c)]
-            
-            for col in drop_cols:
-                gt_df.pop(col)
-            
-            
-            ground_truth_by_model(
-                model=model,
-                main_results_dir = Path(settings.main_results_dir) / path.stem,
-                audio_dir=path / snr_str,
-                label_df=gt_df,
-                overwrite=False
-                # label_idx_dict=None,
-                # label_column='label:species',
-            )
-    df_vis.to_csv(path / 'visualization_dataframe.csv', index=False)
-else:
-    df_vis = pd.read_csv(path / 'visualization_dataframe.csv', index_col=False)
-
-# with h5py.File('/media/siriussound/Extreme SSD/identifying_unknown_sounds/data_h5_files/6_ratio-n2t_10/snr=0/unknown_sounds_len_3_sr_32000_repetitions_6_ratio-n2t_10_AnuranSet_INCT41.h5', 'r') as data:
-#     a = data['audio'][:]
     
 
 remaining_settings = {**vars(settings)}
 
-snr_str = 'snr=9'
-snr_val = 9.0
+snr_str = 'snr=12'
+snr_val = 12.0
 vis_settings = {
     'models':list(embeds.keys()), 
     'audio_dir':path / snr_str, 
@@ -318,7 +452,8 @@ vis_settings = {
     'dim_reduction_model':config.dim_reduction_model, 
     'dim_reduc_parent_dir':settings.dim_reduc_parent_dir,
     'only_embed_annotations':True,
-    'annotations_df' : df_vis[df_vis.snr.isin([snr_val, -1])],
+    'annotations_df' : df_vis,#[df_vis.snr.isin([snr_val, -1])],
+    'constant_sr' : 32_000
 }
 
 
@@ -327,150 +462,7 @@ for k in vis_settings.keys():
         remaining_settings.pop(k)
         
         
-# visualize_using_dashboard(
-#     **vis_settings,
-#     **remaining_settings
-#     )
-
-def print_clusterings(clust_results, df, model, clust_name, eval_name, save_path):
-    plot_data= {}
-    for species in df.species.unique():
-        if species == '':
-            continue
-        plot_data[species] = {}
-        for noise_env in df.noise_env.unique():
-            plot_data[species][noise_env] = [clust_results[model][str(snr)][clust_name][eval_name][noise_env][species] for snr in df.snr.unique() if snr >= 0]
-
-
-    fig = plt.figure(figsize=[10, 8])
-    ax = fig.subplots(4, 1)
-    idx = 0
-    for species in df.species.unique():
-        if species == '':
-            continue
-        for noise_env in df.noise_env.unique():
-            ax[idx].plot([s for s in df.snr.unique() if s >= 0], plot_data[species][noise_env], label=noise_env)
-        ax[idx].set_title(species)
-        
-        if (
-            not eval_name == 'species_vs_infile_noise' 
-            and not np.max(list(plot_data[species].values())) > 0.5
-            ):
-            
-            ax[idx].set_ylim([0, 0.5])
-        else:
-            ax[idx].set_ylim([0, 1])
-        
-        ax[idx].set_xticks([s for s in df.snr.unique() if s >= 0], [str(s) for s in df.snr.unique() if s >= 0])
-        idx += 1
-    ax[0].set_ylabel('Homogeneity Score')
-    ax[-1].set_ylabel('Homogeneity Score')
-    ax[-1].legend()
-    ax[-1].set_xlabel('SNR')
-    fig.suptitle(f'{clust_name} {eval_name} {model}')
-    fig.tight_layout()
-    fig.savefig(save_path / f'{clust_name}_{eval_name}_{model}.png')
-    plt.close(fig)
-
-print(clust_results)
-
-# model = 'audioprotopnet'
-# clust_name = 'hdb'
-# snr = '9.0'
-# # species = 'Black-bellied Plover'
-# eval_name = 'species_vs_all'
-# species_vs_infile_noise
-# species_vs_all
-# species_vs_species
-# species_vs_other_noise
-## plot species by snr 
-for model in ['birdnet', 'audioprotopnet', 'perch_v2']:
-    for clust_name in ['hdb', 'kmeans']:
-        for eval_name in [
-            'species_vs_infile_noise',
-            'species_vs_all',
-            'species_vs_species',
-            'species_vs_other_noise'
-            ]:
-            save_path = main_results_path / f'{clust_name}_{model}'
-            save_path.mkdir(exist_ok=True)
-            print_clusterings(clust_results, df, model, clust_name, eval_name, save_path)
-
-
-# Convert string labels to numeric codes for coloring
-# print(clust_results[model][snr][clust_name][eval_name]['BIRB_NES'][species])
-# print(clust_results[model][snr]['kmeans'][eval_name]['BIRB_NES'][species])
-
-clust_name_list = list(clust_results[model].keys())
-eval_name_list = list(clust_results[model]['kmeans'].keys())
-species_list = list(clust_results[model][clust_name][eval_name].keys())
-species_list.remove('avg')
-
-dropdown_vars = {
-    'def_clust': clust_name,
-    'def_eval': eval_name,
-    'def_species': species,
-    'clust_opts': clust_name_list,
-    'species_opts': species_list,
-    'eval_opts': eval_name_list,
-}
-
-from interactive_plot import InteractivePlot
-file_dts = [Labels.get_dt_filename(f) for f in filenames]
-
-padding_func = main_results_path.stem.split('_')[-1]
-plot_obj = InteractivePlot(
-    data_file,
-    clust_results,
-    label_dict_bool,
-    clust_dict,
-    umaps,
-    src_path = '/media/siriussound/Extreme SSD/Recordings',
-    sample_rate = 48_000,
-    example_window_seconds = 3.,
-    pad_func = padding_func
+visualize_using_dashboard(
+    **vis_settings,
+    **remaining_settings
     )
-
-# fig = plotly_mutual_information(model, clust_name, species, eval_name)
-plot_obj.interactive_plot('birdnet', title=f'cluster_evaluation {padding_func}', port=8052, **dropdown_vars)
-        
-def plotly_compare_models():
-    unique_labels = np.unique(labels)
-    label_to_num = {label: i for i, label in enumerate(unique_labels)}
-
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-    label_colors = {label: colors[i % len(colors)] for i, label in enumerate(unique_labels)}
-
-    fig = make_subplots(
-    rows=2, cols=2,
-    subplot_titles=('BirdNET UMAP', 'Perch Bird UMAP', 'Perch V2 UMAP', 'NatureBeats UMAP'),
-    horizontal_spacing=0.1,
-    vertical_spacing=0.12
-    )
-
-    for label in unique_labels:
-        mask = labels == label
-        def trace(model, row, col, showlegend=False):
-            # Add to first subplot
-            fig.add_trace(go.Scatter(
-                x=umaps[model][mask, 0],
-                y=umaps[model][mask, 1],
-                mode='markers',
-                name=label,
-                marker=dict(size=8, color=label_colors[label]),
-                customdata=np.column_stack((datasets[mask], filenames[mask], starts[mask])),
-                hovertemplate=f'<b>{label}</b><br>dataset: %{{customdata[0]}}<br>filename: %{{customdata[1]}}<br>start: %{{customdata[2]}}<extra></extra>',
-                legendgroup=label,  # Group for shared legend
-                showlegend=showlegend
-            ), row=row, col=col)
-                
-    trace('birdnet', 1, 1, showlegend=True)
-    trace('perch_bird', 1, 2)
-    trace('perch_v2', 2, 1)
-    trace('naturebeats', 2, 2)
-
-    fig.update_layout(height=1200, width=1600, hovermode='closest')
-    fig.write_html('test.html')
-    fig.show()
-        
-        
