@@ -1,6 +1,10 @@
 # don't track environment files, model checkpoints, test files, and vscode settings
 env*
 bacpipe/model_checkpoints/*
+bacpipe_model_checkpoints/*
+
+.coverage
+uv.lock
 bacpipe/tests/.pytest*
 *__pycache__*
 .vscode

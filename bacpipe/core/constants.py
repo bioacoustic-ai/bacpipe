@@ -21,6 +21,7 @@ EMBEDDING_DIMENSIONS = {
     "birdaves_especies": 1024,
     "biolingual": 512,
     "birdnet": 1024,
+    "birdnet3_dev": 1024,
     "birdmae": 1280,
     "convnext_birdset": 1024,
     "hbdet": 2048,
