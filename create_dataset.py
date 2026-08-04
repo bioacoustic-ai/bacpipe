@@ -210,8 +210,6 @@ def combined_target_and_noise(
         rms_signal = np.mean(lb.feature.rms(y=signal))
         rms_noise = np.mean(lb.feature.rms(y=noise))
 
-        # Calculate the required scaling factor for the noise
-        # SNR = 20 * log10(rms_signal / (k * rms_noise))
         k = rms_signal / (rms_noise * (10 ** (snr_db / 20.0)))
 
         # Mix the signals

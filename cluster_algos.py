@@ -79,11 +79,21 @@ from sklearn.cluster import MiniBatchKMeans, DBSCAN, KMeans, kmeans_plusplus
 
 
 class MiniBatchkMeans_w_DBSCAN:
-    def __init__(self, max_cluster_size, n_centroids, 
-                 random_state=42, batch_size=2048, 
-                 dcscan_eps=0.5, dbscan_min_samples=5, 
-                 initial_clustering='minibatchkmeans', 
-                 tol=1e-4, max_iter=300, init='k-means++', n_init=10):
+    def __init__(
+        self, 
+        max_cluster_size, 
+        n_centroids, 
+        filter_centroids=False, 
+        random_state=42, 
+        batch_size=2048, 
+        dcscan_eps=0.5, 
+        dbscan_min_samples=5, 
+        initial_clustering='minibatchkmeans', 
+        tol=1e-4, 
+        max_iter=300, 
+        init='k-means++', 
+        n_init=10
+        ):
         """
         init{‘k-means++’, ‘random’}, callable or array-like of shape (n_clusters, n_features), default=’k-means++’
 
@@ -107,12 +117,24 @@ class MiniBatchkMeans_w_DBSCAN:
             When n_init='auto', the number of runs depends on the value of init: 10 if using init='random' or init is a callable; 1 if using init='k-means++' or init is an array-like.
         
         """
+        ### old umap code
+        # umap4clust = dict()
+        # for key, val in embeds.items():
+        #     umap4clust[key] = dict()
+        #     for snr_key, ems in val.items():
+        #         umap4clust[key][snr_key] = umap_kmeans(ems, n_centroids, 42)
+
+        # clust_df, cluster_booleans, clust_results = fetch_clustering(umap4clust, clustering_dict, overwrite=True)
+
         
         # n_centroids = X.shape[0]//100  # Compress 105,000 points into 1,000 representative centroids
         self.max_cluster_size = max_cluster_size
+        self.filter_centroids = filter_centroids
         if initial_clustering == 'minibatchkmeans':
             self.kmeans = MiniBatchKMeans(n_clusters=n_centroids, random_state=random_state, batch_size=batch_size)
         elif initial_clustering == 'kmeans':
+            self.kmeans = KMeans(n_clusters=n_centroids, random_state=random_state, tol=tol, max_iter=max_iter, init=init, n_init=n_init)
+        elif initial_clustering == 'kmeans+umap':
             import umap
             def umap_kmeans(X, n_clusters, random_state): 
                 clusterer = umap.UMAP(
@@ -122,7 +144,6 @@ class MiniBatchkMeans_w_DBSCAN:
                    "metric": "euclidean", 
                    "random_state": random_state}
                 )
-                # return clusterer.fit(X)
                 X = X.swapaxes(0, 1)
                 centroids = clusterer.fit_transform(X)
                 return centroids.swapaxes(0, 1)
@@ -131,7 +152,7 @@ class MiniBatchkMeans_w_DBSCAN:
         self.dbscan = DBSCAN(eps=dcscan_eps, min_samples=dbscan_min_samples)
         
     def fit_predict(self, X):
-        print("Step 1: Compressing with Mini-Batch K-Means...")
+        print("Step 1: Compressing with K-Means...")
         self.kmeans.fit(X)
 
         
@@ -151,10 +172,20 @@ class MiniBatchkMeans_w_DBSCAN:
         print("Step 4: Mapping labels back to the original dataset...")
         # This elegant, vectorized NumPy indexing maps the centroid's label 
         # to every original point assigned to that centroid in O(1) time.
-        filtered_labels = weights < self.max_cluster_size
+        
         # final_labels = hdb.labels_[kmeans.labels_]
         labels = self.dbscan.labels_
-        labels[~filtered_labels] = -1
+        
+        if self.filter_centroids:
+            from sklearn.metrics import pairwise_distances
+            pp = pairwise_distances(centroids)
+            bool_smaller_than_3std = [True if any(p<(np.mean(pp)-3*np.std(pp)) * (p>0)) else False for p in pp]
+            labels[bool_smaller_than_3std] = -3 
+        
+        
+        filtered_labels = weights < self.max_cluster_size
+        labels[~filtered_labels] = -2
+        
         final_labels = labels[self.kmeans.labels_]
 
         # ==========================================
@@ -168,4 +199,4 @@ class MiniBatchkMeans_w_DBSCAN:
         print(f"Discovered Clusters: {n_clusters}")
         print(f"Noise Points Rejected: {n_noise} ({n_noise / len(X) * 100:.2f}% of data)")
         
-        return final_labels
+        return final_labels, centroids, weights

@@ -320,6 +320,8 @@ class Loader:
             # load the metadata.yml file contained in d
             with open(d.joinpath("metadata.yml"), "r") as f:
                 mdata = yaml.load(f, Loader=yaml.CLoader)
+                if mdata is None:
+                    continue
                 if not self.model_name == mdata["model_name"]:
                     continue
 
