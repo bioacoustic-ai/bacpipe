@@ -40,8 +40,8 @@ class Model(ModelBaseClass):
         return self.results['embeddings']
 
     def classifier_predictions(self, embeddings):
-        inferece_results = torch.sigmoid(self.results['logits'])
-        return inferece_results
+        inference_results = torch.softmax(self.results['logits'], dim=-1)
+        return inference_results
 
 
 
@@ -105,14 +105,7 @@ class PerchV2ONNX(nn.Module):
         if x.ndim == 1:
             x = x.unsqueeze(0)
             
-        mean = torch.mean(x, dim=-1, keepdim=True)
-        x = x - mean
-
-        # 3. Peak Normalization (scale max absolute value per audio chunk to target_peak)
-        max_val = torch.max(torch.abs(x), dim=-1, keepdim=True).values
-        x_norm = x * (1 / (max_val + 1e-8))
-            
-        x_np = x_norm.detach().cpu().numpy().astype(np.float32)
+        x_np = x.detach().cpu().numpy().astype(np.float32)
 
         outputs = self.session.run(None, {self.input_name: x_np})
 

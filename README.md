@@ -942,8 +942,8 @@ Perch_Bird is a EFficientNet B1 model trained on the entire Xeno-canto database.
 - supervised learning
 - trained on birds, amphibians, insects and mammals (xeno-canto, iNaturalis, Tierstimmenarchiv)
 
-Perch V2 or Perch 2.0 is the updated version of the Perch model from bioacousticians at Google. The model is a EfficientNetB3, trained on a very large database of various species. The classifier is able to distinguish 14795 different species. 
-**Bacpipe** uses the onnx implementation which allows the model to run through pytorch so it can be used with all operating systems and also supports cuda and mps accelleration.
+Perch V2 or Perch 2.0 is the updated version of the Perch model from bioacousticians at Google. The model is a single label model! It's architecture is an EfficientNetB3, trained on a very large database of various species. The classifier is able to distinguish 14795 different species. 
+**Bacpipe** uses the onnx implementation by [@justinchuby](https://huggingface.co/justinchuby) which allows the model to run through PyTorch so it can be used with all operating systems and also supports cuda and mps accelleration.
 
 ### SurfPerch
 - CNN
