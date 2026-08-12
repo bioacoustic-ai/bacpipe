@@ -88,10 +88,11 @@ class AudioHandler:
         return preprocessed_frames
     
     def return_windowed_audio(self, sample, **kwargs):
-        audio, sr = self._load_and_resample(sample)
         if self.only_embed_annotations:
-            frames = self._only_load_annotated_segments(sample, audio, **kwargs, **self.kwargs)
+            frames = self._only_load_annotated_segments(sample, **kwargs, **self.kwargs)
+            sr = None
         else:
+            audio, sr = self._load_and_resample(sample)
             frames = self._window_audio(audio)
         return frames, sr
     
@@ -129,7 +130,7 @@ class AudioHandler:
         return torch.tensor(audio), sr
 
     def _only_load_annotated_segments(
-        self, file_path, audio, annotations_filename='annotations.csv', annotations_df=None, **_
+        self, file_path, annotations_filename='annotations.csv', annotations_df=None, **_
         ):
         if annotations_df is None:
             import pandas as pd
@@ -145,10 +146,14 @@ class AudioHandler:
         
         starts = np.array(annotations_df.start.unique(), dtype=np.float32)*self.sr
         ends = np.array(annotations_df.end.unique(), dtype=np.float32)*self.sr
+        
+        
 
-        audio = audio.cpu().squeeze()
+        # audio = audio.cpu().squeeze()
         for idx, (s, e) in enumerate(zip(starts, ends)):
-            s, e = int(s), int(e)
+            s, e = int(s) / self.sr, int(e) / self.sr
+            audio, sr = lb.load(str(file_path), sr=self.sr, mono=True, offset=s, duration=e-s)
+            
             if s > len(audio):
                 logger.warning(
                     f"Annotation with start {s} and end {e} is outside of "
@@ -156,7 +161,7 @@ class AudioHandler:
                 )
                 continue
             segments = lb.util.fix_length(
-                audio[s:e+1],
+                audio,#[s:e+1],
                 size=self.segment_length,
                 mode=self.padding
                 )

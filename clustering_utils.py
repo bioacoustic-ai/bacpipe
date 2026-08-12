@@ -36,7 +36,7 @@ from create_dataset import read_dataset
 
 
 main_path = Path('/media/siriussound/Extreme SSD/identifying_unknown_sounds')
-path = main_path / Path('data_h5_files/6_ratio-n2t_10')
+path = main_path / Path('data_h5_files/10_ratio-n2t_50')
 
 
 main_results_path = main_path / Path('data') / 'clusterings' / path.stem
@@ -53,8 +53,8 @@ def get_embeddings(path, models):
             snr_string = snr_dir.stem if snr_dir.is_dir() else False
             if not snr_string:
                 continue
-            if not '0' in snr_string:
-                continue
+            # if not '0' in snr_string:
+            #     continue
                 # no need to work on other snr's for now
 
             loader = Loader(snr_dir, model_name, use_folder_structure=True, audio_suffixes=['.h5'], main_results_dir=f'bacpipe_results/{audio_dir.stem}')
@@ -242,17 +242,18 @@ def evaluate_clustering(df, clust_df, embeds, clustering_dict, overwrite=False):
             json.dump(clust_results, f)
             
             
-        for model in embeds.keys():
-            for clust_name in clustering_dict.keys():
-                for eval_name in [
-                    'species_vs_infile_noise',
-                    'species_vs_all',
-                    'species_vs_species',
-                    'species_vs_other_noise'
-                    ]:
-                    save_path = main_results_path / f'{clust_name}_{model}'
-                    save_path.mkdir(exist_ok=True)
-                    plot_clusterings(clust_results, df, model, clust_name, eval_name, save_path)
+        if len(df.snr.unique()) > 3:
+            for model in embeds.keys():
+                for clust_name in clustering_dict.keys():
+                    for eval_name in [
+                        'species_vs_infile_noise',
+                        'species_vs_all',
+                        'species_vs_species',
+                        'species_vs_other_noise'
+                        ]:
+                        save_path = main_results_path / f'{clust_name}_{model}'
+                        save_path.mkdir(exist_ok=True)
+                        plot_clusterings(clust_results, df, model, clust_name, eval_name, save_path)
     else:
         cluster_booleans = pd.read_csv(main_results_path / 'cluster_booleans.csv', index_col=False)
         

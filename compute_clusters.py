@@ -6,7 +6,7 @@ from clustering_utils import *
 # path = main_path / Path('data_h5_files/6_ratio-n2t_10_cleaned')
 # file_name = 'unknown_sounds_len_3_sr_32000_repetitions_6_ratio-n2t_4.h5'
 # file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem}.h5'
-file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem+"_snr=0"}.h5'#.split("_cleaned")[0]+
+# file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem+"_snr=0"}.h5'#.split("_cleaned")[0]+
 
 models = ['birdnet']#, 'naturebeats', 'audioprotopnet']#, 'avesecho_passt']
 
@@ -30,7 +30,7 @@ df.index = range(len(df))
 
 ## compute clusterings
 n_centroids = embeds[model][f'snr={SNR}'].shape[0]//100
-max_clust = 400
+max_clust = 100
 clustering_dict = {
     # 'kmeans': KMeans(n_clusters=n_centroids), # because 15 species + noise for the within and diff file ...?
     # # 'hdb': HDBSCAN(min_cluster_size=10, min_samples=None),
@@ -42,12 +42,12 @@ clustering_dict = {
         initial_clustering='kmeans',
         agglomerative_clustering=True
         ),
-    f'kmeans_w_agg_{max_clust+100}': Clustering_Approach(
-        max_cluster_size=max_clust,
-        n_centroids=n_centroids,
-        initial_clustering='kmeans',
-        agglomerative_clustering=True
-        ),
+    # f'kmeans_w_agg_{max_clust+100}': Clustering_Approach(
+    #     max_cluster_size=max_clust,
+    #     n_centroids=n_centroids,
+    #     initial_clustering='kmeans',
+    #     agglomerative_clustering=True
+    #     ),
     # f'kmeans_w_dbscan_{max_clust}': Clustering_Approach(
     #     max_cluster_size=max_clust,
     #     n_centroids=n_centroids,
@@ -84,7 +84,7 @@ def umap_kmeans(X, n_clusters, random_state):
     centroids = clusterer.fit_transform(X)
     return centroids#.swapaxes(0, 1)
 
-OVERWRITE = True
+OVERWRITE = False
 
 clust_df, centroids = fetch_clustering(embeds, df, clustering_dict, overwrite=OVERWRITE)
 # filtered_labels = weights < max_cluster_size
@@ -129,3 +129,38 @@ visualize_using_dashboard(
     **vis_settings,
     **remaining_settings
     )
+
+
+if False:
+    ### check association when inside update_spectrogram:
+    # get h5 path
+    p = '/media/siriussound/Extreme SSD/identifying_unknown_sounds/data_h5_files/10_ratio-n2t_50/snr=0/unknown_sounds_len_3_sr_32000_nr-target_10_ratio-n2t_50_germany_campsite.h5'
+
+    # load h5 idx arry
+    import h5py
+    with h5py.File(p, 'r') as data:
+        au = data[587]
+        
+    # ensure that is identical to audio
+
+    ## load numpy embedding at that idx
+
+    npp = '/home/siriussound/Code/identifying_unknown_species/bacpipe_results/10_ratio-n2t_50/snr=0/embeddings/2026-08-12_12-00___birdnet-snr=0/unknown_sounds_len_3_sr_32000_nr-target_10_ratio-n2t_50_germany_campsite_birdnet.npy'
+    em = np.load(npp)
+    em[587]
+
+
+    # load umap model
+    from umap import UMAP
+    import pickle
+    up = '/home/siriussound/Code/identifying_unknown_species/bacpipe_results/10_ratio-n2t_50/snr=0/dim_reduced_embeddings/2026-08-12_12-03___umap-snr=0-birdnet/umap_model.pkl'
+    um = pickle.load((open(up, 'rb')))
+
+    # transform embedding into umap and check it matches the point in the visualization
+    um.transform(em[587])
+
+
+    ## and ensure the start and end match the csv files data
+    p_csv = '/media/siriussound/Extreme SSD/identifying_unknown_sounds/data_h5_files/10_ratio-n2t_50/snr=0/unknown_sounds_len_3_sr_32000_nr-target_10_ratio-n2t_50_germany_campsite.csv'
+    df = pd.read_csv(p_csv)
+    df.iloc[587]

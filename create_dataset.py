@@ -10,9 +10,18 @@ import h5py
 
 SEED = 42 # ensure that always the same context files get selected
 GLOBAL_LENGTH = 3 # 5s is the standard for bird volcalizations
-SR = 32_000
-NR_REPITITIONS = 2
-RATIO_NOISE_TO_TARGET = 30
+SR = 32_000 # a lot of the data is sampled lower than that anyway
+RATIO_NOISE_TO_TARGET = 50 # ratio between total target to total noise
+
+# This is the number of vocalizations per species that is superimposed
+# with each noise environment. so total number of vocalizations for one
+# species will be this number * number of noise environments. So this
+# is directly linked to the max cluster size that we define in the clustering
+# step because if this is too high than in an ideal scenario our cluster would
+# be too big to be identified. And we do want this value to be small to represent
+# obscure rare classes.
+NR_SEGMENTS_PER_SPECIES = 10
+
 PLOT = True
 # src_path = '/media/siriussound/Extreme SSD/Recordings'
 noise_srcs = {
@@ -88,7 +97,7 @@ def get_noise_df(paths_dict):
                     )
             ]
 
-        for file in tqdm(audio_files, desc='load audio', total=len(audio_files)):
+        for file in tqdm(audio_files, desc='get file lengths', total=len(audio_files)):
             
             with audioread.audio_open(file) as f:
                 length = f.duration
@@ -111,16 +120,16 @@ def load_noise(species_df):
     for noise_env in tqdm(noise_srcs.keys(), desc='noise_env', leave=False, position=1):
         
         
-        file_name = f"unknown_sounds_len_{GLOBAL_LENGTH}_sr_{SR}_repetitions_{NR_REPITITIONS}_ratio-n2t_{RATIO_NOISE_TO_TARGET}_{noise_env}"
-        save_path = main_path / f"data_h5_files/{NR_REPITITIONS}_ratio-n2t_{RATIO_NOISE_TO_TARGET}/{file_name}.h5"
+        file_name = f"unknown_sounds_len_{GLOBAL_LENGTH}_sr_{SR}_nr-target_{NR_SEGMENTS_PER_SPECIES}_ratio-n2t_{RATIO_NOISE_TO_TARGET}_{noise_env}"
+        save_path = main_path / f"data_h5_files/{NR_SEGMENTS_PER_SPECIES}_ratio-n2t_{RATIO_NOISE_TO_TARGET}/{file_name}.h5"
         if not save_path.exists():        
             noise_df = get_noise_df({noise_env: noise_srcs[noise_env]})
-            max_species_df_len = max([len(species_df[species_df.target == species]) for species in species_df.target.unique()])
+            sum_species_df_len = sum([len(species_df[species_df.target == species]) for species in species_df.target.unique()])
             noise_idxs = noise_df[noise_df.target == noise_env].index
             noise = []
             
-            total_number_noise_segments = max_species_df_len * (1 + RATIO_NOISE_TO_TARGET) 
-            random_indices[noise_env] = np.random.permutation(len(noise_idxs.values))[:total_number_noise_segments]
+            total_number_noise_segments = sum_species_df_len * (RATIO_NOISE_TO_TARGET / len(noise_srcs.keys())) 
+            random_indices[noise_env] = np.random.permutation(len(noise_idxs.values))[:int(total_number_noise_segments)]
             this_env_noise_df = noise_df.loc[noise_idxs].iloc[random_indices[noise_env]]
             
             aud = AudioHandler(
@@ -189,6 +198,8 @@ def load_audios(paths_dict):
     df = pd.DataFrame()
     target_audio = []
     for k, v in paths_dict.items():
+        species_audio = []
+        df_species = pd.DataFrame()
         aud = AudioHandler(padding=PAD_FUNC, audio_dir=v, segment_length=GLOBAL_LENGTH*SR, sr=SR, device='cuda')
         
         audio_files = bacpipe.get_audio_files(v)
@@ -197,22 +208,33 @@ def load_audios(paths_dict):
             raw_audio, sr = aud._load_and_resample(file)
             
             input_length = SR * GLOBAL_LENGTH
-            for _ in range(NR_REPITITIONS):
-                rand_timeshift_offset = np.random.randint(input_length // 2)
-                rand_shifted_audio = raw_audio[:, rand_timeshift_offset:]
+            
+            rand_timeshift_offset = np.random.randint(input_length // 2)
+            rand_shifted_audio = raw_audio[:, rand_timeshift_offset:]
+            
+            win_audio = aud._window_audio(rand_shifted_audio)
+            win_audio = win_audio.cpu()
+            species_audio.append(win_audio)
+            df_tmp = pd.DataFrame()
+            df_tmp['target'] = [k] * len(win_audio)
+            df_tmp['file_stem'] = [file.stem] * len(win_audio)
+            
+            df_tmp['start'] = np.arange(len(win_audio)) * GLOBAL_LENGTH + rand_timeshift_offset/SR
+            
+            df_tmp['end'] = df_tmp['start'] + GLOBAL_LENGTH
+            
+            df_species = pd.concat([df_species, df_tmp])
                 
-                win_audio = aud._window_audio(rand_shifted_audio)
-                win_audio = win_audio.cpu()
-                target_audio.append(win_audio)
-                df_tmp = pd.DataFrame()
-                df_tmp['target'] = [k] * len(win_audio)
-                df_tmp['file_stem'] = [file.stem] * len(win_audio)
-                
-                df_tmp['start'] = np.arange(len(win_audio)) * GLOBAL_LENGTH + rand_timeshift_offset/SR
-                
-                df_tmp['end'] = df_tmp['start'] + GLOBAL_LENGTH
-                
-                df = pd.concat([df, df_tmp])
+        
+        rnd_indices = np.random.permutation(len(df_species))[:NR_SEGMENTS_PER_SPECIES]
+        
+        df_species = df_species.iloc[rnd_indices]
+        species_audio = torch.vstack(species_audio)[rnd_indices]
+        
+        
+        df = pd.concat([df, df_species])
+        target_audio.append(species_audio)
+        
     df.index = range(len(df))
             
     return torch.vstack(target_audio), df
@@ -272,8 +294,8 @@ def combined_target_and_noise(
 
 def get_noise_segments(noise_env, batch_random_indices):
     
-    file_name = f"unknown_sounds_len_{GLOBAL_LENGTH}_sr_{SR}_repetitions_{NR_REPITITIONS}_ratio-n2t_{RATIO_NOISE_TO_TARGET}_{noise_env}"
-    file = main_path / f"data_h5_files/{NR_REPITITIONS}_ratio-n2t_{RATIO_NOISE_TO_TARGET}/{file_name}.h5"
+    file_name = f"unknown_sounds_len_{GLOBAL_LENGTH}_sr_{SR}_nr-target_{NR_SEGMENTS_PER_SPECIES}_ratio-n2t_{RATIO_NOISE_TO_TARGET}_{noise_env}"
+    file = main_path / f"data_h5_files/{NR_SEGMENTS_PER_SPECIES}_ratio-n2t_{RATIO_NOISE_TO_TARGET}/{file_name}.h5"
     with h5py.File(file, 'r') as data:
         audio = data['audio'][batch_random_indices]
         
@@ -299,24 +321,10 @@ def build_audio_and_df(species_sounds, species_df, noise_df, snr):
         for species in tqdm(species_df.target.unique(), desc='species', leave=False, position=2):
             species_idxs = species_df[species_df.target == species].index
             tmp_noise_df = noise_df[noise_df.noise_env == noise_env]
-            noise_idxs = tmp_noise_df.index
+            tmp_noise_df.index = range(len(tmp_noise_df))
             
             species_audio = species_sounds[species_idxs]
             
-            # for idx_rep, repetition in tqdm(
-            #     # enumerate(range(0, len(species_audio) * NR_REPITITIONS, len(species_audio))), 
-            #     enumerate(range(len(species_audio))), 
-            #     desc='rep', 
-            #     leave=False, 
-            #     position=3, 
-            #     total=NR_REPITITIONS
-            #     ):
-            #     if idx_rep == NR_REPITITIONS:
-            #         break
-            
-                # batch_random_indices = random_indices[noise_env][repetition:repetition+len(species_audio)]
-                
-            # batch_random_indices = tmp_noise_df.index[repetition:repetition+len(species_audio)]
             indices = tmp_noise_df.index
             rand_indices = np.random.permutation(indices)
             batch_random_indices = rand_indices[:len(species_audio)]
@@ -329,11 +337,11 @@ def build_audio_and_df(species_sounds, species_df, noise_df, snr):
             species_augmented.append(torch.vstack(mixed))
             
             df_tmp.species_filename = species_df.file_stem[species_idxs][:len(mixed)]
-            df_tmp.noise_filename = tmp_noise_df.noise_filename.iloc[noise_idxs[batch_random_indices]].values
+            df_tmp.noise_filename = tmp_noise_df.noise_filename.iloc[batch_random_indices].values
             df_tmp.species_start = species_df.start[species_idxs]
             df_tmp.species_end = species_df.end[species_idxs]
-            df_tmp.noise_start = tmp_noise_df.noise_start.iloc[noise_idxs[batch_random_indices]].values
-            df_tmp.noise_end = tmp_noise_df.noise_end.iloc[noise_idxs[batch_random_indices]].values
+            df_tmp.noise_start = tmp_noise_df.noise_start.iloc[batch_random_indices].values
+            df_tmp.noise_end = tmp_noise_df.noise_end.iloc[batch_random_indices].values
             df_tmp.species = species
             df_tmp.noise_env = noise_env
             df_tmp.snr = snr
@@ -408,8 +416,8 @@ def create_dataset():
     noise_df = load_noise(species_df)
     
     for snr in tqdm([0, 1.5, 3, 6, 9, 12], desc='snr', leave=False, position=0):
-        file_name = f"unknown_sounds_len_{GLOBAL_LENGTH}_sr_{SR}_repetitions_{NR_REPITITIONS}_ratio-n2t_{RATIO_NOISE_TO_TARGET}_{snr=}"
-        save_path = main_path / f"data_h5_files/{NR_REPITITIONS}_ratio-n2t_{RATIO_NOISE_TO_TARGET}/{file_name}.h5"
+        file_name = f"unknown_sounds_len_{GLOBAL_LENGTH}_sr_{SR}_nr-target_{NR_SEGMENTS_PER_SPECIES}_ratio-n2t_{RATIO_NOISE_TO_TARGET}_{snr=}"
+        save_path = main_path / f"data_h5_files/{NR_SEGMENTS_PER_SPECIES}_ratio-n2t_{RATIO_NOISE_TO_TARGET}/{file_name}.h5"
         
         if not save_path.exists():
             species_augmented, df = build_audio_and_df(species_sounds, species_df, noise_df, snr)
