@@ -25,10 +25,11 @@ device: 'cpu'
 
 # batch size for embedding generation, modify if you have memory issues
 # or if you want to speed up the process and have enough memory available
-global_batch_size: 8
+global_batch_size: 32
 
 
 # supported formats of audio files
+# audio_suffixes: ['.h5']
 audio_suffixes: ['.wav', '.WAV', '.aif', '.mp3', '.MP3', '.flac', '.ogg']
 
 # Specify the padding strategy for the models. This will be used
@@ -124,7 +125,7 @@ bool_filter_labels: False
 # if the model has a classifier that ships with the model, by default 
 # it will be used, to provide another option to colorcode embeddings
 # and visualize differences between embeddings. 
-run_pretrained_classifier: True
+run_pretrained_classifier: False
 classifier_threshold: 0.5
 
 # By default all default classifier predictions will also be saved

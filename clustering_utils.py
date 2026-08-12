@@ -30,7 +30,7 @@ from bacpipe.embedding_evaluation.label_embeddings import DefaultLabels as Label
 
 from bacpipe import Embedder, Loader, get_audio_files, visualize_using_dashboard, settings, config, ground_truth_by_model
 
-from cluster_algos import MiniBatchkMeans_w_DBSCAN
+from cluster_algos import Clustering_Approach
 
 from create_dataset import read_dataset
 
@@ -53,8 +53,8 @@ def get_embeddings(path, models):
             snr_string = snr_dir.stem if snr_dir.is_dir() else False
             if not snr_string:
                 continue
-            # if not '12' in snr_string:
-            #     continue
+            if not '0' in snr_string:
+                continue
                 # no need to work on other snr's for now
 
             loader = Loader(snr_dir, model_name, use_folder_structure=True, audio_suffixes=['.h5'], main_results_dir=f'bacpipe_results/{audio_dir.stem}')
@@ -273,7 +273,10 @@ def fetch_visualization_df(clust_df, path, clustering_dict, umaps, overwrite=Tru
                 snr_model_df = load_df_same_order_as_embeddings(path, model, snr_val)
                 
                 for col in ['audiofilename', 'start', 'end']:
-                    if all(df_vis[df_vis.model==model]['label:species'].fillna('')==snr_model_df.loc[:, 'species'].values):
+                    if all(
+                        df_vis.loc[(df_vis.snr.isin([snr_val, -1])).values & (df_vis.model==model).values]['label:species'].fillna('')
+                        ==snr_model_df.loc[:, 'species'].values
+                        ):
                         df_vis.loc[(df_vis.snr.isin([snr_val, -1])).values & (df_vis.model==model).values, col] = snr_model_df.loc[:, col].values
                     else:
                         raise AssertionError('species values by row do not match')
@@ -407,8 +410,9 @@ def load_df_same_order_as_embeddings(audio_dir, model, snr):
         snr_string = snr_dir.stem if snr_dir.is_dir() else False
         if not snr_string:
             continue
-        elif not (snr_string in str(snr_dir) and str(int(snr)) in snr_string):
-            continue
+        elif not (snr_string in str(snr_dir) and str(snr).split('.')[0] in snr_string):
+            if not (snr_string in str(snr_dir) and str(snr).replace('.', ',') in snr_string):
+                continue
     
         loader = Loader(snr_string, model, use_folder_structure=True, audio_suffixes=['.h5'], main_results_dir=f'bacpipe_results/{Path(audio_dir).stem}')
         

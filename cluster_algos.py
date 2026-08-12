@@ -78,21 +78,28 @@ from sklearn.cluster import MiniBatchKMeans, DBSCAN, KMeans, kmeans_plusplus
 
 
 
-class MiniBatchkMeans_w_DBSCAN:
+class Clustering_Approach:
     def __init__(
         self, 
         max_cluster_size, 
         n_centroids, 
         filter_centroids=False, 
-        random_state=42, 
-        batch_size=2048, 
-        dcscan_eps=0.5, 
-        dbscan_min_samples=5, 
+        ### kmeans params
         initial_clustering='minibatchkmeans', 
         tol=1e-4, 
         max_iter=300, 
+        n_init=10,
         init='k-means++', 
-        n_init=10
+        ### general params
+        random_state=42, 
+        ### minibatch params
+        batch_size=2048, 
+        ### dbscan params
+        dcscan_eps=0.5, 
+        dbscan_min_samples=5, 
+        ### agglomerative clustering metrics
+        agglomerative_clustering = False,
+        n_neighbors=5
         ):
         """
         init{‘k-means++’, ‘random’}, callable or array-like of shape (n_clusters, n_features), default=’k-means++’
@@ -130,6 +137,10 @@ class MiniBatchkMeans_w_DBSCAN:
         # n_centroids = X.shape[0]//100  # Compress 105,000 points into 1,000 representative centroids
         self.max_cluster_size = max_cluster_size
         self.filter_centroids = filter_centroids
+        
+        self.agglomerative_clustering = agglomerative_clustering
+        self.n_neighbors = n_neighbors
+        
         if initial_clustering == 'minibatchkmeans':
             self.kmeans = MiniBatchKMeans(n_clusters=n_centroids, random_state=random_state, batch_size=batch_size)
         elif initial_clustering == 'kmeans':
@@ -162,10 +173,27 @@ class MiniBatchkMeans_w_DBSCAN:
         # Count how many original points were assigned to each centroid index
         weights = np.bincount(self.kmeans.labels_)
 
-        print("Step 3: Running DBSCAN on weighted centroids...")
 
-        self.dbscan.fit(centroids, sample_weight=weights)
+        
+        if self.filter_centroids:
+            from sklearn.metrics import pairwise_distances
+            pp = pairwise_distances(centroids)
+            bool_smaller_than_3std = [True if any(p<(np.mean(pp)-3*np.std(pp)) * (p>0)) else False for p in pp]
+            labels[bool_smaller_than_3std] = -3 
+        
+        if self.agglomerative_clustering:
+            print("Step 3: Running DBSCAN on weighted centroids...")
+            final_labels = self.agglomerative_clust(centroids)
+        
+        else:
+            print("Step 3: Running kNN and then agglomerative clustering on weighted centroids...")
 
+            self.dbscan.fit(centroids, sample_weight=weights)
+            labels = self.dbscan.labels_
+            filtered_labels = weights < self.max_cluster_size
+            labels[~filtered_labels] = -2
+            
+            final_labels = labels[self.kmeans.labels_]
         # ==========================================
         # 5. Map the centroid labels back to raw points
         # ==========================================
@@ -174,19 +202,6 @@ class MiniBatchkMeans_w_DBSCAN:
         # to every original point assigned to that centroid in O(1) time.
         
         # final_labels = hdb.labels_[kmeans.labels_]
-        labels = self.dbscan.labels_
-        
-        if self.filter_centroids:
-            from sklearn.metrics import pairwise_distances
-            pp = pairwise_distances(centroids)
-            bool_smaller_than_3std = [True if any(p<(np.mean(pp)-3*np.std(pp)) * (p>0)) else False for p in pp]
-            labels[bool_smaller_than_3std] = -3 
-        
-        
-        filtered_labels = weights < self.max_cluster_size
-        labels[~filtered_labels] = -2
-        
-        final_labels = labels[self.kmeans.labels_]
 
         # ==========================================
         # 6. Analyze and Plot the Results
@@ -200,3 +215,87 @@ class MiniBatchkMeans_w_DBSCAN:
         print(f"Noise Points Rejected: {n_noise} ({n_noise / len(X) * 100:.2f}% of data)")
         
         return final_labels, centroids, weights
+    
+
+    def agglomerative_clust(self, centroids):    
+        from sklearn.cluster import AgglomerativeClustering
+        from sklearn.neighbors import NearestNeighbors
+        
+        import numpy as np
+        from scipy.spatial.distance import pdist
+
+        # Returns a 1D vector of length (N * (N - 1)) / 2
+        # Contains no 0 diagonals and no duplicate pairs!
+        distances = pdist(centroids)
+
+        threshold = np.mean(distances) - 2 * np.std(distances)
+        
+        # 1. Build the k-NN graph directly from NearestNeighbors
+        nbrs = NearestNeighbors(n_neighbors=self.n_neighbors, algorithm='ball_tree').fit(centroids)
+        knn_graph = nbrs.kneighbors_graph(centroids, mode='distance')
+        
+        # 2. Cluster without setting n_clusters
+        clustering = AgglomerativeClustering(
+            n_clusters=None,
+            distance_threshold=threshold,
+            connectivity=knn_graph,
+            linkage='single'         # 'single' matches connected components behavior
+        ).fit(centroids)
+        
+        labels = clustering.labels_
+        n_classes = len(set(labels))
+        
+        print(f"Discovered {n_classes} classes.")
+        
+        new_labels = self.kmeans.labels_
+        for idx_centroid in np.arange(len(centroids)):
+            new_labels[new_labels == idx_centroid] = labels[idx_centroid]
+            
+        for idx_centroid in np.arange(len(centroids)):
+            if len(new_labels[new_labels == idx_centroid]) > self.max_cluster_size:
+                new_labels[new_labels == idx_centroid] = -2
+        
+        return new_labels
+
+# def plot_embeds_with_centroids():
+#     from matplotlib import pyplot as plt
+    
+#     from sklearn.metrics import pairwise_distances
+#     pp = pairwise_distances(centroids)#[tl_mask])
+    
+#     counts, bins = np.histogram(pp, bins=25)
+#     plt.figure()
+#     plt.hist(bins[:-1], bins, weights=counts)
+#     plt.savefig('test-hist.png')
+    
+#     # pp[pp<4] = -1
+#     plt.figure()
+#     plt.imshow(pp)
+#     plt.colorbar()
+#     plt.savefig('test_heat1.png')
+
+# def plot_embeds_with_centroids():
+#     from matplotlib import pyplot as plt
+    
+#     plt.figure()
+#     plt.scatter(umap1.embedding_[:, 0], umap1.embedding_[:, 1], label='embeds')
+#     plt.scatter(cen[:, 0], cen[:, 1], label='centroids')
+#     plt.savefig('test.png')
+
+# ####
+# from matplotlib import pyplot as plt
+
+# plt.figure()
+# plt.scatter(umap1.embedding_[:, 0], umap1.embedding_[:, 1], s=0.5, c=new_labels, label='embeds')
+# mask = self.dbscan.labels_ >= 0
+# # plt.scatter(cen[mask][:, 0], cen[mask][:, 1], s=8, c='blue', label='clust')
+# # plt.scatter(cen[~mask][:, 0], cen[~mask][:, 1], s=12, c='green', label='neg')
+# # plt.scatter(cen[tl_mask][:, 0], cen[tl_mask][:, 1], s=12, c='red', label='tl')
+# plt.scatter(cen[:, 0], cen[:, 1], s=12, c=labels, label='tl')
+
+# plt.legend()
+# plt.savefig('test.png')
+# plt.close()
+
+####
+    

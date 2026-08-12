@@ -11,8 +11,8 @@ import h5py
 SEED = 42 # ensure that always the same context files get selected
 GLOBAL_LENGTH = 3 # 5s is the standard for bird volcalizations
 SR = 32_000
-NR_REPITITIONS = 6
-RATIO_NOISE_TO_TARGET = 10
+NR_REPITITIONS = 2
+RATIO_NOISE_TO_TARGET = 30
 PLOT = True
 # src_path = '/media/siriussound/Extreme SSD/Recordings'
 noise_srcs = {
@@ -22,17 +22,37 @@ noise_srcs = {
     'germany_campsite': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/context/just_noise/germany_campsite',
     'BIRB_NES': '/media/siriussound/Extreme SSD/Recordings/terrestrial/Birds/BirdSet/NES - neotropical coffee farms in Colombia and Costa Rica/soundscape_data/audio',
     'french_guyana': '/media/siriussound/Extreme SSD/Recordings/MNHN/darksound/dB@DARKSOUND/AUDIO/04662-I21',
-    'audiomoth_leiden': '/media/siriussound/Extreme SSD/Recordings/MyRecordings/20250701_AudioMothsLeiden/A1_NW_24E1440360369142/20250605/nighttime',
-    'AnuranSet_INCT41': '/mnt/swap/Work/Data/Amphibians/AnuranSet/AnuranSet/INCT41'
+    'Silencio': '/media/siriussound/Extreme SSD/Recordings/terrestrial/BirdClef',
+    # 'audiomoth_leiden': '/media/siriussound/Extreme SSD/Recordings/MyRecordings/20250701_AudioMothsLeiden/A1_NW_24E1440360369142/20250605/nighttime',
+    'audiomoth_leiden': '/media/siriussound/Extreme SSD/Recordings/MyRecordings/20250701_AudioMothsLeiden/A1_NW_24E1440360369142',
+    ### AnuraSet is excluded because all of my amphibian species are now from there!
+    # 'AnuranSet_INCT41': '/mnt/swap/Work/Data/Amphibians/AnuranSet/AnuranSet/INCT41'
     }
 
 target_paths = {
-    'white-crested turaco': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/birds/white-crested turaco/eq-ed and noise reduced',
-    'tiny cisticola': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/birds/tiny cisticola/eq-ed and noise reduced', 
-    'rufous-crowned roller': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/birds/rufous-crowned roller/eq-ed and noise reduced', 
-    'Decticus albifrons': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/insects/Decticus albifrons/eq-ed and noise reduced',
-    'Acrometopa servillea': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/insects/Acrometopa servillea/eq-ed and noise reduced',
-    'Schmidts Marbled Bush-cricket': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/insects/Schmidts Marbled Bush-cricket/eq-ed and noise reduced'
+    
+    ### Birds
+    'white-crested turaco': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/birds/white-crested turaco/edited',
+    'tiny cisticola': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/birds/tiny cisticola/edited', 
+    'rufous-crowned roller': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/birds/rufous-crowned roller/edited', 
+    
+    ### Insects
+    'Acrometopa servillea': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/insects/Acrometopa servillea/edited',
+    'Oecanthus Dulcisonans': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/insects/Oecanthus Dulcisonans/edited',
+    'Svercus Palmetorum': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/insects/Svercus Palmetorum/edited',
+    
+    ### Amphibians
+    'Adenomera Marmorata': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/amphibians/Adenomera Marmorata/edited',
+    'Dendropsophus Cruzi': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/amphibians/Dendropsophus Cruzi/edited',
+    'Scinax Fuscomarginatus': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/amphibians/Scinax Fuscomarginatus/edited',
+    
+    ### Mammals
+    'Agile Gibbon': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/mammals/Agile Gibbon/edited',
+    'Arctic Fox': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/mammals/Arctic Fox/edited',
+    'Neotine Giant Otters': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/mammals/Neotine Giant Otters/edited',
+    
+    # 'Decticus albifrons': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/insects/Decticus albifrons/eq-ed and noise reduced',
+    # 'Schmidts Marbled Bush-cricket': '/mnt/swap/Work/Data/identifying_unknown_sounds_data/data/target_species/clean_target_sounds/insects/Schmidts Marbled Bush-cricket/eq-ed and noise reduced'
 }
 
 
@@ -41,7 +61,7 @@ main_path = Path('/media/siriussound/Extreme SSD/identifying_unknown_sounds')
 
 # RATIO_WITHIN_FILE = 2
 # RATIO_DIFF_FILE = 1
-PAD_FUNC = 'wrap'
+PAD_FUNC = 'minimum'
 USE_TUKEY_FILTER = True
 
 # number of context files to copy to the get the contextual segments from
@@ -59,6 +79,14 @@ def get_noise_df(paths_dict):
     for k, v in paths_dict.items():
         
         audio_files = bacpipe.get_audio_files(v)
+        if k == 'audiomoth_leiden':
+            audio_files = [
+                f for f in audio_files
+                if (
+                    f.stem.split('_')[-1][0] == '0'
+                    and f.stem.split('_')[1][-3] == '5'
+                    )
+            ]
 
         for file in tqdm(audio_files, desc='load audio', total=len(audio_files)):
             

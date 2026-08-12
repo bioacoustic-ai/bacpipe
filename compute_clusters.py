@@ -8,45 +8,63 @@ from clustering_utils import *
 # file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem}.h5'
 file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem+"_snr=0"}.h5'#.split("_cleaned")[0]+
 
-models = ['birdnet', 'naturebeats', 'audioprotopnet']#, 'avesecho_passt']
+models = ['birdnet']#, 'naturebeats', 'audioprotopnet']#, 'avesecho_passt']
 
 
 embeds, umaps = get_embeddings(path, models)
 
+SNR = 0
 
 
 df = pd.DataFrame()
 for model in models:
-    for snr in embeds[model].keys():
-        df_temp = load_df_same_order_as_embeddings(path, model, snr.split('=')[-1])
+    for idx, snr in enumerate(embeds[model].keys()):
+        df_temp = load_df_same_order_as_embeddings(path, model, snr.split('=')[-1].replace(',','.'))
         df_temp['model'] = [model] * len(df_temp)
-        df = pd.concat([df, df_temp])
+        if idx == 0:
+            df = pd.concat([df, df_temp])
+        else:
+            df_temp = df_temp[df_temp.snr!=-1]
+            df = pd.concat([df, df_temp])
 df.index = range(len(df))
 
 ## compute clusterings
-n_centroids = embeds['birdnet']['snr=12'].shape[0]//100
-max_clust = 100
+n_centroids = embeds[model][f'snr={SNR}'].shape[0]//100
+max_clust = 400
 clustering_dict = {
     # 'kmeans': KMeans(n_clusters=n_centroids), # because 15 species + noise for the within and diff file ...?
     # # 'hdb': HDBSCAN(min_cluster_size=10, min_samples=None),
     # # 'spec': SpectralClustering(n_clusters=16),
-    f'kmeans_w_dbscan_{max_clust}': MiniBatchkMeans_w_DBSCAN(
-        max_cluster_size=max_clust,
-        n_centroids=n_centroids,
-        initial_clustering='kmeans'
-        ),
-    f'kmeans_w_dbscan_{max_clust}_filt_cent': MiniBatchkMeans_w_DBSCAN(
+    
+    f'kmeans_w_agg_{max_clust}': Clustering_Approach(
         max_cluster_size=max_clust,
         n_centroids=n_centroids,
         initial_clustering='kmeans',
-        filter_centroids=True
+        agglomerative_clustering=True
         ),
-    # f'kmeans_umap-init_w_dbscan_{max_clust}': MiniBatchkMeans_w_DBSCAN(
+    f'kmeans_w_agg_{max_clust+100}': Clustering_Approach(
+        max_cluster_size=max_clust,
+        n_centroids=n_centroids,
+        initial_clustering='kmeans',
+        agglomerative_clustering=True
+        ),
+    # f'kmeans_w_dbscan_{max_clust}': Clustering_Approach(
+    #     max_cluster_size=max_clust,
+    #     n_centroids=n_centroids,
+    #     initial_clustering='kmeans'
+    #     ),
+    # f'kmeans_w_dbscan_{max_clust}_filt_cent': Clustering_Approach(
+    #     max_cluster_size=max_clust,
+    #     n_centroids=n_centroids,
+    #     initial_clustering='kmeans',
+    #     filter_centroids=True
+    #     ),
+    # f'kmeans_umap-init_w_dbscan_{max_clust}': Clustering_Approach(
     #     max_cluster_size=max_clust,
     #     n_centroids=n_centroids, 
     #     initial_clustering='kmeans+umap'
     #     ),
-    # f'kmeans_umap-init_half_w_dbscan_{max_clust}': MiniBatchkMeans_w_DBSCAN(
+    # f'kmeans_umap-init_half_w_dbscan_{max_clust}': Clustering_Approach(
     #     max_cluster_size=max_clust,
     #     n_centroids=2, 
     #     initial_clustering='kmeans+umap'
@@ -66,10 +84,12 @@ def umap_kmeans(X, n_clusters, random_state):
     centroids = clusterer.fit_transform(X)
     return centroids#.swapaxes(0, 1)
 
-clust_df, centroids = fetch_clustering(embeds, df, clustering_dict, overwrite=True)
+OVERWRITE = True
+
+clust_df, centroids = fetch_clustering(embeds, df, clustering_dict, overwrite=OVERWRITE)
 # filtered_labels = weights < max_cluster_size
 # labels[~filtered_labels] = -2
-cluster_booleans, clust_results = evaluate_clustering(df, clust_df, embeds, clustering_dict, overwrite=True)
+cluster_booleans, clust_results = evaluate_clustering(df, clust_df, embeds, clustering_dict, overwrite=OVERWRITE)
 
 #### filter clusters
 
@@ -77,14 +97,14 @@ cluster_booleans, clust_results = evaluate_clustering(df, clust_df, embeds, clus
 print(clust_results)
 
 
-df_vis = fetch_visualization_df(clust_df, path, clustering_dict, umaps, overwrite=True, overwrite_gt=True)
+df_vis = fetch_visualization_df(clust_df, path, clustering_dict, umaps, overwrite=OVERWRITE, overwrite_gt=False)
 
     
 
 remaining_settings = {**vars(settings)}
 
-snr_str = 'snr=12'
-snr_val = 12.0
+snr_str = f'snr={SNR}'
+snr_val = SNR
 vis_settings = {
     'models':list(embeds.keys()), 
     'audio_dir':path / snr_str, 
