@@ -32,7 +32,7 @@ from bacpipe import Embedder, Loader, get_audio_files, visualize_using_dashboard
 
 from cluster_algos import Clustering_Approach
 
-from create_dataset import read_dataset
+from create_dataset import read_dataset, PAD_FUNC
 
 
 main_path = Path('/media/siriussound/Extreme SSD/identifying_unknown_sounds')
@@ -62,8 +62,10 @@ def get_embeddings(path, models):
                 if loader.continue_incomplete_run:
                     raise FileNotFoundError('Not all files have been processed yet.')
                 embeds_snr[model_name][snr_string] = loader.embeddings()
+                if len(embeds_snr[model_name][snr_string]) == 0:
+                    raise ValueError('No embeddings created yet')
             except:
-                embed_obj = Embedder(model_name, loader=loader, device='cuda', padding='wrap', global_batch_size=24)
+                embed_obj = Embedder(model_name, loader=loader, device='cuda', padding=PAD_FUNC, global_batch_size=24)
                 for file in loader.files:
                     df, audio = read_dataset(file)
                     embeds_snr[model_name][snr_string] = embed_obj.embeddings_using_multithreading(audio)
@@ -101,7 +103,7 @@ def get_embeddings(path, models):
                         umaps[model_name][file.stem.split('_')[0]] = json.load(f)
                 # umaps[model_name][file.stem.split('_')[0]]['umap_model'] = load_umap_model(loader_dr.embed_dir / 'umap_model.pkl')
             except:
-                umap_embed_obj = Embedder(model_name, loader=loader_dr, device='cuda', padding='wrap', dim_reduction_model='umap')
+                umap_embed_obj = Embedder(model_name, loader=loader_dr, device='cuda', padding=PAD_FUNC, dim_reduction_model='umap')
                 umap_embed_obj.run_dimensionality_reduction_pipeline()
                 loader_dr.write_metadata_file()
                 save_umap_model(loader_dr.embed_dir / 'umap_model.pkl', umap_embed_obj)
