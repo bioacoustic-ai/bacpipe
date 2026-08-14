@@ -42,7 +42,7 @@ class AudioHandler:
         self.bool_change_speed = bool_change_speed
         self.new_speed = new_speed
         self.kwargs = kwargs
-
+        
     def prepare_audio(self, sample):
         """
         Use bacpipe pipeline to load audio file, window it according to
@@ -60,13 +60,14 @@ class AudioHandler:
         torch.Tensor
             audio frames preprocessed with model specific preprocessing
         """
-        audio, sr = self._load_and_resample(sample)
-        # audio = audio.to(self.model.device)
+        
         if self.model.only_embed_annotations:
             frames = self._only_load_annotated_segments(
                 sample, audio, **self.kwargs
             )
+            sr = None
         else:
+            audio, sr = self._load_and_resample(sample)
             frames = self._window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
         if not self.bool_change_speed:
@@ -131,9 +132,11 @@ class AudioHandler:
             * self.model.sr
         )
 
-        audio = audio.cpu().squeeze()
+        # audio = audio.cpu().squeeze()
         for idx, (s, e) in enumerate(zip(starts, ends)):
-            s, e = int(s), int(e)
+            s, e = int(s) / self.sr, int(e) / self.sr
+            audio, sr = lb.load(str(file_path), sr=self.sr, mono=True, offset=s, duration=e-s)
+            
             if s > len(audio):
                 logger.warning(
                     f"Annotation with start {s} and end {str(e)} is outside of "
@@ -141,10 +144,10 @@ class AudioHandler:
                 )
                 continue
             segments = lb.util.fix_length(
-                audio[s : e + 1],
-                size=self.model.segment_length,
-                mode=self.padding,
-            )
+                audio,#[s:e+1],
+                size=self.segment_length,
+                mode=self.padding
+                )
             if idx == 0:
                 cumulative_segments = segments
             else:
@@ -152,7 +155,6 @@ class AudioHandler:
                     [cumulative_segments, segments]
                 )
         cumulative_segments = torch.Tensor(cumulative_segments)
-        cumulative_segments = cumulative_segments.to(self.model.device)
         return cumulative_segments
 
     def _load_audio_based_on_fixed_segment_length(
@@ -206,5 +208,4 @@ class AudioHandler:
             frames = padded_audio.reshape([num_frames, self.model.segment_length])
         if not isinstance(frames, torch.Tensor):
             frames = torch.tensor(frames)
-        frames = frames.to(self.model.device)
         return frames
