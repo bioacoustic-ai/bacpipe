@@ -35,6 +35,7 @@ class Model(ModelBaseClass):
         return audio
 
     def __call__(self, input):
+        input = input.cpu()
         self.predictions, self.embeddings = self.model(np.array(input))
 
         return self.embeddings

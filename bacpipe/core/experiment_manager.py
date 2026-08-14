@@ -156,13 +156,17 @@ class Loader:
                 )
 
     def _initialize_path_structure(self, testing=False, **kwargs):
-        # if testing:
-        #     kwargs["main_results_dir"] = "bacpipe/tests/results_files"
-
+        if testing:
+            kwargs["main_results_dir"] = "bacpipe_results"
+            
         if self.use_folder_structure:
             from bacpipe import settings
+            default_kwargs = {**vars(settings)}
+            passed_kwargs = kwargs
+            for key, value in default_kwargs.items():
+                if not key in passed_kwargs:
+                    kwargs[key] = value
 
-            kwargs = {**vars(settings)}
 
         for key, val in kwargs.items():
             if key == "main_results_dir":
@@ -663,8 +667,17 @@ class Loader:
         """
         d = {}
         if not self.files[0].suffix == self.embed_suffix:
-            self.files = list(self.embed_dir.rglob(f"*{self.embed_suffix}"))
-            self.files.sort()
+            embedding_files = list(self.embed_dir.rglob(f"*{self.embed_suffix}"))
+            if len(embedding_files) == 0:
+                logger.warning(
+                    "No embedding files were found. Check that the path is right "
+                    f"or if you actually have processed embeddings with {self.model_name} "
+                    f"for file in {self.audio_dir}."
+                )
+                return None
+            else:
+                self.files = embedding_files
+                self.files.sort()
         for file in self.files:
             if not self.dim_reduction_model:
                 embeds = np.load(file)
@@ -1189,6 +1202,7 @@ class Loader:
 
 
 def replace_default_kwargs_with_user_kwargs(remove_keys=None, **kwargs):
+        
     from bacpipe import config, settings
 
     default_kwargs = {**vars(config), **vars(settings)}

@@ -80,7 +80,7 @@ class Embedder(AudioHandler):
             self.model_name = model_name
 
         kwargs = replace_default_kwargs_with_user_kwargs(
-            ["audio_dir", "models", "dim_reduction_model"], kwargs=kwargs
+            ["audio_dir", "models", "dim_reduction_model"], **kwargs
         )
         self.nr_parallel_workers = kwargs.get("nr_parallel_workers")
 
