@@ -9,6 +9,8 @@ bacpipe/tests/.pytest*
 *__pycache__*
 .vscode
 dist/*
+uv.lock
+.coverage
 
 # Ignore everything in results
 *results/*

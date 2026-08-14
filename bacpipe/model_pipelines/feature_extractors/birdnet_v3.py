@@ -24,11 +24,11 @@ class Model(ModelBaseClass):
     ):
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
         
-        label_path = self.model_utils_base_path / 'birdnet3_dev/BirdNET+_V3.0-preview3.1_Global_11K_Labels.csv'
+        label_path = self.model_utils_base_path / 'birdnet_v3/BirdNET+_V3.0-preview3.1_Global_11K_Labels.csv'
         checkpoint_path=(
-            self.model_base_path / 'birdnet3_dev' / 'model.onnx'
+            self.model_base_path / 'birdnet_v3' / 'model.onnx'
             )
-        self.model = BirdNET3_DEV_ONNX(checkpoint_path, device=self.device)
+        self.model = birdnet_v3_ONNX(checkpoint_path, device=self.device)
         self.classes = pd.read_csv(label_path, sep=';')['com_name'].values
         
     def preprocess(self, audio):
@@ -44,7 +44,7 @@ class Model(ModelBaseClass):
 
 
 
-class BirdNET3_DEV_ONNX(nn.Module):
+class birdnet_v3_ONNX(nn.Module):
     """Perch v2 ONNX Model Wrapper with multi-platform GPU acceleration.
     
     Supports: Linux (CUDA/CPU), macOS (CoreML/CPU), Windows (CUDA/DirectML/CPU).

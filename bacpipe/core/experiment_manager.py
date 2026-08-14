@@ -1127,7 +1127,7 @@ class Loader:
             and run_pretrained_classifier
         ):
             if self.model_name in [
-                "birdnet3_dev",
+                "birdnet_v3",
                 "perch_v2",
                 "perch_bird",
                 "vggish",
