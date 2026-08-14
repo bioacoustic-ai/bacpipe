@@ -2,8 +2,8 @@ import torch
 import logging
 import numpy as np
 import librosa as lb
-import torchaudio as ta
 from pathlib import Path
+import audioread
 
 logger = logging.getLogger("bacpipe")
 
@@ -63,25 +63,33 @@ class AudioHandler:
         
         if self.model.only_embed_annotations:
             frames = self._only_load_annotated_segments(
-                sample, audio, **self.kwargs
+                sample, **self.kwargs
             )
             sr = None
         else:
             audio, sr = self._load_and_resample(sample)
             frames = self._window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
-        if not self.bool_change_speed:
-            self.file_length[sample.stem] = len(audio[0]) / self.model.sr
-        else:
-            self.file_length[sample.stem] = len(audio[0]) / sr
         self.preprocessed_shape = tuple(preprocessed_frames.shape)
         if self.model.device == "cuda":
-            del audio, frames
+            if self.model.only_embed_annotations:
+                del frames
+            else:
+                del audio, frames
             torch.cuda.empty_cache()
         return preprocessed_frames
 
+    def get_file_length(self, path):
+        with audioread.audio_open(str(path)) as f:
+            length = f.duration
+        if not self.bool_change_speed:
+            self.file_length[path.stem] = length
+        else:
+            self.file_length[path.stem] = length / self.new_speed
+
     def _load_and_resample(self, path):
         try:
+            self.get_file_length(path)
             if not self.bool_change_speed:
                 audio, sr = lb.load(str(path), sr=self.model.sr, mono=True)
             else:
@@ -107,10 +115,11 @@ class AudioHandler:
         return torch.tensor(audio), sr
 
     def _only_load_annotated_segments(
-        self, file_path, audio, annotations_filename="annotations.csv", **_
+        self, file_path, annotations_filename="annotations.csv", **_
     ):
         import pandas as pd
         from bacpipe import Loader
+
 
         annots = pd.read_csv(Path(self.audio_dir) / annotations_filename)
         # filter current file
@@ -123,29 +132,23 @@ class AudioHandler:
                 "Continuing with next file."
             )
 
-        starts = (
-            np.array(file_annots.start.unique(), dtype=np.float32)
-            * self.model.sr
-        )
-        ends = (
-            np.array(file_annots.end.unique(), dtype=np.float32)
-            * self.model.sr
-        )
+        starts = np.array(file_annots.start.unique(), dtype=np.float32)
+        ends = np.array(file_annots.end.unique(), dtype=np.float32)
 
         # audio = audio.cpu().squeeze()
         for idx, (s, e) in enumerate(zip(starts, ends)):
-            s, e = int(s) / self.sr, int(e) / self.sr
-            audio, sr = lb.load(str(file_path), sr=self.sr, mono=True, offset=s, duration=e-s)
-            
-            if s > len(audio):
+            self.get_file_length(file_path)
+            if s > self.file_length[file_path.stem]:
                 logger.warning(
                     f"Annotation with start {s} and end {str(e)} is outside of "
                     f"range of {file_path}. Skipping annotation."
                 )
                 continue
+            
+            audio, sr = lb.load(str(file_path), sr=self.model.sr, mono=True, offset=s, duration=e-s)
             segments = lb.util.fix_length(
-                audio,#[s:e+1],
-                size=self.segment_length,
+                audio,
+                size=self.model.segment_length,
                 mode=self.padding
                 )
             if idx == 0:
