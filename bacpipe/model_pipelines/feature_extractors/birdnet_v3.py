@@ -46,7 +46,8 @@ class Model(ModelBaseClass):
 
 
 class birdnet_v3_ONNX(nn.Module):
-    """Perch v2 ONNX Model Wrapper with multi-platform GPU acceleration.
+    """ONNX Model Wrapper with multi-platform GPU acceleration.
+    Adapted from https://huggingface.co/justinchuby/Perch-onnx.
     
     Supports: Linux (CUDA/CPU), macOS (CoreML/CPU), Windows (CUDA/DirectML/CPU).
     Input: Audio tensor of shape (batch_size, 160000) at 32kHz sample rate.
@@ -75,58 +76,6 @@ class birdnet_v3_ONNX(nn.Module):
             providers = ["CPUExecutionProvider"]
 
         providers.append("CPUExecutionProvider")
-        return providers
-    
-    
-    def chunk_audio(
-        y: np.ndarray, 
-        chunk_length: float = LENGTH_IN_SAMPLES / SAMPLE_RATE, 
-        overlap: float = 0.0, 
-        sr: int = SAMPLE_RATE
-        ):
-        """
-        Split audio into chunks with optional temporal overlap.
-
-        Args:
-            y: 1D numpy array (mono audio).
-            chunk_length: Length of each chunk in seconds (>0).
-            overlap: Overlap between consecutive chunks in seconds (0 <= overlap < chunk_length).
-            sr: Sample rate.
-
-        Returns:
-            chunks: Float32 array of shape [N, chunk_samples]
-            spans: List of (start_sec, end_sec) for each chunk (end_sec truncated to original audio length).
-        """
-        chunk_len = int(round(chunk_length * sr))
-        if chunk_len <= 0:
-            raise ValueError("chunk_length must be > 0")
-        if overlap < 0:
-            raise ValueError("overlap must be >= 0")
-        if overlap >= chunk_length:
-            raise ValueError("overlap must be < chunk_length")
-
-        step = chunk_len - int(round(overlap * sr))
-        if step <= 0:
-            raise ValueError("Invalid step size (adjust overlap/chunk_length).")
-
-        n = len(y)
-        if n == 0:
-            return np.zeros((0, chunk_len), dtype=np.float32), []
-
-        starts = np.arange(0, n, step)
-        chunks = []
-        spans = []
-        for s in starts:
-            e = min(s + chunk_len, n)
-            seg = y[s:e]
-            if len(seg) < chunk_len:
-                pad = np.zeros(chunk_len - len(seg), dtype=seg.dtype)
-                seg = np.concatenate([seg, pad], axis=0)
-            chunks.append(seg.astype(np.float32, copy=False))
-            spans.append((s / sr, min(e, n) / sr))
-            if e >= n:
-                break
-        return np.stack(chunks, axis=0), spans
     
 
     def forward(
@@ -179,6 +128,6 @@ class birdnet_v3_ONNX(nn.Module):
             
             preds_out.append(pred.astype(np.float32))
         
-        predictions = np.concatenate(preds_out, axis=0)
-        embeddings = np.concatenate(embs_out, axis=0) if return_embeddings and embs_out else None
+        predictions = torch.tensor(np.concatenate(preds_out, axis=0))
+        embeddings = torch.tensor(np.concatenate(embs_out, axis=0))
         return predictions, embeddings

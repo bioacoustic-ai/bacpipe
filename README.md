@@ -117,6 +117,7 @@ available_models : [
     "birdaves_especies",
     "biolingual",
     "birdnet",
+    "birdnet_v3",
     "birdmae",
     "convnext_birdset",
     "hbdet",
@@ -222,6 +223,7 @@ Models currently include:
 |   BirdAVES_ESpecies    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 1024 |
 |   BirdMAE    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   32 kHz|   10 s| 1280 |
 |   BirdNET     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s| 1024 |
+|   BirdNET_v3     |   [paper](https://zenodo.org/records/20703646)   |   [code](https://github.com/birdnet-team/birdnet-V3.0-dev)    |   32 kHz|   variable, default 3 s | 1280 |
 |   ConveNeXT_BirdSet   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |   32 kHz|   5 s| 1024 |
 |   Google_Whale       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   24 kHz|   5 s| 1280 |
 |   hbdet |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s| 2048|
@@ -492,6 +494,7 @@ Models that already contain classification heads, are the following:
 - Bat
 - BatDetect2_Clip_Avg
 - BirdNET
+- BirdNET_v3
 - ConvNeXT_birdset
 - google_whale
 - Perch_v2
@@ -754,6 +757,7 @@ This is the resulting folder structure:
 |   [BioLingual](#biolingual)  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   ssl|   trafo| CLAP | included |
 |   [BirdAVES_ESpecies](#birdaves_especies)    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   ssl|   trafo | HuBERT | [weights](https://storage.googleapis.com/esp-public-files/birdaves/birdaves-biox-large.torchaudio.pt)|
 |   [BirdMAE](#birdmae)    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   ssl | trafo | ViT | included |
+|   [BirdNET_v3](#birdnet)     |   [paper](https://zenodo.org/records/20703646)   |   [code](https://github.com/birdnet-team/birdnet-V3.0-dev)    |   sup l |   trafo | pending | [weights](https://zenodo.org/records/20703646)|
 |   [BirdNET](#birdnet)     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   sup l|   CNN | EffNetB0 | [weights](https://github.com/kahst/BirdNET-Analyzer/tree/main/birdnet_analyzer/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model)|
 |   [ConvNeXT_BirdSet](#convnext_birdset)   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |  sup l |   CNN | ConvNext | included|
 |   [Google_Whale](#google_whale)       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   sup l|   CNN| EffNetb0 | included|
@@ -861,6 +865,13 @@ BirdMAE is a masked autoencoder inspired by meta's AudioMAE, however the model w
 - trained on bird song data
 
 BirdNET (v2.4) is based on a EfficientNET(b0) architecture. The model is trained on a large amount of bird vocalizations from the xeno-canto database alongside other bird song databses. 
+
+### BirdNET_v3
+- Transformer
+- supervised training model
+- trained on bird song data, as well as other animal sounds
+
+BirdNET_v3 is a transformer model. The model is still in a development stage, therefore explicit information about the architecture and training data is not yet available. The model is trained on a large amount of bird vocalizations from the xeno-canto database alongside other bird song databases, as well as other animal sounds.
 
 ### ConvNeXT_BirdSet
 - CNN
