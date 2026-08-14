@@ -151,7 +151,9 @@ class Attention(nn.Module):
         self.proj = nn.Linear(dim_out, dim_out)
         self.proj_drop = nn.Dropout(proj_drop)
 
-    def _build_projection(self, dim_in, dim_out, kernel_size, padding, stride, method):
+    def _build_projection(
+        self, dim_in, dim_out, kernel_size, padding, stride, method
+    ):
         if method == "dw_bn":
             proj = nn.Sequential(
                 OrderedDict(
@@ -257,7 +259,9 @@ class Attention(nn.Module):
         flops = 0
 
         _, T, C = input.shape
-        H = W = int(np.sqrt(T - 1)) if module.with_cls_token else int(np.sqrt(T))
+        H = W = (
+            int(np.sqrt(T - 1)) if module.with_cls_token else int(np.sqrt(T))
+        )
 
         H_Q = H / module.stride_q
         W_Q = H / module.stride_q
@@ -276,16 +280,28 @@ class Attention(nn.Module):
         # [B x T x S] x [B x S x C] --> [B x T x C]
         flops += T_Q * module.dim * T_KV
 
-        if hasattr(module, "conv_proj_q") and hasattr(module.conv_proj_q, "conv"):
-            params = sum([p.numel() for p in module.conv_proj_q.conv.parameters()])
+        if hasattr(module, "conv_proj_q") and hasattr(
+            module.conv_proj_q, "conv"
+        ):
+            params = sum(
+                [p.numel() for p in module.conv_proj_q.conv.parameters()]
+            )
             flops += params * H_Q * W_Q
 
-        if hasattr(module, "conv_proj_k") and hasattr(module.conv_proj_k, "conv"):
-            params = sum([p.numel() for p in module.conv_proj_k.conv.parameters()])
+        if hasattr(module, "conv_proj_k") and hasattr(
+            module.conv_proj_k, "conv"
+        ):
+            params = sum(
+                [p.numel() for p in module.conv_proj_k.conv.parameters()]
+            )
             flops += params * H_KV * W_KV
 
-        if hasattr(module, "conv_proj_v") and hasattr(module.conv_proj_v, "conv"):
-            params = sum([p.numel() for p in module.conv_proj_v.conv.parameters()])
+        if hasattr(module, "conv_proj_v") and hasattr(
+            module.conv_proj_v, "conv"
+        ):
+            params = sum(
+                [p.numel() for p in module.conv_proj_v.conv.parameters()]
+            )
             flops += params * H_KV * W_KV
 
         params = sum([p.numel() for p in module.proj_q.parameters()])
@@ -325,7 +341,9 @@ class Block(nn.Module):
             dim_in, dim_out, num_heads, qkv_bias, attn_drop, drop, **kwargs
         )
 
-        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
+        self.drop_path = (
+            DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
+        )
         self.norm2 = norm_layer(dim_out)
 
         dim_mlp_hidden = int(dim_out * mlp_ratio)
@@ -364,7 +382,11 @@ class ConvEmbed(nn.Module):
         self.patch_size = patch_size
 
         self.proj = nn.Conv2d(
-            in_chans, embed_dim, kernel_size=patch_size, stride=stride, padding=padding
+            in_chans,
+            embed_dim,
+            kernel_size=patch_size,
+            stride=stride,
+            padding=padding,
         )
         self.norm = norm_layer(embed_dim) if norm_layer else None
 
@@ -566,7 +588,9 @@ class ConvolutionalVisionTransformer(nn.Module):
             logging.info(f"=> loading pretrained model {pretrained}")
             model_dict = self.state_dict()
             pretrained_dict = {
-                k: v for k, v in pretrained_dict.items() if k in model_dict.keys()
+                k: v
+                for k, v in pretrained_dict.items()
+                if k in model_dict.keys()
             }
             need_init_state_dict = {}
             for k, v in pretrained_dict.items():
@@ -603,7 +627,9 @@ class ConvolutionalVisionTransformer(nn.Module):
 
                         posemb_grid = posemb_grid.reshape(gs_old, gs_old, -1)
                         zoom = (gs_new / gs_old, gs_new / gs_old, 1)
-                        posemb_grid = scipy.ndimage.zoom(posemb_grid, zoom, order=1)
+                        posemb_grid = scipy.ndimage.zoom(
+                            posemb_grid, zoom, order=1
+                        )
                         posemb_grid = posemb_grid.reshape(1, gs_new**2, -1)
                         v = torch.tensor(
                             np.concatenate([posemb_tok, posemb_grid], axis=1)

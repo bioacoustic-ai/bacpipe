@@ -5,13 +5,23 @@
 [![PyPI version](https://badge.fury.io/py/bacpipe.svg?icon=si%3Apython&icon_color=%23f66151)](https://badge.fury.io/py/bacpipe)
 [![arXiv](https://img.shields.io/badge/arXiv-2604.11560-b31b1b.svg)](https://arxiv.org/abs/2604.11560)
 
+
+[![Tests](https://img.shields.io/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_311_linux.yaml?label=3.11&&logo=linux)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_311_linux.yaml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_312_linux.yaml?label=3.12&&logo=linux)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_312_linux.yaml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_311_apple.yaml?label=3.11&&logo=apple)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_311_apple.yaml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_312_apple.yaml?label=3.12&&logo=apple)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_312_apple.yaml)
+[![Tests](https://custom-icon-badges.demolab.com/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_312_windows.yaml?label=3.12&logo=windows11&logoColor=white)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_312_windows.yaml)
+[![Tests](https://custom-icon-badges.demolab.com/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_311_windows.yaml?label=3.11&logo=windows11&logoColor=white)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_311_windows.yaml)
+
 ![](src/bacpipe_logo.png)
 image by Nicole Allison
 
 **bacpipe** makes using deep learning models for bioacoustics easy!
-Using **bacpipe** you can generate embeddings and classifier predictions and evaluate them using probing, clustering and benchmarking. All you need is your audio data!.
+Using **bacpipe** you can generate embeddings and classifier predictions and evaluate them using probing, clustering and benchmarking. All you need is your audio data!
 
-And the best part is, it comes with an interactive GUI for you to explore your data organized by the state-of-the-art deep learning models for bioacoustics. 
+There's an applications paper available on [arxiv](https://arxiv.org/abs/2604.11560) describing the pipeline and its capabilities which is currently under review.
+
+The best part is, **bacpipe** comes with an interactive GUI for you to explore your data organized by the state-of-the-art deep learning models for bioacoustics. 
 
 **bacpipe** is also available on pip: `pip install bacpipe`
 
@@ -28,36 +38,47 @@ A more detailed description of the API can be found under [API](#api). In `bacpi
 
 There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) available on youtube to install and run bacpipe.
 
+
+__Try it out__ and (__please__) feel free to give feedback, make suggestions and ask questions either in the [Discussion](https://github.com/bioacoustic-ai/bacpipe/discussions), [Raise an Issue](https://github.com/bioacoustic-ai/bacpipe/issues) or submit a [Pull Request](https://github.com/bioacoustic-ai/bacpipe/pulls). 
+
+This project is still in its early stages and so bugs can still occur. However, all models have been tested successfully on different operating systems. The traffic suggests that it is useful for researchers in our field. It would be great to see it grow into a community project.
+
+
 ## 📚 Table of Contents
 
 - [How it works](#how-it-works)
 - [Dashboard visualization](#dashboard-visualization)
+    - [Using your annotations](#using-your-annotations)
 - [Available models](#available-models)
-- [API](#api)
-    - [Use bacpipe immediately on the integrated test data](#use-bacpipe-immediately-on-the-integrated-test-data)
-    - [Modify configurations and settings as attributs](#modify-configurations-and-settings-as-attributs)
-    - [Modify audio source path, models, device](#modify-audio-source-path-models-device)
-    - [Use bacpipe in an existing pipeline](#use-bacpipe-in-an-existing-pipeline)
-    - [Produce embeddings for multiple models in your own pipeline](#produce-embeddings-for-multiple-models-in-your-own-pipeline)
 - [Installation](#installation)
     - [Install prerequisites](#install-prerequisites)
     - [Clone the git repository](#clone-the-git-repository)
-    - [Install the dependencies once the prerequisites are satisfied](#install-the-dependencies-once-the-prerequisites-are-satisfied)
+    - [Create a virtual environment for this project](#create-a-virtual-environment-for-this-project)
+    - [Bacpipe comes with requirements files to install without cuda or tensorflow](#bacpipe-comes-with-requirements-files-to-install-without-cuda-or-tensorflow)
+    - [GPU support](#gpu-support)
     - [Model checkpoints are downloaded automatically](#model-checkpoints-are-downloaded-automatically)
     - [Test the installation was successful](#test-the-installation-was-successful)
-- [Usage](#usage)
+- [Using bacpipe](#using-bacpipe)
     - [Configurations and settings](#configurations-and-settings)
     - [Running the pipeline](#running-the-pipeline)
     - [Model selection](#model-selection)
     - [Dimensionality reduction](#dimensionality-reduction)
     - [Dashboard](#dashboard)
     - [Evaluation](#evaluation)
+    - [Only generate embeddings for annotated segments](#only-generate-embeddings-for-annotated-segments)
+- [API](#api)
+    - [Use bacpipe immediately on the integrated test data](#use-bacpipe-immediately-on-the-integrated-test-data)
+    - [Modify configurations and settings as attributs](#modify-configurations-and-settings-as-attributs)
+    - [Modify audio source path, models, device](#modify-audio-source-path-models-device)
+    - [Use bacpipe in an existing pipeline](#use-bacpipe-in-an-existing-pipeline)
+    - [Produce embeddings for multiple models in your own pipeline](#produce-embeddings-for-multiple-models-in-your-own-pipeline)
     - [Models with classifiers](#models-with-classifiers)
+- [Bacpipe's generated data](#bacpipes-generated-data)
     - [Generated Files](#generated-files)
-        - [Embedding Folders](#embedding-folders)
-        - [Dimensionality reduced embedding folders](#dimensionality-reduced-embedding-folders)
-        - [Evaluation folders](#evaluation-folders)
-        - [Example result files structure](#example-result-files-structure)
+    - [More detailed model information](#more-detailed-model-information)
+    - [Brief description of models](#brief-description-of-models)
+- [Dimensionality reduction models](#dimensionality-reduction-models)
+- [Add a new model](#add-a-new-model)
 - [Contribute](#contribute)
 - [Known issues](#known-issues)
 - [Citation](#citation)
@@ -90,6 +111,8 @@ available_models : [
     "avesecho_passt",
     "aves_especies",
     "bat",
+    "batdetect2_clip_avg",
+    "batdetect2_dets_avg",
     "beats",
     "birdaves_especies",
     "biolingual",
@@ -132,33 +155,13 @@ available_evaluation_tasks: [
 ]
 ```
 
-## Interactive dashboard to explore data visually and aurally
-The repository also includes a panel dashboard for visualizing the generated embeddings. The `dashboard` variable in the [settings.yaml](bacpipe/settings.yaml) file controls is, and by default is set to `True`. The dashboard will automatically open in your browser creating embeddings and classifier predictions. The dashboard is interactive and thus let's you explore the embeddings and even listen to the audio.
-
-The pipeline is designed to be modular, so you can easily add or remove models as needed. The models are organized into pipelines, which are defined in the `bacpipe/model_pipelines/feature_extractors` directory. If you want to add a different dimensionality reduction model, you do so by adding a new pipeline to the `bacpipe/model_pipelines/dimensionality_reduction` directory.
-
-## Using annotations for evaluation
-
-If you have annotations for your dataset, you can use them to evaluate the generated embeddings. The labels will be used to compute the clustering and classification performance of the embeddings. 
-
-To use the annotations for evaluation, create a file called `annotations.csv` in the directory specified in the `audio_dir` variable in the [config.yaml](bacpipe/config.yaml) file. The file should contain the following columns:
-```csv
-audiofilename,start,end,label:species
-```
-Where `audiofilename` is the name of the audio file, `start` and `end` are the start and end times of the annotation in seconds, and `label:species` is the label of the annotation.
-
-For reference see the [example annotations file](bacpipe/tests/test_data/annotations.csv).
-
-If this file exists, the evaluation script will automatically use the annotations to compute the clustering and classification performance of the embeddings. The labels will also be used to color the points in the dashboard visualization showing the embeddings.
-
-
 # Dashboard visualization
 
 ### bacpipe includes a dashboard visualization by default allowing you to easily explore the generated embeddings
 
 Once embeddings are generated, they can be easily visualized using a dashboard (built using `panel`) by simply setting the `dashboard` setting in the [config.yaml](bacpipe/config.yaml) file to `True`.
 
-Below you can see a gif showing the basic usage of the dashboard.
+Below you can see a gif showing the basic usage of the dashboard. Embeddings can also be visualized in 3 dimensions using the `visualization_dimensions` parameter in the [settings](bacpipe/settings.yaml) file.
 
 ![](src/bacpipe_demo.gif)
 
@@ -171,18 +174,32 @@ The dashboard has 5 main sections:
 
 In the single model section, you can select a model and visualize the embeddings generated by that model. The embeddings can be colored by :
 - metadata extracted from the files (date and time information, and file and parent directory) 
-- the labels specified in the `annotations.csv` file
-- the cluster labels generated by the clustering algorithm (kmeans)
+- the labels specified in the `annotations.csv` file (if available)
+- the cluster labels generated by a clustering algorithm (by default kmeans)
 
 In the dashboard sidebar you can select the model, by which to label the embeddings, whether to remove noise, and the type of classification task to show the results for. 
 
-The noise removal is done by removing the embeddings that do not correspond to annotated sections of the audio files. This is useful if you want to focus on the annotated sections of the audio files and disregard the rest of the data. 
+The noise removal is done by removing the embeddings that do not correspond to annotated sections of the audio files (does not apply if you do not have annotations). This is useful if you want to focus on the annotated sections of the audio files and disregard the rest of the data. 
 
 The visualizations can be saved as png files by clicking the save button in the bottom right corner of the plot.
 
-__Try it out__ and (__please__) feel free to give feedback and ask questions (or suggestions for improvements) - or in case something does not work raise issues.
 
 
+## Using your annotations
+
+If you have annotations for your dataset, **bacpipe** will read them and use them in visualizations and evaluations. 
+
+To use your annotations for evaluation, they must be in a specific format and file name: The file must be called `annotations.csv` and located in the root directory or your audio data (specified in the `audio_dir` variable in the [config.yaml](bacpipe/config.yaml) file). The file should contain the following columns:
+```csv
+audiofilename,start,end,label:species
+```
+Where `audiofilename` is the name of the audio file, `start` and `end` are the start and end times of the annotation in seconds, and `label:species` is the label of the annotation. Your file can have multiple label columns. In that case `species` can be replaced with other label-types such as `calltype` or `individual`, just the `label:` part is necessary to specify it as a label column.
+
+For reference see the [example annotations file](bacpipe/tests/test_data/annotations.csv).
+
+If this file exists, **bacpipe** will create ground_truth.csv files for each `label:` column it finds. These ground truth files will have timestamps that match the embedding timestamps of the respective model. You will be able to find them under the folder `bacpipe_results/<dataset_name>/evaluations/<model_name>/labels`. 
+
+Each label will be selectable to color your embeddings in the dashboard.
 
 
 # Available models
@@ -197,7 +214,9 @@ Models currently include:
 |   AudioProtoPNet   |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954125000901)   |   [code](https://github.com/DBD-research-group/AudioProtoPNet)    |   32 kHz|   5 s| 1024 |
 |   AvesEcho_PASST   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   32 kHz|   3 s| 768 |
 |   AVES_ESpecies        |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 768 |
-| Bat | [paper](https://arxiv.org/abs/2309.11218) | [code](https://github.com/FrankFundel/BAT-cli) | 22.05 kHz | ~1 s | 64 |
+| Bat | [paper](https://arxiv.org/abs/2309.11218) | [code](https://github.com/FrankFundel/BAT-cli) | 220.5 kHz | ~1 s | 64 |
+| BatDetect2_Clip_Avg | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | 256 kHz | 1 s | 32 |
+| BatDetect2_Dets_avg | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | 256 kHz | 1 s | 32 |
 | BEATs | [paper](https://arxiv.org/abs/2212.09058) | [code](https://github.com/microsoft/unilm/tree/master/beats) | 16 kHz | 10 s | 768 |
 |   BioLingual  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   48 kHz|   10 s| 512 |
 |   BirdAVES_ESpecies    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 1024 |
@@ -218,6 +237,269 @@ Models currently include:
 |   VGGish      |   [paper](https://ieeexplore.ieee.org/document/7952132)   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   16 kHz|   0.96 s| 128 |
 
 
+
+---
+# Installation
+
+**bacpipe** runs on all major operating systems and is supported for Python version 3.11 and 3.12. For linux and mac all models are supported for both 3.11 and 3.12. For windows tensorflow models (birdnet, perch_bird, surfperch, google_whale and vggish) are only supported for Python 3.11.
+
+## Install prerequisites
+
+In the following instructions, you will find the steps to install Python 3.11 and git on your local computer. If you already have these installed, you can skip this step.
+
+### Install Python 3.11 and git on your local computer
+
+For **Windows**:
+- Download python 3.11: https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe
+- Download Git: https://github.com/git-for-windows/git/releases/download/v2.51.0.windows.1/Git-2.51.0-64-bit.exe
+
+For **Linux**
+- `sudo add-apt-repository ppa:deadsnakes/ppa`
+- `sudo apt install python3.11`
+- `sudo apt install git`
+
+For **Mac**
+- (install homebrew: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" `
+- install git: `brew install git`
+
+
+
+
+### Install `uv` (recommended) or `poetry`
+
+For speed and stability it is recommended to use `uv`. To install `uv` use the following command (you can also do it all without `uv` then, just leave the `uv` part away, as all the commands are also `pip` commands):
+
+`pip install uv` 
+
+
+For **Windows**:
+- move to a folder of your choice (choose wisely - something like `Documents` is always a good starting point), then right click and `Open Git Bash here`
+- install **uv**: `"$HOME/AppData/Local/Programs/Python/Python311/python" -m pip install uv`
+
+For **Linux** / **MAC**:
+- open a terminal (console) in the folder of your choice
+- install **uv**: `/usr/bin/python/Python311/python -m pip install uv`
+- (if Mac users get an error locate python with `which python3` and use that path instead followed by `-m pip install uv`)
+
+If you prefer to use `poetry`, you can install it using: 
+
+`pipx install poetry` 
+
+## Clone the git repository
+
+
+For all systems navitage to a folder of your choice and run:
+
+- `git clone https://github.com/bioacoustic-ai/bacpipe`
+
+
+## Create a virtual environment for this project
+
+Virtual environments are very important. They ensure that specific libraries that are needed for one project don't get in the way of libraries you need for another project. Luckily packages like `uv` take care of everything and only require a single command.
+
+Create a virtual environment and install the packages with one command:
+- `uv sync`
+
+If it's causing trouble, try using `python -m uv sync` instead. Alternatively, you can create the environment manually, using `uv venv --python 3.11` and then `python -m uv pip install -r pyproject.toml`. All commands should install the identical dependencies, but splitting up the commands allows you to have more control over the environment, the python version and name and location.
+
+### Install virtual environment and packages yourself
+If you prefer having control over the environment name, use these commands:
+
+Create your virtual environment (all systems):
+- `uv venv --python 3.11`
+
+(if that doesn't work for windows, try `$HOME/AppData/Local/Programs/Python/Python311/python.exe -m uv venv`)
+
+After that we will activate the environment and then install the packages.
+
+For **Windows**, activate your environment:
+- `source .venv/Scripts/activate`
+
+For **Linux**/**Mac**, activate your environment:
+- `source .venv/bin/activate`
+
+(alternatively for `poetry` use `poetry env use 3.11`)
+
+Install the project dependencies using `uv` (all systems):
+- `uv pip install -r pyproject.toml`
+
+If you do not have admin rights and encounter a `permission denied` error when using `pip install`, use `python -m pip install ...` instead.
+
+
+For `poetry`:
+
+- `poetry lock`
+
+- `poetry install`
+
+
+---
+ 
+## Bacpipe comes with requirements files to install without cuda or tensorflow
+
+If you would like to limit the size of your virtual environment, **bacpipe** comes with requirements files to install without cuda or tensorflow. This is useful if you know that you are not going to use a GPU or you know you don't want to use tensorflow models (like BirdNet).
+
+Use the files `requirements_no_cuda.txt` and `requirements_no_tf.txt` to install the dependencies without cuda or tensorflow.
+
+Install them using `uv` after creating and activating your environment (see previous section):
+For requirements without cuda:
+- `uv pip install -r requirements_no_cuda.txt`
+
+or for requirements without tensorflow (necessary on **Windows** when using Python 3.12):
+- `uv pip install -r requirements_no_tf.txt`
+
+## GPU support
+
+### For PyTorch models
+
+**Bacpipe** supports inference on GPUs. For Mac and linux users the necessary packages are installed alongside `pytorch` and should work out of the box. To use the GPU, set the `device` variable in the [settings.yaml](bacpipe/settings.yaml) file to `cuda` (for linux) and `mps` (for Mac).
+
+### For TensorFlow models
+
+TensorFlow models can also be used on the GPU but only for Linux machines. 
+
+Because of the requirements of `torch==2.6` the cuda versions are installed corresponding to what pytorch supports. However, it is possible to also support tensorflow with cuda. To achieve this you have to first install the normal requirements as explained above. Once you have installed the requirements. Install the following dependencies using 
+`uv pip install -r requirements_tf_gpu.txt`.
+
+```python
+nvidia-cublas-cu12==12.5.2.13
+nvidia-cuda-cccl-cu12==12.5.39.post1
+nvidia-cuda-cupti-cu12==12.5.39
+nvidia-cuda-cuxxfilt-cu12==12.5.39
+nvidia-cuda-nvcc-cu12==12.5.40
+nvidia-cuda-nvrtc-cu12==12.5.40
+nvidia-cuda-opencl-cu12==12.5.39
+nvidia-cuda-profiler-api-cu12==12.5.39
+nvidia-cuda-runtime-cu12==12.5.39
+nvidia-cuda-sanitizer-api-cu12==12.5.39
+nvidia-cudnn-cu12==9.3.0.75
+nvidia-cufft-cu12==11.2.3.18
+nvidia-curand-cu12==10.3.6.39
+nvidia-cusolver-cu12==11.6.2.40
+nvidia-cusparse-cu12==12.4.1.24
+nvidia-cusparselt-cu12==0.6.2
+nvidia-nccl-cu12==2.21.5
+nvidia-npp-cu12==12.3.0.116
+nvidia-nvfatbin-cu12==12.5.39
+nvidia-nvjitlink-cu12==12.5.40
+nvidia-nvjpeg-cu12==12.3.2.38
+nvidia-nvml-dev-cu12==12.5.39
+nvidia-nvtx-cu12==12.5.39
+```
+
+This should allow you to still support all the pytorch models and also use the tensorflow models with cuda.
+
+## Model checkpoints are downloaded automatically. 
+
+Model checkpoints will be downloaded automatically. Once you run `bacpipe.play()`, it will automatically download models that were included but are not yet available locally. Models are downloaded from [this huggingface repo](https://huggingface.co/datasets/vskode/bacpipe_models/tree/main).
+
+## Test the installation was successful
+
+By doing so you will also ensure that the directory structure for the model checkpoints will be created. 
+
+`pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py`
+
+The tests could take a while, so to run a small test, you can also pass the model you would like to test:
+
+`pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py --models=birdnet,perch_bird`
+
+(keep in mind you have to have the checkpoints locally for the models that require it)
+
+In case of a permission denied error, run
+`python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py`
+
+If everything passes then you've successfully installed bacpipe and can now proceed to use it.
+
+
+
+
+# Using bacpipe
+
+## Configurations and settings
+
+To see the capabilities of bacpipe, go ahead and run the `run_pipeline.py` script. This will run the pipeline with the default settings and configurations on a small set of test data. 
+
+### To use bacpipe on your own data, you will need to modify the configuration files.
+
+The only two files that need to be modified are the [config.yaml](bacpipe/config.yaml) and [settings.yaml](bacpipe/settings.yaml) files. The [config.yaml](bacpipe/config.yaml) is used for the standard configurations: 
+- path to audio files
+- models to run
+- dimensionality reduction model
+- evaluation tasks
+- whether to run the dashboard or not
+
+The [settings.yaml](bacpipe/settings.yaml) file is used for more advanced configurations and does not need to be modified unless you have specific preferences. It includes settings such as to run on CPU, then use `cpu` or a GPU, then use `cuda` (linux)/`mps` (mac) (by default `cpu`). Other advances settings are the paths where results are saved, configurations for the evaluation tasks and more. 
+
+Modify the [config.yaml](bacpipe/config.yaml) file in the root directory to specify the path to your `dataset`. Define what models to run by specifying the strings in the `models` list (copy and paste as needed, I usually just comment the model's I don't want to run). 
+
+
+## Running the pipeline
+
+Once the configuration is complete, execute the run_pipeline.py file (make sure the environment is activated)
+`python run_pipeline.py`
+
+While the scripts are executed, directories will be created corresponding to the `main_results_dir` setting. Embeddings will be saved in `main_results_dir/YOUR_DATASET/embeddings` (see [here](results/test_data/embeddings/README.md) for more info) and if selected, reduced dimensionality embeddings will be saved in `main_results_dir/evaluation/dim_reduced_embeddings` (see [here](results/test_data/dim_reduced_embeddings/README.md) for more info).
+
+### Reusing already created embeddings
+
+If you have already computed embeddings with a model, **bacpipe** will compare between the audio files and the generated embedding files what files still need to be processed. It will then continue where it left off. If all files have been processed already, loading the embeddings and displaying the dashboard should only take a few seconds. 
+
+Even if `overwrite` is set to `True`, **bacpipe** will not overwrite the embeddings if they already exist. `overwrite` only specifies if the evaluations (generating ground truth, clustering and probing) should be overwritten.
+
+Embeddings can be regenerated by setting the parameters `check_if_already_processed` (for embeddings) and `check_if_already_dim_reduced` (for dimensionality reduced embeddings) to False. 
+
+## Model selection
+
+Select the models you want to run in the [config.yaml](bacpipe/config.yaml) file. The models are specified in this ReadMe and in the file [constants](bacpipe/core/constants.py). You can select the models you want to run by adding them to the `models` list in the [config.yaml](bacpipe/config.yaml) file.
+
+## Dimensionality reduction
+
+Different dimensionality reduction models can be selected in the [config.yaml](bacpipe/config.yaml) file. The available models are specified in the section [Dimensionality reduction models](#dimensionality-reduction-models). Insert the name of the selected model in the `dim_reduction_model` variable in the [config.yaml](bacpipe/config.yaml) file. The default is `umap`, but you can also select `pca`, `sparse_pca` or `t_sne`.
+
+
+## Dashboard
+
+The dashboard is a panel application that allows you to visualize the generated embeddings. To enable the dashboard, set the `dashboard` variable in the [config.yaml](bacpipe/config.yaml) file to `True`. The dashboard will automatically open in your browser (at `http://localhost:8050`) after running the `run_dashboard.py` script.
+
+## Evaluation
+
+As explained in the previous section ([Using your annotations](#using-your-annotations)), if you have an `annotations.csv` file in the root directory of your audio data, **bacpipe** will use it to generate ground truth files for each label column.
+
+
+The evaluation script will automatically use the annotations to evaluate the clustering and probing performance of the embeddings. The labels will also be used to color the points in the dashboard visualization showing the embeddings.
+
+
+The labels can then be used to perform clustering and probing evaluation. This can be done only in regard to one label, so specify the main label column in the `label_column` variable in [settings.yaml](bacpipe/settings.yaml). This defaults to `species`. Only labels that exceed the `min_label_occurrences` value will be used. This is to make sure you have enough data to train linear classifiers and do meaningful evaluations. If you have enough labeled data, feel free to increase this. 
+
+See the file [annotations.csv](bacpipe/tests/test_data/annotations.csv) for an example of how the annotations file should look like.
+
+Once the annotations file is created, add either `probing` or `clustering` (or both) to the `evaluation_task` variable in the [config.yaml](bacpipe/config.yaml) file (use double quotes: "probing" or "clustering"). You can run the evaluation script using normal `python run_pipeline.py` command. The evaluation script will automatically use the annotations to compute the clustering and probing performance of the embeddings. The results will be saved in the `bacpipe/results/YOUR_DATASET/evaluation` directory.
+
+If you selected probing, a linear probe will be trained and saved in the probing subdirectory of the evaluation folder. This .pt file can be used to generate class predictions with a model that wasn't originally trained on these classes. A tutorial will be available shortly explaining this in more detail. The .pt file can be used in the repository [acodet](https://github.com/vskode/acodet) to generate class predictions with the combination of a feature extractor and the trained linear classifier.
+
+
+
+## Only generate embeddings for annotated segments
+
+
+Using the settings attribute `only_embed_annotations`, you can also decide to only generate embedding corresponding to your annotations. In that case **bacpipe** will take each annotation and create embeddings for each selected model from only those segments. If segments are shorter than the model input length, the segments will be padded. If they are longer, they will produce several embeddings.
+
+
+## Models with classifiers
+
+Models that already contain classification heads, are the following:
+- AudioProtoPNet
+- Bat
+- BatDetect2_Clip_Avg
+- BirdNET
+- ConvNeXT_birdset
+- google_whale
+- Perch_v2
+- Perch_bird
+- SurfPerch
+
+With all of these models, you only need to set `run_pretrained_classifier` to True and then the model will save the classification outputs in the `predictions/original_classifier_outputs` folder. Only predictions exceeding the `classifier_threshold` value will be saved. A csv file in the shape of the annotations.csv file is also saved corresponding to the class predictions. The dashboard will also contain an extra `label_by` option `default_classifier`.
+
 # API
 
 **bacpipe** can be used as a package and installed from pip
@@ -225,6 +507,8 @@ Models currently include:
 `pip install bacpipe`
 
 There are `jupyter` notebooks available in the `bacpipe/examples` directory to show you how to use the API. Below you can find a quick overview of some of the API capabilities. 
+
+All previously explained features can also be accessed using the API.
 
 ## Use bacpipe immediately on the integrated test data
 
@@ -329,261 +613,18 @@ loader['birdnet'].metadata_dict
 # Thic dictionary is also saved as a yaml file in the directory of the embeddings
 ```
 
+# Bacpipe's generated data
 
-
----
-# Installation
-
-## Install prerequisites
-<details>
-<summary> Install python 3.11, uv and git <b>(click to expand)</b> </summary> 
-
-### Install Python 3.11 and git on your local computer
-
-For **Windows**:
-- Download python 3.11: https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe
-- Download Git: https://github.com/git-for-windows/git/releases/download/v2.51.0.windows.1/Git-2.51.0-64-bit.exe
-
-For **Linux**
-- `sudo add-apt-repository ppa:deadsnakes/ppa`
-- `sudo apt install python3.11`
-- `sudo apt install git`
-
-For **Mac**
-- (install homebrew: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" `
-- install git: `brew install git`
-
-
-
-
-## Install `uv` (recommended) or `poetry`
-
-It is recommended to use python 3.11 for this repository, as some of the models require it. 
-
-For speed and stability it is recommended to use `uv`. To install `uv` use the following command (you can also do it all without `uv` then, just leave the `uv` part away, as all the commands are also `pip` commands):
-
-`pip install uv` 
-
-(for windows use `$HOME/AppData/Local/Programs/Python/Python311/python.exe -m pip install uv`)
-
-If you prefer to use `poetry`, you can install it using: 
-
-`pipx install poetry` 
-
-### Create a virtual environment
-
-`python3.11 -m uv venv .env_bacpipe`
-
-(for windows use `$HOME/AppData/Local/Programs/Python/Python311/python.exe -m uv venv .env_bacpipe`)
-
-(alternatively for `poetry` use `poetry env use 3.11`)
-
-activate the environment
-
-`source .env_bacpipe/bin/activate` (for windows use `source .env_bacpipe\Scripts\activate`)
-
-</details>
-
-
-## Clone the git repository
-
-For **Windows**:
-- move to a folder of your choice (choose wisely - something like `Documents` is always a good starting point), then right click and `Open Git Bash here`
-- install **uv**: `"$HOME/AppData/Local/Programs/Python/Python311/python" -m pip install uv`
-
-For **Linux** / **MAC**:
-- open a terminal (console) in the folder of your choice
-- install **uv**: `/usr/bin/python/Python311/python -m pip install uv`
-- (if Mac users get an error locate python with `which python3` and use that path instead followed by `-m pip install uv`)
-
-For all systems:
-
-- run `git clone https://github.com/bioacoustic-ai/bacpipe`
-
-
-## Create a virtual environment for this project
-
-Virtual environments are very important. They ensure that specific libraries that are needed for one project don't get in the way of libraries you need for another project.
-
-Create a virtual environment and install the packages with one command:
-- `uv sync` (if it's causing trouble, try using `python -m uv sync` instead)
-
----
-
-<details>
-<summary> Click here if you prefer to have control about the environment name <b>(click to expand)</b> </summary> 
-
-
-If you prefer having control over the environment name, use these commands:
-
-Create your virtual environment (all systems):
-- `uv venv --python 3.11 env_bacpipe`
-
-For **Windows**, Activate your environment:
-- `source env_bacpipe/Scripts/activate`
-
-For **Linux**/**Mac**, Activate your environment:
-- `source env_bacpipe/bin/activate`
-
-Install the project dependencies (all systems):
-- `uv pip install -r pyproject.toml`
-
-
-### Install the dependencies once the prerequisites are satisfied.
-
-`uv pip install -r pyproject.toml`
-
-- this will automatically install requirements based on your os, so windows should also work fine. However, gpu support is not available on windows
-
-For `poetry`:
-
-`poetry lock`
-
-`poetry install`
-
-If you do not have admin rights and encounter a `permission denied` error when using `pip install`, use `python -m pip install ...` instead.
-
-</details>
-
-## Install gpu support for tensorflow
-
-Because of the requirements of `torch==2.6` the cuda versions have to be installed corresponding to what pytorch supports. However, I have tested that you are able to install different cuda dependencies to also support tensorflow gpus once the environment is set up. Once you have installed the requirements. Install the following dependencies using 
-`uv pip install -r requirements_tf_gpu.txt`.
-
-```python
-nvidia-cublas-cu12==12.5.2.13
-nvidia-cuda-cccl-cu12==12.5.39.post1
-nvidia-cuda-cupti-cu12==12.5.39
-nvidia-cuda-cuxxfilt-cu12==12.5.39
-nvidia-cuda-nvcc-cu12==12.5.40
-nvidia-cuda-nvrtc-cu12==12.5.40
-nvidia-cuda-opencl-cu12==12.5.39
-nvidia-cuda-profiler-api-cu12==12.5.39
-nvidia-cuda-runtime-cu12==12.5.39
-nvidia-cuda-sanitizer-api-cu12==12.5.39
-nvidia-cudnn-cu12==9.3.0.75
-nvidia-cufft-cu12==11.2.3.18
-nvidia-curand-cu12==10.3.6.39
-nvidia-cusolver-cu12==11.6.2.40
-nvidia-cusparse-cu12==12.4.1.24
-nvidia-cusparselt-cu12==0.6.2
-nvidia-nccl-cu12==2.21.5
-nvidia-npp-cu12==12.3.0.116
-nvidia-nvfatbin-cu12==12.5.39
-nvidia-nvjitlink-cu12==12.5.40
-nvidia-nvjpeg-cu12==12.3.2.38
-nvidia-nvml-dev-cu12==12.5.39
-nvidia-nvtx-cu12==12.5.39
-```
-
-## Model checkpoints are downloaded automatically. 
-
-Model checkpoints will be downloaded automatically. Once you run `bacpipe.play()`, it will automatically download models that were included but are not yet available locally. Models are downloaded from [this huggingface repo](https://huggingface.co/datasets/vskode/bacpipe_models/tree/main).
-
-## Test the installation was successful
-
-By doing so you will also ensure that the directory structure for the model checkpoints will be created. 
-
-`pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py`
-
-The tests could take a while, so to run a small test, you can also pass the model you would like to test:
-
-`pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py --models=birdnet,perch_bird`
-
-(keep in mind you have to have the checkpoints locally for the models that require it)
-
-In case of a permission denied error, run
-`python -m pytest -v --disable-warnings bacpipe/tests/test_embedding_creation.py`
-
-If everything passes then you've successfully installed bacpipe and can now proceed to use it.
-
-# Usage
-
-## Configurations and settings
-
-To see the capabilities of bacpipe, go ahead and run the `run_pipeline.py` script. This will run the pipeline with the default settings and configurations on a small set of test data. 
-
-### To use bacpipe on your own data, you will need to modify the configuration files.
-
-The only two files that need to be modified are the [config.yaml](bacpipe/config.yaml) and [settings.yaml](bacpipe/settings.yaml) files. The [config.yaml](bacpipe/config.yaml) is used for the standard configurations: 
-- path to audio files
-- models to run
-- dimensionality reduction model
-- evaluation tasks
-- whether to run the dashboard or not
-
-The [settings.yaml](bacpipe/settings.yaml) file is used for more advanced configurations and does not need to be modified unless you have specific preferences. It includes settings such as to run on a `cpu` or a `cuda` (gpu) (by default `cpu`), the paths where results are saved, configurations for the evaluation tasks and more. 
-
-Modify the [config.yaml](bacpipe/config.yaml) file in the root directory to specify the path to your `dataset`. Define what models to run by specifying the strings in the `models` list (copy and paste as needed, I usually just comment the model's I don't want to run). 
-
-If you have already computed embeddings on the dataset specified in audio_data, and you want to do the dimensionality reduction and evaluation for the models you have already run, you can set the `already_computed` variable to `True`. This will only select the models that have already been computed.
-
-In either case if you have already computed embeddings with a model, **bacpipe** will skip the model and use the **already computed** embeddings (if they are still located in the same directory). Even if `overwrite` is set to `True`, **bacpipe** will not overwrite the embeddings if they already exist. It will recompute clusterings and label generation.
-
-## Running the pipeline
-
-Once the configuration is complete, execute the run_pipeline.py file (make sure the environment is activated)
-`python run_pipeline.py`
-
-While the scripts are executed, directories will be created corresponding to the `main_results_dir` setting. Embeddings will be saved in `main_results_dir/YOUR_DATASET/embeddings` (see [here](results/test_data/embeddings/README.md) for more info) and if selected, reduced dimensionality embeddings will be saved in `main_results_dir/evaluation/dim_reduced_embeddings` (see [here](results/test_data/dim_reduced_embeddings/README.md) for more info).
-
-
-## Model selection
-
-Select the models you want to run in the [config.yaml](bacpipe/config.yaml) file. The models are specified in this ReadMe and in the [test_file](bacpipe/tests/test_embedding_creation.py). You can select the models you want to run by adding them to the `models` list in the [config.yaml](bacpipe/config.yaml) file.
-
-## Dimensionality reduction
-
-Different dimensionality reduction models can be selected in the [config.yaml](bacpipe/config.yaml) file. The available models are specified in the section [Dimensionality reduction models](#dimensionality-reduction-models). Insert the name of the selected model in the `dim_reduction_model` variable in the [config.yaml](bacpipe/config.yaml) file. The default is `umap`, but you can also select `pca`, `sparse_pca` or `t_sne`.
-
-
-## Dashboard
-
-The dashboard is a panel application that allows you to visualize the generated embeddings. To enable the dashboard, set the `dashboard` variable in the [config.yaml](bacpipe/config.yaml) file to `True`. The dashboard will automatically open in your browser (at `http://localhost:8050`) after running the `run_dashboard.py` script.
-
-## Evaluation
-
-You can use `bacpipe` to evaluate the generated embeddings using different metrics. To evaluate the embeddings, you need annotations for your dataset. The annotations should be in a file called `annotations.csv` in the directory specified in the `audio_dir` variable in the [config.yaml](bacpipe/config.yaml) file or the results directory of your dataset `main_results_dir/YOUR_DATASET`. The file should contain the following columns:
-```csv
-audiofilename,start,end,label:species
-```
-
-Where `audiofilename` is the name of the audio file, `start` and `end` are the start and end times of the annotation in seconds, and `label` is the label of the annotation.
-
-Using the settings attribute `only_embed_annotations`, you can also decide to only generate embedding corresponding to your annotations. In that case bacpipe will take each annotation and create embeddings for each selected model from only those segments. If segments are shorter than the model input length, the segments will be padded. If they are longer, they will produce several embeddings.
-
-`species` is a placeholder here and can be replaced with any label description. So if you have labelled call types, change it to `label:call_type`. But it's important that there are no spaces and that it contains `label:`. By doing this you will be able to visualize your data based on all of these label columns.
-
-The labels can then be used to perform clustering and probing evaluation. This can be done only in regard to one label, so specify the main label column in the `label_column` variable in [settings.yaml](bacpipe/settings.yaml). This defaults to `species`. Only labels that exceed the `min_label_occurrences` value will be used. This is to make sure you have enough data to train linear classifiers and do meaningful evaluations. If you have enough labeled data, feel free to increase this. 
-
-See the file [annotations.csv](bacpipe/tests/test_data/annotations.csv) for an example of how the annotations file should look like.
-
-Once the annotations file is created, add either `probing` or `clustering` (or both) to the `evaluation_task` variable in the [config.yaml](bacpipe/config.yaml) file (use double quotes: "probing" or "clustering"). You can run the evaluation script using normal `python run_pipeline.py` command. The evaluation script will automatically use the annotations to compute the clustering and probing performance of the embeddings. The results will be saved in the `bacpipe/results/YOUR_DATASET/evaluation` directory.
-
-If you selected probing, a linear probe will be trained and saved in the probing subdirectory of the evaluation folder. This .pt file can be used to generate class predictions with a model that wasn't originally trained on these classes. A tutorial will be available shortly explaining this in more detail. The .pt file can be used in the repository [acodet](https://github.com/vskode/acodet) to generate class predictions with the combination of a feature extractor and the trained linear classifier.
-
-## Models with classifiers
-
-Models that already contain classification heads, are the following:
-- Perch_v2
-- BirdNET
-- Perch_bird
-- SurfPerch
-- AudioProtoPNet
-- ConvNeXT_birdset
-- google_whale
-
-With all of these models, you only need to set `run_pretrained_classifier` to True and then the model will save the classification outputs in the `predictions/original_classifier_outputs` folder. Only predictions exceeding the `classifier_threshold` value will be saved. A csv file in the shape of the annotations.csv file is also saved corresponding to the class predictions. The dashboard will also contain an extra `label_by` option `default_classifier`.
 
 ## Generated Files
 
-When processing `bacpipe` generates a number of files. It will firstly create the `main_results_dir` specified in [settings.yaml](bacpipe/settings.yaml) and within that it will create a folder named like the dataset selected in `audio_dir` in [config.yaml](bacpipe/config.yaml). Within this directory, bacpipe will create 3 directories: `embed_parent_dir`, `dim_reduc_parent_dir` and `evaluations_dir`. 
+When processing `bacpipe` generates a number of files. It will firstly create the `main_results_dir` specified in [settings.yaml](bacpipe/settings.yaml) and within that it will create a folder named like the dataset selected in `audio_dir` in [config.yaml](bacpipe/config.yaml). Within this directory, **bacpipe** will create 4 directories: `embeddings`, `dim_reduced_embeddings`, `evaluations`, `logs`. 
 
-The `embed_parent_dir` will contain the model-specific folders with the timestamps when they were processed. The `dim_reduc_parent_dir` contains the model-specific and dimensionality reduction-specific folder again with a timestamp when they were processed. And the `evaluations_dir` contains folders for each model that has been processed. 
+The `embeddings` will contain the model-specific folders with the timestamps when they were processed. The `deim_reduced_embeddings` contains the model-specific and dimensionality reduction-specific folder again with a timestamp when they were processed. The `evaluations` contains folders for each model that has been processed. `logs` contains the logs of the runs and the config and settings files used for the run.
 
 ### Embedding folders
 
-By default the naming conventions for the embedding directories is:
+By default, the naming conventions for the embedding directories is:
 
 `_year-month-day_hour-minute___modelname_datasetname`
 
@@ -627,11 +668,17 @@ It is important that the name of this directory remains unchanged, so that it ca
 
 ### Evaluation folders
 
-Within the `evaluations_dir` folder, you will find the following folders: `predictions`, `probing`, `clustering`, `labels` and `plots`. These folders will be filled with results if the corresponding evaluation tasks are selected. `distanctes` is currently not supported and therefore only a place-holder. `label` will contain a `.npy` file containing the auto-generated labels from the metadata and if available ground_truth.
+Within the `evaluations` folder, you will find the following folders: `predictions`, `probing`, `clustering`, `labels` and `plots`. These folders will be filled with results if the corresponding evaluation tasks are selected. `labels` will contain the auto-generated labels from the metadata and if available ground_truth. `predictions` will contain the predictions from the pretrained classifier if available. `probing` will contain the results of the probing evaluation and `clustering` will contain the results of the clustering evaluation. `plots` will contain plots of the evaluation results.
 
 ### Pretrained classifier annotations
 
-If the model has a pretrained classifier and `run_pretrained_classifier` is `True`, `bacpipe` will create a `original_classifier_output` folder and a `default_classifier_annotations.csv` file, corresponding to annotations from the pretrained classifier. The folder will contain `.json` files for each audio file with the species and in which time bin they occurred with what certainty. The `default_classifier_annotations.csv` file contains annotations in the same style as the [annotations.csv](bacpipe/tests/test_data/annotations.csv) file.
+If the model has a pretrained classifier and `run_pretrained_classifier` is `True`, `bacpipe` will the folders `original_classifier_output` and `raven_tables` and two csv files: `<model_name>_all_predictions.csv` and `<model_name>_classifier_annotations.csv`. 
+
+The folder `original_classifier_output` will contain `.json` files for each audio file with the species and in which time bin they occurred with what certainty. `raven_tables` will contain raven annotation tables for each audio file. 
+
+`<model_name>_all_predictions.csv` contains predictions from the classifier. Per timestamp a maximum number of predictiosn is defined by the parameter `max_labels_per_timestamp` in the [settings.yaml](bacpipe/settings.yaml) file exceeding the threshold (also specified in the settings file).
+
+`<model_name>_classifier_annotations.csv` only lists the highest ranking prediction for a timestamp along with the confidence. The file contains annotations in the same style as the [annotations.csv](bacpipe/tests/test_data/annotations.csv) file.
 
 
 ### Example result files structure
@@ -664,6 +711,9 @@ This is the resulting folder structure:
 └── evaluations
     ├── birdnet
     │   ├── predictions
+    │   │   └── birdnet_all_predictions.csv
+    │   │   └── birdnet_classifier_annotations.csv
+    │   │   └── raven_tables
     │   │   └── original_classifier_outputs
     │   │       └── audio
     │   │           ├── FewShot
@@ -675,6 +725,9 @@ This is the resulting folder structure:
     ├── overview
     └── perch_bird
         ├── predictions
+        │   └── perch_bird_all_predictions.csv
+        │   └── perch_bird_classifier_annotations.csv
+        │   └── raven_tables
         │   └── original_classifier_outputs
         │       └── audio
         │           ├── FewShot
@@ -695,6 +748,8 @@ This is the resulting folder structure:
 |   [AvesEcho_PaSST](#avesecho_passt)   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   sup l |   trafo | PaSST | [weights](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1/-/blob/main/checkpoints/best_model_passt.pt?ref_type=heads) |
 |   [AVES_ESpecies](#aves_especies)        |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   ssl|   trafo | HuBERT | [weights](https://storage.googleapis.com/esp-public-files/ported_aves/aves-base-all.torchaudio.pt)|
 | [Bat](#bat) | [paper](https://arxiv.org/abs/2309.11218) | [code](https://github.com/FrankFundel/BAT-cli) | sup l | trafo | CNN + trafo | [weights](https://github.com/FrankFundel/BAT-cli/tree/main/models) |
+| [BatDetect2_Clip_Avg](#batdetect2_clip_avg) | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | sup l | trafo | U-Net | included |
+| [BatDetect2_Dets_avg](#batdetect2_dets_avg) | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | sup l | trafo | U-Net | included |
 | [BEATs](#beats) | [paper](https://arxiv.org/abs/2212.09058) | [code](https://github.com/microsoft/unilm/tree/master/beats) | ssl | trafo | ViT | [weights](https://1drv.ms/u/s!AqeByhGUtINrgcpoZecQbiXeaUjN8A?e=DasbeC) |
 |   [BioLingual](#biolingual)  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   ssl|   trafo| CLAP | included |
 |   [BirdAVES_ESpecies](#birdaves_especies)    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   ssl|   trafo | HuBERT | [weights](https://storage.googleapis.com/esp-public-files/birdaves/birdaves-biox-large.torchaudio.pt)|
@@ -753,6 +808,21 @@ AVES_ESpecies is short for Animal Vocalization Encoder based on Self-Supervision
 - bat data (Skiba et al. 2003))
 
 Bat is a hybrid CNN+transformer model used for bat classification. 
+
+### BatDetect2_Clip_Avg
+- trafo
+- supervised learning
+- trained on bat data
+
+BatDetect2_Clip_Avg is a transformer model trained on bat data. The model was trained to detect bat calls in audio clips and to classify them into different species. The model uses a clip-level average pooling strategy to aggregate the predictions from multiple segments of the audio clip.
+
+### BatDetect2_Dets_avg
+- trafo
+- supervised learning
+- trained on bat data
+
+BatDetect2_Dets_avg is a transformer model trained on bat data. This variant of the model returns the spatially averaged embeddings generated from the detection part of the model.
+
 
 ### BEATs
 - trafo
@@ -873,6 +943,7 @@ Perch_Bird is a EFficientNet B1 model trained on the entire Xeno-canto database.
 - trained on birds, amphibians, insects and mammals (xeno-canto, iNaturalis, Tierstimmenarchiv)
 
 Perch V2 or Perch 2.0 is the updated version of the Perch model from bioacousticians at Google. The model is a EfficientNetB3, trained on a very large database of various species. The classifier is able to distinguish 14795 different species. 
+**Bacpipe** uses the onnx implementation which allows the model to run through pytorch so it can be used with all operating systems and also supports cuda and mps accelleration.
 
 ### SurfPerch
 - CNN
@@ -954,7 +1025,7 @@ Most of the models are based on pytorch. For tensorflow models, see __birdnet__,
 
 # Contribute
 
-This repository is intended to be a collaborative project for people working in the field of bioacoustics. If you think there is some improvement that could be useful, please raise an **issues**, submit a **PR** or get in touch. 
+This repository is intended to be a collaborative project for people working in the field of bioacoustics. If you think there is some improvement that could be useful, please raise an [issue](https://github.com/bioacoustic-ai/bacpipe/issues), submit a [PR](https://github.com/bioacoustic-ai/bacpipe/pulls) or get in touch. 
 
 There are two main intentions for this repository that should always be considered when contributing: 
       
@@ -968,7 +1039,6 @@ There should always be a baseline minimal use case, where embeddings are created
 
 # Known issues
 
-Perch_v2 is only supported on linux machines. see [this issue](https://github.com/google-research/perch-hoplite/issues/56#issuecomment-3372589067).
 
 `bacpipe` is being updated regularly. To make sure you're always up to date with the latest fixes run `git pull` regularly.
 If you have local changes (like changes in the `config` or `settings` files) you don't want to lose run the following:
@@ -994,7 +1064,7 @@ A lot of work has gone into creating these bioacoustic models, both by data coll
 This work now has a paper associated with it. The manuscript is currently under review. A preprint is available on arXiv. If you use **bacpipe** for your research, please include the following reference:
 
 ```bibtex
-@misc{kather2026bacpipepythonpackagemake,
+@misc{kather2026bacpipe,
       title={bacpipe: a Python package to make bioacoustic deep learning models accessible}, 
       author={Vincent S. Kather and Sylvain Haupert and Burooj Ghani and Dan Stowell},
       year={2026},

@@ -1,6 +1,7 @@
 import json
 
 import matplotlib.pyplot as plt
+
 plt.ioff()
 from matplotlib.figure import Figure
 import numpy as np
@@ -10,6 +11,7 @@ import plotly.express as px
 
 import bacpipe.embedding_evaluation.label_embeddings as le
 from bacpipe import settings
+
 # from bacpipe.embedding_evaluation.visualization.visualize_spectrograms import SpectrogramPlot
 import matplotlib
 
@@ -90,8 +92,8 @@ def collect_dim_reduced_embeds(
         if file.suffix == ".json":  # and dim_reduction_model in file.stem:
             with open(file, "r") as f:
                 embeds_dict = json.load(f)
-    if bool(embeds_dict.get('x')) and bool(embeds_dict.get('timestamp')):
-        if not len(embeds_dict['x']) == len(embeds_dict['timestamp']):
+    if bool(embeds_dict.get("x")) and bool(embeds_dict.get("timestamp")):
+        if not len(embeds_dict["x"]) == len(embeds_dict["timestamp"]):
             logger.warning(
                 "The lengths of timestamps and embeddings do not match. "
                 "This could be the result of processing in multiple steps. "
@@ -117,39 +119,49 @@ class EmbedAndLabelLoader:
     def get_data(self, model_name, label_by, remove_noise=False, **kwargs):
         if not model_name in self.labels.keys():
 
+            if not kwargs.get('widget_idx') is None and 'overwrite' in self.kwargs:
+                self.kwargs['overwrite'] = False
             tup = get_labels_for_plot(model_name, **self.kwargs)
             self.labels[model_name], self.bool_noise[model_name] = tup
 
             dim_reduced_embed_path = le.get_dim_reduc_path_func(
-                model_name, dim_reduction_model=self.dim_reduction_model, **kwargs
+                model_name,
+                dim_reduction_model=self.dim_reduction_model,
+                **kwargs,
             )
 
             self.embeds[model_name] = collect_dim_reduced_embeds(
-                model_name, dim_reduced_embed_path, self.dim_reduction_model, **kwargs
+                model_name,
+                dim_reduced_embed_path,
+                self.dim_reduction_model,
+                **kwargs,
             )
 
         if remove_noise:
-            return_embeds, return_labels = self.remove_noise_indices(model_name)
+            return_embeds, return_labels = self.remove_noise_indices(
+                model_name
+            )
         else:
             return_labels = self.labels[model_name]
             return_embeds = self.embeds[model_name]
-            return_embeds['index'] = np.arange(len(return_embeds['x']))
-            if (
-                len(return_embeds['metadata']['audio_files'])
-                < len(return_embeds['x'])
-                ):
+            return_embeds["index"] = np.arange(len(return_embeds["x"]))
+            if len(return_embeds["metadata"]["audio_files"]) < len(
+                return_embeds["x"]
+            ):
                 audiofilenames = []
                 [
-                    audiofilenames.extend([f] * nr) 
+                    audiofilenames.extend([f] * nr)
                     for f, nr in zip(
-                        return_embeds['metadata']['audio_files'], 
-                        return_embeds['metadata']['nr_embeds_per_file']
-                        )
+                        return_embeds["metadata"]["audio_files"],
+                        return_embeds["metadata"]["nr_embeds_per_file"],
+                    )
                 ]
-                return_embeds['metadata']['audio_files'] = audiofilenames
+                return_embeds["metadata"]["audio_files"] = audiofilenames
 
         if label_by in return_labels:
-            return_splits = data_split_by_labels(return_embeds, return_labels[label_by])
+            return_splits = data_split_by_labels(
+                return_embeds, return_labels[label_by]
+            )
         else:
             return [], [], {}
         return (
@@ -162,29 +174,30 @@ class EmbedAndLabelLoader:
     def remove_noise_indices(self, model_name):
         return_labels, return_embeds = dict(), dict()
         bool_noise = self.bool_noise[model_name]
-        
-        
+
         for key, values in self.labels[model_name].items():
             if "noise" in key:
                 return_labels[key] = values
             else:
-                return_labels[key] = np.array(values, 
-                                                dtype=object)[~bool_noise]
+                return_labels[key] = np.array(values, dtype=object)[
+                    ~bool_noise
+                ]
 
         for key, value in self.embeds[model_name].items():
-            if not key == 'metadata':
+            if not key == "metadata":
                 return_embeds[key] = np.array(value)[~bool_noise]
             else:
-                return_embeds['metadata'] = dict()
+                return_embeds["metadata"] = dict()
                 for meta_key, meta_value in value.items():
                     if not isinstance(meta_value, list):
-                        return_embeds['metadata'][meta_key] = meta_value
+                        return_embeds["metadata"][meta_key] = meta_value
                     else:
-                        if meta_key == 'audio_files':
-                            return_embeds['metadata'][meta_key] = (
-                                np.array(meta_value)[~bool_noise]
-                                )
+                        if meta_key == "audio_files":
+                            return_embeds["metadata"][meta_key] = np.array(
+                                meta_value
+                            )[~bool_noise]
         return return_embeds, return_labels
+
 
 def plot_embeddings(
     loader,
@@ -211,7 +224,7 @@ def plot_embeddings(
     model_name : str
         name of model
     label_by : str, optional
-        key of default_labels dict, by default "audio_file_name"
+        key of metadata_labels dict, by default "audio_file_name"
     paths : SimpleNamespace object, optional
         object with path attributes, defaults to None
     dim_reduction_model : str
@@ -234,22 +247,26 @@ def plot_embeddings(
     list
         plt point objects for legend of colorbar
     """
-    labels, embeds, split_data = loader.get_data(model_name, label_by, **kwargs)
+    labels, embeds, split_data = loader.get_data(
+        model_name, label_by, **kwargs
+    )
 
     fig, axes, return_axes = init_embed_figure(fig, axes, **kwargs)
-    
+
     if len(labels[label_by]) == 0 and len(embeds) == 0:
         return fig
 
-    if label_by == 'audio_file_name':
-        new_labels = [Path(l).stem+Path(l).suffix for l in labels]
+    if label_by == "audio_file_name":
+        new_labels = [Path(l).stem + Path(l).suffix for l in labels]
         new_split_data = dict()
         for label in split_data.keys():
-            new_label = Path(label).stem+Path(label).suffix
+            new_label = Path(label).stem + Path(label).suffix
             new_split_data[new_label] = split_data[label]
         split_data = new_split_data
 
-    c_label_dict = {lab: i for i, lab in enumerate(np.unique(labels[label_by]))}
+    c_label_dict = {
+        lab: i for i, lab in enumerate(np.unique(labels[label_by]))
+    }
 
     if return_axes:
         points = plot_embedding_points(
@@ -258,10 +275,7 @@ def plot_embeddings(
         return axes, c_label_dict, points
     elif dashboard:
         return plot_embeddings_px(
-            embeds, 
-            labels,
-            c_label_dict,
-            label_by=label_by
+            embeds, labels, label_by=label_by
         )
     else:
         set_colorbar_or_legend(
@@ -272,10 +286,13 @@ def plot_embeddings(
         fig.savefig(paths.plot_path.joinpath("embeddings.png"), dpi=300)
         plt.close(fig)
 
+
 def init_embed_figure(fig, axes, bool_3d=False, widget_idx=None, **kwargs):
     if not fig:
         if bool_3d:
-            fig, axes = plt.subplots(subplot_kw={"projection": "3d"}, figsize=(12, 8))
+            fig, axes = plt.subplots(
+                subplot_kw={"projection": "3d"}, figsize=(12, 8)
+            )
         else:
             try:
                 plt.close(widget_idx)
@@ -291,32 +308,128 @@ def init_embed_figure(fig, axes, bool_3d=False, widget_idx=None, **kwargs):
     return fig, axes, return_axes
 
 
-def get_labels_for_plot(model_name=None, **kwargs):
-    labels = dict()
-    labels = le.get_default_labels(model_name, **kwargs)
+def get_boolean_array_for_annotated_embeddings(
+    df_ground_truth, model_name, 
+    ground_truth_files=None, gt_file=None,
+    overwrite=False, **kwargs
+):
+    if not gt_file is None and not ground_truth_files is None:
+        if (
+            settings.label_column in str(gt_file) 
+            or len(ground_truth_files) == 1
+            ): 
+            logger.info(
+                f"Using {gt_file} to calculate the boolean "
+                "mask to enable filtering of only annotated "
+                "embeddings."
+            )
+        else:
+            logger.info(
+                "\nThere are multiple ground truth files: "
+                "Since the label does not fit to the label "
+                "label_column in settings.yaml It is unclear "
+                "which one bacpipe should use "
+                "to filter. Therefore the first file "
+                f"{str(ground_truth_files[0])=} is selected. \n"
+            )
+        
+    if max(df_ground_truth.simultaneous_labels) > 1:
+        logger.warning(
+            "You have passed a multi-label ground truth array. "
+            "However for visualization only one label will be displayed."
+        )
+        
+    df_metadata_labels = le.create_metadata_labels(
+        model=model_name, overwrite=overwrite,
+        return_type='dataframe', **kwargs
+        )
+    df_metadata_labels['audiofilename'] = df_metadata_labels['audio_file_name']
+    
 
-    ground_truth_files = list(le.get_paths(model_name).labels_path.glob("ground_truth*csv"))
-    if len(ground_truth_files) > 0:
+    df_ground_truth = df_ground_truth[df_ground_truth.simultaneous_labels > 0]
+    
+    df_metadata_labels['start'] = [np.round(v, 4) for v in df_metadata_labels['start']]
+    df_ground_truth['start'] = [np.round(v, 4) for v in df_ground_truth['start']]
+    
+    # Create multi-indexes for exact row matching
+    meta_idx = pd.MultiIndex.from_frame(df_metadata_labels[['audiofilename', 'start']])
+    gt_idx = pd.MultiIndex.from_frame(df_ground_truth[['audiofilename', 'start']])
+
+    # Get your exact boolean mask
+    is_in_ground_truth = meta_idx.isin(gt_idx)
+    is_noise = ~is_in_ground_truth
+    return is_noise
+
+
+def get_single_label_gt_labels(df_ground_truth, bool_noise):
+    if 'species_richness' in df_ground_truth.columns:
+        df_ground_truth.rename(columns={'species_richness': 'simultaneous_labels'}, inplace=True)
+        
+    
+    non_species_labels = [
+        "start",
+        "end",
+        "audiofilename",
+        "simultaneous_labels",
+    ]
+    
+    # ensure that all segments where no annotations were associated with timestamps
+    # are dropped
+    df_ground_truth = df_ground_truth[df_ground_truth.simultaneous_labels > 0]
+    
+    # now filter the dataframe to only contain the species columns
+    gt_without_metadata = df_ground_truth.drop(columns=non_species_labels)
+    
+    single_label = np.array(['noise'] * len(bool_noise), dtype='U50')
+    
+    # Now we need to ensure the length matches the other labels:
+    assert (
+        len(single_label[~bool_noise]) == len(gt_without_metadata.idxmax(axis=1).values)
+        ), (
+        "The lengths of the boolean array and the ground_truth arrays don't match. "
+        "Try rerunning the script with overwrite=True."
+        )
+    
+    # extract the species of the maximum index. now this is a bit
+    # of a random selection becaues annotations are binary values
+    # and so if there are 5 species present they are all equally
+    # likely to be selected here
+    single_label[~bool_noise] = gt_without_metadata.idxmax(axis=1).values
+    return single_label
+
+def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
+    labels = dict()
+    labels = le.get_metadata_labels(model_name, overwrite=overwrite, **kwargs)
+
+    paths = le.get_paths(model_name)
+    ground_truth_files = list(
+        paths.labels_path.glob("ground_truth*csv")
+    )
+    if len(ground_truth_files) > 0:        
         for gt_file in ground_truth_files:
-            ground_truth_df = le.get_ground_truth(model_name, file_path=gt_file, return_type='dataframe')
-            label = gt_file.stem.split('truth_')[-1]
-            
-            # inv = {v: k for k, v in ground_truth[f"label_dict:{label}"].items()}
-            # inv[-1.0] = "noise"
-            # inv[-2.0] = "noise"
-            # technically -2.0 is not noise, but corresponds to sections
-            # with multiple sources vocalizing simultaneously
-            if max(ground_truth_df.species_richness) > 1:
-                # TODO for display we're just taking the first label
-                logger.warning(
-                    "You have passed a multi-label ground truth array. "
-                    "However for visualization only one label will be displayed."
+            try:
+                ground_truth_df = le.get_ground_truth(
+                    model_name, file_path=gt_file, return_type="dataframe"
                 )
                 
-            non_species_labels = ['starts', 'ends', 'audiofilename', 'species_richness']
-            gt_without_metadata = ground_truth_df.drop(columns=non_species_labels)
-            labels[label] = gt_without_metadata.idxmax(axis=1).values
-            bool_noise = np.array(labels[label]) == "noise"
+                bool_noise = get_boolean_array_for_annotated_embeddings(
+                    ground_truth_df, model_name,
+                    gt_file=gt_file, ground_truth_files=ground_truth_files, 
+                )
+                label = gt_file.stem.replace("ground_truth_", "")
+                
+                labels[label] = get_single_label_gt_labels(
+                    ground_truth_df, bool_noise
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Building of ground truth labels for plots failed "
+                    f"due to {str(e)}. Continuing without ground truth labels. "
+                )
+                bool_noise = np.array([False] * len(list(labels.values())[0]))
+                
+
+        
     else:
         bool_noise = np.array([False] * len(list(labels.values())[0]))
     if len(list(le.get_paths(model_name).clust_path.glob("*.npy"))) > 0:
@@ -329,14 +442,17 @@ def get_labels_for_plot(model_name=None, **kwargs):
                 if "kmeans" in name:
                     labels[name] = values
                 else:
-                    labels[name] = np.array(["noise"] * len(bool_noise), dtype=object)
-                    labels[name][~bool_noise] = [inv[v] for v in values]
+                    labels[name] = np.array(
+                        ["noise"] * len(bool_noise), dtype=object
+                    )
 
     return labels, bool_noise
 
 
-def set_colorbar_or_legend(fig, axes, points, c_label_dict, label_by, **kwargs):
-    if len(c_label_dict.keys()) > 20:
+def set_colorbar_or_legend(
+    fig, axes, points, c_label_dict, label_by, **kwargs
+):
+    if len(c_label_dict.keys()) > settings.max_nr_categories:
         if isinstance(list(c_label_dict.keys())[0], int):
             fontsize = 9
         elif isinstance(list(c_label_dict.keys())[0], np.int32):
@@ -368,7 +484,13 @@ def set_colorbar_or_legend(fig, axes, points, c_label_dict, label_by, **kwargs):
 
 
 def plot_embedding_points(
-    axes, embeds, split_data, labels, c_label_dict, remove_noise=False, **kwargs
+    axes,
+    embeds,
+    split_data,
+    labels,
+    c_label_dict,
+    remove_noise=False,
+    **kwargs,
 ):
     """
     Plot embeddings in scatter plot.
@@ -393,7 +515,7 @@ def plot_embedding_points(
     plt object
         axes points
     """
-    if len(c_label_dict.keys()) > 50:
+    if len(c_label_dict.keys()) > settings.max_nr_categories:
         import matplotlib.cm as cm
 
         cmap = cm.viridis  # or 'plasma', 'inferno', 'magma', etc.
@@ -404,7 +526,7 @@ def plot_embedding_points(
         #     bool_labels = [True] * len(labels)
 
         num_labels = np.array([c_label_dict[lab] for lab in labels])
-        if not len(labels) == len(embeds['x']):
+        if not len(labels) == len(embeds["x"]):
             raise AssertionError(
                 f"The number of labels is {len(labels)} whereas the number of "
                 f"embedding points is {len(embeds['x'])}. This mismatch could "
@@ -412,9 +534,9 @@ def plot_embedding_points(
                 "the dim_reduced_embeddings corresponding to that. Check if in your results folder "
                 "there are not multiple dim_reduced_embeddings, and if so, delete the incomplete one."
             )
-        if len(np.array(embeds['x']).shape) > 1:
-            embeds["x"] = np.array(embeds["x"])[:, 0],
-            embeds["y"] = np.array(embeds["y"])[:, 0],
+        if len(np.array(embeds["x"]).shape) > 1:
+            embeds["x"] = (np.array(embeds["x"])[:, 0],)
+            embeds["y"] = (np.array(embeds["y"])[:, 0],)
         points = axes.scatter(
             # np.array(embeds["x"])[bool_labels],
             # np.array(embeds["y"])[bool_labels],
@@ -442,7 +564,13 @@ def plot_embedding_points(
 
 
 def set_legend(
-    handles, labels, fig, axes, bool_plot_centroids=False, dashboard=False, **kwargs
+    handles,
+    labels,
+    fig,
+    axes,
+    bool_plot_centroids=False,
+    dashboard=False,
+    **kwargs,
 ):
     """
     Create the legend for embeddings visualization plots.
@@ -472,7 +600,9 @@ def set_legend(
 
     # Calculate number of columns dynamically based on the number of labels
     num_labels = len(labels)  # Number of labels in the legend
-    ncol = min(num_labels, 5)  # Use 6 columns or fewer if there are fewer labels
+    ncol = min(
+        num_labels, 5
+    )  # Use 6 columns or fewer if there are fewer labels
 
     if bool_plot_centroids:
         custom_marker = plt.scatter(
@@ -525,7 +655,7 @@ def data_split_by_labels(embeds_dict, labels):
     """
     split_data = {}
     uni_labels = np.unique(labels)
-    if len(uni_labels) > 20:
+    if len(uni_labels) > settings.max_nr_categories:
         split_data["all"] = np.array(
             [
                 np.array(embeds_dict["x"]),
@@ -533,7 +663,7 @@ def data_split_by_labels(embeds_dict, labels):
             ]
         )
     else:
-        for label in uni_labels:  # TODO don't do this for more than 20 categories
+        for label in uni_labels:
             split_data[str(label)] = np.array(
                 [
                     np.array(embeds_dict["x"])[np.array(labels) == label],
@@ -659,12 +789,80 @@ def plot_comparison(
     if "clustering" in evaluation_task:
         reorder_embeddings_by_clustering_performance(plot_path, axes, models)
 
-    fig.suptitle(f"Comparison of {dim_reduction_model} embeddings", fontweight="bold")
+    fig.suptitle(
+        f"Comparison of {dim_reduction_model} embeddings", fontweight="bold"
+    )
     if not dashboard:
         fig.savefig(plot_path.joinpath("comp_fig.png"), dpi=300)
         plt.close(fig)
     else:
         return fig
+    
+def get_arrays_for_spectrogram_text(labels, label_by, data_dict, embeds):
+    dlk = settings.default_label_keys
+        
+    df_lab = {}
+    for k, v in labels.items():
+        if not k in dlk and not "kmeans" in k and not k == label_by:
+            df_lab[k] = list(v)
+    [df_lab.pop(k) for k in data_dict.keys() if k in df_lab.keys()]
+    
+    if 'default_classifier' in labels:
+        file_paths = list((
+            Path(embeds['metadata']['embed_dir'])
+            .parent
+            .parent
+            / settings.evaluations_dir
+            / embeds['metadata']['model_name']
+            / 'predictions'
+            ).glob('*all_predictions*'))
+        if len(file_paths) > 0:
+            if 'csv' in str(file_paths[0]):
+                try:
+                    all_preds = pd.read_csv(file_paths[0], index_col=False)
+                except:
+                    all_preds = None
+            elif 'parquet' in str(file_paths[0]):
+                try:
+                    all_preds = pd.read_parquet(file_paths[0], index_col=False)
+                except:
+                    all_preds = None
+        if not all_preds is None:
+            try:
+                ## now filter the df so we only have the top 5 preds
+                just_labels = all_preds.drop(columns=['audiofilename', 'start', 'end', 'simultaneous_labels'])
+                if 'Unnamed: 0' in just_labels.columns:
+                    just_labels = just_labels.drop(columns=['Unnamed: 0'])
+                np_labels = just_labels.values.T
+                
+                k=settings.nr_predictions_to_display
+                top_k_indices = np.argsort(np.array(np_labels), axis=0)[-k:][::-1]
+                top_k_probs = np.sort(np_labels, axis=0)[-k:][::-1]
+                top_k_species = just_labels.columns.values[top_k_indices].T
+                
+                top_k_probs = top_k_probs.T
+                top_k_species[top_k_probs == 0] = ''
+                
+                i = 0
+                species, probs = [], []
+                for idx, label in enumerate(labels['default_classifier']):
+                    if label == 'below_thresh':
+                        species.append([])
+                        probs.append([])
+                    else:
+                        species.append(top_k_species[i].tolist())
+                        probs.append(top_k_probs[i].tolist())
+                        i += 1
+                df_lab[f'top_{k}_species'] = species
+                df_lab[f'top_{k}_confidence'] = probs
+            except Exception as e:
+                logger.info(
+                    f"\nTop {k} predictions for display could not be loaded. "
+                    "The reason could be that a previous run failed and not all "
+                    "predictions were saved. Regenerating the embeddings is the "
+                    f"best chance of getting this to work. {str(e)}"
+                )
+    return df_lab
 
 
 def reorder_embeddings_by_clustering_performance(
@@ -685,161 +883,204 @@ def reorder_embeddings_by_clustering_performance(
         key corresponding to a metric in the clustering_results.json file.
         Defaults to "ARI(kmeans)"
     """
-    clust_dict = json.load(open(plot_path.joinpath("clustering_results.json"), "r"))
+    clust_dict = json.load(
+        open(plot_path.joinpath("clustering_results.json"), "r")
+    )
     new_order = dict(
         sorted(
-            clust_dict.items(), key=lambda kv: kv[1]["ARI"][order_metric], reverse=True
+            clust_dict.items(),
+            key=lambda kv: kv[1]["ARI"][order_metric],
+            reverse=True,
         )
     )
-    positions = {mod: ax.get_position() for mod, ax in zip(new_order, axes.flatten())}
+    positions = {
+        mod: ax.get_position() for mod, ax in zip(new_order, axes.flatten())
+    }
     for model, ax in zip(models, axes.flatten()):
         if not model in positions.keys():
             continue
         ax.set_position(positions[model])
 
 
-
-
-
 def plot_embeddings_px(
-    embeds,
-    labels,
-    c_label_dict,
-    label_by="label",
-    **kwargs
+    embeds, labels, label_by="label", **kwargs
 ):
     # 1. Prepare Data
-    if len(np.array(embeds['x']).shape) > 1:
-        embeds['x'] = np.array(embeds['x']).squeeze()
-        embeds['y'] = np.array(embeds['y']).squeeze()
-    x_data = embeds['x']
-    y_data = embeds['y']
-    
-    audiofilenames = embeds['metadata']['audio_files']
-    
-    starts = embeds['timestamp']
-    
-    if 'durations' in embeds.keys() and len(embeds.get('durations')) > 0:
-        ends = np.array(embeds.get('durations')) + np.array(starts)
+    if len(np.array(embeds["x"]).shape) > 1:
+        embeds["x"] = np.array(embeds["x"]).squeeze()
+        embeds["y"] = np.array(embeds["y"]).squeeze()
+    x_data = embeds["x"]
+    y_data = embeds["y"]
+    if not embeds.get('z') is None:
+        z_data = embeds.get('z')
+
+    audiofilenames = embeds["metadata"]["audio_files"]
+
+    starts = embeds["timestamp"]
+
+    if "durations" in embeds.keys() and len(embeds.get("durations")) > 0:
+        ends = np.array(embeds.get("durations")) + np.array(starts)
         ends = ends.tolist()
     else:
         ends = np.array(starts) + (
-            embeds['metadata']['segment_length (samples)'] 
-            / embeds['metadata']['sample_rate (Hz)']
-            )
+            embeds["metadata"]["segment_length (samples)"]
+            / embeds["metadata"]["sample_rate (Hz)"]
+        )
         ends = ends.tolist()
-    
+
     starts, ends = np.round(starts, 4), np.round(ends, 4)
-    
+
     # Calculate unique labels to decide on Legend vs Colorbar
     unique_labels = np.unique(labels[label_by])
     n_labels = len(unique_labels)
-    
+
     # Create an integer mapping for high-cardinality plotting
     # (Plotly needs numbers to generate a gradient colorbar)
     label_to_id = {lbl: i for i, lbl in enumerate(unique_labels)}
     label_ids = [label_to_id[l] for l in labels[label_by]]
 
     data_dict = {
-        'x': x_data,
-        'y': y_data,
-        'label': labels[label_by],            # The actual string (for hover/legend)
-        'label_id': label_ids,      # The integer (for colorbar)
-        'audiofilename': audiofilenames,
-        'start': starts,
-        'end': ends,
-        'idx': embeds['index']
+        "x": x_data,
+        "y": y_data,
+        "label": labels[label_by],  # The actual string (for hover/legend)
+        "label_id": label_ids,  # The integer (for colorbar)
+        "audiofilename": audiofilenames,
+        "start": starts,
+        "end": ends,
+        "idx": embeds["index"],
     }
-    dlk = settings.default_label_keys
     
-    df_lab = {}
-    for k, v in labels.items():
-        if not k in dlk and not 'kmeans' in k and not k == label_by:
-            df_lab[k] = list(v)
-    [df_lab.pop(k) for k in data_dict.keys() if k in df_lab.keys()]
-    
+    if not embeds.get('z') is None:
+        data_dict['z'] = z_data
+        
+    df_lab = get_arrays_for_spectrogram_text(
+        labels, label_by, data_dict, embeds
+        )
+                    
     # Pack variable labels as JSON string to preserve order and labels
-    data_dict['variable_labels_json'] = [json.dumps({k: v for k, v in zip(df_lab.keys(), row)}) for row in zip(*df_lab.values())] if df_lab else [json.dumps({})]*len(labels[label_by])
-    
+    data_dict["variable_labels_json"] = (
+        [
+            json.dumps({k: v for k, v in zip(df_lab.keys(), row)})
+            for row in zip(*df_lab.values())
+        ]
+        if df_lab
+        else [json.dumps({})] * len(labels[label_by])
+    )
+
     data_dict = {**data_dict}
 
     df = pd.DataFrame(data_dict)
-    df = df.sort_values('label')
-    
-    hover_data={k: False for k in data_dict}
+    df = df.sort_values("label")
+
+    hover_data = {k: False for k in data_dict}
     for k in hover_data.keys():
-        if k in ['label', 'audiofilename', 'start', 'end']:
-            hover_data[k] = True 
-            
-    custom_data = ['audiofilename', 'start', 'end', 'idx', 'label', 'variable_labels_json']
+        if k in ["label", "audiofilename", "start", "end"]:
+            hover_data[k] = True
+
+    custom_data = [
+        "audiofilename",
+        "start",
+        "end",
+        "idx",
+        "label",
+        "variable_labels_json",
+    ]
 
     # 2. Setup Figure based on Label Count
-    if n_labels > 500:
-    # if label_by in ['time_of_day', 'continuous_timestamp', 'day_of_year']:
-        # --- HIGH CARDINALITY: Use Colorbar ---
-        # We map color to 'label_id' (int) to force a continuous scale
-        fig = px.scatter(
-            df, x='x', y='y',
-            color='label_id',
-            hover_data=hover_data,
-            custom_data=custom_data,
-            title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
-            render_mode='webgl',
-            color_continuous_scale=kwargs.get('color_continuous')
+    if n_labels > settings.max_nr_categories:
+        if not embeds.get('z') is None:
+            fig = px.scatter_3d(
+                df,
+                x="x",
+                y="y",
+                z="z",
+                size_max=1,
+                color="label_id",
+                hover_data=hover_data,
+                custom_data=custom_data,
+                title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
+                color_continuous_scale=kwargs.get("color_continuous"),
+            )
+        else:
+            fig = px.scatter(
+                df,
+                x="x",
+                y="y",
+                color="label_id",
+                hover_data=hover_data,
+                custom_data=custom_data,
+                title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
+                render_mode="webgl",
+                color_continuous_scale=kwargs.get("color_continuous"),
+            )
+
+        tick_vals = (
+            np.linspace(0, n_labels - int(n_labels // 100 + 1), 6)
+            .astype(int)
+            .tolist()
         )
-
-        tick_vals = np.linspace(0, n_labels - int(n_labels//100+1), 6).astype(int).tolist()
         tick_text = [str(unique_labels[i]) for i in tick_vals]
-        
-        fig.update_coloraxes(
-                    colorbar_title=label_by,
-                    colorbar_tickmode='array',
-                    colorbar_tickvals=tick_vals,
-                    colorbar_ticktext=tick_text,
-                )
 
+        fig.update_coloraxes(
+            colorbar_title=label_by,
+            colorbar_tickmode="array",
+            colorbar_tickvals=tick_vals,
+            colorbar_ticktext=tick_text,
+        )
 
     else:
-        
-        # force a discrete legend
-        fig = px.scatter(
-            df, x='x', y='y',
-            color='label', 
-            hover_data=hover_data,
-            custom_data=custom_data,
-            title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
-            render_mode='webgl',
-            color_discrete_sequence=COLOR_DISCRETE
-        )
-        
+        if not embeds.get('z') is None:
+            fig = px.scatter_3d(
+                df,
+                x="x",
+                y="y",
+                z="z",
+                size_max=1,
+                color="label",
+                hover_data=hover_data,
+                custom_data=custom_data,
+                title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
+                color_discrete_sequence=COLOR_DISCRETE,
+            )
+        else:
+            # force a discrete legend
+            fig = px.scatter(
+                df,
+                x="x",
+                y="y",
+                color="label",
+                hover_data=hover_data,
+                custom_data=custom_data,
+                title=f"Embedding Plot - {embeds['metadata']['model_name']} - {label_by}",
+                render_mode="webgl",
+                color_discrete_sequence=COLOR_DISCRETE,
+            )
+
         # Configure the Discrete Legend
         fig.update_layout(
             legend=dict(
-                orientation="v", 
-                yanchor="bottom", 
-                y=0, 
-                xanchor="left", 
+                orientation="v",
+                yanchor="bottom",
+                y=0,
+                xanchor="left",
                 x=1.02,
-                title_text=label_by
+                title_text=label_by,
             )
         )
 
-    
     fig.update_layout(
         # autosize=True,
-        template='plotly_white',
-        height=settings.embed_fig_height,    
-        clickmode='event', 
-        hovermode='closest',
+        uirevision=True,
+        scene=dict(uirevision=True),
+        template="plotly_white",
+        height=settings.embed_fig_height,
+        clickmode="event",
+        hovermode="closest",
         # margin=dict(l=20, r=20, t=40, b=20),
         margin=dict(l=0, r=80, t=40, b=0),
         # Ensure selection tools are available
-        modebar=dict(add=['lasso2d', 'select2d'], remove=['autoScale2d']),
+        modebar=dict(add=["lasso2d", "select2d"], remove=["autoScale2d"]),
     )
-    # fig.update_xaxes(visible=False, showticklabels=True) # Hide x axis ticks 
-    # fig.update_yaxes(visible=False, showticklabels=True) # Hide y axis ticks
-    
-    # Improve marker appearance
-    fig.update_traces(marker_size=8, marker_opacity=0.6)
+    marker_sz = 3 if embeds.get("z") is not None else 8
+    fig.update_traces(marker_size=marker_sz, marker_opacity=0.6)
     return fig
-

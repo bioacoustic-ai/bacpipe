@@ -1,7 +1,6 @@
 from ..model_utils import ModelBaseClass
 from sklearn.manifold import TSNE
 
-
 # UMAP settings
 tsne_config = {
     "n_components": 2,

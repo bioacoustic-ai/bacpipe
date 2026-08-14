@@ -7,17 +7,20 @@ import bacpipe
 from .beats import BeatsModel
 from ..model_utils import ModelBaseClass
 
-
 SAMPLE_RATE = 16_000
 LENGTH_IN_SAMPLES = int(5 * SAMPLE_RATE)
 
-BEATS_PRETRAINED_PATH_FT = "beats/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt1.pt"
+BEATS_PRETRAINED_PATH_FT = (
+    "beats/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt1.pt"
+)
 BEATS_PRETRAINED_PATH_NATURELM = "naturebeats/naturebeats.pt"
 
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
+        super().__init__(
+            sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
+        )
 
         self.beats = BeatsModel(
             checkpoint_path=self.model_base_path / BEATS_PRETRAINED_PATH_FT
@@ -36,6 +39,10 @@ class Model(ModelBaseClass):
         self.beats.model.load_state_dict(beats_ckpt_naturelm, strict=True)
         self.beats.model.eval()
         self.beats.model.to(self.device)
+        
+        self.model = self.beats.model
+        self.model.preprocess_audio = self.beats.process_audio_beats
+        self.model.return_embeddings = self.beats.get_embeddings
 
     def preprocess(self, audio):
         audio = torch.clamp(audio, -1.0, 1.0)

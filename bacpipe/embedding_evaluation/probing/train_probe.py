@@ -11,7 +11,7 @@ logger = logging.getLogger("bacpipe")
 
 
 class LinearProbe(nn.Module):
-    def __init__(self, in_dim, out_dim, device='cpu', **kwargs):
+    def __init__(self, in_dim, out_dim, device="cpu", **kwargs):
         """
         Linear classification layer.
 
@@ -64,7 +64,7 @@ def train_linear_probe(
     try:
         linear_classifier = linear_classifier.to(device)
     except RuntimeError:
-        logger.error('Traceback', exc_info=True)
+        logger.error("Traceback", exc_info=True)
         logger.info(
             "This problem is likely caused by tensorflow hogging all the gpu vram. "
             "The best fix for this is to simply restart bacpipe with the same settings, "
@@ -72,10 +72,13 @@ def train_linear_probe(
             "`cpu` for device in the settings.yaml file."
         )
         import sys
+
         sys.exit(0)
 
     # Define optimizer and loss function
-    optimizer = torch.optim.Adam(linear_classifier.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(
+        linear_classifier.parameters(), lr=learning_rate
+    )
     criterion = nn.CrossEntropyLoss()
 
     # Training loop
@@ -118,8 +121,6 @@ def train_linear_probe(
     return linear_classifier
 
 
-
-
 class KNNProbe(nn.Module):
     def __init__(self, n_neighbors=15, testing=False, **kwargs):
         """
@@ -144,7 +145,7 @@ class KNNProbe(nn.Module):
     def forward(self, x):
         """Predict using KNN (only after it's trained)"""
         if not self.is_trained:
-            error = ("\nKNN model is not trained. Call `fit()` first.")
+            error = "\nKNN model is not trained. Call `fit()` first."
             logger.exception(error)
             raise ValueError(error)
 
@@ -153,7 +154,9 @@ class KNNProbe(nn.Module):
         probs = self.knn.predict_proba(x_np)  # Predict probabilities
 
         preds_tensor = torch.tensor(preds, dtype=torch.long, device=x.device)
-        probs_tensor = torch.tensor(probs, dtype=torch.float32, device=x.device)
+        probs_tensor = torch.tensor(
+            probs, dtype=torch.float32, device=x.device
+        )
 
         return preds_tensor, probs_tensor
 
@@ -198,14 +201,16 @@ def train_knn_probe(knn_classifier, train_dataloader, device="cpu", **kwargs):
     return knn_classifier
 
 
-
 def train_probe(
-    embeds, df, label2index, 
-    config="linear", 
+    embeds,
+    df,
+    label2index,
+    config="linear",
     learning_rate=None,
     num_epochs=None,
     n_neighbors=None,
-    **kwargs):
+    **kwargs,
+):
     """
     Classification pipeline. First the classification dataframe is loaded,
     then a dict is created to link labels to ints, then the dataset loaders
@@ -229,32 +234,41 @@ def train_probe(
     dict
         performance dictionary
     """
-    
 
     # generate the loaders
-    train_gen = probe_dataset_loader("train", df, embeds, label2index, **kwargs)
+    train_gen = probe_dataset_loader(
+        "train", df, embeds, label2index, **kwargs
+    )
 
     embed_size = embeds[0].shape[-1]
 
     if config == "linear":
         if learning_rate is None:
-            learning_rate = bacpipe.settings.probe_configs['config_1']['learning_rate']
+            learning_rate = bacpipe.settings.probe_configs["config_1"][
+                "learning_rate"
+            ]
         if num_epochs is None:
-            num_epochs = bacpipe.settings.probe_configs['config_1']['num_epochs']
+            num_epochs = bacpipe.settings.probe_configs["config_1"][
+                "num_epochs"
+            ]
         probe = LinearProbe(
             in_dim=embed_size, out_dim=len(df.label.unique()), **kwargs
-            )
+        )
         probe = train_linear_probe(
-            probe, train_gen, 
-            learning_rate=learning_rate, num_epochs=num_epochs, 
-            **kwargs
-            )
+            probe,
+            train_gen,
+            learning_rate=learning_rate,
+            num_epochs=num_epochs,
+            **kwargs,
+        )
 
     elif config == "knn":
         if n_neighbors is None:
-            n_neighbors = bacpipe.settings.probe_configs['config_2']['n_neighbors']
-        if len(df[df.predefined_set =='test']) < n_neighbors:
-            kwargs['n_neighbors'] = len(df[df.predefined_set =='test']) - 1
+            n_neighbors = bacpipe.settings.probe_configs["config_2"][
+                "n_neighbors"
+            ]
+        if len(df[df.predefined_set == "test"]) < n_neighbors:
+            kwargs["n_neighbors"] = len(df[df.predefined_set == "test"]) - 1
         probe = KNNProbe(**kwargs)
         probe = train_knn_probe(probe, train_gen, **kwargs)
 

@@ -21,7 +21,7 @@ Constants
 .. autofunction:: NEEDS_CHECKPOINT
 
 Main Processing Classes
----------
+-----------------------
 
 .. autoclass:: Loader
    :members:
@@ -30,6 +30,7 @@ Main Processing Classes
    :inherited-members:
 
 .. autoclass:: Embedder
+   :no-index:
    :members:
    :undoc-members:
    :show-inheritance:
@@ -44,28 +45,28 @@ Main Pipeline Functions
 .. autofunction:: generate_embeddings
     
 Return audio files in specified dir
---------------
+-------------------------------------
 
 .. autofunction:: get_audio_files
 
 Automatic creation of labels and ground truth
---------------
+-------------------------------------------------
 
 .. autofunction:: DefaultLabels 
-.. autofunction:: create_default_labels
+.. autofunction:: create_metadata_labels
 .. autofunction:: ground_truth_by_model
-.. autofunction:: get_default_labels
+.. autofunction:: get_metadata_labels
 .. autofunction:: get_dt_filename
 
 Probing functions
---------------
+------------------
 
 .. autofunction:: probing_pipeline
 .. autofunction:: run_probe_inference
 .. autofunction:: prepare_probe_inference
 
 Clustering functions
---------------
+--------------------
 
 .. autofunction:: clustering_pipeline
 .. autofunction:: run_clustering
@@ -73,14 +74,14 @@ Clustering functions
 .. autofunction:: eval_with_silhouette
 
 Evaluation pipelines
---------------
+--------------------
 
 .. autofunction:: benchmark
 .. autofunction:: model_specific_evaluation
 .. autofunction:: cross_model_evaluation
 
 Experiment managing functions
---------------
+--------------------------------
 
 .. autofunction:: ensure_models_exist
 .. autofunction:: evaluation_with_settings_already_exists
@@ -88,7 +89,7 @@ Experiment managing functions
 .. autofunction:: make_set_paths_func
 
 Visualization function to start dashboard
---------------
+-----------------------------------------
 
 .. autofunction:: visualize_using_dashboard
 

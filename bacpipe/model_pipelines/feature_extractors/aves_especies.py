@@ -17,26 +17,24 @@ LENGTH_IN_SAMPLES = 16000
 class Model(ModelBaseClass, nn.Module):
     def __init__(self, birdaves=False, nonbioaves=False, **kwargs):
 
-        super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
+        super().__init__(
+            sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
+        )
         nn.Module.__init__(self)
 
         # reference: https://pytorch.org/audio/stable/_modules/torchaudio/models/wav2vec2/utils/import_fairseq.html
         base_path = self.model_base_path
         if birdaves:
             model_config_path = f"{base_path}/birdaves_especies/birdaves-biox-large.torchaudio.model_config.json"
-            model_path = (
-                f"{base_path}/birdaves_especies/birdaves-biox-large.torchaudio.pt"
-            )
+            model_path = f"{base_path}/birdaves_especies/birdaves-biox-large.torchaudio.pt"
         elif nonbioaves:
             model_config_path = f"{base_path}/nonbioaves_especies/aves-base-nonbio.torchaudio.model_config.json"
-            model_path = (
-                f"{base_path}/nonbioaves_especies/aves-base-nonbio.torchaudio.pt"
-            )
+            model_path = f"{base_path}/nonbioaves_especies/aves-base-nonbio.torchaudio.pt"
         else:
-            model_config_path = (
-                f"{base_path}/aves_especies/aves-base-bio.torchaudio.model_config.json"
+            model_config_path = f"{base_path}/aves_especies/aves-base-bio.torchaudio.model_config.json"
+            model_path = (
+                f"{base_path}/aves_especies/aves-base-bio.torchaudio.pt"
             )
-            model_path = f"{base_path}/aves_especies/aves-base-bio.torchaudio.pt"
         model_config = json.load(open(model_config_path, "r"))
         self.model = wav2vec2_model(**model_config, aux_num_out=None)
         self.model.load_state_dict(torch.load(model_path, weights_only=True))

@@ -12,7 +12,7 @@ evaluations_dir :       evaluations
 
 # fixed path, model checkpoints are/should be stored here
 # this is also where bacpipe will look for existing checkpoints
-model_base_path: bacpipe/model_checkpoints
+model_base_path: bacpipe_model_checkpoints
 
 
 #########-----------------------------------############
@@ -90,15 +90,23 @@ annotations_filename :  annotations.csv
 # padding specified below (see `padding`).
 only_embed_annotations: False
 
+# Specify a minimum duration in seconds that a annotation has to 
+# be to include it in the ground truth. This can be helpful
+# if you want to avoid taking into account very short annotations
+# in which the embedding is likely to be dominated by other 
+# acoustic features than the annotated one.
+min_annotation_length: 0
+
 ##########-----------------------------#################
-##########   DEFAULT LABELS SETTINGS   #################
+##########   METADATA LABELS SETTINGS   #################
 ##########-----------------------------#################
 
-# kinds of default labels that are created for the embeddings.
+# kinds of metadata labels that are created for the embeddings.
 # only modify these if you are ready to modify the 
 # corresponding code in label_embeddings.py
 default_label_keys: [
   "time_of_day",
+  "week_of_year",
   "day_of_year",
   "continuous_timestamp",
   "parent_directory",
@@ -111,6 +119,11 @@ default_label_keys: [
 #######-------------------------------------############
 #######   INTEGRATED CLASSIFIER  SETTINGS   ############
 #######-------------------------------------############
+
+# Maximum number of labels per timestamp. This drastically reduces file size
+# of predictions for models that return high amounts of false positives. Set to
+# False if you want to retrieve all predictions exceeding the threshold.
+max_labels_per_timestamp: 30
 
 # For evaluation using classification it is necessary to have a minimum number 
 # of embeddings for each label. The remaining embeddings will be marked as noise.
@@ -179,7 +192,9 @@ clust_configs:
     # number of clusters is set to a default value of 18
     # this is the default value can be adjusted as needed
     params:
-      n_clusters: 18
+      # if this is set to None, it will default to the number of
+      # unique labels found in the ground truth
+      n_clusters: None
   config_2:
     bool: False
     name: "hdbscan" # not that this will require installing the hdbscan package
@@ -192,6 +207,25 @@ clust_configs:
 #######------------------------############
 #######   DASHBOARD SETTINGS   ############
 #######------------------------############
+
+# Choose weather you want to display the embeddings 
+# in plots with 2 or 3 dimensions. Every other number
+# will fail. 
+visualization_dimensions: 2
+
+
+# This parameter controls how many classifier predictions 
+# are displayed above the spectrogram. Only predictions
+# exceeding the threshold are displayed. Predictions
+# are displayed along with their respective confidence
+# scores.
+nr_predictions_to_display: 3
+
+# maximum number of discrete categories
+# This number determines how many categories will be shown
+# as distinct labels. If more categories than this number
+# are found a colorbar will be used
+max_nr_categories: 100
 
 # port for dashboard
 dashboard_port: 5006
@@ -212,7 +246,6 @@ accordion_width: 780
 # color scales used in dashboard
 spec_colorscale: 'Viridis'
 color_continuous: 'Twilight'
-
 
 
 #######-----------------------------------############

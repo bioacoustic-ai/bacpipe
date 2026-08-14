@@ -33,7 +33,9 @@ class Model(ModelBaseClass):
         self.detection_threshold = detection_threshold
         self.top_k_detections = top_k_detections
 
-        self.config = api.get_config(detection_threshold=self.detection_threshold)
+        self.config = api.get_config(
+            detection_threshold=self.detection_threshold
+        )
         self.model, _ = api.load_model(device=self.device)  # type: ignore
 
         self.generate_spectrogram = partial(
@@ -59,12 +61,14 @@ class Model(ModelBaseClass):
         self.classes = self.config["class_names"]
 
     def preprocess(self, audio):
-        if audio.device.type == 'cuda':
+        if audio.device.type == "cuda":
             segments = audio.cpu().numpy()
         else:
             segments = audio.numpy()
         # NOTE: Need to pre-process each segment separately
-        spectrograms = [self.generate_spectrogram(segment) for segment in segments]
+        spectrograms = [
+            self.generate_spectrogram(segment) for segment in segments
+        ]
         return torch.stack(spectrograms, axis=0).squeeze()
 
     @torch.no_grad()

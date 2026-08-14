@@ -79,7 +79,9 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
 
         # keep the first subset
         ids_keep = ids_shuffle[:, :len_keep]
-        x_masked = torch.gather(x, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, D))
+        x_masked = torch.gather(
+            x, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, D)
+        )
 
         # generate the binary mask: 0 is keep, 1 is remove
         mask = torch.ones([N, L], device=x.device)
@@ -144,7 +146,9 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         )  # ascend: small is keep, large is remove
         ids_keep = ids_shuffle[:, :len_keep_F]
         # index = ids_keep.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, T, D)
-        index = ids_keep.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, len_keep_T, D)
+        index = (
+            ids_keep.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, len_keep_T, D)
+        )
         x_masked = torch.gather(x, dim=1, index=index)
         x_masked = x_masked.permute(0, 2, 1, 3)  # N F' T' D => N T' F' D
         # x_masked = x_masked.reshape(N,len_keep*T,D)
@@ -158,7 +162,9 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
 
         x = x + self.pos_embed[:, 1:, :]
         if self.random_masking_2d:
-            x, mask, ids_restore = self.random_masking_2d(x, mask_t_prob, mask_f_prob)
+            x, mask, ids_restore = self.random_masking_2d(
+                x, mask_t_prob, mask_f_prob
+            )
         else:
             x, mask, ids_restore = self.random_masking(x, mask_t_prob)
         cls_token = self.cls_token + self.pos_embed[:, :1, :]
@@ -181,7 +187,12 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
 
     # overwrite original timm
     def forward(
-        self, x, v=None, mask_t_prob=0.0, mask_f_prob=0.0, return_embeddings=True
+        self,
+        x,
+        v=None,
+        mask_t_prob=0.0,
+        mask_f_prob=0.0,
+        return_embeddings=True,
     ):
         if mask_t_prob > 0.0 or mask_f_prob > 0.0:
             x = self.forward_features_mask(
@@ -204,7 +215,7 @@ def vit_small_patch16(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs
+        **kwargs,
     )
     return model
 
@@ -218,7 +229,7 @@ def vit_base_patch16(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs
+        **kwargs,
     )
     return model
 
@@ -232,7 +243,7 @@ def vit_large_patch16(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs
+        **kwargs,
     )
     return model
 
@@ -246,6 +257,6 @@ def vit_huge_patch14(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs
+        **kwargs,
     )
     return model

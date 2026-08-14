@@ -8,7 +8,7 @@ from clustering_utils import *
 # file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem}.h5'
 # file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem+"_snr=0"}.h5'#.split("_cleaned")[0]+
 
-models = ['birdnet']#, 'naturebeats', 'audioprotopnet']#, 'avesecho_passt']
+models = ['birdnet', 'birdnet_v3', 'naturebeats', 'audioprotopnet', 'avesecho_passt']
 
 
 embeds, umaps = get_embeddings(path, models)
@@ -97,7 +97,7 @@ cluster_booleans, clust_results = evaluate_clustering(df, clust_df, embeds, clus
 print(clust_results)
 
 
-df_vis = fetch_visualization_df(clust_df, path, clustering_dict, umaps, overwrite=OVERWRITE, overwrite_gt=False)
+df_vis = fetch_visualization_df(clust_df, path, clustering_dict, umaps, overwrite=True, overwrite_gt=True)
 
     
 

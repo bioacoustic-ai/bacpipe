@@ -68,9 +68,14 @@ class ProbeDatasetLoader(Dataset):
         return X, y
 
 
-
 def probe_dataset_loader(
-    set_name, clean_df, embeds, label2index, batch_size=64, shuffle=False, **kwargs
+    set_name,
+    clean_df,
+    embeds,
+    label2index,
+    batch_size=64,
+    shuffle=False,
+    **kwargs,
 ):
     """
     Create dataset loader object for classification.
@@ -108,69 +113,78 @@ def probe_dataset_loader(
     )
     return loader_generator
 
+
 def generate_annotations_for_probing_task(
-    ground_truth, paths, label_column, 
-    dataset_csv_path='probe_annotations.csv', 
-    train_ratio=None, test_ratio=None, **kwargs
-    ):
+    ground_truth,
+    paths,
+    label_column,
+    dataset_csv_path="probe_annotations.csv",
+    train_ratio=None,
+    test_ratio=None,
+    seed=42,
+    **kwargs,
+):
     import bacpipe
+
     if train_ratio is None:
-        train_ratio = bacpipe.settings.probe_configs['config_1']['train_ratio']
+        train_ratio = bacpipe.settings.probe_configs["config_1"]["train_ratio"]
     if test_ratio is None:
-        test_ratio = bacpipe.settings.probe_configs['config_1']['test_ratio']
-    
-    if (
-        paths is None
-        or not Path(dataset_csv_path).exists()
-        ):
-        
-        non_species_labels = ['starts', 'ends', 'audiofilename', 'species_richness']
+        test_ratio = bacpipe.settings.probe_configs["config_1"]["test_ratio"]
+
+    if paths is None or not Path(dataset_csv_path).exists():
+        rng = np.random.default_rng(seed=seed)
+
+        non_species_labels = [
+            "start",
+            "end",
+            "audiofilename",
+            "simultaneous_labels",
+        ]
         species = ground_truth.drop(columns=non_species_labels).columns
-        
-        active_starts = ground_truth.species_richness == 1
+
+        active_starts = ground_truth.simultaneous_labels == 1
         gt_4_probing = ground_truth[active_starts.values]
         gt_4_probing.index = range(len(gt_4_probing))
-        
-        gt_4_probing_only_species_columns = gt_4_probing.drop(columns=non_species_labels)
-        
+
+        gt_4_probing_only_species_columns = gt_4_probing.drop(
+            columns=non_species_labels
+        )
+
         active_labels = gt_4_probing_only_species_columns.idxmax(axis=1).values
-        
+
         df = pd.DataFrame()
-        
+
         if not paths is None:
-            filenames = gt_4_probing['audiofilename']
-            starts, ends = gt_4_probing['starts'], gt_4_probing['ends']
-            df["audiofilename"] = filenames 
-            df["starts"] = starts
-            df["ends"] = ends
-            
-            
+            filenames = gt_4_probing["audiofilename"]
+            starts, ends = gt_4_probing["start"], gt_4_probing["end"]
+            df["audiofilename"] = filenames
+            df["start"] = starts
+            df["end"] = ends
+
         df["label"] = active_labels
         df.index = range(len(df))
         df["predefined_set"] = "undefined"
         for v in species:
             num_species_occurances = gt_4_probing[v].sum()
-            ar = gt_4_probing[gt_4_probing[v] == 1].index.values
-            np.random.shuffle(ar) # TODO have seed option
-            tr_ar = ar[:int(
-                num_species_occurances * train_ratio
-                )] 
-            te_ar = ar[int(
-                num_species_occurances * train_ratio
-                ) : int(
+            ar = gt_4_probing[gt_4_probing[v] == 1].index.values.tolist()
+            rng.shuffle(ar)
+            tr_ar = ar[: int(num_species_occurances * train_ratio)]
+            te_ar = ar[
+                int(num_species_occurances * train_ratio) : int(
                     num_species_occurances * (train_ratio + test_ratio)
-                    )]
-            va_ar = ar[int(
-                num_species_occurances * (train_ratio + test_ratio)
-                ) :]
-            if not all([len(tr_ar)>0, len(te_ar)>0, len(va_ar)>0]):
+                )
+            ]
+            va_ar = ar[
+                int(num_species_occurances * (train_ratio + test_ratio)) :
+            ]
+            if not all([len(tr_ar) > 0, len(te_ar) > 0, len(va_ar) > 0]):
                 continue
             df.loc[tr_ar, "predefined_set"] = "train"
             df.loc[te_ar, "predefined_set"] = "test"
             df.loc[va_ar, "predefined_set"] = "val"
-        
-        df = df.sort_values(by=['audiofilename', 'starts'])
-        
+
+        df = df.sort_values(by=["audiofilename", "start"])
+
         if paths is None:
             df.to_csv(dataset_csv_path, index=False)
         else:
@@ -187,78 +201,25 @@ def generate_annotations_for_probing_task(
         df = pd.read_csv(dataset_csv_path, index_col=False)
     return df
 
-def old_generate_annotations_for_probing_task(
-    ground_truth, paths, label_column, 
-    dataset_csv_path='probe_annotations.csv', 
-    train_ratio=None, test_ratio=None, **kwargs
-    ):
-    import bacpipe
-    if train_ratio is None:
-        train_ratio = bacpipe.settings.probe_configs['config_1']['train_ratio']
-    if test_ratio is None:
-        test_ratio = bacpipe.settings.probe_configs['config_1']['test_ratio']
-    
-    if (
-        paths is None
-        or not Path(dataset_csv_path).exists()
-        or not paths.labels_path.joinpath(dataset_csv_path).exists()
-        ):
-        inv = {v: k for k, v in ground_truth[f"label_dict:{label_column}"].items()}
-        labels = ground_truth[f"label:{label_column}"][
-            ground_truth[f"label:{label_column}"] > -1
-        ]
-        labs = [inv[i] for i in labels]
-        df = pd.DataFrame()
-        
-        if not paths is None:
-            filenames, starts = get_filenames_and_starts_for_probe_df(paths, ground_truth, label_column)
-            df["filenames"] = filenames 
-            df["starts"] = starts
-            
-        df["label"] = labs
-        df["predefined_set"] = "undefined"
-        for v in inv.values():
-            l = labs.count(v)
-            ar = list(df[df.label == v].index)
-            np.random.shuffle(ar) # TODO have seed option
-            tr_ar = ar[: int(l * train_ratio)] 
-            te_ar = ar[int(l * train_ratio) : int(l * (train_ratio + test_ratio))]
-            va_ar = ar[int(l * (train_ratio + test_ratio)) :]
-            if not all([tr_ar, te_ar, va_ar]):
-                continue
-            df.loc[tr_ar, "predefined_set"] = "train"
-            df.loc[te_ar, "predefined_set"] = "test"
-            df.loc[va_ar, "predefined_set"] = "val"
-        df = df[df.predefined_set.isin(["train", "val", "test"])]
-        
-        if paths is None:
-            df.to_csv(dataset_csv_path, index=False)
-        else:
-            df.to_csv(
-                paths.labels_path.joinpath("probing_dataframe.csv"),
-                index=False,
-            )
-    else:
-        df = pd.read_csv(paths.labels_path.joinpath(dataset_csv_path))
-    return df
-
 def get_filenames_and_starts_for_probe_df(paths, ground_truth, label_column):
-    from bacpipe.embedding_evaluation.label_embeddings import get_default_labels, get_dt_filename
+    from bacpipe.embedding_evaluation.label_embeddings import (
+        get_metadata_labels,
+        get_dt_filename,
+    )
     import datetime as dt
+
     model_name = paths.labels_path.parent.stem
-    default_labels = get_default_labels(model_name, overwrite=False)
-    filenames = np.array(default_labels['audio_file_name'])[
+    metadata_labels = get_metadata_labels(model_name, overwrite=False)
+    filenames = np.array(metadata_labels["audio_file_name"])[
         ground_truth[f"label:{label_column}"] > -1
     ]
-    times_of_day = np.array(default_labels['time_of_day'])[
+    times_of_day = np.array(metadata_labels["time_of_day"])[
         ground_truth[f"label:{label_column}"] > -1
     ]
     starts = [
         (
-            dt.datetime.strptime(tod_e, '%H-%M-%S')
-            - get_dt_filename(tod_f)
+            dt.datetime.strptime(tod_e, "%H-%M-%S") - get_dt_filename(tod_f)
         ).seconds
-        for tod_e, tod_f in 
-        zip(times_of_day, filenames)
-        ]
+        for tod_e, tod_f in zip(times_of_day, filenames)
+    ]
     return filenames, starts

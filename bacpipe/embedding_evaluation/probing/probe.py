@@ -6,50 +6,47 @@ import torch
 from pathlib import Path
 
 import bacpipe
+
 logger = logging.getLogger(__name__)
 
 from .train_probe import train_probe, LinearProbe
 from .evaluate_probe import eval_probe
 from .dataset_probe import generate_annotations_for_probing_task
+from bacpipe.embedding_evaluation.visualization.visualize_embeddings import (
+    get_boolean_array_for_annotated_embeddings
+    )
 
 
-def embeds_array_without_noise(embeds, ground_truth, df, **kwargs):
-    # if len(ground_truth[f"label:{label_column}"].shape) > 1:
-    #     bool_array = np.any(ground_truth[f"label:{label_column}"] > -1, axis=1)
-    # else:
-    #     bool_array = ground_truth[f"label:{label_column}"] > -1
-    bool_array_gt = (ground_truth.species_richness == 1).values
+def embeds_array_where_single_label(embeds, ground_truth, bool_noise, df, **kwargs):
+    # first extract the segments that have annotations
+    ground_truth = ground_truth[ground_truth.simultaneous_labels > 0]
     
-    bool_array_probing = df.predefined_set.isin(["train", "val", "test"]).values
+    # now get the segments that have exactly one label
+    bool_single_label = (ground_truth.simultaneous_labels == 1).values
     
+    bool_array_probing = df.predefined_set.isin(
+        ["train", "val", "test"]
+        ).values
+
     df = df[bool_array_probing]
     df.index = range(len(df))
-        
+
     if isinstance(embeds, np.ndarray):
-        embeds = embeds[bool_array_gt]
+        embeds = embeds[~bool_noise]
+        embeds = embeds[bool_single_label]
         return df, embeds[bool_array_probing]
-        
-def old_embeds_array_without_noise(embeds, ground_truth, label_column, **kwargs):
-    if len(ground_truth[f"label:{label_column}"].shape) > 1:
-        bool_array = np.any(ground_truth[f"label:{label_column}"] > -1, axis=1)
-    else:
-        bool_array = ground_truth[f"label:{label_column}"] > -1
-        
-    if isinstance(embeds, np.ndarray):
-        return embeds[bool_array]
-    elif isinstance(embeds, dict):
-        return np.concatenate(list(embeds.values()))[
-        bool_array
-    ]
+
 
 def probing_pipeline(
     model_name,
-    ground_truth, embeds, 
-    paths=None, name='linear', 
-    overwrite=True, 
-    label_column=bacpipe.settings.label_column, 
-    dataset_csv_path='annotations.csv',
-    **kwargs
+    ground_truth,
+    embeds,
+    paths=None,
+    name="linear",
+    overwrite=True,
+    label_column=bacpipe.settings.label_column,
+    dataset_csv_path="annotations.csv",
+    **kwargs,
 ):
     """
     Probing pipeline consisting of building the classifier,
@@ -70,25 +67,24 @@ def probing_pipeline(
     """
     if not kwargs:
         kwargs = {**vars(bacpipe.settings)}
-        kwargs.pop('label_column')
+        kwargs.pop("label_column")
     if not paths:
         get_paths_func = bacpipe.make_set_paths_func(
             bacpipe.config.audio_dir, bacpipe.settings.main_results_dir
         )
         paths = get_paths_func(model_name)
-        
-    
+
     df = generate_annotations_for_probing_task(
-        ground_truth, 
-        paths, 
-        label_column=label_column, 
+        ground_truth,
+        paths,
+        label_column=label_column,
         dataset_csv_path=paths.labels_path / dataset_csv_path,
-        **kwargs
-        )
-    
+        **kwargs,
+    )
+
     if (
         overwrite
-        or name=='knn'
+        or name == "knn"
         or not paths.probe_path.joinpath(f"probe_results_{name}.json").exists()
     ):
         if len(df) == 0:
@@ -97,9 +93,12 @@ def probing_pipeline(
             )
             return None
 
-        df, embeds = embeds_array_without_noise(
-            embeds, ground_truth, df, **kwargs
+        bool_noise = get_boolean_array_for_annotated_embeddings(
+            ground_truth, model_name, overwrite=overwrite, **kwargs
             )
+        df, embeds = embeds_array_where_single_label(
+            embeds, ground_truth, bool_noise, df, **kwargs
+        )
         if not len(df) == embeds.shape[0]:
             error = (
                 "\nYour embeddings and ground truth dataframe ('probing_dataframe.csv') "
@@ -111,7 +110,7 @@ def probing_pipeline(
             )
             logger.exception(error)
             raise AttributeError(error)
-        
+
         if not len(embeds) > 0:
             error = (
                 "\nNo embeddings were found for classification task. "
@@ -120,15 +119,15 @@ def probing_pipeline(
                 "simply remove it from the evaluation tasks list in the config.yaml file."
             )
             logger.exception(error)
-            raise AssertionError(error)        
+            raise AssertionError(error)
 
         label2index = {label: i for i, label in enumerate(df.label.unique())}
 
         probe = train_probe(embeds, df, label2index, config=name, **kwargs)
-        
+
         metrics = eval_probe(
             probe, embeds, df, label2index, config=name, paths=paths, **kwargs
-            )
+        )
 
     else:
         logger.info(
@@ -136,67 +135,76 @@ def probing_pipeline(
             " so is not computed. If you want to overwrite existing results, "
             "set overwrite to True in config.yaml."
         )
-        from bacpipe.embedding_evaluation.probing.train_probe import LinearProbe
+        from bacpipe.embedding_evaluation.probing.train_probe import (
+            LinearProbe,
+        )
+
         state_dict = torch.load(paths.probe_path / f"{name}_probe.pt")
         probe = LinearProbe(
-            in_dim=embeds.shape[-1], 
-            out_dim=list(state_dict.values())[-1].shape[0], 
-            **kwargs
-            )
+            in_dim=embeds.shape[-1],
+            out_dim=list(state_dict.values())[-1].shape[0],
+            **kwargs,
+        )
         probe.load_state_dict(state_dict=state_dict)
         with open(paths.probe_path / "label2index.json", "r") as f:
             label2index = json.load(f)
-            
+
         load_path = paths.probe_path.joinpath(f"probe_results_{name}.json")
         with open(load_path, "r") as f:
             metrics = json.load(f)
-            
+
     return probe, label2index, metrics
 
-    
-def prepare_probe_inference(model, probe_path=''):
+
+def prepare_probe_inference(model, probe_path=""):
     from bacpipe import config, settings
-    if probe_path == '':
+
+    if probe_path == "":
         import bacpipe.embedding_evaluation.label_embeddings as le
+
         path_func = le.make_set_paths_func(
-            config.audio_dir, 
-            settings.main_results_dir, 
-            settings.dim_reduc_parent_dir
+            config.audio_dir,
+            settings.main_results_dir,
+            settings.dim_reduc_parent_dir,
         )
         probe_path = (
-            path_func(model).probe_path / 'linear_probe.pt'
-            ).as_posix()
-    
-    with open(Path(probe_path).parent / 'label2index.json', 'r') as f:
+            path_func(model).probe_path / "linear_probe.pt"
+        ).as_posix()
+
+    with open(Path(probe_path).parent / "label2index.json", "r") as f:
         label2index = json.load(f)
-        
+
     probe_weights = torch.load(probe_path, map_location=settings.device)
     probe = LinearProbe(
-        probe_weights['probe.weight'].shape[-1], 
-        len(label2index)
-        )
+        probe_weights["probe.weight"].shape[-1], len(label2index)
+    )
     probe.load_state_dict(probe_weights)
     probe.to(settings.device)
-    
+
     return probe, label2index
 
 
 def run_probe_inference(
-    model, linear_probe, threshold, 
-    embeds=None, return_binary_presence=True, callbacks=None
-    ):
+    model,
+    linear_probe,
+    threshold,
+    embeds=None,
+    return_binary_presence=True,
+    callbacks=None,
+):
     if embeds is None:
         from bacpipe.core.experiment_manager import Loader
         from bacpipe import config, settings
-        
+
         ld = Loader(
-            audio_dir=config.audio_dir, 
-            model_name=model,
-            **vars(settings)
-            )
-        embeds = torch.Tensor(ld.embeddings(return_type='array')).to(settings.device)
-    
+            audio_dir=config.audio_dir, model_name=model, **vars(settings)
+        )
+        embeds = torch.Tensor(ld.embeddings(return_type="array")).to(
+            settings.device
+        )
+
     import torch.nn.functional as F
+
     return_values = []
     for idx, batch in enumerate(embeds):
         logits = linear_probe(batch)
@@ -209,8 +217,8 @@ def run_probe_inference(
         else:
             return_values.append(probabilities.tolist())
             return_dtype = np.float32
-        
-        if isinstance(callbacks, dict) and hasattr(callbacks, 'progress_bar'):
-            callbacks.progress_bar.value = int((idx+1)/len(embeds)*100)
-    
+
+        if isinstance(callbacks, dict) and hasattr(callbacks, "progress_bar"):
+            callbacks.progress_bar.value = int((idx + 1) / len(embeds) * 100)
+
     return np.array(return_values, dtype=return_dtype)
