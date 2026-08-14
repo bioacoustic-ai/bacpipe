@@ -3,6 +3,7 @@ env*
 bacpipe/model_checkpoints/*
 bacpipe_model_checkpoints/*
 
+!.github
 .coverage
 uv.lock
 bacpipe/tests/.pytest*
