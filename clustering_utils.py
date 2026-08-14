@@ -332,7 +332,7 @@ def plot_clusterings(clust_results, df, model, clust_name, eval_name, save_path)
 
 
     fig = plt.figure(figsize=[14, 8])
-    ax = fig.subplots((len(df.species.unique())-1)//2, 2)
+    ax = fig.subplots(3, 4)#(len(df.species.unique())-1)//2, 4)
     idx = 0
     for species in df.species.unique():
         if species == '':
@@ -409,10 +409,14 @@ def listen_to_index(idx, file_path = None):
 def load_df_same_order_as_embeddings(audio_dir, model, snr):
     for snr_dir in tqdm(audio_dir.iterdir()):
         snr_string = snr_dir.stem if snr_dir.is_dir() else False
+        try:
+            if int(snr) == float(snr): snr = int(snr) 
+        except ValueError:
+            pass
         if not snr_string:
             continue
-        elif not (snr_string in str(snr_dir) and str(snr).split('.')[0] in snr_string):
-            if not (snr_string in str(snr_dir) and str(snr).replace('.', ',') in snr_string):
+        elif not (snr_string in str(snr_dir) and str(snr).replace('.', ',') in snr_string):
+            if not (snr_string in str(snr_dir) and str(snr).split('.')[-1] in snr_string):
                 continue
     
         loader = Loader(snr_string, model, use_folder_structure=True, audio_suffixes=['.h5'], main_results_dir=f'bacpipe_results/{Path(audio_dir).stem}')
