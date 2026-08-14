@@ -193,19 +193,19 @@ class AudioHandler:
         return cumulative_segments
 
     def _window_audio(self, audio):
-        num_frames = int(np.ceil(len(audio[0]) / self.segment_length))
+        num_frames = int(np.ceil(len(audio[0]) / self.model.segment_length))
         if isinstance(audio, torch.Tensor):
             audio = audio.cpu()
         padded_audio = lb.util.fix_length(
             audio,
-            size=int(num_frames * self.segment_length),
+            size=int(num_frames * self.model.segment_length),
             mode=self.padding,
         )
         logger.debug(f"{self.padding} was used on an audio segment.")
         if len(padded_audio.shape) > 1 and padded_audio.shape[0] > 1:
             frames = padded_audio
         else:
-            frames = padded_audio.reshape([num_frames, self.segment_length])
+            frames = padded_audio.reshape([num_frames, self.model.segment_length])
         if not isinstance(frames, torch.Tensor):
             frames = torch.tensor(frames)
         return frames
