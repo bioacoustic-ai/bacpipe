@@ -223,7 +223,7 @@ Models currently include:
 |   BirdAVES_ESpecies    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 1024 |
 |   BirdMAE    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   32 kHz|   10 s| 1280 |
 |   BirdNET     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s| 1024 |
-|   BirdNET_v3     |   [paper](https://zenodo.org/records/20703646)   |   [code](https://github.com/birdnet-team/birdnet-V3.0-dev)    |   32 kHz|   variable, default 3 s | 1280 |
+|   BirdNET_v3     |   paper   |   [code](https://github.com/birdnet-team/birdnet-V3.0-dev)    |   32 kHz|   variable, default 3 s | 1280 |
 |   ConveNeXT_BirdSet   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |   32 kHz|   5 s| 1024 |
 |   Google_Whale       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   24 kHz|   5 s| 1280 |
 |   hbdet |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s| 2048|
