@@ -751,13 +751,13 @@ This is the resulting folder structure:
 |   [AvesEcho_PaSST](#avesecho_passt)   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   sup l |   trafo | PaSST | [weights](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1/-/blob/main/checkpoints/best_model_passt.pt?ref_type=heads) |
 |   [AVES_ESpecies](#aves_especies)        |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   ssl|   trafo | HuBERT | [weights](https://storage.googleapis.com/esp-public-files/ported_aves/aves-base-all.torchaudio.pt)|
 | [Bat](#bat) | [paper](https://arxiv.org/abs/2309.11218) | [code](https://github.com/FrankFundel/BAT-cli) | sup l | trafo | CNN + trafo | [weights](https://github.com/FrankFundel/BAT-cli/tree/main/models) |
-| [BatDetect2_Clip_Avg](#batdetect2_clip_avg) | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | sup l | trafo | U-Net | included |
-| [BatDetect2_Dets_avg](#batdetect2_dets_avg) | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | sup l | trafo | U-Net | included |
+| [BatDetect2_Clip_Avg](#batdetect2_clip_avg) | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | sup l | trafo | Net2DFast | included |
+| [BatDetect2_Dets_avg](#batdetect2_dets_avg) | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | sup l | trafo | Net2DFast | included |
 | [BEATs](#beats) | [paper](https://arxiv.org/abs/2212.09058) | [code](https://github.com/microsoft/unilm/tree/master/beats) | ssl | trafo | ViT | [weights](https://1drv.ms/u/s!AqeByhGUtINrgcpoZecQbiXeaUjN8A?e=DasbeC) |
 |   [BioLingual](#biolingual)  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   ssl|   trafo| CLAP | included |
 |   [BirdAVES_ESpecies](#birdaves_especies)    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   ssl|   trafo | HuBERT | [weights](https://storage.googleapis.com/esp-public-files/birdaves/birdaves-biox-large.torchaudio.pt)|
 |   [BirdMAE](#birdmae)    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   ssl | trafo | ViT | included |
-|   [BirdNET_v3](#birdnet)     |   [paper](https://zenodo.org/records/20703646)   |   [code](https://github.com/birdnet-team/birdnet-V3.0-dev)    |   sup l |   trafo | pending | [weights](https://zenodo.org/records/20703646)|
+|   [BirdNET_v3](#birdnet)     |   paper   |   [code](https://github.com/birdnet-team/birdnet-V3.0-dev)    |   sup l |   CNN | EffNetv2s | [weights](https://zenodo.org/records/20703646)|
 |   [BirdNET](#birdnet)     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   sup l|   CNN | EffNetB0 | [weights](https://github.com/kahst/BirdNET-Analyzer/tree/main/birdnet_analyzer/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model)|
 |   [ConvNeXT_BirdSet](#convnext_birdset)   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |  sup l |   CNN | ConvNext | included|
 |   [Google_Whale](#google_whale)       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   sup l|   CNN| EffNetb0 | included|
@@ -867,11 +867,11 @@ BirdMAE is a masked autoencoder inspired by meta's AudioMAE, however the model w
 BirdNET (v2.4) is based on a EfficientNET(b0) architecture. The model is trained on a large amount of bird vocalizations from the xeno-canto database alongside other bird song databses. 
 
 ### BirdNET_v3
-- Transformer
+- CNN
 - supervised training model
-- trained on bird song data, as well as other animal sounds
+- trained on bird song data (xeno-canto, Macaulay Library), as well as other animal sounds
 
-BirdNET_v3 is a transformer model. The model is still in a development stage, therefore explicit information about the architecture and training data is not yet available. The model is trained on a large amount of bird vocalizations from the xeno-canto database alongside other bird song databases, as well as other animal sounds.
+BirdNET_v3 is a CNN model based on the EfficientNetv2s architecture. The model is still in a development stage, therefore explicit information about training data is not yet available. The model is trained on a large amount of bird vocalizations from the xeno-canto and Macaulay Library databases alongside other animal sound databases. The models classifier can distinguish 11,000 different species. 
 
 ### ConvNeXT_BirdSet
 - CNN
