@@ -563,11 +563,13 @@ class Embedder(AudioHandler):
                         "do the trick. If you simply don't have enough VRAM, you can reduce the global "
                         f"batch size in the settings file. Or just compute on the cpu. {str(e)}"
                     )
+                    self.classifier.predictions = torch.tensor([])
                 except AttributeError as e:
                     logger.warning(
                         f"The results folder structure does not exist, therefore files can't be "
                         "saved. Please pass the keyword use_folder_structure=True."
                     )
+                    self.classifier.predictions = torch.tensor([])
                     pbar.update(1)
                 except Exception as e:
                     logger.warning(
@@ -577,6 +579,10 @@ class Embedder(AudioHandler):
                         # run to fail because of minor problems.
                         f"Error generating embeddings for {file}, skipping file.\nError: {str(e)}"
                     )
+                    # Do not carry a failed file's predictions over into the
+                    # next file's classifier outputs (this previously produced
+                    # merged JSONs with predictions for multiple audio files).
+                    self.classifier.predictions = torch.tensor([])
                     pbar.update(1)
                     continue
 
@@ -609,6 +615,9 @@ class Embedder(AudioHandler):
                     f"\n Error generating embeddings, skipping file. \n"
                     f"Error: {str(e)}"
                 )
+                # Do not carry a failed file's predictions over into the next
+                # file's classifier outputs.
+                self.classifier.predictions = torch.tensor([])
                 continue
 
             self.loader._write_audio_file_to_metadata(
@@ -901,9 +910,18 @@ class Classifier:
         classifier_annotations["audiofilename"] = str(
             file.relative_to(fileloader_obj.audio_dir).as_posix()
         )
+        # Index into the (object dtype) classes array with an explicit 1-D
+        # numpy index array. A single-element torch index makes numpy return
+        # a plain ``str`` scalar (which has no ``.tolist()``), crashing on any
+        # file that has exactly one bin exceeding the threshold. When that
+        # happened the file's predictions were not reset and leaked into the
+        # next file's saved JSON.
+        detected_bin_idxs = np.atleast_1d(
+            np.array(maxes.indices[maxes.values > self.classifier_threshold])
+        ).astype(int)
         classifier_annotations["label:default_classifier"] = np.array(
             self.model.classes
-        )[maxes.indices[maxes.values > self.classifier_threshold]].tolist()
+        )[detected_bin_idxs].tolist()
 
         classifier_annotations["label:confidence"] = np.array(
             maxes.values[maxes.values > self.classifier_threshold].tolist()
@@ -1009,17 +1027,26 @@ class Classifier:
         # if self.model.only_embed_annotations: #annotation file exists
         #     np.save(file_dest.replace('.json', '.npy'), self.predictions)
 
-        self._fill_dataframe_with_classiefier_results(fileloader_obj, file)
+        try:
+            self._fill_dataframe_with_classiefier_results(fileloader_obj, file)
 
-        cls_results = self.make_classification_dict(
-            self.predictions, self.model.classes, self.classifier_threshold
-        )
+            cls_results = self.make_classification_dict(
+                self.predictions, self.model.classes, self.classifier_threshold
+            )
 
-        with open(file_dest, "w") as f:
-            json.dump(cls_results, f, indent=2)
+            with open(file_dest, "w") as f:
+                json.dump(cls_results, f, indent=2)
 
-        if self.save_raven_tables:
-            self.save_Raven_table(file, relative_parent_path)
+            if self.save_raven_tables:
+                self.save_Raven_table(file, relative_parent_path)
+        except Exception:
+            # If anything goes wrong while saving this file, drop its
+            # predictions so they are NOT carried over into the next file's
+            # classifier outputs. Without this reset a save failure previously
+            # produced merged JSONs containing predictions for multiple audio
+            # files (their head "Time bins in this file" was a multiple of 20).
+            self.predictions = torch.tensor([])
+            raise
 
         self.predictions = torch.tensor([])
 
