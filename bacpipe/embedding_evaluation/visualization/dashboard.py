@@ -98,7 +98,10 @@ class DashBoard(DashBoardHelper):
             len(list(le.get_paths(model_names[0]).clust_path.glob("*.npy")))
             > 0
         ):
-            self.label_by += ["kmeans"]
+            self.label_by += [
+                clustering['name'] for clustering in bacpipe.settings.clust_configs.values()
+                if clustering['bool'] is True
+            ]
 
         self.evaluation_task = evaluation_task
         self.dim_reduction_model = dim_reduction_model

@@ -442,10 +442,20 @@ def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
                 if "kmeans" in name:
                     labels[name] = values
                 else:
-                    labels[name] = np.array(
-                        ["noise"] * len(bool_noise), dtype=object
-                    )
-
+                    if len(values) == len(bool_noise):
+                        labels[name] = values
+                    elif 'no_noise' in name:
+                        if len(values) == len(np.where(~bool_noise)[0]):
+                            labels[name] = values
+                    else:
+                        logger.warning(
+                            f"The clustering {name} does not match the length "
+                            "of generated embeddings and can therefore not be "
+                            "correctly displayed."
+                        )
+                        labels[name] = np.array(
+                            ["noise"] * len(bool_noise), dtype=object
+                        )
     return labels, bool_noise
 
 
@@ -800,14 +810,25 @@ def plot_comparison(
     
 def get_arrays_for_spectrogram_text(labels, label_by, data_dict, embeds):
     dlk = settings.default_label_keys
+    label_copy = labels.copy()
+    # remove clustering labels from dict
+    
+    for clustering in settings.clust_configs.values():
+        for label_key in labels.keys():
+            if clustering['name'] in label_key:
+                label_copy.pop(label_key)
+            
         
     df_lab = {}
-    for k, v in labels.items():
-        if not k in dlk and not "kmeans" in k and not k == label_by:
+    for k, v in label_copy.items():
+        if (
+            not k in dlk 
+            and not k == label_by
+            ):
             df_lab[k] = list(v)
     [df_lab.pop(k) for k in data_dict.keys() if k in df_lab.keys()]
     
-    if 'default_classifier' in labels:
+    if 'default_classifier' in label_copy:
         file_paths = list((
             Path(embeds['metadata']['embed_dir'])
             .parent
@@ -845,7 +866,7 @@ def get_arrays_for_spectrogram_text(labels, label_by, data_dict, embeds):
                 
                 i = 0
                 species, probs = [], []
-                for idx, label in enumerate(labels['default_classifier']):
+                for idx, label in enumerate(label_copy['default_classifier']):
                     if label == 'below_thresh':
                         species.append([])
                         probs.append([])
@@ -956,11 +977,11 @@ def plot_embeddings_px(
     df_lab = get_arrays_for_spectrogram_text(
         labels, label_by, data_dict, embeds
         )
-                    
+    from bacpipe.embedding_evaluation.clustering.cluster import convert_numpy_types
     # Pack variable labels as JSON string to preserve order and labels
     data_dict["variable_labels_json"] = (
         [
-            json.dumps({k: v for k, v in zip(df_lab.keys(), row)})
+            json.dumps({k: convert_numpy_types(v) for k, v in zip(df_lab.keys(), row)})
             for row in zip(*df_lab.values())
         ]
         if df_lab
