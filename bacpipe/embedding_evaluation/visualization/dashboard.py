@@ -38,6 +38,11 @@ pn.extension("plotly")
 
 
 class DashBoard(DashBoardHelper):
+    """
+    Panel dashboard visualizing embeddings, clustering, probing results and
+    classifier predictions for one or multiple models.
+    """
+
     def __init__(
         self,
         model_names,
@@ -290,7 +295,7 @@ class DashBoard(DashBoardHelper):
 
         embedding_info_dialogue = pn.widgets.StaticText(
             value="",
-            width=self.kwargs.get("accordion_width") - 80,
+            sizing_mode="stretch_width",
         )
 
         self.spec_plot_obj[widget_idx] = SpectrogramPlot(
@@ -436,13 +441,14 @@ class DashBoard(DashBoardHelper):
                 pn.Accordion(
                     self.embedding_panel(widget_idx),
                     active=[0],
-                    width=self.kwargs.get("accordion_width"),
+                    sizing_mode="stretch_width",
                 ),
                 pn.Accordion(
                     self.spectrogram_panel(widget_idx),
                     self.clustering_panel(widget_idx),
                     self.probing_panel(widget_idx),
                     active=[0, 1, 2],
+                    sizing_mode="stretch_width",
                 ),
             )
         else:
@@ -452,7 +458,7 @@ class DashBoard(DashBoardHelper):
                 self.clustering_panel(widget_idx),
                 self.probing_panel(widget_idx),
                 active=[0, 1, 2, 3],
-                width=self.kwargs.get("accordion_width"),
+                sizing_mode="stretch_width",
             )
 
         main_content = pn.Column(
@@ -466,11 +472,10 @@ class DashBoard(DashBoardHelper):
                 },
             ),
             data_panels,
-            # width=self.kwargs.get('accordion_width'),
-            # sizing_mode="stretch_both",
+            sizing_mode="stretch_width",
         )
 
-        return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
+        return pn.Row(sidebar, main_content, sizing_mode="stretch_width")
 
     def all_models_page(self, widget_idx):
         """
@@ -557,14 +562,13 @@ class DashBoard(DashBoardHelper):
                         )
                     ),
                 ),
-                # sizing_mode="stretch_width",
                 active=[0, 1, 2],
+                sizing_mode="stretch_width",
             ),
-            width=2 * self.kwargs.get("accordion_width"),
-            # sizing_mode="stretch_both",
+            sizing_mode="stretch_width",
         )
 
-        return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
+        return pn.Row(sidebar, main_content, sizing_mode="stretch_width")
 
     def apply_clfier_page(self, widget_idx):
         """
@@ -648,7 +652,7 @@ class DashBoard(DashBoardHelper):
         )
 
         main_content = pn.Column(
-            pn.pane.Markdown("## All Models Dashboard"),
+            pn.pane.Markdown("## Classifier Predictions"),
             pn.Accordion(
                 (
                     "Classification settings",
@@ -692,12 +696,13 @@ class DashBoard(DashBoardHelper):
                     ),
                 ),
                 active=[0, 1, 2],
+                sizing_mode="stretch_width",
                 # by default create all annotations as one big annotations file
                 # # add button to save as raven annotations
             ),
-            width=self.kwargs.get("accordion_width"),
+            sizing_mode="stretch_width",
         )
-        return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
+        return pn.Row(sidebar, main_content, sizing_mode="stretch_width")
 
     def make_sidebar(
         self, widget_idx, model=True, classifier_page=False, all_models=False
@@ -839,13 +844,14 @@ class DashBoard(DashBoardHelper):
         model_all_page = self.all_models_page(3)
         apply_classifier0_page = self.apply_clfier_page(4)
         apply_classifier1_page = self.apply_clfier_page(5)
+        apply_classifier2_page = self.apply_clfier_page(6)
 
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
         sidebar1, content1 = model1_page.objects
         sidebar2, content2 = model2_page.objects
-        sidebar3, content3 = apply_classifier0_page.objects
         sidebar4, content4 = apply_classifier1_page.objects
+        sidebar5, content5 = apply_classifier2_page.objects
 
         # Wrap sidebars with titles
         sidebar0 = pn.Column(
@@ -868,19 +874,20 @@ class DashBoard(DashBoardHelper):
                 ),
             ),
             ("All models", model_all_page),
-            ("Single Model Predictions", apply_classifier1_page),
+            ("Single Model Predictions", apply_classifier0_page),
             (
                 "Two Model Predictions",
                 pn.Row(
-                    pn.Column(sidebar3, sidebar4),
-                    pn.Row(content3, content4),
+                    pn.Column(sidebar4, sidebar5),
+                    pn.Row(content4, content5),
                     sizing_mode="stretch_both",
                 ),
             ),
+            dynamic=True,
         )
 
         self.add_styling(
-            model0_page, model2_page, model_all_page, apply_classifier1_page
+            model0_page, model2_page, model_all_page, apply_classifier0_page
         )
 
     def add_styling(self, *pages):

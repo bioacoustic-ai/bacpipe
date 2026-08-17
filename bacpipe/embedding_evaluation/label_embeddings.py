@@ -20,6 +20,11 @@ logger = logging.getLogger("bacpipe")
 
 
 class DefaultLabels:
+    """
+    Generate the default metadata labels (e.g. species, time of day) for
+    the embeddings of a single model.
+    """
+
     def __init__(self, paths, model, default_label_keys, **kwargs):
         """
         Class to generate metadata labels based on audio files and

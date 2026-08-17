@@ -672,6 +672,12 @@ class Embedder(AudioHandler):
 
 
 class Classifier:
+    """
+    Handle all tasks surrounding classification: generating predictions from
+    embeddings, collecting them into arrays and creating dataframes and
+    annotation tables from them.
+    """
+
     def __init__(
         self,
         model,

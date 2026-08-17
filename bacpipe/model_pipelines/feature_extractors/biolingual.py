@@ -11,6 +11,10 @@ BATCH_SIZE = 16
 
 
 class Model(ModelBaseClass):
+    """
+    BioLingual feature extractor (contrastive language-audio pretraining).
+    """
+
     def __init__(self, **kwargs):
         """
         Initialize the BioLingual model.

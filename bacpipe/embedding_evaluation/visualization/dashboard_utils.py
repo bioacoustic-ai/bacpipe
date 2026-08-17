@@ -14,6 +14,10 @@ matplotlib.use("agg")
 
 
 class DashBoardHelper:
+    """
+    Helper class providing shared widget event handlers and figure update
+    logic used by the dashboard pages.
+    """
 
     def handle_selection(self, event, widget_idx=None):
         """
@@ -353,6 +357,10 @@ class DashBoardHelper:
             # No widgets, just call the function once
             fig_panel = pn.panel(plot_func(**kwargs))
 
+        # Make the plot fill the available container width so the dashboard
+        # stays responsive when the browser window is resized.
+        fig_panel.sizing_mode = "stretch_width"
+
         def save_figure(event):
             """
             Save the displayed figure to the plot path.
@@ -423,4 +431,9 @@ class DashBoardHelper:
         button.on_click(save_figure)
         notification = pn.pane.Markdown("")
 
-        return pn.Column(fig_panel, pn.Row(button), notification)
+        return pn.Column(
+            fig_panel,
+            pn.Row(button),
+            notification,
+            sizing_mode="stretch_width",
+        )

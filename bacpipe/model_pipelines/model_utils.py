@@ -10,6 +10,11 @@ logger = logging.getLogger("bacpipe")
 
 
 class ModelBaseClass:
+    """
+    Base class for all feature extraction models, defining the common
+    preprocessing and inference pipeline.
+    """
+
     def __init__(
         self,
         sr,

@@ -9,6 +9,10 @@ logger = logging.getLogger("bacpipe")
 
 
 class ProbeDatasetLoader(Dataset):
+    """
+    PyTorch Dataset yielding embedding/label pairs for probe classification.
+    """
+
     def __init__(self, class_df, embeds, label2index, set_name=None, **kwargs):
         """
         Class to initialize and iterate through classification dataset.

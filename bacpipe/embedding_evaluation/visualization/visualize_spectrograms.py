@@ -8,6 +8,10 @@ from bacpipe import settings
 
 
 class SpectrogramPlot:
+    """
+    Utility for creating and updating the dashboard spectrogram figure.
+    """
+
     def __init__(
         self, audio_dir, loader, model_name, panel_static_text, **kwargs
     ):

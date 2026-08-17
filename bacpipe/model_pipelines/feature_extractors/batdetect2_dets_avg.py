@@ -14,6 +14,10 @@ NUM_CLASSES = 17
 
 
 class Model(ModelBaseClass):
+    """
+    BatDetect2 feature extractor averaging per-detection embeddings.
+    """
+
     def __init__(
         self,
         segment_duration=DEFAULT_SEGMENT_DURATION,

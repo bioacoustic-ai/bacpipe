@@ -111,6 +111,11 @@ def collect_dim_reduced_embeds(
 
 
 class EmbedAndLabelLoader:
+    """
+    Load and cache labels, dimensionally reduced embeddings and split data
+    used for the embedding plots.
+    """
+
     def __init__(self, dim_reduction_model, dashboard=False, **kwargs):
         """
         Initialize the embeddings and labels loader.
@@ -771,14 +776,33 @@ def set_legend(
         new_handles = handles
         new_labels = labels
     if dashboard:
-        fig.subplots_adjust(right=0.7)
+        # Compute the column count so the legend
+        # stays inside the figure boundaries even when there are many labels (e.g. many species). 
+        num_labels = len(new_labels)
+        fig_w, fig_h = fig.get_size_inches()
+        max_rows = max(1, int(fig_h / 0.28))
+        ncol = max(1, int(np.ceil(num_labels / max_rows)))
+        max_cols = max(1, 2)#int((0.45 * fig_w) / 0.7))
+        ncol = min(ncol, max_cols)
+
+        fontsize = 6 if num_labels > 40 else 7
+        markerscale = 3 if num_labels > 40 else 4
+
+        # Reserve only as much horizontal space as the legend actually needs
+        right = 0.8 - min(0.5, (ncol * 0.7) / fig_w)
+
+        fig.subplots_adjust(right=right)
+        fig.tight_layout(
+            rect=(0.0, fig.subplotpars.bottom, right, fig.subplotpars.top)
+        )
 
         fig.legend(
             new_handles,
             new_labels,
             loc="outside right",
-            markerscale=4 if dashboard else 6,
-            fontsize=7,
+            ncol=ncol,
+            markerscale=markerscale,
+            fontsize=fontsize,
             frameon=False,
         )
     else:
@@ -835,6 +859,13 @@ def return_rows_cols(num):
     """
     Determine the grid dimensions for a comparison plot.
 
+    The grid is chosen so that no subplot slots are left empty: for small
+    model counts the grid matches the model count exactly. This keeps the
+    individual plots as large as possible and avoids a dead band in the
+    comparison figure (which previously always used a 1x3 grid for up to
+    three models, leaving a third of the width empty when only two models
+    were compared).
+
     Parameters
     ----------
     num : int
@@ -846,19 +877,21 @@ def return_rows_cols(num):
         number of rows and columns for the grid
     """
     if num <= 3:
-        return 1, 3
-    elif num > 3 and num <= 6:
+        return 1, max(2, num)
+    elif num == 4:
+        return 2, 2
+    elif num <= 6:
         return 2, 3
-    elif num > 6 and num <= 9:
+    elif num <= 9:
         return 3, 3
-    elif num > 9 and num <= 12:
+    elif num <= 12:
         return 3, 4
-    elif num > 12 and num <= 16:
+    elif num <= 16:
         return 4, 4
-    elif num > 16 and num <= 20:
+    elif num <= 20:
         return 4, 5
     else:
-        return 5, num // 5
+        return 5, int(np.ceil(num / 5))
 
 
 def set_figsize_for_comparison(rows, cols):
@@ -1007,10 +1040,9 @@ def get_arrays_for_spectrogram_text(labels, label_by, data_dict, embeds):
     label_copy = labels.copy()
     # remove clustering labels from dict
     
-    for clustering in settings.clust_configs.values():
-        for label_key in labels.keys():
-            if clustering['name'] in label_key:
-                label_copy.pop(label_key)
+    for label_key in labels.keys():
+        if 'no_noise' in label_key:
+            label_copy.pop(label_key)
             
         
     df_lab = {}
@@ -1168,15 +1200,27 @@ def plot_embeddings_px(
     unique_labels = np.unique(labels[label_by])
     n_labels = len(unique_labels)
 
+    # When the number of categories is below the settings threshold we want
+    # to show a discrete legend. Cluster labels (e.g. kmeans) are typically
+    # integers, but plotly express treats numeric "color" columns as a
+    # continuous variable and would draw a colorbar instead of a legend.
+    # Casting the label values to strings keeps them categorical.
+    if n_labels <= settings.max_nr_categories:
+        labels_for_plot = [str(lbl) for lbl in labels[label_by]]
+        unique_labels = np.unique(labels_for_plot)
+        n_labels = len(unique_labels)
+    else:
+        labels_for_plot = labels[label_by]
+
     # Create an integer mapping for high-cardinality plotting
     # (Plotly needs numbers to generate a gradient colorbar)
     label_to_id = {lbl: i for i, lbl in enumerate(unique_labels)}
-    label_ids = [label_to_id[l] for l in labels[label_by]]
+    label_ids = [label_to_id[l] for l in labels_for_plot]
 
     data_dict = {
         "x": x_data,
         "y": y_data,
-        "label": labels[label_by],  # The actual string (for hover/legend)
+        "label": labels_for_plot,  # The actual string (for hover/legend)
         "label_id": label_ids,  # The integer (for colorbar)
         "audiofilename": audiofilenames,
         "start": starts,

@@ -17,6 +17,10 @@ N_MELS = 128
 
 
 class Model(ModelBaseClass):
+    """
+    RCL-FS-BSED feature extractor for few-shot bird sound event detection.
+    """
+
     def __init__(self, **kwargs):
         """
         Initialize the RCL-FS-BSED feature extractor model.

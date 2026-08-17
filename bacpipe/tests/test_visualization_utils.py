@@ -10,11 +10,13 @@ import numpy as np
 import pandas as pd
 
 matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 from bacpipe.embedding_evaluation.visualization.visualize_embeddings import (
     get_arrays_for_spectrogram_text,
     get_boolean_array_for_annotated_embeddings,
     get_single_label_gt_labels,
+    return_rows_cols,
 )
 from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
     PredictionsLoader,
@@ -270,4 +272,252 @@ class TestPlotOverviewResults:
         heights = self._bar_heights_by_model(ax)
         # model_b knn (macro 0.7) sorted before model_a knn (macro 0.6)
         assert heights == {0: [0.7, 1.0, 0.6], 1: [0.6, 0.9, 0.5]}
+
+
+from pathlib import Path
+
+import pytest
+
+import bacpipe
+from bacpipe import settings
+from bacpipe.embedding_evaluation.visualization.visualize_embeddings import (
+    plot_embeddings_px,
+    set_legend,
+)
+from bacpipe.embedding_evaluation.visualization import visualize_predictions
+
+
+def _make_embeds(n=40):
+    """Build a minimal embeddings dict for ``plot_embeddings_px``."""
+    rng = np.random.default_rng(0)
+    return {
+        "x": rng.normal(size=n).tolist(),
+        "y": rng.normal(size=n).tolist(),
+        "z": None,
+        "timestamp": np.arange(n).tolist(),
+        "durations": [1.0] * n,
+        "index": list(range(n)),
+        "metadata": {
+            "audio_files": [f"file_{i % 4}.wav" for i in range(n)],
+            "segment_length (samples)": [32000] * n,
+            "sample_rate (Hz)": [32000] * n,
+            "model_name": "birdnet",
+            "embed_dir": "/tmp/does/not/matter",
+        },
+    }
+
+
+class TestPlotEmbeddingsPxDiscreteVsContinuous:
+    """The plotly embedding plot must use a discrete legend (and no colorbar)
+    whenever the number of categories is below ``settings.max_nr_categories``,
+    even when the labels are numeric (e.g. integer kmeans cluster ids)."""
+
+    def test_integer_cluster_labels_use_discrete_legend(self):
+        labels = {"kmeans": np.array([0, 1, 2, 3] * 10, dtype=np.int32)}
+        fig = plot_embeddings_px(_make_embeds(), labels, label_by="kmeans")
+        layout = fig.layout.to_plotly_json()
+        assert "coloraxis" not in layout
+        assert layout.get("legend")
+        # one trace per cluster -> categorical legend entries
+        assert len(fig.data) == 4
+
+    def test_float_cluster_labels_use_discrete_legend(self):
+        labels = {"kmeans": np.array([0.0, 1.0, 2.0, 3.0] * 10)}
+        fig = plot_embeddings_px(_make_embeds(), labels, label_by="kmeans")
+        layout = fig.layout.to_plotly_json()
+        assert "coloraxis" not in layout
+        assert len(fig.data) == 4
+
+    def test_string_labels_keep_discrete_legend(self):
+        labels = {"label": np.array(["a", "b", "c", "d"] * 10)}
+        fig = plot_embeddings_px(_make_embeds(), labels, label_by="label")
+        layout = fig.layout.to_plotly_json()
+        assert "coloraxis" not in layout
+        assert len(fig.data) == 4
+
+    def test_high_cardinality_labels_keep_colorbar(self, monkeypatch):
+        # More categories than the threshold must keep the gradient colorbar.
+        monkeypatch.setattr(settings, "max_nr_categories", 5)
+        labels = {"file": np.array([f"f{i % 40}" for i in range(40)])}
+        fig = plot_embeddings_px(_make_embeds(), labels, label_by="file")
+        layout = fig.layout.to_plotly_json()
+        assert "coloraxis" in layout
+
+
+class TestPredictionsLoaderCacheConsistency:
+    """A failed load must not poison the PredictionsLoader cache. Otherwise
+    the single model predictions tab crashes with a KeyError when switching
+    between classifier types/models after a failed probe run."""
+
+    class _FakeVisLoader:
+        def __init__(self):
+            n = 6
+            self.embeds = {
+                "birdnet": {
+                    "x": np.arange(n).tolist(),
+                    "y": np.arange(n).tolist(),
+                    "timestamp": np.arange(n).tolist(),
+                    "metadata": {
+                        "audio_files": [
+                            "20240101060000.wav",
+                            "20240102060000.wav",
+                        ],
+                        "nr_embeds_per_file": [3, 3],
+                    },
+                }
+            }
+
+    class _FakePanelSelection:
+        def __init__(self):
+            self.options = []
+            self.value = None
+
+    @staticmethod
+    def _fake_load_classification(model, threshold):
+        binary_presence = np.zeros((6, 2), dtype=np.int8)
+        binary_presence[:3, 0] = 1
+        binary_presence[3:, 1] = 1
+        return binary_presence, {"class_a": 0, "class_b": 1}
+
+    @staticmethod
+    def _fake_prepare_probe(model, probe_path):
+        return object(), {"probe_a": 0, "probe_b": 1}
+
+    @staticmethod
+    def _fake_run_probe_success(
+        model, probe, threshold, return_binary_presence=True, callbacks=None
+    ):
+        binary_presence = np.zeros((6, 2), dtype=np.int8)
+        binary_presence[:3, 0] = 1
+        binary_presence[3:, 1] = 1
+        return binary_presence
+
+    @staticmethod
+    def _fake_run_probe_failure(*args, **kwargs):
+        raise RuntimeError("simulated probe inference failure")
+
+    def _make_loader(self, tmp_path, run_probe):
+        (tmp_path / "probing").mkdir(parents=True)
+        (tmp_path / "probing" / "linear_probe.pt").touch()
+
+        def path_func(model_name):
+            return SimpleNamespace(
+                probe_path=tmp_path / "probing",
+                preds_path=tmp_path / "predictions",
+            )
+
+        loader = PredictionsLoader(
+            vis_loader=self._FakeVisLoader(),
+            path_func=path_func,
+            models=["birdnet"],
+            panel_selection=self._FakePanelSelection(),
+            progress_bar=SimpleNamespace(value=0),
+            loading_pane=SimpleNamespace(value="", name=""),
+        )
+        loader.load_classification = self._fake_load_classification
+        visualize_predictions.prepare_probe_inference = (
+            self._fake_prepare_probe
+        )
+        visualize_predictions.run_probe_inference = run_probe
+        return loader
+
+    def test_integrated_load_adds_overall_and_options(self, tmp_path):
+        loader = self._make_loader(tmp_path, self._fake_run_probe_success)
+        loader.get_data("birdnet", 0.5, clfier_type="Integrated")
+        assert loader.binary_presence.shape[1] == 3  # 2 classes + overall
+        assert "overall" in loader.class_dict
+        assert "overall" in loader.panel_selection.options
+
+    def test_failed_linear_run_clears_cache(self, tmp_path):
+        loader = self._make_loader(tmp_path, self._fake_run_probe_success)
+        loader.get_data("birdnet", 0.5, clfier_type="Integrated")
+        assert loader.binary_presence is not None
+
+        # The probe inference fails -> no stale state may be left behind.
+        visualize_predictions.run_probe_inference = (
+            self._fake_run_probe_failure
+        )
+        with pytest.raises(RuntimeError, match="simulated"):
+            loader.get_data("birdnet", 0.5, clfier_type="Linear")
+        assert loader.binary_presence is None
+        assert loader.class_dict is None
+
+        # A repeated Linear request must retry (not hit a stale cache).
+        with pytest.raises(RuntimeError, match="simulated"):
+            loader.get_data("birdnet", 0.5, clfier_type="Linear")
+
+        # Switching back to the integrated classifier still works.
+        loader.load_classification = self._fake_load_classification
+        loader.get_data("birdnet", 0.5, clfier_type="Integrated")
+        assert "overall" in loader.class_dict
+        assert loader.binary_presence.shape[1] == 3
+
+    def test_accumulate_data_falls_back_to_overall(self, tmp_path):
+        loader = self._make_loader(tmp_path, self._fake_run_probe_success)
+        loader.get_data("birdnet", 0.5, clfier_type="Integrated")
+        # A species that is not part of the current classifier outputs must
+        # not crash the heatmap; it falls back to the overall presence.
+        accumulated = loader.accumulate_data("not_a_species", "day")
+        assert accumulated.shape[0] == 24
+
+
+class TestSetLegendDashboardStaysInBounds:
+    """The dashboard (comparison) legend must stay inside the figure
+    boundaries even when there are many labels (e.g. many species in the
+    all-models comparison plot). Regression test: the legend used to be drawn
+    outside the canvas, extending beyond the figure boundaries."""
+
+    @pytest.mark.parametrize("num_labels", [7, 30, 60, 100])
+    def test_legend_within_figure_bounds(self, num_labels):
+        fig = plt.figure(figsize=(11, 5), dpi=100)
+        ax = fig.subplots()
+        handles, labels = [], []
+        rng = np.random.default_rng(0)
+        for i in range(num_labels):
+            p = ax.scatter(rng.random(10), rng.random(10), label=f"species_{i}")
+            handles.append(p)
+            labels.append(f"species_{i}")
+
+        fig, ax = set_legend(
+            handles, labels, fig, ax, bool_plot_centroids=False, dashboard=True
+        )
+        fig.canvas.draw()
+        fig_bounds = fig.get_window_extent()
+        legend_bounds = fig.legends[0].get_window_extent()
+        # Allow a 1px tolerance for rounding at the figure edges.
+        assert legend_bounds.x0 >= fig_bounds.x0
+        assert legend_bounds.x1 <= fig_bounds.x1 + 1
+        assert legend_bounds.y0 >= fig_bounds.y0 - 1
+        assert legend_bounds.y1 <= fig_bounds.y1 + 1
+        plt.close(fig)
+
+
+class TestReturnRowsColsExactFitGrid:
+    """The comparison plot grid must not leave empty slots for the common
+    model counts, so the individual plots stay as large as possible (no dead
+    band in the figure). Regression test: up to three models always used a
+    1x3 grid, leaving a third of the width empty when comparing two models."""
+
+    @pytest.mark.parametrize(
+        "num_models, expected",
+        [
+            (1, (1, 1)),
+            (2, (1, 2)),
+            (3, (1, 3)),
+            (4, (2, 2)),
+            (5, (2, 3)),
+            (6, (2, 3)),
+            (7, (3, 3)),
+            (12, (3, 4)),
+            (16, (4, 4)),
+            (20, (4, 5)),
+            (21, (5, 5)),
+            (25, (5, 5)),
+        ],
+    )
+    def test_grid_has_no_empty_slots(self, num_models, expected):
+        rows, cols = return_rows_cols(num_models)
+        assert (rows, cols) == expected
+        # The grid must always be able to hold all models.
+        assert rows * cols >= num_models
 

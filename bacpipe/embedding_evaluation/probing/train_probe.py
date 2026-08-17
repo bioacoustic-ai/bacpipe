@@ -11,6 +11,10 @@ logger = logging.getLogger("bacpipe")
 
 
 class LinearProbe(nn.Module):
+    """
+    Linear probing classifier head mapping embeddings to class logits.
+    """
+
     def __init__(self, in_dim, out_dim, device="cpu", **kwargs):
         """
         Linear classification layer.
@@ -137,6 +141,10 @@ def train_linear_probe(
 
 
 class KNNProbe(nn.Module):
+    """
+    K-nearest-neighbor probing classifier operating on raw embeddings.
+    """
+
     def __init__(self, n_neighbors=15, testing=False, **kwargs):
         """
         K-nearest neighbor classifier.
