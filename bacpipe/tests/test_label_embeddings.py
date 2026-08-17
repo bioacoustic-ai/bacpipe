@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 from bacpipe.embedding_evaluation.label_embeddings import (
     assign_global_get_paths_function,
+    create_metadata_labels,
     ensure_windoof_path_to_posix,
     fetch_annotation_file,
     filter_annotations,
@@ -258,3 +259,99 @@ class TestGetGroundTruth:
 
     def test_none_file_returns_none(self):
         assert get_ground_truth("ignored") is None
+
+
+class TestCreateMetadataLabels:
+    """Tests for ``create_metadata_labels``, which powers the default labels
+    used in the ``simple_use_cases`` notebook (cell 15) and by the clustering
+    pipeline."""
+
+    TEST_AUDIO_DIR = "bacpipe/tests/test_data"
+
+    def _make_paths(self, tmp_path):
+        paths = SimpleNamespace(
+            audio_dir=tmp_path / "audio",
+            main_embeds_path=tmp_path / "embeddings",
+            labels_path=tmp_path / "labels",
+            preds_path=tmp_path / "predictions",
+        )
+        paths.main_embeds_path.mkdir(exist_ok=True, parents=True)
+        paths.labels_path.mkdir(exist_ok=True, parents=True)
+        paths.preds_path.mkdir(exist_ok=True, parents=True)
+        return paths
+
+    def _fake_metadata(self, audio_file="audio/FewShot/CHE_01_20190101_163410.wav"):
+        return {
+            "files": {
+                "audio_files": [audio_file],
+                "nr_embeds_per_file": [2],
+            },
+            "nr_embeds_total": 2,
+            "segment_length (samples)": 48000,
+            "sample_rate (Hz)": 48000,
+        }
+
+    def test_generates_and_saves_labels(self, tmp_path, monkeypatch):
+        import bacpipe.embedding_evaluation.label_embeddings as le
+
+        paths = self._make_paths(tmp_path)
+        monkeypatch.setattr(
+            le, "get_files_if_no_embeds", lambda *a, **k: ([], 1.0, self._fake_metadata())
+        )
+
+        dl = create_metadata_labels(
+            audio_dir=self.TEST_AUDIO_DIR,
+            model="testmodel",
+            paths=paths,
+            overwrite=True,
+            return_type="dataframe",
+            default_label_keys=["time_of_day", "audio_file_name"],
+        )
+        # two embeddings for the single audio file
+        assert len(dl) == 2
+        assert "time_of_day" in dl.columns
+        assert "audio_file_name" in dl.columns
+        assert dl["audio_file_name"].tolist() == [
+            "audio/FewShot/CHE_01_20190101_163410.wav",
+        ] * 2
+        # the per-embedding start/end grid is derived from the segment length
+        assert dl["start"].tolist() == [0.0, 1.0]
+        assert dl["end"].tolist() == [1.0, 2.0]
+        assert (paths.labels_path / "metadata_labels.csv").exists()
+
+    def test_returns_dict_for_return_type_dict(self, tmp_path, monkeypatch):
+        import bacpipe.embedding_evaluation.label_embeddings as le
+
+        paths = self._make_paths(tmp_path)
+        monkeypatch.setattr(
+            le, "get_files_if_no_embeds", lambda *a, **k: ([], 1.0, self._fake_metadata())
+        )
+        labels = create_metadata_labels(
+            audio_dir=self.TEST_AUDIO_DIR,
+            model="testmodel",
+            paths=paths,
+            overwrite=True,
+            return_type="dict",
+            default_label_keys=["audio_file_name"],
+        )
+        assert isinstance(labels, dict)
+        assert len(labels["audio_file_name"]) == 2
+
+    def test_loads_existing_labels_without_regenerating(self, tmp_path):
+        paths = self._make_paths(tmp_path)
+        pd.DataFrame(
+            {
+                "time_of_day": ["12-00-00", "12-00-01"],
+                "audio_file_name": ["a.wav", "a.wav"],
+            }
+        ).to_csv(paths.labels_path / "metadata_labels.csv", index=False)
+
+        dl = create_metadata_labels(
+            audio_dir=self.TEST_AUDIO_DIR,
+            model="testmodel",
+            paths=paths,
+            overwrite=False,
+            return_type="dataframe",
+        )
+        assert list(dl.columns) == ["time_of_day", "audio_file_name"]
+        assert len(dl) == 2

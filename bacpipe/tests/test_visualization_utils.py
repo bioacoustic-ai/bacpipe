@@ -8,6 +8,7 @@ import pandas as pd
 
 from bacpipe.embedding_evaluation.visualization.visualize_embeddings import (
     get_arrays_for_spectrogram_text,
+    get_boolean_array_for_annotated_embeddings,
     get_single_label_gt_labels,
 )
 from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
@@ -77,6 +78,67 @@ class TestGetSingleLabelGtLabels:
         assert labels[0] == "Tree Pipit"
         assert labels[1] == "Eurasian Kestrel"
         assert labels[2] == "noise"
+
+
+class TestGetBooleanArrayForAnnotatedEmbeddings:
+    def _metadata_labels(self):
+        # one row per embedding segment (matches the model time grid)
+        return pd.DataFrame(
+            {
+                "audio_file_name": ["a.wav", "a.wav", "b.wav"],
+                "start": [0.0, 3.0, 0.0],
+                "end": [3.0, 6.0, 3.0],
+            }
+        )
+
+    def _ground_truth(self):
+        return pd.DataFrame(
+            {
+                "audiofilename": ["a.wav", "b.wav"],
+                "start": [0.0, 0.0],
+                "end": [3.0, 3.0],
+                "simultaneous_labels": [1, 2],
+                "sp_a": [1, 1],
+                "sp_b": [0, 1],
+            }
+        )
+
+    def _patch_metadata_labels(self, monkeypatch):
+        import bacpipe.embedding_evaluation.label_embeddings as le
+
+        monkeypatch.setattr(
+            le, "create_metadata_labels", lambda **kwargs: self._metadata_labels()
+        )
+
+    def test_marks_unannotated_embeddings_as_noise(self, monkeypatch):
+        self._patch_metadata_labels(monkeypatch)
+        is_noise = get_boolean_array_for_annotated_embeddings(
+            self._ground_truth(), "birdnet"
+        )
+        # a.wav@0 and b.wav@0 are annotated; a.wav@3 has no annotation
+        assert is_noise.tolist() == [False, True, False]
+
+    def test_returns_boolean_array(self, monkeypatch):
+        self._patch_metadata_labels(monkeypatch)
+        is_noise = get_boolean_array_for_annotated_embeddings(
+            self._ground_truth(), "birdnet"
+        )
+        assert isinstance(is_noise, np.ndarray)
+        assert is_noise.dtype == bool
+
+    def test_all_segments_annotated(self, monkeypatch):
+        self._patch_metadata_labels(monkeypatch)
+        gt = pd.DataFrame(
+            {
+                "audiofilename": ["a.wav", "a.wav", "b.wav"],
+                "start": [0.0, 3.0, 0.0],
+                "end": [3.0, 6.0, 3.0],
+                "simultaneous_labels": [1, 1, 1],
+                "sp_a": [1, 1, 1],
+            }
+        )
+        is_noise = get_boolean_array_for_annotated_embeddings(gt, "birdnet")
+        assert is_noise.tolist() == [False, False, False]
 
 
 class TestGetArraysForSpectrogramText:
