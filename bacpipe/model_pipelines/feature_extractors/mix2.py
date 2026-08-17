@@ -13,6 +13,9 @@ from ..model_utils import ModelBaseClass
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
+        """
+        Initialize the Mix2 model.
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -28,6 +31,19 @@ class Model(ModelBaseClass):
         self.min_max_norm = MinMaxNorm()
 
     def preprocess(self, audio):
+        """
+        Convert the audio samples to a normalized mel spectrogram.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            normalized mel spectrogram
+        """
         audio = audio.cpu()
         audio = self.mel(audio)
         audio = self.ampl2db(audio)
@@ -35,4 +51,17 @@ class Model(ModelBaseClass):
         return audio.unsqueeze(dim=1)
 
     def __call__(self, x):
+        """
+        Run the model on the input spectrogram.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            input mel spectrogram
+
+        Returns
+        -------
+        torch.Tensor
+            model output
+        """
         return self.model(x)

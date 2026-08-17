@@ -21,6 +21,9 @@ from ..model_utils import ModelBaseClass
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
+        """
+        Initialize the AudioProtoPNet model.
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -61,12 +64,51 @@ class Model(ModelBaseClass):
         ]
 
     def preprocess(self, audio):
+        """
+        Preprocess the audio samples with the model's feature extractor.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        dict
+            preprocessor outputs
+        """
         return self.preprocessor(audio)
 
     def __call__(self, x):
+        """
+        Run the backbone on the input.
+
+        Parameters
+        ----------
+        x : dict
+            preprocessed input
+
+        Returns
+        -------
+        torch.Tensor
+            pooler output embeddings
+        """
         self.results = self.model(x)
         return self.results.pooler_output
 
     def classifier_predictions(self, embeddings):
+        """
+        Run the classifier head on the last hidden state.
+
+        Parameters
+        ----------
+        embeddings : torch.Tensor
+            embeddings from the last model call (unused)
+
+        Returns
+        -------
+        torch.Tensor
+            sigmoid class logits
+        """
         logits, _ = self.classifier(self.results.last_hidden_state)
         return torch.sigmoid(logits).detach()

@@ -22,6 +22,18 @@ class Model(ModelBaseClass):
         segment_length=LENGTH_IN_SAMPLES,
         **kwargs,
     ):
+        """
+        Initialize the BirdNET v3 model wrapper.
+
+        Parameters
+        ----------
+        sr : int
+            sample rate in Hz
+        segment_length : int
+            number of samples per input segment
+        **kwargs
+            additional keyword arguments passed to the base class
+        """
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
         
         label_path = self.model_utils_base_path / 'birdnet_v3/BirdNET+_V3.0-preview3.1_Global_11K_Labels.csv'
@@ -32,15 +44,54 @@ class Model(ModelBaseClass):
         self.classes = pd.read_csv(label_path, sep=';')['com_name'].values
         
     def preprocess(self, audio):
+        """
+        Pass-through preprocessing.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            input audio tensor
+
+        Returns
+        -------
+        torch.Tensor
+            the unchanged input audio
+        """
         return audio
 
     def __call__(self, input):
+        """
+        Run the BirdNET v3 model on the input audio.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            input audio tensor
+
+        Returns
+        -------
+        torch.Tensor
+            embeddings produced by the model
+        """
         input = input.cpu()
         self.predictions, self.embeddings = self.model(np.array(input))
 
         return self.embeddings
 
     def classifier_predictions(self, embeddings):
+        """
+        Return the class predictions from the last model call.
+
+        Parameters
+        ----------
+        embeddings : torch.Tensor
+            embeddings from the last model call (unused)
+
+        Returns
+        -------
+        torch.Tensor
+            class predictions produced by the model
+        """
         return self.predictions
 
 
@@ -54,6 +105,16 @@ class birdnet_v3_ONNX(nn.Module):
     """
 
     def __init__(self, checkpoint_path, device: str = "auto"):
+        """
+        Initialize the BirdNET v3 ONNX classifier.
+
+        Parameters
+        ----------
+        checkpoint_path : pathlib.Path
+            path to the ONNX checkpoint
+        device : str
+            requested device ("auto", "cpu", or "cuda")
+        """
         super().__init__()
         
         try:
@@ -67,6 +128,19 @@ class birdnet_v3_ONNX(nn.Module):
             sys.exit(1)
 
     def _get_execution_providers(self, device: str) -> list[str]:
+        """
+        Resolve the ONNX execution providers for the requested device.
+
+        Parameters
+        ----------
+        device : str
+            requested device ("auto", "cpu", or "cuda")
+
+        Returns
+        -------
+        list of str
+            execution providers to use for the ONNX session
+        """
         providers = []
 
         # Select execution provider based on device
@@ -86,15 +160,21 @@ class birdnet_v3_ONNX(nn.Module):
     ):
         """
         Run inference with ONNX model.
-        
-        Args:
-            session: ONNX Runtime inference session.
-            chunks: [N, T] float32 mono audio.
-            batch_size: batch size.
-            return_embeddings: if True, also return stacked embeddings [N, D].
-        
-        Returns:
+
+        Parameters
+        ----------
+        chunks : np.ndarray
+            [N, T] float32 mono audio
+        batch_size : int, optional
+            batch size, by default 16
+        return_embeddings : bool, optional
+            if True, also return stacked embeddings [N, D], by default True
+
+        Returns
+        -------
+        np.ndarray
             predictions: [N, C] float32
+        np.ndarray or None
             embeddings: [N, D] float32 or None
         """
         if chunks.shape[0] == 0:

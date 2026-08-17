@@ -18,6 +18,19 @@ logger = logging.getLogger(__name__)
 
 
 def convert_numpy_types(obj):
+    """
+    Convert numpy types to native Python types.
+
+    Parameters
+    ----------
+    obj : numpy object
+        object to be converted
+
+    Returns
+    -------
+    int or float or list
+        object converted to a native Python type
+    """
     if isinstance(obj, np.int64):
         return int(obj)
     elif isinstance(obj, np.float32):
@@ -110,6 +123,8 @@ def eval_clustering(
         metadata labels for the dataset
     label_column : string
         label type defined in annotations.csv file
+    embeds : np.array, optional
+        embeddings, by default None
 
     Returns
     -------

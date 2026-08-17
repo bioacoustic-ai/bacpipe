@@ -310,6 +310,8 @@ def evaluation_with_settings_already_exists(
         name of the dimensionality reduction model to be used
     models : list
         embedding models
+    testing : bool, optional
+        set to True for testing, by default False
 
     Returns
     -------
@@ -490,6 +492,9 @@ def model_specific_evaluation(
         in the bacpipe/settings.yaml file.
     models : list
         embedding models
+    dim_reduction_model : bool or str, optional
+        Can be bool or the string corresponding to the
+        dimensionality reduction model, by default False
     """
     if "CustomModels" in kwargs:
         assert len(kwargs["CustomModels"]) == len(models), (
@@ -648,9 +653,6 @@ def run_pipeline_for_single_model(
     check_if_already_dim_reduced : bool, optional
         set to False if you want to force recomputing of
         dimensionality reduced embeddings, by default True
-    overwrite : bool, optional
-        set to True if you want metadata labels and
-        ground truth labels to be processed again, by default False
     testing : bool, optional
         set to True for testing, by default False
 

@@ -18,6 +18,9 @@ N_MELS = 128
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
+        """
+        Initialize the RCL-FS-BSED feature extractor model.
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -48,6 +51,19 @@ class Model(ModelBaseClass):
         self.model.eval()
 
     def preprocess(self, audio):
+        """
+        Convert the audio samples to a mel spectrogram in decibels.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            mel spectrogram in decibels
+        """
         audio = audio.cpu()
         mel = self.mel(torch.tensor(audio))
         mel_db = self.power_to_db(mel)
@@ -55,5 +71,18 @@ class Model(ModelBaseClass):
 
     @torch.inference_mode()
     def __call__(self, input):
+        """
+        Run the model on the input spectrogram.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            input mel spectrogram
+
+        Returns
+        -------
+        torch.Tensor
+            model output
+        """
         res = self.model(input.unsqueeze(1))
         return res

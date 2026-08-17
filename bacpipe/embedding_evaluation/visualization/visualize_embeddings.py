@@ -40,11 +40,15 @@ def darken_hex_color_bitwise(hex_color):
     """
     Darkens a hex color using the bitwise operation: (color & 0xfefefe) >> 1.
 
-    Parameters:
-        hex_color (str): The hex color string (e.g., '#1f77b4').
+    Parameters
+    ----------
+    hex_color : str
+        The hex color string (e.g., '#1f77b4').
 
-    Returns:
-        str: The darkened hex color.
+    Returns
+    -------
+    str
+        The darkened hex color.
     """
     # Remove '#' and convert hex color to an integer
     color_int = int(hex_color.lstrip("#"), 16)
@@ -108,6 +112,18 @@ def collect_dim_reduced_embeds(
 
 class EmbedAndLabelLoader:
     def __init__(self, dim_reduction_model, dashboard=False, **kwargs):
+        """
+        Initialize the embeddings and labels loader.
+
+        Parameters
+        ----------
+        dim_reduction_model : str
+            name of the dimensionality reduction model
+        dashboard : bool
+            whether the loader is used by the dashboard
+        **kwargs
+            additional keyword arguments (e.g., overwrite flag)
+        """
         self.labels = dict()
         self.embeds = dict()
         self.split_data = dict()
@@ -117,6 +133,25 @@ class EmbedAndLabelLoader:
         self.kwargs = kwargs
 
     def get_data(self, model_name, label_by, remove_noise=False, **kwargs):
+        """
+        Load or return cached labels and embeddings for a model.
+
+        Parameters
+        ----------
+        model_name : str
+            name of the model
+        label_by : str
+            key of the metadata labels dict
+        remove_noise : bool
+            whether to filter out unannotated embeddings
+        **kwargs
+            additional keyword arguments passed to the path helpers
+
+        Returns
+        -------
+        tuple of (dict, dict, dict)
+            labels, embeddings, and data split by label
+        """
         if not model_name in self.labels.keys():
 
             if not kwargs.get('widget_idx') is None and 'overwrite' in self.kwargs:
@@ -172,6 +207,19 @@ class EmbedAndLabelLoader:
         )
 
     def remove_noise_indices(self, model_name):
+        """
+        Return labels and embeddings with unannotated points removed.
+
+        Parameters
+        ----------
+        model_name : str
+            name of the model
+
+        Returns
+        -------
+        tuple of (dict, dict)
+            filtered embeddings and filtered labels
+        """
         return_labels, return_embeds = dict(), dict()
         bool_noise = self.bool_noise[model_name]
 
@@ -288,6 +336,27 @@ def plot_embeddings(
 
 
 def init_embed_figure(fig, axes, bool_3d=False, widget_idx=None, **kwargs):
+    """
+    Initialize a matplotlib figure and axes for embedding plots.
+
+    Parameters
+    ----------
+    fig : plt.figure object or False
+        existing figure handle
+    axes : plt.axes object or False
+        existing axes handle
+    bool_3d : bool
+        whether to create a 3D projection axes
+    widget_idx : int or None
+        figure number used for the dashboard widget
+    **kwargs
+        additional keyword arguments (unused)
+
+    Returns
+    -------
+    tuple of (plt.figure, plt.axes, bool)
+        figure handle, axes handle, and whether existing handles were used
+    """
     if not fig:
         if bool_3d:
             fig, axes = plt.subplots(
@@ -313,6 +382,29 @@ def get_boolean_array_for_annotated_embeddings(
     ground_truth_files=None, gt_file=None,
     overwrite=False, **kwargs
 ):
+    """
+    Compute a boolean mask identifying embeddings that are annotated.
+
+    Parameters
+    ----------
+    df_ground_truth : pandas.DataFrame
+        ground truth annotations dataframe
+    model_name : str
+        name of the model
+    ground_truth_files : list or None
+        list of ground truth csv files for the model
+    gt_file : pathlib.Path or None
+        selected ground truth file
+    overwrite : bool
+        whether to force regeneration of the metadata labels
+    **kwargs
+        additional keyword arguments passed to create_metadata_labels
+
+    Returns
+    -------
+    np.ndarray
+        boolean array that is True for unannotated (noise) embeddings
+    """
     if not gt_file is None and not ground_truth_files is None:
         if (
             settings.label_column in str(gt_file) 
@@ -362,6 +454,21 @@ def get_boolean_array_for_annotated_embeddings(
 
 
 def get_single_label_gt_labels(df_ground_truth, bool_noise):
+    """
+    Reduce multi-label ground truth to a single label per segment.
+
+    Parameters
+    ----------
+    df_ground_truth : pandas.DataFrame
+        ground truth annotations dataframe
+    bool_noise : np.ndarray
+        boolean array that is True for unannotated (noise) embeddings
+
+    Returns
+    -------
+    np.ndarray
+        single label per embedding segment
+    """
     if 'species_richness' in df_ground_truth.columns:
         df_ground_truth.rename(columns={'species_richness': 'simultaneous_labels'}, inplace=True)
         
@@ -398,6 +505,23 @@ def get_single_label_gt_labels(df_ground_truth, bool_noise):
     return single_label
 
 def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
+    """
+    Build the label dict and noise mask used for embedding plots.
+
+    Parameters
+    ----------
+    model_name : str or None
+        name of the model
+    overwrite : bool
+        whether to force regeneration of the metadata labels
+    **kwargs
+        additional keyword arguments passed to the label helpers
+
+    Returns
+    -------
+    tuple of (dict, np.ndarray)
+        labels by label key and the noise boolean mask
+    """
     labels = dict()
     labels = le.get_metadata_labels(model_name, overwrite=overwrite, return_type='dict', **kwargs)
 
@@ -462,6 +586,29 @@ def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
 def set_colorbar_or_legend(
     fig, axes, points, c_label_dict, label_by, **kwargs
 ):
+    """
+    Add a colorbar or a legend to the embedding plot depending on label count.
+
+    Parameters
+    ----------
+    fig : plt.figure object
+        figure handle
+    axes : plt.axes object
+        axes handle
+    points : list
+        plt point objects for the legend or colorbar
+    c_label_dict : dict
+        mapping of label name to label index
+    label_by : str
+        key of the label dict used for coloring
+    **kwargs
+        additional keyword arguments passed to set_legend
+
+    Returns
+    -------
+    tuple of (plt.figure, plt.axes)
+        updated figure and axes handles
+    """
     if len(c_label_dict.keys()) > settings.max_nr_categories:
         if isinstance(list(c_label_dict.keys())[0], int):
             fontsize = 9
@@ -685,6 +832,19 @@ def data_split_by_labels(embeds_dict, labels):
 
 
 def return_rows_cols(num):
+    """
+    Determine the grid dimensions for a comparison plot.
+
+    Parameters
+    ----------
+    num : int
+        number of subplots to lay out
+
+    Returns
+    -------
+    tuple of (int, int)
+        number of rows and columns for the grid
+    """
     if num <= 3:
         return 1, 3
     elif num > 3 and num <= 6:
@@ -702,6 +862,21 @@ def return_rows_cols(num):
 
 
 def set_figsize_for_comparison(rows, cols):
+    """
+    Choose a figure size based on the comparison grid dimensions.
+
+    Parameters
+    ----------
+    rows : int
+        number of grid rows
+    cols : int
+        number of grid columns (unused in the size selection)
+
+    Returns
+    -------
+    tuple of (float, float)
+        figure width and height in inches
+    """
     if rows == 1:
         return (11, 5)
     elif rows == 2:
@@ -809,6 +984,25 @@ def plot_comparison(
         return fig
     
 def get_arrays_for_spectrogram_text(labels, label_by, data_dict, embeds):
+    """
+    Build extra label arrays shown in the spectrogram hover text.
+
+    Parameters
+    ----------
+    labels : dict
+        labels by label key
+    label_by : str
+        key of the label dict currently used for coloring
+    data_dict : dict
+        data arrays already included in the figure
+    embeds : dict
+        embeddings dict with metadata
+
+    Returns
+    -------
+    dict
+        additional label arrays for the hover text
+    """
     dlk = settings.default_label_keys
     label_copy = labels.copy()
     # remove clustering labels from dict
@@ -926,6 +1120,25 @@ def reorder_embeddings_by_clustering_performance(
 def plot_embeddings_px(
     embeds, labels, label_by="label", **kwargs
 ):
+    """
+    Create a plotly embedding scatter plot.
+
+    Parameters
+    ----------
+    embeds : dict
+        embeddings dict with x, y (and optional z) arrays and metadata
+    labels : dict
+        labels by label key
+    label_by : str
+        key of the label dict used for coloring
+    **kwargs
+        additional keyword arguments (e.g., color_continuous)
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        embedding scatter plot figure
+    """
     # 1. Prepare Data
     if len(np.array(embeds["x"]).shape) > 1:
         embeds["x"] = np.array(embeds["x"]).squeeze()

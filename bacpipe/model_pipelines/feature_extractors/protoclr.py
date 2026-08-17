@@ -19,15 +19,34 @@ FMIN = 50  # fmin
 
 class Normalization(torch.nn.Module):
     def __init__(self):
+        """
+        Initialize the normalization module.
+        """
         super().__init__()
         self.batch_size = BATCH_SIZE
 
     def forward(self, x):
+        """
+        Normalize the input to the range [0, 1].
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            input tensor
+
+        Returns
+        -------
+        torch.Tensor
+            normalized tensor
+        """
         return (x - x.min()) / (x.max() - x.min())
 
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
+        """
+        Initialize the ProtoCLR feature extractor model.
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -59,6 +78,19 @@ class Model(ModelBaseClass):
         self.model.eval()
 
     def preprocess(self, audio):
+        """
+        Convert the audio samples to a normalized mel spectrogram.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            normalized mel spectrogram
+        """
         audio = audio.to(self.device)
         mel = self.mel(audio)
         mel = self.power_to_db(mel)
@@ -66,5 +98,18 @@ class Model(ModelBaseClass):
         return mel
 
     def __call__(self, input):
+        """
+        Run the model on the input spectrogram.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            input mel spectrogram
+
+        Returns
+        -------
+        torch.Tensor
+            model output
+        """
         res = self.model(input.unsqueeze(1))
         return res

@@ -24,6 +24,20 @@ class Model(ModelBaseClass):
         segment_length=LENGTH_IN_SAMPLES,
         **kwargs,
     ):
+        """
+        Initialize the Perch model.
+
+        Parameters
+        ----------
+        model_choice : str
+            name of the model configuration to load
+        sr : int
+            sample rate
+        segment_length : int
+            length of each audio segment in samples
+        **kwargs
+            additional keyword arguments passed to the base class
+        """
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
 
         if model_choice == "vggish":
@@ -61,14 +75,53 @@ class Model(ModelBaseClass):
             self.class_list = mod.class_list
 
     def preprocess(self, audio):
+        """
+        Convert the audio tensor to a TensorFlow tensor.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        tf.Tensor
+            audio tensor
+        """
         audio = audio.cpu()
         return tf.convert_to_tensor(audio, dtype=tf.float32)
 
     def __call__(self, input):
+        """
+        Run the embedding model on the input.
+
+        Parameters
+        ----------
+        input : tf.Tensor
+            preprocessed audio
+
+        Returns
+        -------
+        tf.Tensor
+            embeddings
+        """
         self.results = self.model(input)
         return self.results.embeddings.squeeze(1)
 
     def classifier_predictions(self, embeddings):
+        """
+        Return the sigmoid class logits from the last call.
+
+        Parameters
+        ----------
+        embeddings : tf.Tensor
+            embeddings from the last model call (unused)
+
+        Returns
+        -------
+        np.array
+            sigmoid class logits
+        """
         inferece_results = self.results.logits[self.class_label_key]
         return tf.nn.sigmoid(inferece_results).numpy()
 

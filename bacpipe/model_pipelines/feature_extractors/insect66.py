@@ -63,6 +63,9 @@ class SpectrogramCNN(nn.Module):
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
+        """
+        Initialize the Insect66 model.
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -84,6 +87,19 @@ class Model(ModelBaseClass):
         self.model.load_state_dict(state_dict)
 
     def preprocess(self, audio):
+        """
+        Convert the audio samples to a mel spectrogram.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            mel spectrogram
+        """
         audio = audio[:, None, :]
 
         # (bs, channel, mel, time)
@@ -91,6 +107,19 @@ class Model(ModelBaseClass):
 
     @torch.inference_mode()
     def __call__(self, input):
+        """
+        Run the model on the input spectrogram.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            input mel spectrogram
+
+        Returns
+        -------
+        torch.Tensor
+            model embeddings
+        """
         self.model.block_features = self.model.backbone.blocks(
             self.model.backbone.bn1(self.model.backbone.conv_stem(input))
         )

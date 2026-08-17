@@ -276,6 +276,31 @@ def plot_classification_heatmap(
     species=None,
     **kwargs,
 ):
+    """
+    Generate a presence heatmap for a species across time and hours.
+
+    Parameters
+    ----------
+    event : object or None
+        widget event triggering the update
+    predictions_loader : PredictionsLoader object
+        loader providing the binary presence data
+    model : str
+        name of the model
+    accumulate_by : str
+        time unit used to aggregate ("day", "week", or "month")
+    threshold : float or str
+        detection threshold
+    species : str or None
+        species to plot, by default None
+    **kwargs
+        additional keyword arguments (e.g., heatmap_fig_height)
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        presence heatmap figure
+    """
     if event is None and species is None:
         return SpectrogramPlot.dummy_image(
             title="Click the button to generate a prediction heatmap."
@@ -415,6 +440,26 @@ class PredictionsLoader:
         loading_pane,
         thresh=0.5,
     ):
+        """
+        Initialize the predictions loader.
+
+        Parameters
+        ----------
+        vis_loader : EmbedAndLabelLoader object
+            loader providing the embeddings
+        path_func : function
+            function returning the paths for a given model
+        models : list
+            list of models
+        panel_selection : object
+            dropdown widget for selecting the species
+        progress_bar : object
+            progress bar widget
+        loading_pane : object
+            pane widget for status messages
+        thresh : float
+            default detection threshold
+        """
         self.vis_loader = vis_loader
         self.path_func = path_func
         self.models = models
@@ -426,6 +471,27 @@ class PredictionsLoader:
     def get_data(
         self, model, threshold, clfier_type=None, probe_path="", **kwargs
     ):
+        """
+        Load or recompute the binary presence data for a model.
+
+        Parameters
+        ----------
+        model : str
+            name of the model
+        threshold : float or str
+            detection threshold
+        clfier_type : str or None
+            type of classifier ("Linear", "Integrated", or None)
+        probe_path : str
+            path to the probe used for the linear classifier
+        **kwargs
+            additional keyword arguments (unused)
+
+        Returns
+        -------
+        None
+            results are cached on the instance
+        """
         threshold = self.verify_threshold(threshold)
         if hasattr(self, "binary_presence"):
             if all(
@@ -518,6 +584,19 @@ class PredictionsLoader:
 
     @staticmethod
     def verify_threshold(threshold):
+        """
+        Normalize a threshold widget value to a float.
+
+        Parameters
+        ----------
+        threshold : float or str
+            raw threshold value, possibly an empty string
+
+        Returns
+        -------
+        float
+            validated threshold
+        """
         if threshold == "":
             threshold = 0.5
         else:
@@ -526,6 +605,21 @@ class PredictionsLoader:
 
     @staticmethod
     def reorder_by_most_occurrance(probs, label2index):
+        """
+        Reorder the class index mapping by total occurrence count.
+
+        Parameters
+        ----------
+        probs : np.ndarray
+            binary presence array of shape (n_embeddings, n_classes)
+        label2index : dict
+            mapping of class name to column index
+
+        Returns
+        -------
+        dict
+            class to index mapping sorted by decreasing occurrence
+        """
         sums = [sum(probs[:, a]) for a in range(probs.shape[1])]
 
         sorted_l2i = dict(
@@ -534,6 +628,19 @@ class PredictionsLoader:
         return sorted_l2i
 
     def get_classes(self, path):
+        """
+        Load the class names from a probe's label2index file.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path
+            path to the probe file
+
+        Returns
+        -------
+        list
+            class names, or an empty list if no probe exists
+        """
         if path == "":
             path = (
                 self.path_func(self.models[0]).probe_path / "linear_probe.pt"
@@ -546,6 +653,22 @@ class PredictionsLoader:
             return []
 
     def load_classification(self, model, threshold):
+        """
+        Load the integrated classifier outputs as binary presence data.
+
+        Parameters
+        ----------
+        model : str
+            name of the model
+        threshold : float
+            detection threshold applied to the class probabilities
+
+        Returns
+        -------
+        tuple of (np.ndarray or None, dict or None)
+            binary presence array and class to index mapping, or
+            (None, None) if no classifier outputs exist
+        """
         integrated_clfier_path = self.path_func(model).preds_path.joinpath(
             "original_classifier_outputs"
         )
@@ -625,6 +748,21 @@ class PredictionsLoader:
         return binary_classification, keys2idx
 
     def accumulate_data(self, species, accumulate_by="day"):
+        """
+        Accumulate the binary presence of a species into a time heatmap.
+
+        Parameters
+        ----------
+        species : str or None
+            species to accumulate, or None for the overall presence
+        accumulate_by : str
+            time unit used to aggregate ("day", "week", or "month")
+
+        Returns
+        -------
+        np.ndarray
+            accumulated presence array of shape (24, n_time_bins)
+        """
         if not species:
             species = "overall"
         self.panel_selection.value = species
@@ -656,6 +794,23 @@ class PredictionsLoader:
     def transform_presence_into_hour_heatmap(
         species_presence, hours, accumulator
     ):
+        """
+        Transform per-embedding presence into a 24-hour by time-bin matrix.
+
+        Parameters
+        ----------
+        species_presence : np.ndarray
+            binary presence per embedding
+        hours : np.ndarray
+            hour of day for each embedding
+        accumulator : list of tuples
+            time bin label (e.g., (year, month, day)) for each embedding
+
+        Returns
+        -------
+        np.ndarray
+            heatmap of shape (24, n_time_bins) with -1 for empty bins
+        """
         accumulated = (
             np.ones([24, len(np.unique(accumulator, axis=0))], dtype=np.int8)
             * -1
@@ -680,6 +835,19 @@ class PredictionsLoader:
         return accumulated
 
     def get_timestamps_per_embedding(self, model):
+        """
+        Compute a datetime timestamp for each embedding.
+
+        Parameters
+        ----------
+        model : str
+            name of the model
+
+        Returns
+        -------
+        None
+            timestamps are stored on the instance
+        """
         from bacpipe.embedding_evaluation.label_embeddings import (
             get_dt_filename,
         )
