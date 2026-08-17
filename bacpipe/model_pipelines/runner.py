@@ -580,8 +580,7 @@ class Embedder(AudioHandler):
                         f"Error generating embeddings for {file}, skipping file.\nError: {str(e)}"
                     )
                     # Do not carry a failed file's predictions over into the
-                    # next file's classifier outputs (this previously produced
-                    # merged JSONs with predictions for multiple audio files).
+                    # next file's classifier outputs.
                     self.classifier.predictions = torch.tensor([])
                     pbar.update(1)
                     continue
@@ -910,12 +909,10 @@ class Classifier:
         classifier_annotations["audiofilename"] = str(
             file.relative_to(fileloader_obj.audio_dir).as_posix()
         )
-        # Index into the (object dtype) classes array with an explicit 1-D
+        # Index into the classes array with an explicit 1-D
         # numpy index array. A single-element torch index makes numpy return
         # a plain ``str`` scalar (which has no ``.tolist()``), crashing on any
-        # file that has exactly one bin exceeding the threshold. When that
-        # happened the file's predictions were not reset and leaked into the
-        # next file's saved JSON.
+        # file that has exactly one bin exceeding the threshold.
         detected_bin_idxs = np.atleast_1d(
             np.array(maxes.indices[maxes.values > self.classifier_threshold])
         ).astype(int)
@@ -1042,9 +1039,7 @@ class Classifier:
         except Exception:
             # If anything goes wrong while saving this file, drop its
             # predictions so they are NOT carried over into the next file's
-            # classifier outputs. Without this reset a save failure previously
-            # produced merged JSONs containing predictions for multiple audio
-            # files (their head "Time bins in this file" was a multiple of 20).
+            # classifier outputs. 
             self.predictions = torch.tensor([])
             raise
 
