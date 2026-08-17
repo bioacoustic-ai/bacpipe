@@ -3,8 +3,13 @@ Unit tests for the visualization helpers in
 ``bacpipe.embedding_evaluation.visualization``.
 """
 
+from types import SimpleNamespace
+
+import matplotlib
 import numpy as np
 import pandas as pd
+
+matplotlib.use("Agg")
 
 from bacpipe.embedding_evaluation.visualization.visualize_embeddings import (
     get_arrays_for_spectrogram_text,
@@ -13,6 +18,9 @@ from bacpipe.embedding_evaluation.visualization.visualize_embeddings import (
 )
 from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
     PredictionsLoader,
+)
+from bacpipe.embedding_evaluation.visualization.visualize import (
+    plot_overview_results,
 )
 
 
@@ -168,3 +176,98 @@ class TestGetArraysForSpectrogramText:
             labels, "label", data_dict, embeds
         )
         assert out == {"custom_attr": ["x", "y"]}
+
+
+class TestPlotOverviewResults:
+    """Regression tests for the probing overview bar plot.
+
+    The overview plot used by the dashboard must read the per-model
+    ``probe_results_*.json`` files directly (instead of the aggregated
+    ``overview/probing_results.json``, which can be missing or stale) and
+    must show the same metrics as the per-model probing plots.
+    """
+
+    @staticmethod
+    def _make_probe_results(tmp_path, model_names, configs=("linear", "knn")):
+        """Write probe_results_<config>.json files and return a path_func."""
+        import json
+
+        probe_dirs = {}
+        for m_idx, model in enumerate(model_names):
+            probe_dir = tmp_path / model / "probing"
+            probe_dir.mkdir(parents=True)
+            probe_dirs[model] = probe_dir
+            for i, config in enumerate(configs):
+                results = {
+                    "overall": {
+                        "macro_accuracy": 0.5 + m_idx / 10 + i / 10,
+                        "micro_accuracy": 0.7 + m_idx / 10 + i / 10,
+                        "auc": 0.8 + m_idx / 10 + i / 10,
+                        "macro_f1": 0.4 + m_idx / 10 + i / 10,
+                        "micro_f1": 0.7 + m_idx / 10 + i / 10,
+                    },
+                    "per_class_accuracy": {"a": 0.6, "b": 0.6},
+                }
+                with open(
+                    probe_dir / f"probe_results_{config}.json", "w"
+                ) as f:
+                    json.dump(results, f)
+
+        def path_func(model_name):
+            return SimpleNamespace(probe_path=probe_dirs[model_name])
+
+        return path_func
+
+    @staticmethod
+    def _bar_heights_by_model(ax):
+        """Group bar heights by model index. Models are sorted by the first
+        metric (macro_accuracy) in descending order, and each model's bars
+        are centered around the corresponding x-tick position."""
+        ticks = ax.get_xticks()
+        heights = {i: [] for i in range(len(ticks))}
+        for p in ax.patches:
+            center = p.get_x() + p.get_width() / 2
+            model_idx = int(np.argmin(np.abs(ticks - center)))
+            heights[model_idx].append(round(float(p.get_height()), 3))
+        return heights
+
+    def test_loads_per_model_results_without_aggregate_file(self, tmp_path):
+        """The dashboard path must work without overview/probing_results.json."""
+        models = ["model_a", "model_b"]
+        path_func = self._make_probe_results(tmp_path, models)
+
+        fig = plot_overview_results(
+            plot_path=None,
+            task_name="linear",
+            model_list=models,
+            metrics=None,
+            path_func=path_func,
+            return_fig=True,
+        )
+        ax = fig.axes[0]
+        legend = [t.get_text() for t in ax.get_legend().get_texts()]
+        # micro-averaged metrics are dropped so the overview matches the
+        # per-model probing plots shown in the dashboard
+        assert legend == ["macro_accuracy", "auc", "macro_f1"]
+        # model_b (macro 0.6) is sorted before model_a (macro 0.5)
+        heights = self._bar_heights_by_model(ax)
+        assert heights == {0: [0.6, 0.9, 0.5], 1: [0.5, 0.8, 0.4]}
+
+    def test_knn_task_selects_knn_results(self, tmp_path):
+        """The 'knn' classification type must pick the knn probe results."""
+        models = ["model_a", "model_b"]
+        path_func = self._make_probe_results(tmp_path, models)
+
+        fig = plot_overview_results(
+            plot_path=None,
+            task_name="knn",
+            model_list=models,
+            metrics=None,
+            path_func=path_func,
+            return_fig=True,
+        )
+        ax = fig.axes[0]
+        heights = self._bar_heights_by_model(ax)
+        # model_b knn (macro 0.7) sorted before model_a knn (macro 0.6)
+        assert heights == {0: [0.7, 1.0, 0.6], 1: [0.6, 0.9, 0.5]}
+
