@@ -17,7 +17,14 @@ BEATS_PRETRAINED_PATH_FT = (
 
 class BeatsModel:
     def __init__(self, checkpoint_path):
+        """
+        Initialize the BEATs model from a checkpoint.
 
+        Parameters
+        ----------
+        checkpoint_path : pathlib.Path
+            path to the BEATs checkpoint
+        """
         # load the fine-tuned checkpoints
         checkpoint = torch.load(checkpoint_path)
 
@@ -71,6 +78,9 @@ class BeatsModel:
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
+        """
+        Initialize the BEATs model.
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -82,7 +92,33 @@ class Model(ModelBaseClass):
         self.model.model.to(self.device)
 
     def preprocess(self, audio):
+        """
+        Preprocess the audio samples with the BEATs preprocessing.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            preprocessed audio
+        """
         return self.model.process_audio_beats(audio)
 
     def __call__(self, x):
+        """
+        Get the BEATs embeddings for the input.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            preprocessed audio
+
+        Returns
+        -------
+        torch.Tensor
+            BEATs embeddings
+        """
         return self.model.get_embeddings(x)

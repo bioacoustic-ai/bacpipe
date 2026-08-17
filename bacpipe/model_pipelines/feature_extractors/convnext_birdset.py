@@ -13,6 +13,9 @@ from ..model_utils import ModelBaseClass
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
+        """
+        Initialize the ConvNeXT BirdSet model.
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -45,12 +48,51 @@ class Model(ModelBaseClass):
         ]
 
     def preprocess(self, audio):
+        """
+        Preprocess the audio samples with the model's preprocessor.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            preprocessed audio
+        """
         return self.preprocessor(audio)
 
     def __call__(self, x):
+        """
+        Run the ConvNeXT backbone on the input.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            preprocessed input
+
+        Returns
+        -------
+        torch.Tensor
+            pooler output embeddings
+        """
         results = self.model(x)
         return results.pooler_output
 
     def classifier_predictions(self, embeddings):
+        """
+        Run the classifier head on the embeddings.
+
+        Parameters
+        ----------
+        embeddings : torch.Tensor
+            embeddings from the backbone
+
+        Returns
+        -------
+        torch.Tensor
+            sigmoid class logits
+        """
         logits = self.classifier(embeddings)
         return torch.sigmoid(logits).detach()

@@ -37,6 +37,22 @@ class PatchEmbed_new(nn.Module):
     def __init__(
         self, img_size=224, patch_size=16, in_chans=3, embed_dim=768, stride=10
     ):
+        """
+        Initialize the flexible patch embedding layer.
+
+        Parameters
+        ----------
+        img_size : int or tuple
+            size of the input image
+        patch_size : int or tuple
+            size of each patch
+        in_chans : int
+            number of input channels
+        embed_dim : int
+            embedding dimension
+        stride : int or tuple
+            stride of the convolution
+        """
         super().__init__()
         img_size = to_2tuple(img_size)
         patch_size = to_2tuple(patch_size)
@@ -57,10 +73,36 @@ class PatchEmbed_new(nn.Module):
         self.num_patches = h * w
 
     def get_output_shape(self, img_size):
+        """
+        Compute the output shape of the projection for a given image size.
+
+        Parameters
+        ----------
+        img_size : tuple
+            (height, width) of the input image
+
+        Returns
+        -------
+        torch.Size
+            output shape of the convolution
+        """
         # todo: don't be lazy..
         return self.proj(torch.randn(1, 1, img_size[0], img_size[1])).shape
 
     def forward(self, x):
+        """
+        Project the input patches into embeddings.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            input image patches
+
+        Returns
+        -------
+        torch.Tensor
+            patch embeddings
+        """
         B, C, H, W = x.shape
         # FIXME look at relaxing size constraints
         # assert H == self.img_size[0] and W == self.img_size[1], \
@@ -72,6 +114,9 @@ class PatchEmbed_new(nn.Module):
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
+        """
+        Initialize the AudioMAE model.
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -153,6 +198,19 @@ class Model(ModelBaseClass):
         )
 
     def preprocess(self, audio):
+        """
+        Process each audio frame into model-ready patches.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio frames to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            processed frames
+        """
         processed_frame = []
         for frame in audio:
             processed_frame.append(self.audio_obj.process(frame.view(1, -1)))
@@ -161,4 +219,17 @@ class Model(ModelBaseClass):
 
     @torch.inference_mode()
     def __call__(self, input):
+        """
+        Run the model on the input.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            preprocessed input patches
+
+        Returns
+        -------
+        torch.Tensor
+            model output
+        """
         return self.model(input)

@@ -40,6 +40,14 @@ class ProbeDatasetLoader(Dataset):
         self.dataset = self.dataset.sample(frac=1, random_state=42)
 
     def __len__(self):
+        """
+        Get the number of samples in the dataset.
+
+        Returns
+        -------
+        int
+            number of samples in the dataset
+        """
         return len(self.dataset)
 
     def __getitem__(self, idx):
@@ -124,6 +132,35 @@ def generate_annotations_for_probing_task(
     seed=42,
     **kwargs,
 ):
+    """
+    Generate the probing annotations dataframe from the ground truth. The
+    labels are determined from the simultaneous labels in the ground truth
+    and the samples are split into train, test and validation sets per
+    species. If the dataframe already exists, it is loaded instead.
+
+    Parameters
+    ----------
+    ground_truth : pandas.DataFrame
+        ground truth dataframe containing the species labels
+    paths : SimpleNamespace
+        object with the paths used for saving the probing dataframe
+    label_column : str
+        name of the label column
+    dataset_csv_path : str, optional
+        path to the probing dataframe csv file, by default
+        "probe_annotations.csv"
+    train_ratio : float, optional
+        proportion of samples used for training, by default None
+    test_ratio : float, optional
+        proportion of samples used for testing, by default None
+    seed : int, optional
+        random seed used for shuffling, by default 42
+
+    Returns
+    -------
+    pandas.DataFrame
+        probing annotations dataframe
+    """
     import bacpipe
 
     if train_ratio is None:

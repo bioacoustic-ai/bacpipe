@@ -11,6 +11,23 @@ class SpectrogramPlot:
     def __init__(
         self, audio_dir, loader, model_name, panel_static_text, **kwargs
     ):
+        """
+        Initialize the spectrogram plotting utility.
+
+        Parameters
+        ----------
+        audio_dir : str or pathlib.Path
+            directory containing the audio files
+        loader : object
+            embeddings loader used to fetch model metadata
+        model_name : object
+            dropdown/selector widget holding the model options
+        panel_static_text : object
+            panel text widget updated with the playback metadata
+        **kwargs
+            additional plotting options (e.g., spec colorscale, height,
+            padding, bool_change_speed, new_speed)
+        """
         self.audio_dir = audio_dir
         self.panel_static_text = panel_static_text
         self.all_sample_rates = {}
@@ -25,16 +42,47 @@ class SpectrogramPlot:
         self.kwargs = kwargs
 
     def _update_spec_obj(self, model, bool_autoplay_audio):
+        """
+        Cache the active model and its audio playback settings.
+
+        Parameters
+        ----------
+        model : str
+            name of the active model
+        bool_autoplay_audio : bool
+            whether audio should autoplay when a point is selected
+        """
         self.model_name = model
         self.sample_rate = self.all_sample_rates[model]
         self.segment_length = self.all_segment_lengths[model]
         self.bool_autoplay_audio = bool_autoplay_audio
 
     def _cache_selected_points(self, selected_points):
+        """
+        Cache the currently selected plot points.
+
+        Parameters
+        ----------
+        selected_points : list
+            currently selected embedding points
+        """
         self.selected_points = selected_points
 
     @staticmethod
     def dummy_image(title):
+        """
+        Create a placeholder figure to display before a point is selected.
+
+        Parameters
+        ----------
+        title : str
+            title of the placeholder image
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+            dummy image figure
+        """
         # initial dummy figure, as a placeholder
         fig = px.imshow(np.zeros((100, 100, 3), dtype=np.uint8))
         fig.update_layout(
@@ -49,6 +97,23 @@ class SpectrogramPlot:
     def update_spectrogram(
         self, clickData=None, play_btn=None, autoplay_radio=None
     ):
+        """
+        Update the spectrogram figure based on the clicked embedding point.
+
+        Parameters
+        ----------
+        clickData : dict or None
+            plotly click event data
+        play_btn : object or None
+            play button widget (unused)
+        autoplay_radio : object or None
+            autoplay radio widget (unused)
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+            updated spectrogram figure
+        """
         # Sohw black image initially
         if not clickData:
             return SpectrogramPlot.dummy_image(
@@ -81,6 +146,22 @@ class SpectrogramPlot:
     def update_text(
         self, start_s, end_s, audiofilename, label, variable_labels_json=None
     ):
+        """
+        Update the static text panel with the selected audio metadata.
+
+        Parameters
+        ----------
+        start_s : float
+            start offset of the audio segment in seconds
+        end_s : float
+            end offset of the audio segment in seconds
+        audiofilename : str
+            name of the audio file
+        label : str
+            label of the selected point
+        variable_labels_json : str or None
+            JSON string with additional variable labels
+        """
         # Parse variable labels from JSON
         variable_labels_html = ""
         if variable_labels_json:
@@ -112,6 +193,19 @@ class SpectrogramPlot:
         """
 
     def create_specs(self, audio):
+        """
+        Create the spectrogram figure for an audio segment.
+
+        Parameters
+        ----------
+        audio : np.ndarray
+            audio samples to visualize
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+            spectrogram figure
+        """
         S = np.abs(lb.stft(audio, win_length=1024))
         S_dB = lb.amplitude_to_db(S, ref=np.max)
         f_max, S_dB = self.set_axis_lims_dep_sr(S_dB)
@@ -133,6 +227,14 @@ class SpectrogramPlot:
         return fig
 
     def play_audio(self, event):
+        """
+        Play the currently cached audio segment.
+
+        Parameters
+        ----------
+        event : object
+            widget event triggering playback (unused)
+        """
         import sounddevice as sd
 
         if not hasattr(self, "audio"):
@@ -144,6 +246,23 @@ class SpectrogramPlot:
         )
 
     def load_audio(self, start, end, filename):
+        """
+        Load an audio segment from file and return it at the model sample rate.
+
+        Parameters
+        ----------
+        start : float
+            start offset in seconds
+        end : float
+            end offset in seconds
+        filename : str
+            name of the audio file
+
+        Returns
+        -------
+        tuple of (np.ndarray, str)
+            loaded audio samples and the file stem
+        """
         path = Path(self.audio_dir) / filename
         if not self.kwargs.get("bool_change_speed"):
             audio, self.orig_sr = lb.load(
@@ -178,6 +297,19 @@ class SpectrogramPlot:
         return return_audio, path.stem
 
     def set_axis_lims_dep_sr(self, S_dB):
+        """
+        Trim the spectrogram to the Nyquist frequency band of the sample rate.
+
+        Parameters
+        ----------
+        S_dB : np.ndarray
+            spectrogram magnitudes in dB
+
+        Returns
+        -------
+        tuple of (float, np.ndarray)
+            maximum frequency shown and the trimmed spectrogram
+        """
         f_max = self.sample_rate / 2
         reduce = self.sample_rate / (f_max * 2)
         S_dB = S_dB[: int(S_dB.shape[0] / reduce), :]

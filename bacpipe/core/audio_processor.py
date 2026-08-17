@@ -35,6 +35,12 @@ class AudioHandler:
             padding function to use for where padding is necessary
         audio_dir : pathlib.Path object
             path to audio dir
+        bool_change_speed : bool, optional
+            whether to change the speed of the audio before processing,
+            by default False
+        new_speed : float, optional
+            new speed to use when changing the playback speed of the
+            audio, by default None
         """
         self.model = model
         self.padding = padding
@@ -80,6 +86,17 @@ class AudioHandler:
         return preprocessed_frames
 
     def get_file_length(self, path):
+        """
+        Determine the length of the audio file at ``path`` and store it
+        in ``self.file_length`` under the file stem. When
+        ``bool_change_speed`` is set, the stored length is divided by the
+        new speed.
+
+        Parameters
+        ----------
+        path : pathlib.Path or str
+            path to the audio file
+        """
         with audioread.audio_open(str(path)) as f:
             length = f.duration
         if not self.bool_change_speed:
@@ -88,6 +105,21 @@ class AudioHandler:
             self.file_length[path.stem] = length / self.new_speed
 
     def _load_and_resample(self, path):
+        """
+        Load an audio file and resample it to the model sample rate.
+
+        Parameters
+        ----------
+        path : pathlib.Path or str
+            path to the audio file
+
+        Returns
+        -------
+        torch.Tensor
+            mono audio waveform
+        int
+            sample rate of the loaded audio
+        """
         try:
             self.get_file_length(path)
             if not self.bool_change_speed:
@@ -117,6 +149,24 @@ class AudioHandler:
     def _only_load_annotated_segments(
         self, file_path, annotations_filename="annotations.csv", **_
     ):
+        """
+        Load only the segments of an audio file that are covered by
+        annotations in the annotations CSV file.
+
+        Parameters
+        ----------
+        file_path : pathlib.Path or str
+            path to the audio file
+        annotations_filename : str, optional
+            name of the annotations CSV file located in the audio
+            directory, by default "annotations.csv"
+
+        Returns
+        -------
+        torch.Tensor
+            tensor containing the annotated audio segments padded to the
+            model segment length
+        """
         import pandas as pd
         from bacpipe import Loader
 
@@ -163,6 +213,24 @@ class AudioHandler:
     def _load_audio_based_on_fixed_segment_length(
         self, audio, segment_length, **_
     ):
+        """
+        Compute the start and end indices used to split an audio signal
+        into non-overlapping fixed-length segments.
+
+        Parameters
+        ----------
+        audio : np.ndarray or torch.Tensor
+            audio signal
+        segment_length : float
+            length of each segment in seconds
+
+        Returns
+        -------
+        np.ndarray
+            array of start indices in samples
+        np.ndarray
+            array of end indices in samples
+        """
         nr_segments = len(audio) // segment_length + 1
         starts = np.arange(nr_segments) * segment_length * self.model.sr
         ends = np.arange(1, nr_segments + 1) * segment_length * self.model.sr
@@ -171,6 +239,26 @@ class AudioHandler:
     def _load_and_pad_audio_based_on_grid(
         self, audio, starts, ends, file_path
     ):
+        """
+        Extract the audio segments defined by ``starts`` and ``ends`` from
+        an audio signal and pad them to the model segment length.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio signal
+        starts : np.ndarray
+            array of segment start indices in samples
+        ends : np.ndarray
+            array of segment end indices in samples
+        file_path : pathlib.Path
+            path to the audio file, used for logging warnings
+
+        Returns
+        -------
+        torch.Tensor
+            tensor containing the padded audio segments
+        """
         audio = audio.cpu().squeeze()
         for idx, (s, e) in enumerate(zip(starts, ends)):
             s, e = int(s), int(e)
@@ -196,6 +284,20 @@ class AudioHandler:
         return cumulative_segments
 
     def _window_audio(self, audio):
+        """
+        Split an audio signal into windows of the model segment length and
+        pad the final window if necessary.
+
+        Parameters
+        ----------
+        audio : np.ndarray or torch.Tensor
+            audio signal
+
+        Returns
+        -------
+        torch.Tensor
+            audio frames of shape (num_frames, segment_length)
+        """
         num_frames = int(np.ceil(len(audio[0]) / self.model.segment_length))
         if isinstance(audio, torch.Tensor):
             audio = audio.cpu()

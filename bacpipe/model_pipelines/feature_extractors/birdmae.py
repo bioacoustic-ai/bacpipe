@@ -8,6 +8,9 @@ LENGTH_IN_SAMPLES = 160_000
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
+        """
+        Initialize the Bird-MAE model.
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -25,6 +28,19 @@ class Model(ModelBaseClass):
         self.preproc_batch_size = 511
 
     def preprocess(self, audio):
+        """
+        Process the audio windows into model input features.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio windows to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            batched input features
+        """
         batched_windows = torch.Tensor([])
         for i in range(0, len(audio), self.preproc_batch_size):
             batched_windows = torch.cat(
@@ -39,4 +55,17 @@ class Model(ModelBaseClass):
 
     @torch.inference_mode()
     def __call__(self, input):
+        """
+        Run the model on the input.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            preprocessed input features
+
+        Returns
+        -------
+        torch.Tensor
+            last hidden state
+        """
         return self.model(input).last_hidden_state

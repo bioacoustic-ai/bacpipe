@@ -69,6 +69,8 @@ class Embedder(AudioHandler):
         dim_reduction_model : bool, optional
             Can be bool or the string corresponding to the
             dimensionality reduction model, by default False
+        audio_dir : str, optional
+            path to the directory containing the audio files, by default None
         """
         self.file_length = {}
         self.loader = loader
@@ -112,7 +114,13 @@ class Embedder(AudioHandler):
 
     def _init_model(self, CustomModel=None, **kwargs):
         """
-        Load model specific module, instantiate model and allocate device for model.
+        Load the model specific module, instantiate the model and allocate
+        the device for the model.
+
+        Parameters
+        ----------
+        CustomModel : class, optional
+            custom model class to use for processing, by default None
         """
         if self.dim_reduction_model or CustomModel is None:
             if self.dim_reduction_model:
@@ -129,6 +137,19 @@ class Embedder(AudioHandler):
         self.model.prepare_inference()
 
     def init_dataloader(self, audio):
+        """
+        Create a dataloader from the audio samples based on the model type.
+
+        Parameters
+        ----------
+        audio : torch.Tensor or tf.Tensor
+            preprocessed audio samples
+
+        Returns
+        -------
+        torch.utils.data.DataLoader or tf.data.Dataset
+            batched dataloader or dataset with batch size of the model
+        """
         if "tensorflow" in str(type(audio)):
             import tensorflow as tf
 
@@ -143,6 +164,22 @@ class Embedder(AudioHandler):
             )
 
     def batch_inference(self, batched_samples, callback=None):
+        """
+        Run the model on all batches and collect the embeddings.
+
+        Parameters
+        ----------
+        batched_samples : iterable
+            iterable with the batched samples, created by init_dataloader
+        callback : callable, optional
+            callback function that is called with the fraction of processed
+            batches, by default None
+
+        Returns
+        -------
+        torch.Tensor or np.array
+            embeddings for all batches
+        """
         if self.model_name in bacpipe.TF_MODELS:
             import tensorflow
 
@@ -220,6 +257,19 @@ class Embedder(AudioHandler):
         return embeds
 
     def get_reduced_dimensionality_embeddings(self, embeds):
+        """
+        Apply the dimensionality reduction model to a set of embeddings.
+
+        Parameters
+        ----------
+        embeds : np.array
+            embeddings to be reduced
+
+        Returns
+        -------
+        np.array
+            reduced dimensionality embeddings
+        """
         samples = self.model.preprocess(embeds)
         if "umap" in self.model.__module__:
             if samples.shape[0] <= self.model.umap_config["n_neighbors"]:
@@ -231,6 +281,13 @@ class Embedder(AudioHandler):
         return self.model(samples)
 
     def run_dimensionality_reduction_pipeline(self):
+        """
+        Run the full dimensionality reduction pipeline for all embeddings
+        and save the reduced embeddings to disk.
+
+        This method checks the total number of embeddings and subsamples
+        them if necessary to avoid running into memory errors.
+        """
         if self.loader.metadata_dict["nr_embeds_total"] > 300_000:
             self.nr_subsampled_embeds_for_umap = 300_000
             logger.info(
@@ -314,13 +371,13 @@ class Embedder(AudioHandler):
 
         Parameters
         ----------
-        fileloader_obj : Loader object
-            contains all metadata of a model specific embedding creation session
+        array_of_audios : np.array
+            array with the audio samples to embed
 
         Returns
         -------
-        Loader object
-            updated object with metadata on embedding creation session
+        list
+            list with the embeddings for the audio samples
         """
         if len(array_of_audios.shape) == 1:
             array_of_audios = torch.tensor(array_of_audios).unsqueeze(0)
@@ -338,6 +395,7 @@ class Embedder(AudioHandler):
 
         # --- Producer: load + preprocess in background ---
         def producer():
+            """Load and preprocess all audio samples in the background."""
             for idx, audio in enumerate(windowed_audios):
                 try:
                     preprocessed = self.model.preprocess(audio)
@@ -415,15 +473,8 @@ class Embedder(AudioHandler):
         - Consumer (main thread) embeds audio while producer prepares next batch
         Ensures metadata and embeddings are written exactly like in the sequential version.
 
-        Parameters
-        ----------
-        fileloader_obj : Loader object
-            contains all metadata of a model specific embedding creation session
-
-        Returns
-        -------
-        Loader object
-            updated object with metadata on embedding creation session
+        Generates embeddings for all files in the loader in a pipelined
+        manner and saves the metadata and embeddings to disk.
         """
         if not self.nr_parallel_workers:
             from multiprocessing import cpu_count
@@ -439,6 +490,7 @@ class Embedder(AudioHandler):
 
         # --- Producer: load + preprocess in background ---
         def producer():
+            """Load and preprocess all audio files in the background."""
             for idx, file in enumerate(self.loader.files):
                 try:
                     preprocessed = self.prepare_audio(file)
@@ -531,6 +583,10 @@ class Embedder(AudioHandler):
                 pbar.update(1)
 
     def run_inference_pipeline_sequentially(self):
+        """
+        Generate embeddings for all files in the loader sequentially and
+        save the metadata, the embeddings and classifier outputs to disk.
+        """
         for idx, file in enumerate(
             tqdm(
                 self.loader.files,
@@ -634,6 +690,15 @@ class Classifier:
             name of the model
         classifier_threshold : float, optional
             Value under which class predictions are discarded, by default None
+        audio_dir : str
+            path to the directory containing the audio files
+        main_results_dir : str
+            path to the main results directory
+        use_folder_structure : bool, optional
+            if True, the results are saved in the folder structure,
+            by default True
+        save_raven_tables : bool, optional
+            if True, Raven annotation tables are saved, by default False
         """
         self.model = model
         self.model_name = model_name
@@ -718,6 +783,24 @@ class Classifier:
 
     @staticmethod
     def make_classification_dict(probabilities, classes, threshold):
+        """
+        Make a classification dictionary for one audio file with the top k
+        classifications and a head with general information about the file.
+
+        Parameters
+        ----------
+        probabilities : np.array
+            probabilities for each class
+        classes : list
+            class names
+        threshold : float
+            value to threshold the probabilities with
+
+        Returns
+        -------
+        dict
+            dictionary with the classification results for the audio file
+        """
         if probabilities.shape[0] != len(classes):
             probabilities = probabilities.swapaxes(0, 1)
 
@@ -732,6 +815,14 @@ class Classifier:
         return cls_results
 
     def classify(self, embeddings):
+        """
+        Classify embeddings and collect the predictions.
+
+        Parameters
+        ----------
+        embeddings : torch.Tensor or np.array
+            embeddings to be classified
+        """
         if not isinstance(embeddings, torch.Tensor):
             clfier_output = self.model.classifier_predictions(
                 torch.tensor(np.array(embeddings))
@@ -834,6 +925,17 @@ class Classifier:
     def _load_existing_clfier_outputs(
         self, fileloader_obj: bacpipe.Loader, clfier_annotations=None
     ):
+        """
+        Load the existing classifier outputs from the predictions file and
+        combine them with the new classifier annotations.
+
+        Parameters
+        ----------
+        fileloader_obj : bacpipe.Loader object
+            all paths and metadata of the embedding creation run
+        clfier_annotations : pandas.DataFrame, optional
+            dataframe with the new classifier annotations, by default None
+        """
         df_dict = {
             "start": [],
             "end": [],
@@ -859,6 +961,14 @@ class Classifier:
         )
 
     def save_annotation_table(self, loader_obj: bacpipe.Loader, **kwargs):
+        """
+        Save the cumulative classifier annotations as a csv file.
+
+        Parameters
+        ----------
+        loader_obj : bacpipe.Loader object
+            all paths and metadata of the embedding creation run
+        """
         self.paths.preds_path.mkdir(exist_ok=True, parents=True)
         loader_obj.get_annotations_parquet(
             starts=self.start_timestamps, ends=self.end_timestamps, **kwargs
@@ -870,6 +980,17 @@ class Classifier:
         self.cumulative_annotations.to_csv(save_path, index=False)
 
     def save_classifier_outputs(self, fileloader_obj, file):
+        """
+        Save the classification results for a single audio file as a json
+        file and optionally as a Raven annotation table.
+
+        Parameters
+        ----------
+        fileloader_obj : bacpipe.Loader object
+            all paths and metadata of the embedding creation run
+        file : pathlib.Path
+            path to the audio file
+        """
         if len(self.predictions.shape) == 1:
             self.predictions = self.predictions.unsqueeze(0)
         elif self.predictions.shape[-1] != len(self.model.classes):
@@ -903,6 +1024,17 @@ class Classifier:
         self.predictions = torch.tensor([])
 
     def save_Raven_table(self, file, relative_parent_path):
+        """
+        Save the classifier predictions of a single audio file as a Raven
+        annotation table.
+
+        Parameters
+        ----------
+        file : pathlib.Path
+            path to the audio file
+        relative_parent_path : pathlib.Path
+            path of the parent folder relative to the audio directory
+        """
         raven_results_path = self.paths.preds_path.joinpath(
             "raven_tables"
         ).joinpath(relative_parent_path)
@@ -949,6 +1081,15 @@ class Classifier:
             raven_df.to_csv(raven_file_dest, sep="\t", index=False)
 
     def run_default_classifier(self, loader):
+        """
+        Run the pretrained classifier on all embeddings, save the classifier
+        outputs for every file and save the cumulative annotation table.
+
+        Parameters
+        ----------
+        loader : bacpipe.Loader object
+            all paths and metadata of the embedding creation run
+        """
         all_embeds = loader.embeddings()
         for f_name, embeddings in tqdm(
             all_embeds.items(),

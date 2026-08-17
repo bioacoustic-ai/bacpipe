@@ -12,6 +12,9 @@ from ..model_utils import ModelBaseClass
 class Model(ModelBaseClass):
 
     def __init__(self, **kwargs):
+        """
+        Initialize the BirdNET model.
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -51,6 +54,19 @@ class Model(ModelBaseClass):
         self.classifier = tf.keras.Model(x, y, name="classifier_model")
 
     def preprocess(self, audio):
+        """
+        Preprocess the audio samples in batches of 511 frames.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        tf.Tensor
+            preprocessed audio
+        """
         audio = audio.cpu()
         for idx in range(0, audio.shape[0], 511):
             if idx == 0:
@@ -71,15 +87,49 @@ class Model(ModelBaseClass):
         return tf.convert_to_tensor(processed, dtype=tf.float32)
 
     def __call__(self, input):
+        """
+        Run the embeddings model on the input.
+
+        Parameters
+        ----------
+        input : tf.Tensor
+            preprocessed audio
+
+        Returns
+        -------
+        tf.Tensor
+            embeddings
+        """
         return self.embeds(input, training=False)
 
     def classifier_predictions(self, embeddings):
+        """
+        Run the classifier head on the embeddings.
+
+        Parameters
+        ----------
+        embeddings : tf.Tensor
+            embeddings from the backbone
+
+        Returns
+        -------
+        np.array
+            sigmoid class logits
+        """
         logits = self.classifier(embeddings).numpy()
         return tf.nn.sigmoid(logits).numpy()
 
 
 class Rebuilder:
     def __init__(self, model):
+        """
+        Initialize the model rebuilder.
+
+        Parameters
+        ----------
+        model : keras.Model
+            model whose layers should be rebuilt from layer 4 onward
+        """
         self.input_layer = tf.keras.Input(
             shape=model.layers[4].input.shape[1:],
             name="inputs",
@@ -93,6 +143,19 @@ class Rebuilder:
         self.layer_confs = []
 
     def rebuild_layer(self, layer):
+        """
+        Rebuild a layer and its dependencies into the new model graph.
+
+        Parameters
+        ----------
+        layer : keras.layers.Layer
+            layer to rebuild
+
+        Returns
+        -------
+        keras.Tensor
+            output tensor of the rebuilt layer
+        """
         if layer.name in self.output_cache:
             return self.output_cache[layer.name]
 
@@ -135,6 +198,19 @@ class Rebuilder:
         return out
 
     def build_model(self, model):
+        """
+        Build the rebuilt model from the input layer to the final output.
+
+        Parameters
+        ----------
+        model : keras.Model
+            original model to rebuild
+
+        Returns
+        -------
+        tuple
+            (layer configuration dict, rebuilt keras.Model)
+        """
         # Recurse from final output layer
         output = self.rebuild_layer(model.layers[-1])
         return (

@@ -17,6 +17,18 @@ LENGTH_IN_SAMPLES = 16000
 class Model(ModelBaseClass, nn.Module):
     def __init__(self, birdaves=False, nonbioaves=False, **kwargs):
 
+        """
+        Initialize the AVES species model.
+
+        Parameters
+        ----------
+        birdaves : bool
+            whether to use the bird-specific AVES checkpoint
+        nonbioaves : bool
+            whether to use the non-biological AVES checkpoint
+        **kwargs
+            additional keyword arguments passed to the base class
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -42,10 +54,36 @@ class Model(ModelBaseClass, nn.Module):
         self.model.eval()
 
     def preprocess(self, audio):
+        """
+        Pass the audio through unchanged.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            unchanged audio samples
+        """
         return audio
 
     @torch.inference_mode()
     def __call__(self, input):
+        """
+        Extract features for the input audio and mean-pool them.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            input audio
+
+        Returns
+        -------
+        torch.Tensor
+            concatenated mean-pooled embeddings
+        """
         embeds = []
         for batch in input.split(BATCH_SIZE):
             out_raw = self.model.extract_features(batch)[0]

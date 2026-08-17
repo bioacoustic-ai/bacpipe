@@ -36,8 +36,6 @@ def visualise_results_across_models(plot_path, task_name, model_list):
 
     Parameters
     ----------
-    path_func : function
-        return the paths when given a model name
     plot_path : pathlib.Path object
         path to overview plots
     task_name : str
@@ -226,6 +224,29 @@ def plot_clusterings(
 def generate_bar_plot(
     metrics, fig, ax, x_label="Metric value", no_legend=False, **kwargs
 ):
+    """
+    Generate a grouped horizontal bar plot of model metrics.
+
+    Parameters
+    ----------
+    metrics : dict
+        mapping of comparison name to dict of metric name/value pairs
+    fig : matplotlib.figure.Figure
+        figure to draw on
+    ax : matplotlib.axes.Axes
+        axes to draw on
+    x_label : str
+        label for the x-axis
+    no_legend : bool
+        whether to suppress the legend
+    **kwargs
+        additional keyword arguments (unused)
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        the figure with the bar plot drawn
+    """
     bar_height = 1 / (len(list(metrics.values())[0].keys()) + 1)
     cmap = plt.cm.tab10
     colors = cmap(np.arange(len(list(metrics.values())[0].keys())) % cmap.N)
@@ -283,6 +304,11 @@ def plot_overview_results(
         list of models
     metrics : dict
         performance dictionary
+    path_func : callable, optional
+        function that returns the paths when given a model name,
+        by default None
+    return_fig : bool, optional
+        whether to return the figure instead of saving it, by default False
     sort_string : str
         string to sort the metrics by, defaults to "kmeans-audio_file_name"
     """
