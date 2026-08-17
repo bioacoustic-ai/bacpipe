@@ -25,6 +25,7 @@ jobs:
           - birdaves_especies
           - biolingual
           - birdnet
+          - birdnet_v3
           - birdmae
           - convnext_birdset
           - hbdet

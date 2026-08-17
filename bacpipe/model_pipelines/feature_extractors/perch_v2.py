@@ -47,6 +47,7 @@ class Model(ModelBaseClass):
 
 class PerchV2ONNX(nn.Module):
     """Perch v2 ONNX Model Wrapper with multi-platform GPU acceleration.
+    Adapted from https://huggingface.co/justinchuby/Perch-onnx.
     
     Supports: Linux (CUDA/CPU), macOS (CoreML/CPU), Windows (CUDA/DirectML/CPU).
     Input: Audio tensor of shape (batch_size, 160000) at 32kHz sample rate.

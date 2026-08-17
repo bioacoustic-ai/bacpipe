@@ -156,13 +156,17 @@ class Loader:
                 )
 
     def _initialize_path_structure(self, testing=False, **kwargs):
-        # if testing:
-        #     kwargs["main_results_dir"] = "bacpipe/tests/results_files"
-
+        if testing:
+            kwargs["main_results_dir"] = "bacpipe_results"
+            
         if self.use_folder_structure:
             from bacpipe import settings
+            default_kwargs = {**vars(settings)}
+            passed_kwargs = kwargs
+            for key, value in default_kwargs.items():
+                if not key in passed_kwargs:
+                    kwargs[key] = value
 
-            kwargs = {**vars(settings)}
 
         for key, val in kwargs.items():
             if key == "main_results_dir":
@@ -663,8 +667,17 @@ class Loader:
         """
         d = {}
         if not self.files[0].suffix == self.embed_suffix:
-            self.files = list(self.embed_dir.rglob(f"*{self.embed_suffix}"))
-            self.files.sort()
+            embedding_files = list(self.embed_dir.rglob(f"*{self.embed_suffix}"))
+            if len(embedding_files) == 0:
+                logger.warning(
+                    "No embedding files were found. Check that the path is right "
+                    f"or if you actually have processed embeddings with {self.model_name} "
+                    f"for file in {self.audio_dir}."
+                )
+                return None
+            else:
+                self.files = embedding_files
+                self.files.sort()
         for file in self.files:
             if not self.dim_reduction_model:
                 embeds = np.load(file)
@@ -795,36 +808,37 @@ class Loader:
         df_dict = {"start": [], "end": [], "audiofilename": []}
 
         total_length = 0
-        for idx, file in tqdm(
-            enumerate(files),
-            "Building continuous dataframe from processed predictions",
-            total=len(files),
-            leave=False,
-        ):
-            current_time_bins = nr_embeds_per_file[idx]
+        if len(active_bins_global) > 0:
+            for idx, file in tqdm(
+                enumerate(files),
+                "Building continuous dataframe from processed predictions",
+                total=len(files),
+                leave=False,
+            ):
+                current_time_bins = nr_embeds_per_file[idx]
 
-            # find active bins within this file's slice
-            active_in_file = (
-                active_bins_global[
-                    (active_bins_global >= total_length)
-                    & (active_bins_global < total_length + current_time_bins)
-                ]
-                - total_length
-            )  # make relative to file start
+                # find active bins within this file's slice
+                active_in_file = (
+                    active_bins_global[
+                        (active_bins_global >= total_length)
+                        & (active_bins_global < total_length + current_time_bins)
+                    ]
+                    - total_length
+                )  # make relative to file start
 
-            audio_filename = (
-                relative_audio_stems[idx] + "." + relative_audio_suffixes[idx]
-            )
+                audio_filename = (
+                    relative_audio_stems[idx] + "." + relative_audio_suffixes[idx]
+                )
 
-            df_dict["start"].extend((active_in_file * seg_len).tolist())
-            df_dict["end"].extend(
-                ((active_in_file * seg_len) + seg_len).tolist()
-            )
-            df_dict["audiofilename"].extend(
-                [audio_filename] * len(active_in_file)
-            )
+                df_dict["start"].extend((active_in_file * seg_len).tolist())
+                df_dict["end"].extend(
+                    ((active_in_file * seg_len) + seg_len).tolist()
+                )
+                df_dict["audiofilename"].extend(
+                    [audio_filename] * len(active_in_file)
+                )
 
-            total_length += current_time_bins
+                total_length += current_time_bins
 
         if return_type == "dict":
             return_dict = {}
@@ -835,6 +849,8 @@ class Loader:
                 offset += counts
             return return_dict, keys2idx
         elif return_type == "dataframe":
+            if len(active_bins_global) == 0:
+                return pd.DataFrame()
             # get only active rows from cl_array using active_bins_global
             df = pd.DataFrame(
                 cl_array[:, active_bins_global].T, columns=keys2idx.keys()
@@ -1124,6 +1140,7 @@ class Loader:
             and run_pretrained_classifier
         ):
             if self.model_name in [
+                "birdnet_v3",
                 "perch_v2",
                 "perch_bird",
                 "vggish",
@@ -1185,6 +1202,7 @@ class Loader:
 
 
 def replace_default_kwargs_with_user_kwargs(remove_keys=None, **kwargs):
+        
     from bacpipe import config, settings
 
     default_kwargs = {**vars(config), **vars(settings)}

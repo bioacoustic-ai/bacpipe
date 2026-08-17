@@ -80,7 +80,7 @@ class Embedder(AudioHandler):
             self.model_name = model_name
 
         kwargs = replace_default_kwargs_with_user_kwargs(
-            ["audio_dir", "models", "dim_reduction_model"], kwargs=kwargs
+            ["audio_dir", "models", "dim_reduction_model"], **kwargs
         )
         self.nr_parallel_workers = kwargs.get("nr_parallel_workers")
 
@@ -939,7 +939,9 @@ class Classifier:
             file.stem + file.suffix
         )
         raven_df["File Offset (s)"] = df.start
-        raven_df.to_csv(raven_file_dest, sep="\t", index=False)
+        if len(raven_df) > 0:
+            # only save table if there are predictions
+            raven_df.to_csv(raven_file_dest, sep="\t", index=False)
 
     def run_default_classifier(self, loader):
         all_embeds = loader.embeddings()

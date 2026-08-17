@@ -141,7 +141,7 @@ class SpectrogramPlot:
 
         sd.play(
             audio, self.sample_rate
-        )  # int(self.orig_sr / self.kwargs.get('new_speed')))
+        )
 
     def load_audio(self, start, end, filename):
         path = Path(self.audio_dir) / filename
@@ -156,15 +156,12 @@ class SpectrogramPlot:
             audio, self.orig_sr = lb.load(
                 path,
                 sr=None,
-                offset=float(start / self.kwargs.get("new_speed")),
-                duration=(
-                    float(end / self.kwargs.get("new_speed"))
-                    - float(start / self.kwargs.get("new_speed"))
-                ),
+                offset=float(start),
+                duration=float(end) - float(start),
             )
             audio = lb.resample(
                 audio,
-                orig_sr=int(self.orig_sr / self.kwargs.get("new_speed")),
+                orig_sr=int(self.orig_sr * self.kwargs.get("new_speed")),
                 target_sr=self.sample_rate,
             )
 

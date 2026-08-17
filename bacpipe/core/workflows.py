@@ -185,7 +185,7 @@ def ensure_models_exist(
                 tar.close()
 
     [model_names.remove(l) for l in remove_from_list]
-    return model_base_path.parent / "model_checkpoints"
+    return model_base_path
 
 def confirm_model_name(model_name, **kwargs):
     """

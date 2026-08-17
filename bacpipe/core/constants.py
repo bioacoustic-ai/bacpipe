@@ -1,6 +1,5 @@
 TF_MODELS = [
     "birdnet",
-    # "perch_v2",
     "perch_bird",
     "google_whale",
     "surfperch",
@@ -20,6 +19,7 @@ EMBEDDING_DIMENSIONS = {
     "beats": 768,
     "birdaves_especies": 1024,
     "biolingual": 512,
+    "birdnet_v3": 1280,
     "birdnet": 1024,
     "birdmae": 1280,
     "convnext_birdset": 1024,
@@ -45,6 +45,7 @@ NEEDS_CHECKPOINT = [
     "bat",
     "beats",
     "birdaves_especies",
+    "birdnet_v3",
     "birdnet",
     "hbdet",
     "insect66",
