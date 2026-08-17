@@ -5,6 +5,7 @@ Unit tests for the experiment manager helpers in
 
 import json
 
+import numpy as np
 import pytest
 
 from bacpipe import Loader
@@ -104,3 +105,190 @@ class TestLoader:
         )
         assert len(filtered) == 1
         assert filtered.iloc[0]["start"] == 0
+
+
+class TestLoaderEmbeddings:
+    """Tests for ``Loader.embeddings()``, used in the example notebooks to
+    access already computed embeddings (both as a dict and concatenated
+    array)."""
+
+    def _make_loader(self, tmp_path):
+        return Loader(
+            audio_dir=TEST_AUDIO_DIR,
+            model_name="testmodel",
+            check_if_combination_exists=False,
+            testing=True,
+            use_folder_structure=False,
+            embed_parent_dir=tmp_path / "embeds",
+        )
+
+    def _write_npy_files(self, tmp_path):
+        embed_dir = tmp_path / "embeds"
+        embed_dir.mkdir(parents=True, exist_ok=True)
+        np.save(embed_dir / "file1.npy", np.array([[1.0, 2.0], [3.0, 4.0]]))
+        np.save(embed_dir / "file2.npy", np.array([[5.0, 6.0]]))
+        return embed_dir
+
+    def test_embeddings_array_concatenates_all_files(self, tmp_path):
+        embed_dir = self._write_npy_files(tmp_path)
+        loader = self._make_loader(tmp_path)
+        loader.embed_dir = embed_dir
+        loader.embed_suffix = ".npy"
+        loader.dim_reduction_model = False
+        loader.files = sorted(embed_dir.glob("*.npy"))
+
+        embeds = loader.embeddings(return_type="array")
+        assert embeds.shape == (3, 2)
+        np.testing.assert_allclose(embeds[0], [1.0, 2.0])
+        np.testing.assert_allclose(embeds[2], [5.0, 6.0])
+
+    def test_embeddings_dict_keys_are_relative_paths(self, tmp_path):
+        embed_dir = self._write_npy_files(tmp_path)
+        loader = self._make_loader(tmp_path)
+        loader.embed_dir = embed_dir
+        loader.embed_suffix = ".npy"
+        loader.dim_reduction_model = False
+        loader.files = sorted(embed_dir.glob("*.npy"))
+
+        d = loader.embeddings(return_type="dict")
+        assert set(d.keys()) == {"file1.npy", "file2.npy"}
+        np.testing.assert_allclose(d["file2.npy"], [[5.0, 6.0]])
+
+    def test_embeddings_searches_embed_dir_when_files_are_audio(self, tmp_path):
+        from pathlib import Path
+
+        embed_dir = self._write_npy_files(tmp_path)
+        loader = self._make_loader(tmp_path)
+        loader.embed_dir = embed_dir
+        loader.embed_suffix = ".npy"
+        loader.dim_reduction_model = False
+        # the loader still points at the audio files -> the method must
+        # discover the npy files inside embed_dir on its own
+        audio_file = Path(TEST_AUDIO_DIR) / "FewShot/CHE_01_20190101_163410.wav"
+        loader.files = [audio_file]
+
+        embeds = loader.embeddings(return_type="array")
+        assert embeds.shape == (3, 2)
+
+    def test_no_embedding_files_returns_none(self, tmp_path):
+        from pathlib import Path
+
+        loader = self._make_loader(tmp_path)
+        empty_embed_dir = tmp_path / "empty"
+        empty_embed_dir.mkdir()
+        loader.embed_dir = empty_embed_dir
+        loader.embed_suffix = ".npy"
+        loader.dim_reduction_model = False
+        audio_file = Path(TEST_AUDIO_DIR) / "FewShot/CHE_01_20190101_163410.wav"
+        loader.files = [audio_file]
+
+        assert loader.embeddings() is None
+
+    def test_embeddings_reads_json_for_dim_reduction(self, tmp_path):
+        embed_dir = tmp_path / "embeds_json"
+        embed_dir.mkdir(parents=True, exist_ok=True)
+        (embed_dir / "file1.json").write_text(
+            '{"x": [1.0, 2.0], "y": [3.0, 4.0]}'
+        )
+        (embed_dir / "file2.json").write_text('{"x": [5.0], "y": [6.0]}')
+
+        loader = self._make_loader(tmp_path)
+        loader.embed_dir = embed_dir
+        loader.embed_suffix = ".json"
+        loader.dim_reduction_model = "umap"
+        loader.files = sorted(embed_dir.glob("*.json"))
+
+        embeds = loader.embeddings(return_type="array")
+        # dim-reduced JSON files store one "x"/"y"/... coordinate column per
+        # file; each file therefore loads as a single 0-d object array, which
+        # vstacks to one row per file with the current serialization
+        assert embeds.shape == (2, 1)
+
+
+class TestLoaderPredictions:
+    """Tests for ``Loader.predictions()``, used in the example notebooks to
+    read the pretrained classifier outputs back from disk."""
+
+    def _make_loader(self, tmp_path):
+        return Loader(
+            audio_dir=TEST_AUDIO_DIR,
+            model_name="testmodel",
+            check_if_combination_exists=False,
+            testing=True,
+            use_folder_structure=False,
+            embed_parent_dir=tmp_path / "embeds",
+        )
+
+    def _make_preds_fixture(self, tmp_path):
+        from types import SimpleNamespace
+
+        preds_path = tmp_path / "preds"
+        out_dir = preds_path / "original_classifier_outputs"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "a.json").write_text(
+            json.dumps(
+                {
+                    "head": {"Time bins in this file": 2},
+                    "Tree Pipit": {
+                        "time_bins_exceeding_threshold": [0],
+                        "classifier_predictions": [0.9],
+                    },
+                }
+            )
+        )
+
+        loader = self._make_loader(tmp_path)
+        loader.paths = SimpleNamespace(preds_path=preds_path)
+        loader.metadata_dict = {
+            "files": {
+                "audio_files": [
+                    "audio/FewShot/CHE_01_20190101_163410.wav"
+                ],
+                "nr_embeds_per_file": [2],
+            },
+            "segment_length (samples)": 48000,
+            "sample_rate (Hz)": 48000,
+        }
+        from pathlib import Path
+
+        loader.files = [
+            Path(TEST_AUDIO_DIR) / "FewShot/CHE_01_20190101_163410.wav"
+        ]
+        return loader
+
+    def test_predictions_array_returns_matrix_and_label_map(self, tmp_path):
+        loader = self._make_preds_fixture(tmp_path)
+        arr, keys2idx = loader.predictions(return_type="array")
+        # 2 time bins x 1 species
+        assert arr.shape == (2, 1)
+        assert keys2idx == {"Tree Pipit": 0}
+        # predictions are stored as float32
+        assert arr[0, 0] == pytest.approx(0.9)
+        assert arr[1, 0] == 0.0
+
+    def test_predictions_dataframe_has_metadata_columns(self, tmp_path):
+        loader = self._make_preds_fixture(tmp_path)
+        df = loader.predictions(return_type="dataframe")
+        assert "audiofilename" in df.columns
+        assert "start" in df.columns
+        assert "end" in df.columns
+        assert "Tree Pipit" in df.columns
+        assert df.iloc[0]["start"] == 0.0
+        assert df.iloc[0]["end"] == 1.0
+
+    def test_predictions_without_saved_outputs_warns(self, tmp_path):
+        from types import SimpleNamespace
+
+        loader = self._make_loader(tmp_path)
+        loader.paths = SimpleNamespace(preds_path=tmp_path / "missing_preds")
+        loader.metadata_dict = {
+            "files": {
+                "audio_files": ["a.wav"],
+                "nr_embeds_per_file": [1],
+            },
+            "segment_length (samples)": 48000,
+            "sample_rate (Hz)": 48000,
+        }
+        preds, _ = loader.predictions(return_type="array")
+        assert preds is None
+        assert _ is None

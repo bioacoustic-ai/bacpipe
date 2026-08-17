@@ -203,12 +203,19 @@ def check_if_cudnn_tensorflow_compatible():
     """
     import torch
 
-    version = (torch.backends.cudnn.version() % 1000) // 100
+    cudnn_version = torch.backends.cudnn.version()
+    if cudnn_version is None:
+        # torch built without CUDA/cuDNN support (e.g. CPU-only runners)
+        logger.info(
+            "cuDNN is not available (torch was built without CUDA support). "
+            "Device is therefore set to cpu for the tensorflow models."
+        )
+        return False
+    version = (cudnn_version % 1000) // 100
     if version < 3:
         logger.info(
             "cuDNN version does not match the required 9.3 for tensorflow. "
             "Device is therefore set to cpu for the tensorflow models."
         )
         return False
-    else:
-        return True
+    return True
