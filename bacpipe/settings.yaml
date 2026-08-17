@@ -55,7 +55,7 @@ nr_parallel_workers: False
 
 # To avoid creating embeddings when configurations are still being tested, this is set to True. 
 # Set to False if you want to keep embeddings even if the process is interrupted.
-rm_embedding_on_keyboard_interrupt: True
+rm_embedding_on_keyboard_interrupt: False
 
 # To avoid creating embeddings over and over again every time you run bacpipe,
 # this option exists and is True by default so that bacpipe can compare if a 
@@ -196,7 +196,7 @@ clust_configs:
       n_clusters: None
   config_2:
     bool: False
-    name: "hdbscan" # not that this will require installing the hdbscan package
+    name: "hdbscan" # note that this will require installing the hdbscan package
     params:
       min_cluster_size: 10
       min_samples: 5
@@ -224,7 +224,7 @@ nr_predictions_to_display: 3
 # This number determines how many categories will be shown
 # as distinct labels. If more categories than this number
 # are found a colorbar will be used
-max_nr_categories: 100
+max_nr_categories: 55
 
 # port for dashboard
 dashboard_port: 5006

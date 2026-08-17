@@ -92,11 +92,11 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 include = [
     "/bacpipe",
-    "src",
-    "run_pipeline.py"
+    "run_pipeline.py",
+    "/bacpipe/imgs/bacpipe_favicon_white.png",
+    "/bacpipe/imgs/bacpipe_unlabelled.png"
 ]
 exclude = [
-    "*.png",
     "*.gif",
     "*.jpg",
     "*.jpeg",
@@ -108,11 +108,11 @@ exclude = [
 [tool.hatch.build.targets.sdist]
 include = [
     "/bacpipe",
-    "src",
-    "run_pipeline.py"
+    "run_pipeline.py",
+    "/bacpipe/imgs/bacpipe_favicon_white.png",
+    "/bacpipe/imgs/bacpipe_unlabelled.png"
 ]
 exclude = [
-    "*.png",
     "*.gif",
     "*.jpg",
     "*.jpeg",
