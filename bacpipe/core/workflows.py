@@ -113,7 +113,9 @@ def play(bool_save_logs=False, **kwargs):
 
 
 def ensure_models_exist(
-    model_base_path, model_names, repo_id="vskode/bacpipe_models"
+    model_base_path=settings.model_base_path, 
+    model_names=config.models, 
+    repo_id="vskode/bacpipe_models"
 ):
     """
     Ensure that the model checkpoints for the selected models are
@@ -121,10 +123,12 @@ def ensure_models_exist(
 
     Parameters
     ----------
-    model_base_path : Path
+    model_base_path : Path, optional
         Local base directory where the checkpoints should be stored.
-    model_names : str or list
+        By default settings.model_base_path
+    model_names : str or list, optional
         Model name or list of model names to run
+        By default config.models
     repo_id : str, optional
         Hugging Face Hub repo ID, by default "vinikay/bacpipe_models"
 
@@ -755,6 +759,7 @@ def generate_embeddings(
         loader object to access embeddings and classifier predictions
     """
     model_name = confirm_model_name(model_name, **kwargs)
+    ensure_models_exist(model_names=model_name)
     if "dim_reduction_model" in kwargs:
         logger.info(
             f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"
