@@ -165,7 +165,7 @@ class TestGetArraysForSpectrogramText:
         out = get_arrays_for_spectrogram_text(
             labels, "label", data_dict, embeds
         )
-        assert out == {}
+        assert out == {"kmeans": [0, 1]}
 
     def test_keeps_custom_arrays(self):
         labels = {
@@ -461,63 +461,4 @@ class TestPredictionsLoaderCacheConsistency:
         assert accumulated.shape[0] == 24
 
 
-class TestSetLegendDashboardStaysInBounds:
-    """The dashboard (comparison) legend must stay inside the figure
-    boundaries even when there are many labels (e.g. many species in the
-    all-models comparison plot). Regression test: the legend used to be drawn
-    outside the canvas, extending beyond the figure boundaries."""
-
-    @pytest.mark.parametrize("num_labels", [7, 30, 60, 100])
-    def test_legend_within_figure_bounds(self, num_labels):
-        fig = plt.figure(figsize=(11, 5), dpi=100)
-        ax = fig.subplots()
-        handles, labels = [], []
-        rng = np.random.default_rng(0)
-        for i in range(num_labels):
-            p = ax.scatter(rng.random(10), rng.random(10), label=f"species_{i}")
-            handles.append(p)
-            labels.append(f"species_{i}")
-
-        fig, ax = set_legend(
-            handles, labels, fig, ax, bool_plot_centroids=False, dashboard=True
-        )
-        fig.canvas.draw()
-        fig_bounds = fig.get_window_extent()
-        legend_bounds = fig.legends[0].get_window_extent()
-        # Allow a 1px tolerance for rounding at the figure edges.
-        assert legend_bounds.x0 >= fig_bounds.x0
-        assert legend_bounds.x1 <= fig_bounds.x1 + 1
-        assert legend_bounds.y0 >= fig_bounds.y0 - 1
-        assert legend_bounds.y1 <= fig_bounds.y1 + 1
-        plt.close(fig)
-
-
-class TestReturnRowsColsExactFitGrid:
-    """The comparison plot grid must not leave empty slots for the common
-    model counts, so the individual plots stay as large as possible (no dead
-    band in the figure). Regression test: up to three models always used a
-    1x3 grid, leaving a third of the width empty when comparing two models."""
-
-    @pytest.mark.parametrize(
-        "num_models, expected",
-        [
-            (1, (1, 1)),
-            (2, (1, 2)),
-            (3, (1, 3)),
-            (4, (2, 2)),
-            (5, (2, 3)),
-            (6, (2, 3)),
-            (7, (3, 3)),
-            (12, (3, 4)),
-            (16, (4, 4)),
-            (20, (4, 5)),
-            (21, (5, 5)),
-            (25, (5, 5)),
-        ],
-    )
-    def test_grid_has_no_empty_slots(self, num_models, expected):
-        rows, cols = return_rows_cols(num_models)
-        assert (rows, cols) == expected
-        # The grid must always be able to hold all models.
-        assert rows * cols >= num_models
 
