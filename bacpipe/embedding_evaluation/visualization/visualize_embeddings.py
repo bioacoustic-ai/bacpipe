@@ -399,7 +399,7 @@ def get_single_label_gt_labels(df_ground_truth, bool_noise):
 
 def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
     labels = dict()
-    labels = le.get_metadata_labels(model_name, overwrite=overwrite, **kwargs)
+    labels = le.get_metadata_labels(model_name, overwrite=overwrite, return_type='dict', **kwargs)
 
     paths = le.get_paths(model_name)
     ground_truth_files = list(

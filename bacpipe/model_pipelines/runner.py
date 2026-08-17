@@ -44,6 +44,7 @@ class Embedder(AudioHandler):
         loader=None,
         CustomModel=None,
         dim_reduction_model=False,
+        audio_dir=None,
         **kwargs,
     ):
         """
@@ -71,6 +72,10 @@ class Embedder(AudioHandler):
         """
         self.file_length = {}
         self.loader = loader
+        if loader:
+            audio_dir = loader.audio_dir
+        elif not audio_dir is None:
+            audio_dir = audio_dir
 
         self.dim_reduction_model = dim_reduction_model
         if dim_reduction_model:
@@ -91,14 +96,14 @@ class Embedder(AudioHandler):
         )
         super().__init__(
             model=self.model,
-            audio_dir=loader.audio_dir if loader else None,
+            audio_dir=audio_dir,
             **kwargs,
         )
         if self.model.bool_classifier:
             self.classifier = Classifier(
                 self.model,
                 model_name,
-                audio_dir=loader.audio_dir if loader else None,
+                audio_dir=audio_dir,
                 use_folder_structure=(
                     loader.use_folder_structure if loader else False
                 ),

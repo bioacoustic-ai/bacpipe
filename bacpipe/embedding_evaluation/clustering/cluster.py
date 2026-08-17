@@ -293,7 +293,8 @@ def clustering_pipeline(
         cluster_configs = get_clustering_models(clust_params)
 
         metadata_labels = le.create_metadata_labels(
-            paths.audio_dir, paths.clust_path.parent.stem, paths, overwrite=False,
+            paths.audio_dir, paths.clust_path.parent.stem, 
+            paths, overwrite=False, return_type='dict', 
             **kwargs
         )
         

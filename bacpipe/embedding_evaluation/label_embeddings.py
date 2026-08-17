@@ -645,7 +645,7 @@ def model_specific_embedding_path(
 
 def create_metadata_labels(
     audio_dir=None, model=None, paths=None, 
-    overwrite=True, return_type='dict', **kwargs
+    overwrite=True, return_type='dataframe', **kwargs
 ):
     """
     Create metadata labels based on audio files and model timestamps to
@@ -663,7 +663,7 @@ def create_metadata_labels(
     overwrite : bool, optional
         if True labels are overwritten, by default True
     return_type : string, optional
-        return data as dict or dataframe, defaults to dict
+        return data as dict or dataframe, defaults to dataframe
 
     Returns
     -------
@@ -1025,7 +1025,7 @@ def initialize_ground_truth_df(label_df, label_column):
 
 def get_filename_array(label_df, label_column):
     return np.array([
-        Path(f).stem + Path(f).suffix for f in label_df[f'label:{label_column}']
+        Path(f).stem + Path(f).suffix for f in label_df[label_column]
         ]) 
 
 def collect_ground_truth_labels(
@@ -1038,7 +1038,7 @@ def collect_ground_truth_labels(
     **kwargs,
 ):
     ground_truth = initialize_ground_truth_df(label_df, label_column)
-    filename_array = get_filename_array(label_df, label_column)
+    filename_array = get_filename_array(label_df, 'audiofilename')
     
     for ind, file in tqdm(
         enumerate(files),
@@ -1322,7 +1322,7 @@ def get_files_if_no_embeds(audio_dir, model, label_df=None, only_embed_annotatio
         ]
     else:
         metadata["files"]["nr_embeds_per_file"] = [
-            int(get_duration(path=f) / segment_s) for f in matching_audio_files
+            int(np.ceil(get_duration(path=f) / segment_s)) for f in matching_audio_files
         ]
     files = [Path(f"{Path(d).stem}_{model}") for d in matching_audio_files]
 

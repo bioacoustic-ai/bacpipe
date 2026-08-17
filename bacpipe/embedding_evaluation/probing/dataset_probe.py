@@ -200,26 +200,3 @@ def generate_annotations_for_probing_task(
         )
         df = pd.read_csv(dataset_csv_path, index_col=False)
     return df
-
-def get_filenames_and_starts_for_probe_df(paths, ground_truth, label_column):
-    from bacpipe.embedding_evaluation.label_embeddings import (
-        get_metadata_labels,
-        get_dt_filename,
-    )
-    import datetime as dt
-
-    model_name = paths.labels_path.parent.stem
-    metadata_labels = get_metadata_labels(model_name, overwrite=False)
-    filenames = np.array(metadata_labels["audio_file_name"])[
-        ground_truth[f"label:{label_column}"] > -1
-    ]
-    times_of_day = np.array(metadata_labels["time_of_day"])[
-        ground_truth[f"label:{label_column}"] > -1
-    ]
-    starts = [
-        (
-            dt.datetime.strptime(tod_e, "%H-%M-%S") - get_dt_filename(tod_f)
-        ).seconds
-        for tod_e, tod_f in zip(times_of_day, filenames)
-    ]
-    return filenames, starts

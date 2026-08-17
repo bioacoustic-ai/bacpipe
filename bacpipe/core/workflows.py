@@ -764,7 +764,7 @@ def generate_embeddings(
     try:
         start = time.time()
         ld = Loader(
-            use_folder_structure=True, 
+            use_folder_structure=True if not kwargs.get('use_folder_structure') else kwargs.pop('use_folder_structure'), 
             audio_dir=audio_dir,
             model_name=model_name, 
             **kwargs

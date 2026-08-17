@@ -62,7 +62,7 @@ def prepare_probe_inference(model, probe_path=""):
 def run_probe_inference(
     model,
     linear_probe,
-    threshold,
+    threshold=0.5,
     embeds=None,
     return_binary_presence=True,
     callbacks=None,
@@ -83,8 +83,8 @@ def run_probe_inference(
         model name
     linear_probe : torch model
         linear probe torch model object
-    threshold : float
-        float value to process the predictions
+    threshold : float, optional
+        float value to process the predictions, by default 0.5.
     embeds : torch.Tensor, optional
         embeddings array, by default None
     return_binary_presence : bool, optional
