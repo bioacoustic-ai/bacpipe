@@ -1,4 +1,4 @@
-# Welcome to **bacpipe** (**B**io**A**coustic **C**ollection **Pipe**line)
+# Welcome to **bacpipe** (**B**io**Ac**oustic **Pipe**line)
 
 [![Documentation Status](https://readthedocs.org/projects/bacpipe/badge/?version=latest)](https://bacpipe.readthedocs.io/en/latest/?badge=latest)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/bacpipe?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/bacpipe)
@@ -34,7 +34,10 @@ import bacpipe
 
 bacpipe.play()
 ```
-A more detailed description of the API can be found under [API](#api). In `bacpipe/examples` you can find 3 jupyter notebooks demonstrating different use cases of the API. Full documentation can be found at [https://bacpipe.readthedocs.io](https://bacpipe.readthedocs.io). The github repository can be found at [https://github.com/bioacoustic-ai/bacpipe](https://github.com/bioacoustic-ai/bacpipe).
+A more detailed description of the API can be found under [API](#api). In `bacpipe/examples` you can find 3 jupyter notebooks demonstrating different use cases of the API. A good starting point is the notebook simple_use_cases.ipynb which you can find as a file  [here](bacpipe/examples/basic_examples/simple_use_cases.ipynb) or online in the documentation [here](https://bacpipe.readthedocs.io/en/latest/examples/basic_examples/simple_use_cases.html).
+
+
+Full documentation can be found at [https://bacpipe.readthedocs.io](https://bacpipe.readthedocs.io). The github repository can be found at [https://github.com/bioacoustic-ai/bacpipe](https://github.com/bioacoustic-ai/bacpipe).
 
 There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) available on youtube to install and run bacpipe.
 
