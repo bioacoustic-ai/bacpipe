@@ -294,7 +294,7 @@ def clustering_pipeline(
         if not ground_truth is None and len(ground_truth) > 0:
             
             bool_noise = get_boolean_array_for_annotated_embeddings(
-                ground_truth, model_name
+                ground_truth, model_name, **kwargs
                 )
             ground_truth_1d = get_single_label_gt_labels(
                 ground_truth, bool_noise

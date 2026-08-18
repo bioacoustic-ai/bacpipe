@@ -410,8 +410,14 @@ def get_boolean_array_for_annotated_embeddings(
     np.ndarray
         boolean array that is True for unannotated (noise) embeddings
     """
+        
+    df_metadata_labels = le.create_metadata_labels(
+        model=model_name, overwrite=overwrite,
+        return_type='dataframe', **kwargs
+        )
     if kwargs.get('only_embed_annotations'):
         return np.array([False] * len(df_ground_truth))
+    
     if not gt_file is None and not ground_truth_files is None:
         if (
             settings.label_column in str(gt_file) 
@@ -437,14 +443,8 @@ def get_boolean_array_for_annotated_embeddings(
             "You have passed a multi-label ground truth array. "
             "However for visualization only one label will be displayed."
         )
-        
-    df_metadata_labels = le.create_metadata_labels(
-        model=model_name, overwrite=overwrite,
-        return_type='dataframe', **kwargs
-        )
     df_metadata_labels['audiofilename'] = df_metadata_labels['audio_file_name']
     
-
     df_ground_truth = df_ground_truth[df_ground_truth.simultaneous_labels > 0]
     
     df_metadata_labels['start'] = [np.round(v, 4) for v in df_metadata_labels['start']]

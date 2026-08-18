@@ -131,7 +131,9 @@ class TestEnsureModelsExist:
         assert result == tmp_path / "models"
         assert result.parent.exists()
 
-    def test_custom_models_list_skips_only_custom_entries(self, monkeypatch):
+    def test_custom_models_list_skips_only_custom_entries(
+        self, monkeypatch, tmp_path
+    ):
         validated = []
         monkeypatch.setattr(
             "bacpipe.core.workflows.confirm_model_name",
@@ -139,12 +141,19 @@ class TestEnsureModelsExist:
         )
         from bacpipe.core.workflows import ensure_models_exist
 
+        # Use the tiny torch-only ``bat`` model (no tensorflow import) and
+        # pre-seed its checkpoint directory so the test stays offline.
+        model_base_path = tmp_path / "models"
+        (model_base_path / "bat").mkdir(parents=True)
+        (model_base_path / "bat" / "model.pt").write_text("dummy")
+
         ensure_models_exist(
-            model_names=["birdnet", "mel"],
+            model_base_path=model_base_path,
+            model_names=["bat", "mel"],
             CustomModels=[None, object],
         )
         # only the built-in model name is validated against the supported list
-        assert validated == ["birdnet"]
+        assert validated == ["bat"]
 
     def test_unknown_model_without_custom_raises(self, tmp_path):
         from bacpipe.core.workflows import ensure_models_exist
