@@ -201,6 +201,93 @@ class TestRunPipelineForModelsCustomModels:
         assert single_model_calls == [("birdnet", None), ("mel", "MyModel")]
 
 
+class TestDimReductionNoneQuirk:
+    def test_run_pipeline_for_single_model_none_skips_dim_reduction(
+        self, monkeypatch
+    ):
+        # ``dim_reduction_model=None`` must mean the same as the string
+        # ``"None"`` (no dimensionality reduction). Passing a python ``None``
+        # used to trigger the dim-reduction branch, which crashed on
+        # ``None.upper()`` further down the pipeline.
+        from types import SimpleNamespace
+
+        from bacpipe.core.workflows import run_pipeline_for_single_model
+
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.confirm_model_name",
+            lambda name, **kwargs: name,
+        )
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.replace_default_kwargs_with_user_kwargs",
+            lambda **kwargs: kwargs,
+        )
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.make_set_paths_func",
+            lambda *args, **kwargs: lambda model: SimpleNamespace(
+                plot_path=Path("does/not/matter"), model_name=model
+            ),
+        )
+        generate_calls = []
+
+        def fake_generate_embeddings(**kwargs):
+            generate_calls.append(kwargs)
+            return SimpleNamespace(model_name="mel", embed_dir=Path("."))
+
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.generate_embeddings", fake_generate_embeddings
+        )
+
+        loader = run_pipeline_for_single_model(
+            model_name="mel",
+            audio_dir="audio",
+            dim_reduction_model=None,
+            CustomModel="MyModel",
+            testing=True,
+        )
+
+        # only the primary embedding generation runs; no dim-reduction call
+        assert len(generate_calls) == 1
+        assert "dim_reduction_model" not in generate_calls[0]
+        assert loader.model_name == "mel"
+
+    def test_cross_model_evaluation_none_skips_plot_comparison(
+        self, monkeypatch, tmp_path
+    ):
+        # ``dim_reduction_model=None`` in ``cross_model_evaluation`` must not
+        # attempt to plot a comparison (previously ``None == "None"`` is False,
+        # so the plotting branch was entered and crashed downstream).
+        from types import SimpleNamespace
+
+        from bacpipe.core.workflows import cross_model_evaluation
+
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.confirm_model_name",
+            lambda name, **kwargs: name,
+        )
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.get_paths",
+            lambda model: SimpleNamespace(plot_path=tmp_path / "audio" / model),
+        )
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.visualise_results_across_models",
+            lambda *args, **kwargs: None,
+        )
+        plot_calls = []
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.plot_comparison",
+            lambda *args, **kwargs: plot_calls.append(True),
+        )
+
+        cross_model_evaluation(
+            dim_reduction_model=None,
+            evaluation_task=["probing"],
+            models=["mel", "perch_bird"],
+            CustomModels=["MyModel", None],
+        )
+
+        assert plot_calls == []
+
+
 class TestGenerateEmbeddingsCustomModel:
     def test_passes_custom_model_to_ensure_models_exist(self, monkeypatch):
         # ``generate_embeddings`` must forward the custom model class so the

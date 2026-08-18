@@ -820,7 +820,7 @@ def cross_model_evaluation(
         if not len(evaluation_task) == 0:
             for task in evaluation_task:
                 visualise_results_across_models(plot_path, task, models)
-        if not dim_reduction_model == "None":
+        if not dim_reduction_model in [None, "None", False]:
             kwargs.pop("dashboard")
             if "audio_dir" in kwargs:
                 kwargs.pop("audio_dir")
@@ -909,6 +909,10 @@ def run_pipeline_for_single_model(
             dim_reduction_model='None',
         )
     """
+    if dim_reduction_model is None:
+        # ``None`` (python None) means the same as the string ``"None"``:
+        # no dimensionality reduction should be performed.
+        dim_reduction_model = "None"
     model_name = confirm_model_name(model_name, **kwargs)
         
     kwargs = replace_default_kwargs_with_user_kwargs(
@@ -927,7 +931,7 @@ def run_pipeline_for_single_model(
         **kwargs,
     )
 
-    if not dim_reduction_model in ["None", False]:
+    if not dim_reduction_model in ["None", False, None, ""]:
 
         loader_dim_reduced = generate_embeddings(
             model_name=model_name,
@@ -1053,7 +1057,7 @@ def generate_embeddings(
         model_base_path=kwargs.get("model_base_path", settings.model_base_path),
         CustomModel=kwargs.get("CustomModel"),
     )
-    if "dim_reduction_model" in kwargs:
+    if kwargs.get("dim_reduction_model"):
         logger.info(
             f"\n\n\n###### Generating embeddings using {kwargs['dim_reduction_model'].upper()} ######\n"
         )
