@@ -29,6 +29,9 @@ from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
 from bacpipe.embedding_evaluation.visualization.visualize import (
     plot_overview_results,
 )
+from bacpipe.embedding_evaluation.visualization.dashboard_utils import (
+    _friendly_export_error,
+)
 
 
 class TestVerifyThreshold:
@@ -659,3 +662,72 @@ class TestPlotEmbeddingsPxCustomData:
         # column 7 is the model name, column 6 the numeric label id
         assert set(customdata[:, 7]) == {"birdnet"}
         assert set(customdata[:, 6]) == {0, 1}
+
+class TestFriendlyExportError:
+    """The Save Figure button must surface friendly, actionable messages instead
+    of raw kaleido/plotly exceptions when a browser or kaleido is unavailable."""
+
+    def test_returns_hint_for_kaleido_chrome_not_found(self):
+        from kaleido.errors import ChromeNotFoundError
+
+        message = _friendly_export_error(ChromeNotFoundError())
+        assert message is not None
+        assert "Chrome" in message and "Edge" in message
+
+    def test_returns_hint_for_plotly_chrome_runtime_error(self):
+        # plotly wraps ChromeNotFoundError into a RuntimeError with this text
+        message = _friendly_export_error(
+            RuntimeError("Kaleido requires Google Chrome to be installed.")
+        )
+        assert message is not None
+        assert "kaleido_get_chrome" in message
+
+    def test_returns_hint_for_browser_launch_failures(self):
+        from kaleido.errors import BrowserFailedError, ChromeNotFoundError
+
+        errors = [ChromeNotFoundError(), BrowserFailedError()]
+        try:
+            from choreographer.errors import BrowserDepsError
+
+            # BrowserDepsError is a subclass of BrowserFailedError
+            errors.append(BrowserDepsError())
+        except ImportError:  # pragma: no cover - choreographer is a kaleido dep
+            pass
+
+        for exc in errors:
+            assert _friendly_export_error(exc) is not None
+
+    def test_returns_hint_for_missing_kaleido_package(self):
+        # plotly raises ValueError (or a raw ModuleNotFoundError) when kaleido
+        # is not installed
+        assert (
+            _friendly_export_error(
+                ValueError(
+                    'Image export using the "kaleido" engine requires the '
+                    "Kaleido package"
+                )
+            )
+            is not None
+        )
+        assert (
+            _friendly_export_error(ModuleNotFoundError("No module named 'kaleido'"))
+            is not None
+        )
+
+    def test_returns_none_for_unrelated_errors(self):
+        assert _friendly_export_error(ValueError("boom")) is None
+        assert _friendly_export_error(TypeError("boom")) is None
+
+    def test_does_not_crash_when_kaleido_unimportable(self, monkeypatch):
+        import sys
+
+        # simulate an environment where the kaleido package cannot be imported
+        monkeypatch.setitem(sys.modules, "kaleido", None)
+        monkeypatch.setitem(sys.modules, "kaleido.errors", None)
+
+        # the message-based fallback must still fire without importing kaleido
+        message = _friendly_export_error(
+            RuntimeError("Kaleido requires Google Chrome to be installed.")
+        )
+        assert message is not None
+        assert "Chrome" in message

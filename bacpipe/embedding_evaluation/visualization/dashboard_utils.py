@@ -12,6 +12,75 @@ sns.set_theme(style="whitegrid")
 
 matplotlib.use("agg")
 
+_SAVE_FIGURE_CHROME_HINT = (
+    "Saving figures requires Google Chrome or Microsoft Edge (kaleido uses it for "
+    "static image export) but none could be found on this system. Install Chrome or "
+    "Edge from your browser's official website, or run `kaleido_get_chrome` in the "
+    "terminal to install a compatible Chrome automatically."
+)
+
+_SAVE_FIGURE_KALEIDO_HINT = (
+    "kaleido is required to save figures but is not installed. Install it with "
+    "`pip install 'kaleido>=1.0.0'` and try again."
+)
+
+
+def _friendly_export_error(exc):
+    """
+    Map kaleido static-export failures to a friendly, actionable message.
+
+    Runs when the "Save Figure" button is clicked: kaleido only needs a browser
+    at export time, so on machines without Chrome/Edge (or without kaleido) the
+    raw library exception would otherwise leak into the dashboard notification.
+
+    Parameters
+    ----------
+    exc : Exception
+        the exception raised while exporting the figure
+
+    Returns
+    -------
+    str or None
+        a friendly hint when ``exc`` is a known kaleido export failure, else
+        ``None`` so callers can fall back to the raw error text
+    """
+    try:
+        import kaleido.errors as kaleido_errors
+    except Exception:  # pragma: no cover - kaleido is a hard dependency
+        kaleido_errors = None
+
+    # kaleido/choreographer cannot find or launch a browser
+    if kaleido_errors is not None:
+        browser_errors = tuple(
+            err
+            for err in (
+                getattr(kaleido_errors, name, None)
+                for name in (
+                    "ChromeNotFoundError",
+                    "BrowserFailedError",
+                    "BrowserDepsError",
+                )
+            )
+            if err is not None
+        )
+        if browser_errors and isinstance(exc, browser_errors):
+            return _SAVE_FIGURE_CHROME_HINT
+
+    # plotly wraps ChromeNotFoundError into a RuntimeError mentioning Chrome,
+    # and choreographer's BrowserDepsError also mentions Chrome in its message
+    if "chrome" in str(exc).lower():
+        return _SAVE_FIGURE_CHROME_HINT
+
+    # plotly raises ValueError when the kaleido package itself is missing
+    if isinstance(exc, ValueError) and "kaleido package" in str(exc).lower():
+        return _SAVE_FIGURE_KALEIDO_HINT
+
+    # defensive: raw ModuleNotFoundError for the kaleido package
+    if isinstance(exc, ModuleNotFoundError) and "kaleido" in str(exc).lower():
+        return _SAVE_FIGURE_KALEIDO_HINT
+
+    return None
+
 
 class DashBoardHelper:
     """
@@ -186,7 +255,8 @@ class DashBoardHelper:
                 f"✓ Saved to: {save_path}"
             )
         except Exception as e:
-            self.embed_notification[widget_idx].object = f"✗ Error: {str(e)}"
+            message = _friendly_export_error(e) or f"Error: {str(e)}"
+            self.embed_notification[widget_idx].object = f"✗ {message}"
 
     def update_main_plot(self, p_type, plot_func, widget_idx, **kwargs):
         """
@@ -421,7 +491,8 @@ class DashBoardHelper:
                     fig.savefig(save_path, dpi=300, bbox_inches="tight")
             except Exception as e:
                 logger.error(f"Error saving figure: {str(e)}")
-                notification.object = f"✗ Error saving: {str(e)}"
+                message = _friendly_export_error(e) or f"Error: {str(e)}"
+                notification.object = f"✗ {message}"
                 return
 
             notification.object = f"✓ Figure saved to: {save_path}"
