@@ -16,7 +16,12 @@ from bacpipe.embedding_evaluation.visualization.visualize_embeddings import (
     get_arrays_for_spectrogram_text,
     get_boolean_array_for_annotated_embeddings,
     get_single_label_gt_labels,
+    plot_embeddings_px,
     return_rows_cols,
+)
+from bacpipe.embedding_evaluation.visualization.visualize_spectrograms import (
+    SpectrogramPlot,
+    timestamps_match,
 )
 from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
     PredictionsLoader,
@@ -462,3 +467,195 @@ class TestPredictionsLoaderCacheConsistency:
 
 
 
+class TestTimestampsMatch:
+    def test_identical_timestamps_match(self):
+        assert timestamps_match(0.0, 0.0)
+
+    def test_tiny_float_rounding_differences_match(self):
+        # the plot rounds start times to 4 decimals, the metadata file stores
+        # the raw values -> small differences must not trigger a warning
+        assert timestamps_match(0.6891, 0.6890625)
+
+    def test_subsecond_shift_is_detected(self):
+        # an int() based comparison would treat 0.5 and 0.8 as equal, but they
+        # refer to different audio segments
+        assert not timestamps_match(0.5, 0.8)
+
+    def test_non_numeric_input_does_not_raise(self):
+        assert not timestamps_match(None, 0.0)
+        assert not timestamps_match("not-a-number", 0.0)
+
+
+class TestCheckTimestampOfClickDataAgainstMetadata:
+    """Tests for the spectrogram safety check that verifies the clicked
+    point's timestamp against the metadata labels."""
+
+    class _FakeVisLoader:
+        def __init__(self):
+            self.embeds = {}
+
+        def get_data(self, model, label_by):
+            self.embeds[model] = {
+                "metadata": {
+                    "sample_rate (Hz)": 48000,
+                    "segment_length (samples)": 48000,
+                }
+            }
+
+    class _FakeModelSelect:
+        options = ["birdnet"]
+
+    def _make_spec_plot(self, tmp_path):
+        def path_func(model_name):
+            return SimpleNamespace(
+                labels_path=tmp_path / model_name / "labels"
+            )
+
+        return SpectrogramPlot(
+            audio_dir=tmp_path,
+            loader=self._FakeVisLoader(),
+            model_name=self._FakeModelSelect(),
+            panel_static_text=None,
+            paths=path_func,
+        )
+
+    def _write_csv(self, spec, tmp_path, starts):
+        labels_path = tmp_path / "birdnet" / "labels"
+        labels_path.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({"start": starts}).to_csv(
+            labels_path / "metadata_labels.csv", index=False
+        )
+
+    def test_matching_timestamp_logs_no_warning(self, tmp_path, caplog):
+        spec = self._make_spec_plot(tmp_path)
+        self._write_csv(spec, tmp_path, [0.0, 1.0])
+        with caplog.at_level("WARNING", logger="bacpipe"):
+            spec.check_timestamp_of_click_data_against_metadata(
+                "birdnet", 0, 0.0
+            )
+        assert not any("do not match" in r.message for r in caplog.records)
+
+    def test_mismatching_timestamp_logs_warning(self, tmp_path, caplog):
+        spec = self._make_spec_plot(tmp_path)
+        self._write_csv(spec, tmp_path, [0.0, 1.0])
+        with caplog.at_level("WARNING", logger="bacpipe"):
+            spec.check_timestamp_of_click_data_against_metadata(
+                "birdnet", 0, 5.0
+            )
+        assert any("do not match" in r.message for r in caplog.records)
+
+    def test_missing_metadata_file_does_not_raise(self, tmp_path, caplog):
+        spec = self._make_spec_plot(tmp_path)
+        with caplog.at_level("WARNING", logger="bacpipe"):
+            spec.check_timestamp_of_click_data_against_metadata(
+                "birdnet", 0, 0.0
+            )
+        assert any("No metadata_labels file" in r.message for r in caplog.records)
+
+    def test_parquet_fallback(self, tmp_path, caplog):
+        spec = self._make_spec_plot(tmp_path)
+        labels_path = tmp_path / "birdnet" / "labels"
+        labels_path.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({"start": [0.0, 1.0]}).to_parquet(
+            labels_path / "metadata_labels.parquet"
+        )
+        with caplog.at_level("WARNING", logger="bacpipe"):
+            spec.check_timestamp_of_click_data_against_metadata(
+                "birdnet", 1, 1.0
+            )
+        assert not any("do not match" in r.message for r in caplog.records)
+
+
+
+
+    def test_idx_out_of_range_does_not_raise(self, tmp_path, caplog):
+        spec = self._make_spec_plot(tmp_path)
+        self._write_csv(spec, tmp_path, [0.0, 1.0])
+        with caplog.at_level("WARNING", logger="bacpipe"):
+            spec.check_timestamp_of_click_data_against_metadata(
+                "birdnet", 99, 0.0
+            )
+        assert any("Could not find a metadata label" in r.message for r in caplog.records)
+
+    def test_none_model_name_does_not_raise(self, tmp_path, caplog):
+        spec = self._make_spec_plot(tmp_path)
+        with caplog.at_level("WARNING", logger="bacpipe"):
+            spec.check_timestamp_of_click_data_against_metadata(
+                None, 0, 0.0
+            )
+        assert len(caplog.records) == 0
+
+    def test_remove_noise_disables_check(self, tmp_path, caplog):
+        """Noise-filtered embeddings remap the click indices, so the
+        timestamp check must be skipped entirely when remove_noise is set."""
+        spec = self._make_spec_plot(tmp_path)
+        self._write_csv(spec, tmp_path, [0.0, 1.0])
+
+        class _FakeWidget:
+            value = True
+
+        # both a plain bool and a widget-like object should disable the check
+        for remove_noise in (True, _FakeWidget()):
+            spec.remove_noise_widget = remove_noise
+            caplog.clear()
+            with caplog.at_level("WARNING", logger="bacpipe"):
+                spec.check_timestamp_of_click_data_against_metadata(
+                    "birdnet", 0, 5.0
+                )
+            # timestamps deliberately mismatch, yet no warning is logged
+            assert len(caplog.records) == 0
+
+    def test_metadata_starts_are_cached(self, tmp_path, caplog, monkeypatch):
+        spec = self._make_spec_plot(tmp_path)
+        self._write_csv(spec, tmp_path, [0.0, 1.0])
+
+        real_read_csv = pd.read_csv
+        calls = []
+
+        def counting_read_csv(*args, **kwargs):
+            calls.append(args)
+            return real_read_csv(*args, **kwargs)
+
+        monkeypatch.setattr("pandas.read_csv", counting_read_csv)
+        spec.check_timestamp_of_click_data_against_metadata("birdnet", 0, 0.0)
+        spec.check_timestamp_of_click_data_against_metadata("birdnet", 1, 1.0)
+        # the metadata file is only read once per model, not once per click
+        assert len(calls) == 1
+
+
+class TestPlotEmbeddingsPxCustomData:
+    """Regression test for the spectrogram click data contract: the embedding
+    plot must attach exactly the 8 customdata columns that
+    ``SpectrogramPlot.update_spectrogram`` unpacks."""
+
+    def _embeds(self):
+        return {
+            "x": [0.0, 1.0],
+            "y": [0.0, 1.0],
+            "timestamp": [0.0, 1.0],
+            "index": [0, 1],
+            "metadata": {
+                "model_name": "birdnet",
+                "audio_files": ["a.wav", "a.wav"],
+                "segment_length (samples)": 48000,
+                "sample_rate (Hz)": 48000,
+            },
+        }
+
+    def _labels(self):
+        return {"time_of_day": ["12-00-00", "12-00-01"]}
+
+    def test_customdata_contains_eight_columns_in_click_order(self):
+        fig = plot_embeddings_px(
+            self._embeds(), self._labels(), label_by="time_of_day"
+        )
+        # categorical labels are split into one trace per label, so collect
+        # the customdata of all traces
+        rows = []
+        for trace in fig.data:
+            rows.extend(np.asarray(trace.customdata, dtype=object).tolist())
+        customdata = np.asarray(rows, dtype=object)
+        assert customdata.shape == (2, 8)
+        # column 7 is the model name, column 6 the numeric label id
+        assert set(customdata[:, 7]) == {"birdnet"}
+        assert set(customdata[:, 6]) == {0, 1}

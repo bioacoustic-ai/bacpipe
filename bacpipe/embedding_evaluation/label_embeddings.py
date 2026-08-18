@@ -348,7 +348,7 @@ class DefaultLabels:
             self.default_label_keys.remove("default_classifier")
         else:
             path = clfier_paths[0]
-            df = pd.read_csv(path)
+            df = pd.read_csv(path, index_col=False)
             if not len(self.parent_directory_per_embedding) == len(df):
                 df = self.fill_remaining_labels(df)
             self.default_classifier_per_embedding = df[
@@ -504,7 +504,8 @@ def make_set_paths_func(
         )
         
         task_path = dataset_path.joinpath(
-            bacpipe.settings.evaluations_dir
+            kwargs.get("evaluations_dir")
+            or bacpipe.settings.evaluations_dir
             ).joinpath(
             model_name
         )  
@@ -828,7 +829,7 @@ def create_metadata_labels(
         dictionary with metadata labels
     """
     if paths is None:
-        assign_global_get_paths_function(audio_dir)
+        assign_global_get_paths_function(audio_dir, **kwargs)
         paths = get_paths(model)
     if (
         overwrite
@@ -855,7 +856,9 @@ def create_metadata_labels(
             metadata_labels.metadata['segment_length (samples)']
             / metadata_labels.metadata['sample_rate (Hz)']
             )
-        if not bacpipe.settings.only_embed_annotations:
+        if not kwargs.get(
+            'only_embed_annotations', bacpipe.settings.only_embed_annotations
+        ):
             start = []
             [
                 start.extend([embed_idx * input_length for embed_idx in 
@@ -869,22 +872,31 @@ def create_metadata_labels(
             df_gt = ground_truth_by_model(
                 model, 
                 audio_dir, 
-                annotations_filename=bacpipe.settings.annotations_filename, 
+                annotations_filename=kwargs.get(
+                    'annotations_filename', bacpipe.settings.annotations_filename
+                ), 
                 only_embed_annotations=True, 
                 overwrite=False
                 )
             df_labels['start'] = df_gt['start']
             df_labels['end'] = df_gt['end']
         
+        # The row order of this file is the association between a label and
+        # its embedding, so no index column is written: importing the file
+        # then yields a clean RangeIndex without a spurious "Unnamed: 0".
         if len(df_labels) * len(df_labels.T) > 3_000_000:
-            df_labels.to_parquet(paths.labels_path / "metadata_labels.parquet", index=False)
+            df_labels.to_parquet(
+                paths.labels_path / "metadata_labels.parquet", index=False
+            )
         else:
-            df_labels.to_csv(paths.labels_path / "metadata_labels.csv", index=False)
+            df_labels.to_csv(
+                paths.labels_path / "metadata_labels.csv", index=False
+            )
 
         def_labels = df_labels.to_dict('list')
     else:
         if (paths.labels_path / "metadata_labels.parquet").exists():
-            df_labels  = pd.read_parquet(paths.labels_path / "metadata_labels.parquet", index_col=False)
+            df_labels  = pd.read_parquet(paths.labels_path / "metadata_labels.parquet")
             def_labels = df_labels.to_dict('list')
             
         elif (paths.labels_path / "metadata_labels.csv").exists():
@@ -937,12 +949,12 @@ def fetch_annotation_file(audio_dir, annotations_filename, paths):
     try:
         try:
             return pd.read_csv(
-                Path(audio_dir).joinpath(annotations_filename)
+                Path(audio_dir).joinpath(annotations_filename), index_col=False
             )
         except FileNotFoundError as e:
             try:
                 return pd.read_csv(
-                    Path(audio_dir).joinpath(annotations_filename)
+                    Path(audio_dir).joinpath(annotations_filename), index_col=False
                 )
             except FileNotFoundError as e:
                 logger.warning(
@@ -952,13 +964,13 @@ def fetch_annotation_file(audio_dir, annotations_filename, paths):
                 )
                 raise FileNotFoundError("No annotations file found.")
     except FileNotFoundError as e:
-        logger.warning(
-            f"No annotations file found in {audio_dir}, trying in "
-            f"{str(paths.dataset_path.resolve())}."
-        )
         try:
+            logger.warning(
+                f"No annotations file found in {audio_dir}, trying in "
+                f"{str(paths.dataset_path.resolve())}."
+            )
             return pd.read_csv(
-                paths.dataset_path.joinpath(annotations_filename)
+                paths.dataset_path.joinpath(annotations_filename), index_col=False
             )
         except:
             logger.warning(
@@ -1480,7 +1492,7 @@ def collect_ground_truth_labels(
     return ground_truth
 
 
-def assign_global_get_paths_function(audio_dir):
+def assign_global_get_paths_function(audio_dir, **kwargs):
     """
     Assign the global ``get_paths`` function based on the audio directory.
 
@@ -1488,11 +1500,19 @@ def assign_global_get_paths_function(audio_dir):
     ----------
     audio_dir : str
         full path to the directory containing the audio files
+    **kwargs : dict
+        Explicitly passed kwargs override the defaults from
+        ``bacpipe/config.yaml`` and ``bacpipe/settings.yaml``, e.g.
+        ``main_results_dir`` and ``evaluations_dir``.
     """
     if not "get_paths" in globals():
         from bacpipe import settings as bapcipe_settings
 
-        make_set_paths_func(audio_dir, bapcipe_settings.main_results_dir)
+        make_set_paths_func(
+            audio_dir,
+            kwargs.get("main_results_dir", bapcipe_settings.main_results_dir),
+            evaluations_dir=kwargs.get("evaluations_dir"),
+        )
 
 
 def ground_truth_by_model(
@@ -1567,7 +1587,7 @@ def ground_truth_by_model(
         if gorund truth file is not found
     """
     if paths is None:
-        assign_global_get_paths_function(audio_dir)
+        assign_global_get_paths_function(audio_dir, **kwargs)
         paths = get_paths(model)
 
     if (
@@ -1638,7 +1658,7 @@ def ground_truth_by_model(
             ground_truth = ground_truth[cols]
             ground_truth = ground_truth.sort_values(
                 by=["audiofilename", "start"]
-            )
+            ).reset_index(drop=True)
             ground_truth.to_csv(
                 paths.labels_path.joinpath(
                     f"ground_truth_{clean_label_column}.csv"

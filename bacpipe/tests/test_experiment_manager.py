@@ -7,11 +7,13 @@ import json
 
 import numpy as np
 import pytest
+import yaml
 
 from bacpipe import Loader
 from bacpipe.core.experiment_manager import (
     replace_default_kwargs_with_user_kwargs,
     return_reduced_dimensions,
+    save_logs,
 )
 
 TEST_DATA_DIR = "bacpipe/tests/test_data"
@@ -184,25 +186,192 @@ class TestLoaderEmbeddings:
 
         assert loader.embeddings() is None
 
-    def test_embeddings_reads_json_for_dim_reduction(self, tmp_path):
-        embed_dir = tmp_path / "embeds_json"
-        embed_dir.mkdir(parents=True, exist_ok=True)
-        (embed_dir / "file1.json").write_text(
+    def test_embeddings_for_dim_reduction_loader_finds_primary_npy(self, tmp_path):
+        # Simulate the state of a loader right after a dimensionality
+        # reduction run: ``embed_dir`` points at the reduced-output directory
+        # (containing .json files) while the primary embeddings live in the
+        # directory recorded in the metadata. ``embeddings()`` returns the
+        # actual .npy embedding files in that case.
+        primary_dir = tmp_path / "embeds"
+        primary_dir.mkdir(parents=True, exist_ok=True)
+        np.save(primary_dir / "file1.npy", np.array([[1.0, 2.0], [3.0, 4.0]]))
+        np.save(primary_dir / "file2.npy", np.array([[5.0, 6.0]]))
+
+        umap_dir = tmp_path / "umap"
+        umap_dir.mkdir(parents=True, exist_ok=True)
+        (umap_dir / "file1.json").write_text(
             '{"x": [1.0, 2.0], "y": [3.0, 4.0]}'
         )
-        (embed_dir / "file2.json").write_text('{"x": [5.0], "y": [6.0]}')
+
+        loader = self._make_loader(tmp_path)
+        loader.embed_dir = umap_dir
+        loader.embed_suffix = ".npy"  # stale, left over from get_embedding_dir
+        loader.dim_reduction_model = "umap"
+        loader.files = sorted(umap_dir.glob("*.json"))
+        loader.metadata_dict = {"embed_dir": str(primary_dir)}
+
+        embeds = loader.embeddings(return_type="array")
+        assert embeds.shape == (3, 2)
+        np.testing.assert_allclose(embeds[0], [1.0, 2.0])
+        np.testing.assert_allclose(embeds[2], [5.0, 6.0])
+
+        d = loader.embeddings(return_type="dict")
+        assert set(d.keys()) == {"file1.npy", "file2.npy"}
+
+    def test_embeddings_for_dim_reduction_loader_loads_metadata_if_missing(
+        self, tmp_path
+    ):
+        # a loader created for an already existing dim-reduction combination
+        # never has ``metadata_dict`` set; the primary embed dir must then be
+        # read from the metadata.yml stored next to the reduced .json files.
+        primary_dir = tmp_path / "embeds"
+        primary_dir.mkdir(parents=True, exist_ok=True)
+        np.save(primary_dir / "file1.npy", np.array([[1.0, 2.0], [3.0, 4.0]]))
+        metadata = {
+            "model_name": "testmodel",
+            "audio_dir": str(TEST_AUDIO_DIR),
+            "embed_dir": str(primary_dir),
+            "files": {"audio_files": ["audio/foo.wav"], "nr_embeds_per_file": [2]},
+        }
+        with open(primary_dir / "metadata.yml", "w") as f:
+            yaml.safe_dump(metadata, f)
+
+        umap_dir = tmp_path / "umap"
+        umap_dir.mkdir(parents=True, exist_ok=True)
+        (umap_dir / "file1.json").write_text('{"x": [1.0, 2.0], "y": [3.0, 4.0]}')
+        metadata["embed_dir"] = str(primary_dir)
+        with open(umap_dir / "metadata.yml", "w") as f:
+            yaml.safe_dump(metadata, f)
+
+        loader = self._make_loader(tmp_path)
+        if hasattr(loader, "metadata_dict"):
+            del loader.metadata_dict  # existing dim-reduction loaders have none
+        loader.embed_dir = umap_dir
+        loader.embed_suffix = ".json"
+        loader.dim_reduction_model = "umap"
+        loader.files = sorted(umap_dir.glob("*.json"))
+
+        embeds = loader.embeddings(return_type="array")
+        assert embeds.shape == (2, 2)
+        np.testing.assert_allclose(embeds[0], [1.0, 2.0])
+
+    def test_update_files_restores_embed_suffix(self, tmp_path):
+        embed_dir = tmp_path / "umap"
+        embed_dir.mkdir(parents=True, exist_ok=True)
+        (embed_dir / "file1.json").write_text('{"x": [1.0, 2.0], "y": [3.0, 4.0]}')
 
         loader = self._make_loader(tmp_path)
         loader.embed_dir = embed_dir
+        loader.embed_suffix = ".npy"  # stale
+        loader.dim_reduction_model = "umap"
+
+        loader.update_files()
+        assert loader.embed_suffix == ".json"
+        assert loader.files == [embed_dir / "file1.json"]
+
+        loader.dim_reduction_model = False
+        loader.embed_suffix = ".json"  # stale
+        loader.update_files()
+        assert loader.embed_suffix == ".npy"
+
+    def test_get_metadata_dict_resolves_old_relative_embed_dir(self, tmp_path):
+        # Older bacpipe versions recorded ``embed_dir`` relative to the
+        # working directory of the run (e.g.
+        # ``bacpipe/evaluation/embeddings/<name>``). The actual directory is
+        # the folder the metadata.yml lives in, so it must still be found.
+        primary_name = "2025-03-19_12-18___birdnet-AnuranSet"
+        primary_dir = (
+            tmp_path / "results" / "AnuranSet" / "embeddings" / primary_name
+        )
+        primary_dir.mkdir(parents=True)
+        np.save(primary_dir / "file1.npy", np.array([[1.0, 2.0]]))
+
+        metadata = {
+            "model_name": "birdnet",
+            "audio_dir": "../Data/AnuranSet",
+            "embed_dir": f"bacpipe/evaluation/embeddings/{primary_name}",
+            "files": {"audio_files": ["audio/foo.wav"], "nr_embeds_per_file": [1]},
+        }
+        with open(primary_dir / "metadata.yml", "w") as f:
+            yaml.safe_dump(metadata, f)
+
+        loader = self._make_loader(tmp_path)
+        loader._get_metadata_dict(primary_dir)
+        assert loader.embed_dir == primary_dir
+
+    def test_resolve_embed_dir_finds_sibling_embeddings_folder(self, tmp_path):
+        # Old dim-reduction runs stored their metadata in
+        # ``dim_reduced_embeddings/`` while the primary embeddings lived in
+        # the sibling ``embeddings/`` folder; the recorded ``embed_dir`` was
+        # relative and is no longer resolvable from the current CWD.
+        primary_name = "2025-03-19_12-18___birdnet-AnuranSet"
+        results = tmp_path / "results"
+        primary_dir = results / "AnuranSet" / "embeddings" / primary_name
+        primary_dir.mkdir(parents=True)
+        reduced_dir = (
+            results
+            / "AnuranSet"
+            / "dim_reduced_embeddings"
+            / "2025-04-15_15-53___umap-AnuranSet-birdnet"
+        )
+        reduced_dir.mkdir(parents=True)
+
+        resolved = Loader._resolve_embed_dir(
+            f"bacpipe/evaluation/embeddings/{primary_name}", reduced_dir
+        )
+        assert resolved == primary_dir
+        assert resolved.is_dir()
+
+    def test_embeddings_for_dim_reduction_loader_with_old_relative_embed_dir(
+        self, tmp_path
+    ):
+        # End-to-end reproduction of a dim-reduction loader backed by files
+        # generated several months ago: the reduced run has a metadata.yml
+        # whose ``embed_dir`` is relative to the old working directory, and
+        # the primary .npy files are stored in a sibling ``embeddings``
+        # folder. ``embeddings()`` must return the primary embeddings
+        # instead of silently returning None.
+        primary_name = "2025-03-19_12-18___birdnet-AnuranSet"
+        results = tmp_path / "results"
+        primary_dir = results / "AnuranSet" / "embeddings" / primary_name
+        primary_dir.mkdir(parents=True)
+        np.save(primary_dir / "file1.npy", np.array([[1.0, 2.0], [3.0, 4.0]]))
+        np.save(primary_dir / "file2.npy", np.array([[5.0, 6.0]]))
+
+        reduced_dir = (
+            results
+            / "AnuranSet"
+            / "dim_reduced_embeddings"
+            / "2025-04-15_15-53___umap-AnuranSet-birdnet"
+        )
+        reduced_dir.mkdir(parents=True)
+        (reduced_dir / "AnuranSet_umap.json").write_text(
+            '{"x": [1.0, 2.0], "y": [3.0, 4.0]}'
+        )
+        metadata = {
+            "model_name": "birdnet",
+            "audio_dir": "../Data/AnuranSet",
+            "embed_dir": f"bacpipe/evaluation/embeddings/{primary_name}",
+            "files": {"audio_files": ["audio/foo.wav"], "nr_embeds_per_file": [2]},
+        }
+        with open(reduced_dir / "metadata.yml", "w") as f:
+            yaml.safe_dump(metadata, f)
+
+        loader = self._make_loader(tmp_path)
+        if hasattr(loader, "metadata_dict"):
+            del loader.metadata_dict  # existing dim-reduction loaders have none
+        loader.embed_dir = reduced_dir
         loader.embed_suffix = ".json"
         loader.dim_reduction_model = "umap"
-        loader.files = sorted(embed_dir.glob("*.json"))
+        loader.files = sorted(reduced_dir.glob("*.json"))
 
         embeds = loader.embeddings(return_type="array")
-        # dim-reduced JSON files store one "x"/"y"/... coordinate column per
-        # file; each file therefore loads as a single 0-d object array, which
-        # vstacks to one row per file with the current serialization
-        assert embeds.shape == (2, 1)
+        assert embeds.shape == (3, 2)
+        np.testing.assert_allclose(embeds[0], [1.0, 2.0])
+        np.testing.assert_allclose(embeds[2], [5.0, 6.0])
+
+        d = loader.embeddings(return_type="dict")
+        assert set(d.keys()) == {"file1.npy", "file2.npy"}
 
 
 class TestLoaderPredictions:
@@ -292,3 +461,37 @@ class TestLoaderPredictions:
         preds, _ = loader.predictions(return_type="array")
         assert preds is None
         assert _ is None
+
+
+class TestSaveLogs:
+    def test_honors_kwarg_override(self, tmp_path, monkeypatch):
+        import logging
+
+        from bacpipe import config, settings
+
+        monkeypatch.setattr(config, "audio_dir", "some/default/audio")
+        monkeypatch.setattr(
+            settings, "main_results_dir", str(tmp_path / "default")
+        )
+
+        bacpipe_logger = logging.getLogger("bacpipe")
+        handlers_before = list(bacpipe_logger.handlers)
+        try:
+            save_logs(
+                main_results_dir=str(tmp_path / "custom"),
+                audio_dir=str(tmp_path / "custom_audio"),
+            )
+        finally:
+            # clean up the file handler added by save_logs
+            for handler in list(bacpipe_logger.handlers):
+                if handler not in handlers_before:
+                    handler.close()
+                    bacpipe_logger.removeHandler(handler)
+
+        # the explicitly passed kwargs win over config/settings
+        log_dir = tmp_path / "custom" / "custom_audio" / "logs"
+        assert log_dir.exists()
+        saved = {f.name for f in log_dir.iterdir()}
+        assert any(name.endswith(".log") for name in saved)
+        assert any(name.startswith("config_") for name in saved)
+        assert any(name.startswith("settings_") for name in saved)

@@ -56,6 +56,32 @@ class TestMakeSetPathsFunc:
         assert callable(get_paths)
         assert get_paths("some_model").audio_dir == audio_dir
 
+    def test_evaluations_dir_kwarg_overrides_settings(self, tmp_path):
+        audio_dir = tmp_path / "audio"
+        audio_dir.mkdir()
+        get_paths = make_set_paths_func(
+            audio_dir,
+            main_results_dir=tmp_path / "results",
+            evaluations_dir="custom_evaluations",
+        )
+        paths = get_paths("testmodel")
+        assert "custom_evaluations" in str(paths.labels_path)
+        assert paths.labels_path.parent.parent.name == "custom_evaluations"
+
+    def test_assign_global_get_paths_function_kwargs(self, tmp_path, monkeypatch):
+        import bacpipe.embedding_evaluation.label_embeddings as le
+
+        audio_dir = tmp_path / "audio"
+        audio_dir.mkdir()
+        monkeypatch.delattr(le, "get_paths", raising=False)
+        assign_global_get_paths_function(
+            audio_dir,
+            main_results_dir=tmp_path / "results",
+            evaluations_dir="custom_evaluations",
+        )
+        paths = le.get_paths("some_model")
+        assert "custom_evaluations" in str(paths.labels_path)
+
 
 class TestModelSpecificEmbeddingPath:
     def _make_embed_dirs(self, tmp_path):
@@ -355,3 +381,29 @@ class TestCreateMetadataLabels:
         )
         assert list(dl.columns) == ["time_of_day", "audio_file_name"]
         assert len(dl) == 2
+
+    def test_kwarg_only_embed_annotations_overrides_settings(
+        self, tmp_path, monkeypatch
+    ):
+        import bacpipe
+        import bacpipe.embedding_evaluation.label_embeddings as le
+
+        paths = self._make_paths(tmp_path)
+        monkeypatch.setattr(
+            le, "get_files_if_no_embeds", lambda *a, **k: ([], 1.0, self._fake_metadata())
+        )
+        # settings say "annotations only"...
+        monkeypatch.setattr(bacpipe.settings, "only_embed_annotations", True)
+        # ...but an explicitly passed kwarg must win: a regular time grid is
+        # generated instead of annotation based labels
+        dl = create_metadata_labels(
+            audio_dir=self.TEST_AUDIO_DIR,
+            model="testmodel",
+            paths=paths,
+            overwrite=True,
+            return_type="dataframe",
+            default_label_keys=["time_of_day", "audio_file_name"],
+            only_embed_annotations=False,
+        )
+        assert dl["start"].tolist() == [0.0, 1.0]
+        assert dl["end"].tolist() == [1.0, 2.0]

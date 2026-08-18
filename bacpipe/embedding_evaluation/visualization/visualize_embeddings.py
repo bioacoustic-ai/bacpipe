@@ -410,6 +410,8 @@ def get_boolean_array_for_annotated_embeddings(
     np.ndarray
         boolean array that is True for unannotated (noise) embeddings
     """
+    if kwargs.get('only_embed_annotations'):
+        return np.array([False] * len(df_ground_truth))
     if not gt_file is None and not ground_truth_files is None:
         if (
             settings.label_column in str(gt_file) 
@@ -544,6 +546,7 @@ def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
                 bool_noise = get_boolean_array_for_annotated_embeddings(
                     ground_truth_df, model_name,
                     gt_file=gt_file, ground_truth_files=ground_truth_files, 
+                    **kwargs
                 )
                 label = gt_file.stem.replace("ground_truth_", "")
                 
@@ -1071,7 +1074,7 @@ def get_arrays_for_spectrogram_text(labels, label_by, data_dict, embeds):
                     all_preds = None
             elif 'parquet' in str(file_paths[0]):
                 try:
-                    all_preds = pd.read_parquet(file_paths[0], index_col=False)
+                    all_preds = pd.read_parquet(file_paths[0])
                 except:
                     all_preds = None
         if not all_preds is None:
@@ -1226,6 +1229,7 @@ def plot_embeddings_px(
         "start": starts,
         "end": ends,
         "idx": embeds["index"],
+        "model": [embeds['metadata']['model_name']]*len(x_data),
     }
     
     if not embeds.get('z') is None:
@@ -1262,6 +1266,8 @@ def plot_embeddings_px(
         "idx",
         "label",
         "variable_labels_json",
+        "label_id",
+        "model",
     ]
 
     # 2. Setup Figure based on Label Count

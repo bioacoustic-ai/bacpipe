@@ -5,7 +5,39 @@ import librosa as lb
 from scipy.signal.windows import tukey
 from pathlib import Path
 from bacpipe import settings
+import logging
 
+logger = logging.getLogger("bacpipe")
+
+
+def timestamps_match(start_click, start_metadata, tolerance=1e-2):
+    """
+    Check whether two start timestamps (in seconds) refer to the same audio
+    segment.
+
+    A small tolerance is used instead of ``int()`` truncation so that
+    sub-second shifts between the plotted and the stored start time are
+    detected, while tiny float rounding differences (the embedding plot rounds
+    start times to 4 decimals) do not cause false alarms.
+
+    Parameters
+    ----------
+    start_click : float
+        start time stored in the click/embedding data
+    start_metadata : float
+        start time stored in the metadata labels
+    tolerance : float, optional
+        maximum allowed difference in seconds, by default 1e-2
+
+    Returns
+    -------
+    bool
+        True if the timestamps refer to the same segment
+    """
+    try:
+        return abs(float(start_click) - float(start_metadata)) <= tolerance
+    except (TypeError, ValueError):
+        return False
 
 class SpectrogramPlot:
     """
@@ -13,7 +45,7 @@ class SpectrogramPlot:
     """
 
     def __init__(
-        self, audio_dir, loader, model_name, panel_static_text, **kwargs
+        self, audio_dir, loader, model_name, panel_static_text, paths, **kwargs
     ):
         """
         Initialize the spectrogram plotting utility.
@@ -36,6 +68,11 @@ class SpectrogramPlot:
         self.panel_static_text = panel_static_text
         self.all_sample_rates = {}
         self.all_segment_lengths = {}
+        self.paths = paths
+        # Widget (or bool) that is True whenever noise-filtered embeddings are
+        # displayed. In that mode the clicked point indices no longer map onto
+        # the metadata labels, so the timestamp verification is skipped.
+        self.remove_noise_widget = kwargs.pop("remove_noise", None)
         for model in model_name.options:
             loader.get_data(model, "time_of_day")
             metadata = loader.embeds[model]["metadata"]
@@ -125,7 +162,7 @@ class SpectrogramPlot:
             )
 
         # Extract data from click
-        point_data = clickData.get("customdata", [None] * 6)
+        point_data = clickData.get("customdata", [None] * 8)
         (
             audiofilename,
             start_s,
@@ -134,7 +171,9 @@ class SpectrogramPlot:
             label,
             variable_labels_json,
             label_id,
+            model_name
         ) = point_data
+        self.check_timestamp_of_click_data_against_metadata(model_name, idx, start_s)
 
         # Load Audio
         audio, file_stem = self.load_audio(start_s, end_s, audiofilename)
@@ -146,7 +185,123 @@ class SpectrogramPlot:
 
         return spec_fig
 
-    
+    def check_timestamp_of_click_data_against_metadata(self, model_name, idx, start_s):
+        """
+        Verify that the start timestamp of the clicked embedding point matches
+        the start timestamp stored in the metadata labels of the corresponding
+        model.
+
+        This is a safety check to avoid displaying a spectrogram that does not
+        correspond to the audio that was actually used to generate the clicked
+        embedding (e.g. after switching ``only_embed_annotations`` or changing
+        other settings that affect how the timestamps are generated). The check
+        is advisory only: on any failure a warning is logged and the spectrogram
+        display continues normally.
+
+        To keep the delay added by this check as small as possible, the
+        ``start`` column of the metadata labels is read from disk only once per
+        model and cached for all subsequent clicks.
+
+        Parameters
+        ----------
+        model_name : str or None
+            name of the model the clicked point belongs to
+        idx : int
+            row index of the clicked point in the metadata labels
+        start_s : float
+            start timestamp (seconds) of the clicked point
+        """
+        if model_name is None or self.paths is None:
+            return
+
+        # When noise-filtered embeddings are shown the clicked point indices
+        # no longer map onto the metadata labels, so the check is meaningless.
+        remove_noise = getattr(
+            self.remove_noise_widget, "value", self.remove_noise_widget
+        )
+        if remove_noise:
+            return
+
+        if not hasattr(self, "_metadata_starts_cache"):
+            self._metadata_starts_cache = {}
+
+        if model_name not in self._metadata_starts_cache:
+            self._metadata_starts_cache[model_name] = self._load_metadata_starts(
+                model_name
+            )
+
+        start_from_metadata = self._metadata_starts_cache[model_name]
+        if start_from_metadata is None:
+            return
+
+        try:
+            start_from_metadata = float(start_from_metadata.iloc[idx])
+        except (IndexError, TypeError, KeyError):
+            logger.warning(
+                f"Could not find a metadata label at index {idx} for model "
+                f"{model_name}. Skipping the timestamp verification."
+            )
+            return
+
+        if not timestamps_match(start_s, start_from_metadata):
+            logger.warning(
+                "\nThe timestamps of the clicked point do not match with the timestamps "
+                "of the metadata file. This means the displayed spectrogram might not "
+                "correspond to the audio that was actually used to generate this embedding. "
+                "Please double check that your crucial settings have not changed since "
+                "you generated embeddings. This means that you have not switched the value "
+                "of only_embed_annotations or other parameters that would affect how "
+                "the timestamps are generated. If this error persists, remove the "
+                "dim_reduced_embeddings, as these contain the timestamps that are "
+                "used for the visualization of embedding points.\n"
+            )
+
+    def _load_metadata_starts(self, model_name):
+        """
+        Load the ``start`` column of the metadata labels for a model once.
+
+        Reads ``metadata_labels.csv`` when available and falls back to
+        ``metadata_labels.parquet``. Returns ``None`` (without raising) when
+        no metadata labels file can be found so the dashboard keeps working.
+
+        Parameters
+        ----------
+        model_name : str
+            name of the model
+
+        Returns
+        -------
+        pandas.Series or None
+            the ``start`` column of the metadata labels, or None if unavailable
+        """
+        try:
+            labels_path = self.paths(model_name).labels_path
+        except (AttributeError, TypeError):
+            return None
+
+        csv_path = labels_path / "metadata_labels.csv"
+        parquet_path = labels_path / "metadata_labels.parquet"
+
+        try:
+            if csv_path.exists():
+                return pd.read_csv(
+                    csv_path, usecols=["start"], index_col=False
+                )["start"]
+            if parquet_path.exists():
+                return pd.read_parquet(parquet_path, columns=["start"])["start"]
+        except Exception as e:
+            logger.warning(
+                "Could not read the metadata labels to verify the clicked "
+                f"timestamp: {e}"
+            )
+            return None
+
+        logger.warning(
+            f"No metadata_labels file found for model {model_name}. "
+            "Skipping the timestamp verification of the clicked points."
+        )
+        return None
+
     def update_text(
         self, start_s, end_s, audiofilename, label, variable_labels_json=None
     ):

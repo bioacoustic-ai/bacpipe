@@ -8,6 +8,7 @@ import os
 import pytest
 import torch
 
+import bacpipe
 from bacpipe.model_pipelines.model_utils import (
     ModelBaseClass,
     check_if_cudnn_tensorflow_compatible,
@@ -106,6 +107,40 @@ class TestCheckIfCudnnTensorflowCompatible:
                 torch.backends.cudnn, "version", lambda: cudnn_version
             )
             assert isinstance(check_if_cudnn_tensorflow_compatible(), bool)
+
+
+class TestClassifierKwargs:
+    """The pretrained classifier reads its options from ``settings`` unless
+    the matching kwarg is passed explicitly."""
+
+    def test_max_labels_per_timestamp_kwarg(self):
+        from types import SimpleNamespace
+
+        from bacpipe.model_pipelines.runner import Classifier
+
+        clf = Classifier(
+            SimpleNamespace(),
+            "testmodel",
+            audio_dir=".",
+            main_results_dir=".",
+            classifier_threshold=0.5,
+            use_folder_structure=False,
+            max_labels_per_timestamp=7,
+        )
+        assert clf.max_labels_per_timestamp == 7
+
+        clf_default = Classifier(
+            SimpleNamespace(),
+            "testmodel",
+            audio_dir=".",
+            main_results_dir=".",
+            classifier_threshold=0.5,
+            use_folder_structure=False,
+        )
+        assert (
+            clf_default.max_labels_per_timestamp
+            == bacpipe.settings.max_labels_per_timestamp
+        )
 
 
 class TestCustomModelEmbedder:

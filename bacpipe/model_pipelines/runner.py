@@ -718,39 +718,55 @@ class Classifier:
         self.model_name = model_name
         self.classifier_threshold = classifier_threshold
         self.save_raven_tables = save_raven_tables
+        self.max_labels_per_timestamp = kwargs.get(
+            "max_labels_per_timestamp", bacpipe.settings.max_labels_per_timestamp
+        )
         if use_folder_structure:
             from bacpipe.embedding_evaluation.label_embeddings import (
                 make_set_paths_func,
             )
 
-            self.paths = make_set_paths_func(audio_dir, main_results_dir)(
-                model_name
-            )
+            self.paths = make_set_paths_func(
+                audio_dir,
+                main_results_dir,
+                evaluations_dir=kwargs.get("evaluations_dir"),
+            )(model_name)
 
         self.predictions = torch.tensor([])
 
         if kwargs.get("only_embed_annotations"):
             self.only_embed_annotations = True
-            from bacpipe.embedding_evaluation.label_embeddings import (
-                load_labels_and_build_dict,
-                assign_global_get_paths_function,
-                get_paths,
-            )
+            if not use_folder_structure:
+                from bacpipe.embedding_evaluation.label_embeddings import (
+                    load_labels_and_build_dict
+                )
+                self.df = load_labels_and_build_dict(
+                    paths=None,
+                    annotations_filename=kwargs.get("annotations_filename"),
+                    audio_dir=audio_dir,
+                    bool_filter_labels=False
+                )
+            else:
+                from bacpipe.embedding_evaluation.label_embeddings import (
+                    load_labels_and_build_dict,
+                    assign_global_get_paths_function,
+                    get_paths,
+                )
 
-            assign_global_get_paths_function(audio_dir)
-            paths = get_paths(self.model_name)
-            self.df = load_labels_and_build_dict(
-                paths,
-                kwargs.get("annotations_filename"),
-                audio_dir,
-                bool_filter_labels=False,
-            )
+                assign_global_get_paths_function(audio_dir, **kwargs)
+                paths = get_paths(self.model_name)
+                self.df = load_labels_and_build_dict(
+                    paths,
+                    kwargs.get("annotations_filename"),
+                    audio_dir,
+                    bool_filter_labels=False,
+                )
             self.start_timestamps = self.df.start.values
             self.end_timestamps = self.df.end.values
 
     @staticmethod
     def filter_top_k_classifications(
-        probabilities, class_names, threshold
+        probabilities, class_names, threshold, max_labels_per_timestamp=None
     ):
         """
         Generate a dictionary with the top k classes. By limiting the class number to
@@ -766,14 +782,22 @@ class Classifier:
             class names
         threshold : float
             values to threshold probabilities with
+        max_labels_per_timestamp : int, optional
+            number of labels to keep per timestamp, by default None. If None,
+            the value from ``bacpipe.settings.max_labels_per_timestamp``
+            is used.
 
         Returns
         -------
         dict
             dictionary of top k classes with time bin indices exceeding threshold
         """
-        if not bacpipe.settings.max_labels_per_timestamp is None:
-            k = bacpipe.settings.max_labels_per_timestamp
+        if max_labels_per_timestamp is None:
+            max_labels_per_timestamp = (
+                bacpipe.settings.max_labels_per_timestamp
+            )
+        if not max_labels_per_timestamp is None:
+            k = max_labels_per_timestamp
             
         top_k_indices = np.argsort(np.array(probabilities), axis=0)[-k:][::-1]
         top_k_probs = np.sort(probabilities, axis=0)[-k:][::-1]
@@ -796,7 +820,9 @@ class Classifier:
         return cls_results
 
     @staticmethod
-    def make_classification_dict(probabilities, classes, threshold):
+    def make_classification_dict(
+        probabilities, classes, threshold, max_labels_per_timestamp=None
+    ):
         """
         Make a classification dictionary for one audio file with the top k
         classifications and a head with general information about the file.
@@ -809,6 +835,10 @@ class Classifier:
             class names
         threshold : float
             value to threshold the probabilities with
+        max_labels_per_timestamp : int, optional
+            number of labels to keep per timestamp, by default None. If None,
+            the value from ``bacpipe.settings.max_labels_per_timestamp``
+            is used.
 
         Returns
         -------
@@ -819,7 +849,10 @@ class Classifier:
             probabilities = probabilities.swapaxes(0, 1)
 
         cls_results = Classifier.filter_top_k_classifications(
-            probabilities, classes, threshold
+            probabilities,
+            classes,
+            threshold,
+            max_labels_per_timestamp=max_labels_per_timestamp,
         )
 
         cls_results["head"] = {
@@ -966,14 +999,30 @@ class Classifier:
 
         df = fileloader_obj.predictions(return_type="dataframe")
         if isinstance(df, pd.DataFrame):
-            df_dict = df[["audiofilename", "start", "end"]]
+            df_dict = df[["audiofilename", "start", "end"]].copy()
             if len(df) > 0:
-                cols = df.iloc[:, 4:].columns
-                maxes = np.argmax(np.array(df.iloc[:, 4:]), axis=1)
-                highest_prob_species = [cols[i] for i in maxes]
-
-                df.iloc[:, 4:].max(axis=1)
-                df_dict["label:default_classifier"] = highest_prob_species
+                # Select the species columns by name rather than by position
+                # so that a leading index column (e.g. "Unnamed: 0") in
+                # prediction files written by older bacpipe versions cannot
+                # shift the species columns and mis-assign the species that
+                # belongs to a given embedding row.
+                species_cols = [
+                    col
+                    for col in df.columns
+                    if col not in {
+                        "audiofilename",
+                        "start",
+                        "end",
+                        "simultaneous_labels",
+                    }
+                    and not str(col).startswith("Unnamed")
+                ]
+                if len(species_cols) > 0:
+                    species_df = df[species_cols]
+                    maxes = np.argmax(np.array(species_df), axis=1)
+                    df_dict["label:default_classifier"] = [
+                        species_df.columns[i] for i in maxes
+                    ]
 
         self.cumulative_annotations = pd.DataFrame(df_dict)
         self.cumulative_annotations = pd.concat(
@@ -1034,7 +1083,10 @@ class Classifier:
             self._fill_dataframe_with_classiefier_results(fileloader_obj, file)
 
             cls_results = self.make_classification_dict(
-                self.predictions, self.model.classes, self.classifier_threshold
+                self.predictions,
+                self.model.classes,
+                self.classifier_threshold,
+                max_labels_per_timestamp=self.max_labels_per_timestamp,
             )
 
             with open(file_dest, "w") as f:
@@ -1072,8 +1124,8 @@ class Classifier:
         )
         raven_file_dest = str(raven_file_dest) + ".selection.table.txt"
         
-        if not bacpipe.settings.max_labels_per_timestamp is None:
-            k = bacpipe.settings.max_labels_per_timestamp
+        if not self.max_labels_per_timestamp is None:
+            k = self.max_labels_per_timestamp
             
         top_k_indices = np.argsort(np.array(self.predictions), axis=1)[:,-k:][:, ::-1]
         top_k_probs = np.sort(np.array(self.predictions), axis=1)[:,-k:][:, ::-1]

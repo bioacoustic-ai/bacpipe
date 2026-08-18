@@ -17,19 +17,28 @@ from bacpipe.embedding_evaluation.label_embeddings import (
 logger = logging.getLogger("bacpipe")
 
 
-def save_logs():
+def save_logs(**kwargs):
     """
     Set up file logging for the current run and store a snapshot of the
     current ``bacpipe.config`` and ``bacpipe.settings`` values.
 
     Logs and JSON snapshots are written to a timestamped subdirectory
     ``logs`` under the main results directory.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Explicitly passed kwargs override the defaults from
+        ``bacpipe/config.yaml`` and ``bacpipe/settings.yaml``, e.g.
+        ``main_results_dir`` and ``audio_dir``.
     """
     import datetime
     import json
 
     log_dir = (
-        Path(settings.main_results_dir) / Path(config.audio_dir).stem / f"logs"
+        Path(kwargs.get("main_results_dir", settings.main_results_dir))
+        / Path(kwargs.get("audio_dir", config.audio_dir)).stem
+        / "logs"
     )
     log_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -147,7 +156,9 @@ class Loader:
         else:
             if not model_name is None:
                 get_paths = make_set_paths_func(
-                    audio_dir, settings.main_results_dir
+                    audio_dir,
+                    kwargs.get("main_results_dir", settings.main_results_dir),
+                    evaluations_dir=kwargs.get("evaluations_dir"),
                 )
                 self.paths = get_paths(model_name)
             if not self.combination_already_exists:
@@ -593,6 +604,53 @@ class Loader:
             },
         }
 
+    @staticmethod
+    def _resolve_embed_dir(metadata_embed_dir, metadata_folder):
+        """
+        Resolve the ``embed_dir`` recorded in a ``metadata.yml`` file to a
+        directory that actually exists on disk.
+
+        Newer bacpipe versions store the absolute path of the embedding
+        directory in the metadata file. Older versions stored a path that
+        was relative to the working directory of the run that created the
+        metadata (e.g. ``bacpipe/evaluation/embeddings/<dir name>``). In
+        that case the actual directory is co-located in the results
+        directory, so we fall back to locating it by its directory name.
+
+        Parameters
+        ----------
+        metadata_embed_dir : str
+            value of the ``embed_dir`` key in the metadata file
+        metadata_folder : pathlib.Path
+            folder containing the ``metadata.yml`` file
+
+        Returns
+        -------
+        pathlib.Path
+            path to the embedding directory, resolved if possible,
+            otherwise the original (unresolved) value
+        """
+        embed_dir = Path(metadata_embed_dir)
+        if embed_dir.is_dir():
+            return embed_dir
+
+        # Older versions recorded a path relative to the run's working
+        # directory (e.g. ``bacpipe/evaluation/embeddings/<name>``). The
+        # actual directory is located in the results directory, typically
+        # as a sibling of the folder holding this metadata file, under its
+        # parent ``embeddings`` folder, or directly at the audio-stem level
+        # (``use_folder_structure=False`` runs).
+        name = embed_dir.name
+        for candidate in (
+            metadata_folder.parent.parent.joinpath("embeddings", name),
+            metadata_folder.parent.joinpath("embeddings", name),
+            metadata_folder.parent.joinpath(name),
+            metadata_folder.parent.parent.joinpath(name),
+        ):
+            if candidate.is_dir():
+                return candidate
+        return embed_dir
+
     def _get_metadata_dict(self, folder):
         """
         Load the metadata dictionary from the given folder and assign the
@@ -611,7 +669,7 @@ class Loader:
                     continue
                 if not Path(val).is_dir():
                     if key == "embed_dir":
-                        val = folder.parent.joinpath(Path(val).stem)
+                        val = self._resolve_embed_dir(val, folder)
                     elif key == "audio_dir":
                         logger.info(
                             "The audio files are no longer where they used to be "
@@ -794,6 +852,9 @@ class Loader:
         the first dimension corresponds to the timestamp and the
         second dimension to the embedding dimension.
 
+        For dimensionality reduction loaders the primary ``.npy``
+        embedding files are returned: the reduced coordinates are stored
+        as separate ``.json`` files in ``self.embed_dir``.
 
         Parameters
         ----------
@@ -806,8 +867,23 @@ class Loader:
             depending on `return_type` argument
         """
         d = {}
-        if not self.files[0].suffix == self.embed_suffix:
-            embedding_files = list(self.embed_dir.rglob(f"*{self.embed_suffix}"))
+        if self.dim_reduction_model:
+            # ``embeddings()`` returns the model embeddings (the .npy files).
+            # A dimensionality reduction run stores its reduced coordinates
+            # as separate .json files inside ``self.embed_dir``; locate the
+            # primary embeddings through the directory recorded in the
+            # metadata of the reduced-embedding run.
+            if hasattr(self, "metadata_dict"):
+                embed_dir = self.metadata_dict["embed_dir"]
+            else:
+                embed_dir = load_metadata_file(self.embed_dir)["embed_dir"]
+            embed_dir = self._resolve_embed_dir(embed_dir, self.embed_dir)
+            embed_suffix = ".npy"
+        else:
+            embed_dir = self.embed_dir
+            embed_suffix = self.embed_suffix
+        if not self.files or not self.files[0].suffix == embed_suffix:
+            embedding_files = list(embed_dir.rglob(f"*{embed_suffix}"))
             if len(embedding_files) == 0:
                 logger.warning(
                     "No embedding files were found. Check that the path is right "
@@ -819,13 +895,8 @@ class Loader:
                 self.files = embedding_files
                 self.files.sort()
         for file in self.files:
-            if not self.dim_reduction_model:
-                embeds = np.load(file)
-            else:
-                with open(file, "r") as f:
-                    embeds = json.load(f)
-                embeds = np.array(embeds)
-            d[str(file.relative_to(self.embed_dir))] = embeds
+            embeds = np.load(file)
+            d[str(file.relative_to(embed_dir))] = embeds
         if return_type == "dict":
             return d
         elif return_type == "array":
@@ -1067,12 +1138,16 @@ class Loader:
             )
             if isinstance(df, pd.DataFrame):
                 if len(df) * len(df.T) > 3_000_000:
-                    df.to_parquet(preds_path_local / (file_name + ".parquet"))
+                    df.to_parquet(
+                        preds_path_local / (file_name + ".parquet"), index=False
+                    )
                 else:
-                    df.to_csv(preds_path_local / (file_name + ".csv"))
+                    df.to_csv(
+                        preds_path_local / (file_name + ".csv"), index=False
+                    )
         else:
             try:
-                df = pd.read_csv(preds_path_local / (file_name + ".csv"))
+                df = pd.read_csv(preds_path_local / (file_name + ".csv"), index_col=False)
             except:
                 df = pd.read_parquet(
                     preds_path_local / (file_name + ".parquet")
@@ -1218,14 +1293,23 @@ class Loader:
     def update_files(self):
         """
         Refresh ``self.files`` with the embedding files currently present
-        in ``self.embed_dir``.
+        in ``self.embed_dir`` and restore ``self.embed_suffix`` to the
+        format this loader actually stores (``.json`` for dimensionality
+        reduction loaders, ``.npy`` otherwise).
+
+        The files are kept sorted so that the row order of the returned
+        embeddings is deterministic and matches the per-file bookkeeping
+        written to ``metadata.yml``.
         """
         if self.dim_reduction_model:
             self.files = [
                 f for f in self.embed_dir.iterdir() if f.suffix == ".json"
             ]
+            self.embed_suffix = ".json"
         else:
             self.files = list(self.embed_dir.rglob("*.npy"))
+            self.embed_suffix = ".npy"
+        self.files.sort()
 
     def save_embedding_file(self, file, embeds):
         """

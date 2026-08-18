@@ -303,6 +303,13 @@ class DashBoard(DashBoardHelper):
             self.vis_loader,
             self.model_select[widget_idx],
             embedding_info_dialogue,
+            paths=self.path_func,
+            remove_noise=(
+                self.noise_select[widget_idx]
+                if widget_idx in self.noise_select
+                and self.noise_select[widget_idx] is not None
+                else None
+            ),
             **self.kwargs,
         )
 
