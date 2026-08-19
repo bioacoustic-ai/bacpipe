@@ -500,6 +500,11 @@ class PredictionsLoader:
         if not (
             self.path_func(self.models[0]).probe_path / "linear_probe.pt"
         ).exists():
+            logger.warning(
+                "\nNo Linear probe has been trained yet, therefore Linear is not "
+                "an option. Enable probing to ensure a linear classifier is saved "
+                "first. Then it can be used here.\n"
+            )
             clfier_type = "Integrated"
 
         # Serve the cached result only if it matches the current request and
@@ -520,8 +525,10 @@ class PredictionsLoader:
         try:
             if clfier_type == "Linear":
                 self.loading_pane.value = "Loading embeddings for classification"
+                if not probe_path:
+                    probe_path = self.path_func(model).probe_path / "linear_probe.pt"
                 linear_probe, class_dict = prepare_probe_inference(
-                    model, probe_path
+                    model, probe_path, **kwargs
                 )
                 self.loading_pane.value = "Running linear probe"
                 threshold = self.verify_threshold(threshold)
@@ -532,6 +539,7 @@ class PredictionsLoader:
                     threshold,
                     return_binary_presence=True,
                     callbacks={"progress_bar": self.progress_bar},
+                    **kwargs,
                 )
 
             elif clfier_type == "Integrated":
@@ -543,26 +551,26 @@ class PredictionsLoader:
 
             else:
                 raise ValueError(
-                    f"Unknown classifier type: {clfier_type!r}"
+                    f"\nUnknown classifier type: {clfier_type!r}\n"
                 )
 
             self.embed_dict = self.vis_loader.embeds[model]
 
             if binary_presence is None:
                 warning_string = (
-                    "It seems like the classifier hasn't been run yet, or <br>"
+                    "\nIt seems like the classifier hasn't been run yet, or <br>"
                     f"that {model} doesn't have a pretrained classifier. <br>"
                     "If the model has a pretrained classifier, please rerun <br>"
-                    "bacpipe with the setting `run default classifier` set to `True`."
+                    "bacpipe with the setting `run default classifier` set to `True`.\n"
                 )
                 self.loading_pane.value = warning_string
                 raise FileNotFoundError(warning_string)
 
             if not len(self.embed_dict["x"]) == len(binary_presence):
                 logger.warning(
-                    "There is a mismatch between the number of embeddings "
+                    "\nThere is a mismatch between the number of embeddings "
                     "and the number of predictions. Going to zero pad the "
-                    "rest, but this could misalign things. "
+                    "rest, but this could misalign things. \n"
                 )
                 binary_presence = np.pad(
                     binary_presence,
@@ -738,7 +746,7 @@ class PredictionsLoader:
                     "given that there were no predictions with the minimum "
                     "threshold, the classifications need to be recomputed. "
                     "The easiest way to do this is to delete the generated "
-                    "classifications which will force a recomputation."
+                    "classifications which will force a recomputation.\n"
                 )
                 logger.exception(error_string)
                 raise ValueError(
@@ -785,8 +793,8 @@ class PredictionsLoader:
         # Fall back to the overall presence instead of crashing.
         if species not in self.class_dict:
             logger.warning(
-                f"Species {species!r} not found in the current classifier "
-                "outputs, falling back to 'overall'."
+                f"\nSpecies {species!r} not found in the current classifier "
+                "outputs, falling back to 'overall'.\n"
             )
             species = "overall"
         self.panel_selection.value = species

@@ -274,9 +274,9 @@ class Embedder(AudioHandler):
         if "umap" in self.model.__module__:
             if samples.shape[0] <= self.model.umap_config["n_neighbors"]:
                 logger.warning(
-                    "Not enough embeddings were created to compute a dimensionality"
+                    "\nNot enough embeddings were created to compute a dimensionality"
                     " reduction with the chosen settings. Please embed more audio or "
-                    "reduce the n_neighbors in the umap config."
+                    "reduce the n_neighbors in the umap config.\n"
                 )
         return self.model(samples)
 
@@ -650,7 +650,9 @@ class Embedder(AudioHandler):
             if not isinstance(sample, Path):
                 sample = Path(sample)
                 if not hasattr(self, 'audio_suffixes'):
-                    self.audio_suffixes = bacpipe.settings.audio_suffixes
+                    self.audio_suffixes = self.kwargs.get(
+                        "audio_suffixes", bacpipe.settings.audio_suffixes
+                    )
                 if not sample.suffix in self.audio_suffixes:
                     error = (
                         "\nThe provided path does not lead to a supported audio file with the ending"

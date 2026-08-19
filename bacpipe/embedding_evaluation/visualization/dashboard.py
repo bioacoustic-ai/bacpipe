@@ -126,7 +126,10 @@ class DashBoard(DashBoardHelper):
             > 0
         ):
             self.label_by += [
-                clustering['name'] for clustering in bacpipe.settings.clust_configs.values()
+                clustering['name']
+                for clustering in kwargs.get(
+                    "clust_configs", bacpipe.settings.clust_configs
+                ).values()
                 if clustering['bool'] is True
             ]
 
@@ -185,6 +188,27 @@ class DashBoard(DashBoardHelper):
         tuple of (str, pn.Column)
             panel title and the column containing the plot
         """
+        # ``self.kwargs`` holds the merged config/settings dict and includes
+        # the ``dashboard`` flag from ``config.yaml``. Splatting it verbatim
+        # next to the explicitly passed ``dashboard=True``/``dashboard_idx=...``
+        # (and the other keys below) would raise
+        # "TypeError: got multiple values for keyword argument 'dashboard'".
+        # Filter those keys out so user kwargs still forward without colliding.
+        plot_kwargs = {
+            key: value
+            for key, value in self.kwargs.items()
+            if key
+            not in {
+                "loader",
+                "model_name",
+                "label_by",
+                "ground_truth",
+                "dim_reduction_model",
+                "remove_noise",
+                "dashboard",
+                "dashboard_idx",
+            }
+        }
         if not self.interactive_embedding_plot:
             embedding_plot = self.init_plot(
                 # self.init_interactive_plot(
@@ -203,6 +227,7 @@ class DashBoard(DashBoardHelper):
                 ),
                 dashboard=True,
                 dashboard_idx=widget_idx,
+                **plot_kwargs,
             )
         else:
 
@@ -235,6 +260,7 @@ class DashBoard(DashBoardHelper):
                     ),
                     dashboard=True,
                     dashboard_idx=widget_idx,
+                    **plot_kwargs,
                 )
 
             # Only attach watchers once per widget (check if already attached)
@@ -288,9 +314,18 @@ class DashBoard(DashBoardHelper):
             panel title and the column containing the plot
         """
         self.spectrogram_plot_panel[widget_idx] = pn.pane.Plotly(
-            SpectrogramPlot.dummy_image(title=""),
+            SpectrogramPlot.dummy_image(
+                title="",
+                height=self.kwargs.get(
+                    "spectrogram_plot_height",
+                    bacpipe.settings.spectrogram_plot_height,
+                ),
+            ),
             sizing_mode="stretch_width",
-            height=self.kwargs.get("spectrogram_plot_height"),
+            height=self.kwargs.get(
+                "spectrogram_plot_height",
+                bacpipe.settings.spectrogram_plot_height,
+            ),
         )
 
         embedding_info_dialogue = pn.widgets.StaticText(

@@ -13,7 +13,9 @@ class Model(ModelBaseClass):
         self.umap_config = {
             "n_neighbors": 15,
             "min_dist": 0.1,
-            "n_components": settings.visualization_dimensions,
+            "n_components": kwargs.get(
+                "visualization_dimensions", settings.visualization_dimensions
+            ),
             "metric": "euclidean",
             "random_state": 42,
         }

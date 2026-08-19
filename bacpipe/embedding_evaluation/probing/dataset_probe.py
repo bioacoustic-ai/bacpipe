@@ -235,9 +235,9 @@ def generate_annotations_for_probing_task(
             )
     else:
         logger.info(
-            f"Found file: {str(dataset_csv_path)}. Loading dataframe probing "
+            f"\nFound file: {str(dataset_csv_path)}. Loading dataframe probing "
             "dataframe. If you would like to automatically create a new probing "
-            "dataframe. Please delete the existing one."
+            "dataframe. Please delete the existing one.\n"
         )
         df = pd.read_csv(dataset_csv_path, index_col=False)
     return df

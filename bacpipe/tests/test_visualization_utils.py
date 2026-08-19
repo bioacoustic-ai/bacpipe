@@ -731,3 +731,113 @@ class TestFriendlyExportError:
         )
         assert message is not None
         assert "Chrome" in message
+
+
+class TestDashboardEmbeddingPanelKwargs:
+    """``DashBoard.embedding_panel`` forwards user kwargs to the plot functions
+    without colliding with the explicit ``dashboard``/``dashboard_idx`` flags.
+
+    Regression: ``bacpipe.play`` merges ``config.yaml``/``settings.yaml`` into
+    the dashboard kwargs, and ``config.yaml`` contains a ``dashboard`` key.
+    A naive ``**self.kwargs`` splat next to ``dashboard=True`` raised
+    "TypeError: got multiple values for keyword argument 'dashboard'".
+    """
+
+    def test_dashboard_kwarg_does_not_collide_with_explicit_flag(self):
+        from bacpipe.embedding_evaluation.visualization.dashboard import (
+            DashBoard,
+        )
+
+        dash = object.__new__(DashBoard)
+        # mirrors a real ``bacpipe.play`` run where the merged config/settings
+        # dict (including the ``dashboard`` flag) lands in the dashboard kwargs
+        dash.kwargs = {
+            "dashboard": True,
+            "models": ["model_a"],
+            "overwrite": False,
+            "already_computed": False,
+        }
+        dash.interactive_embedding_plot = False
+        dash.vis_loader = object()
+        dash.model_select = {0: "model_a"}
+        dash.label_select = {0: "time_of_day"}
+        dash.noise_select = {}
+        dash.ground_truth = None
+        dash.dim_reduction_model = "umap"
+        dash.embed_save_button = {0: None}
+        dash.embed_notification = {0: None}
+
+        captured = {}
+
+        def fake_init_plot(p_type, plot_func, widget_idx, **kwargs):
+            captured.update(kwargs)
+            captured["plot_func"] = plot_func
+            return "plot"
+
+        dash.init_plot = fake_init_plot
+
+        # must not raise "got multiple values for keyword argument 'dashboard'"
+        dash.embedding_panel(0)
+
+        assert captured["dashboard"] is True
+        assert captured["dashboard_idx"] == 0
+        assert captured["model_name"] == "model_a"
+        assert captured["label_by"] == "time_of_day"
+        # user kwargs are still forwarded, just without the colliding keys
+        assert captured["overwrite"] is False
+        assert captured["models"] == ["model_a"]
+
+
+
+class TestDashboardInitClustConfigs:
+    """``DashBoard.__init__`` must not read ``self.kwargs`` before it is set.
+
+    Regression: the clustering label block used ``self.kwargs`` while
+    ``self.kwargs = kwargs`` is only assigned at the end of ``__init__``.
+    Building the dashboard after clustering had run (the normal
+    ``bacpipe.play`` flow) therefore raised
+    ``AttributeError: 'DashBoard' object has no attribute 'kwargs'``.
+    """
+
+    def test_clustered_results_do_not_raise_attribute_error(
+        self, tmp_path, monkeypatch
+    ):
+        import bacpipe.embedding_evaluation.label_embeddings as le
+        from bacpipe.embedding_evaluation.visualization.dashboard import (
+            DashBoard,
+        )
+
+        clust_dir = tmp_path / "clustering"
+        clust_dir.mkdir()
+        (clust_dir / "model_a_kmeans.npy").write_bytes(b"")
+        labels_dir = tmp_path / "labels"
+        labels_dir.mkdir()
+
+        def fake_paths(model_name):
+            return SimpleNamespace(
+                preds_path=tmp_path / "predictions",
+                clust_path=clust_dir,
+                labels_path=labels_dir,
+                plot_path=tmp_path / "plots",
+            )
+
+        # ``le.get_paths`` is a module global that only exists once
+        # ``make_set_paths_func`` has been called, so tolerate a missing attr.
+        monkeypatch.setattr(le, "get_paths", fake_paths, raising=False)
+        monkeypatch.setattr(
+            le, "make_set_paths_func", lambda *a, **k: fake_paths
+        )
+
+        dash = DashBoard(
+            model_names=["model_a"],
+            audio_dir=str(tmp_path),
+            main_results_dir=tmp_path,
+            default_label_keys=["label"],
+            evaluation_task="linear",
+            dim_reduction_model=None,
+            dim_reduc_parent_dir="dim_reduced",
+            clust_configs={"kmeans": {"name": "kmeans", "bool": True}},
+        )
+
+        assert "kmeans" in dash.label_by
+

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 from .train_probe import LinearProbe
 
 
-def prepare_probe_inference(model, probe_path=""):
+def prepare_probe_inference(model, probe_path="", **kwargs):
     """
     Load a linear probe that was previously trained and saved.
     The probe is loaded and the state_dict of the model is loaded
@@ -23,6 +23,11 @@ def prepare_probe_inference(model, probe_path=""):
         model name of backbone
     probe_path : str, optional
         path to probe, will default to the standard bacpipe path, by default ''
+    **kwargs : dict
+        Explicitly passed kwargs override the defaults from
+        ``bacpipe/config.yaml`` and ``bacpipe/settings.yaml``, e.g.
+        ``audio_dir``, ``main_results_dir``, ``dim_reduc_parent_dir``
+        and ``device``.
 
     Returns
     -------
@@ -38,23 +43,25 @@ def prepare_probe_inference(model, probe_path=""):
         import bacpipe.embedding_evaluation.label_embeddings as le
 
         path_func = le.make_set_paths_func(
-            config.audio_dir,
-            settings.main_results_dir,
-            settings.dim_reduc_parent_dir,
+            kwargs.get("audio_dir", config.audio_dir),
+            kwargs.get("main_results_dir", settings.main_results_dir),
+            kwargs.get("dim_reduc_parent_dir", settings.dim_reduc_parent_dir),
         )
         probe_path = (
             path_func(model).probe_path / "linear_probe.pt"
         ).as_posix()
 
+    device = kwargs.get("device", settings.device)
+
     with open(Path(probe_path).parent / "label2index.json", "r") as f:
         label2index = json.load(f)
 
-    probe_weights = torch.load(probe_path, map_location=settings.device)
+    probe_weights = torch.load(probe_path, map_location=device)
     probe = LinearProbe(
         probe_weights["probe.weight"].shape[-1], len(label2index)
     )
     probe.load_state_dict(probe_weights)
-    probe.to(settings.device)
+    probe.to(device)
 
     return probe, label2index
 
@@ -67,6 +74,7 @@ def run_probe_inference(
     return_binary_presence=True,
     callbacks=None,
     device="cpu",
+    **kwargs,
 ):
     """
     Apply a previously trained linear probe to data.
@@ -93,22 +101,34 @@ def run_probe_inference(
         use to have custom progress bars increment, by default None
     device : str, optional
         select device to process the probe, by default 'cpu'
+    **kwargs : dict
+        Explicitly passed kwargs override the defaults from
+        ``bacpipe/config.yaml`` and ``bacpipe/settings.yaml``, e.g.
+        ``audio_dir`` and ``device``.
 
     Returns
     -------
     np.ndarray
         generated probe predictions
     """
+    device = kwargs.get("device", device)
     if embeds is None:
         from bacpipe.core.experiment_manager import Loader
         from bacpipe import config, settings
 
+        loader_kwargs = {**vars(settings), **kwargs}
+        # ``audio_dir`` and ``model_name`` are passed explicitly below, so
+        # drop them from the merged dict. Otherwise the explicit keyword and
+        # the same key inside ``**loader_kwargs`` collide and raise
+        # "TypeError: got multiple values for keyword argument".
+        loader_kwargs.pop("audio_dir", None)
+        loader_kwargs.pop("model_name", None)
         ld = Loader(
-            audio_dir=config.audio_dir, model_name=model, **vars(settings)
+            audio_dir=kwargs.get("audio_dir", config.audio_dir),
+            model_name=model,
+            **loader_kwargs,
         )
-        embeds = torch.Tensor(ld.embeddings(return_type="array")).to(
-            settings.device
-        )
+        embeds = torch.Tensor(ld.embeddings(return_type="array")).to(device)
     elif isinstance(embeds, np.ndarray):
         embeds = torch.Tensor(embeds)
 

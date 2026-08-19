@@ -343,3 +343,71 @@ class TestGenerateEmbeddingsCustomModel:
         )
         assert seen["model_names"] == "mel"
         assert seen["CustomModel"] == "MyModel"
+
+
+class TestPlayKwargsOverrideConfig:
+    """
+    ``bacpipe.play(...)`` must forward user-provided kwargs (e.g.
+    ``audio_dir``) to the pipeline functions even when they differ from the
+    defaults in ``config.yaml`` / ``settings.yaml``. This reproduces the
+    setup of a real bug report: ``bacpipe.play(audio_dir=...)`` with an
+    ``audio_dir`` that differed from ``config.audio_dir``.
+    """
+
+    def test_audio_dir_kwarg_overrides_config_default(self, monkeypatch, tmp_path):
+        import bacpipe
+        from bacpipe import config
+        from bacpipe.core.workflows import play
+
+        user_audio_dir = str(tmp_path / "user_audio")
+        (tmp_path / "user_audio").mkdir()
+        monkeypatch.setattr(config, "audio_dir", str(tmp_path / "config_audio"))
+        assert config.audio_dir != user_audio_dir
+
+        seen = {}
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.ensure_models_exist",
+            lambda *a, **k: str(tmp_path / "models"),
+        )
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.get_model_names", lambda **k: ["mel"]
+        )
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.evaluation_with_settings_already_exists",
+            lambda **k: False,
+        )
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.run_pipeline_for_models",
+            lambda **kwargs: seen.setdefault(
+                "run_pipeline", kwargs.get("audio_dir")
+            )
+            or {},
+        )
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.model_specific_evaluation",
+            lambda *args, **kwargs: seen.setdefault(
+                "model_specific", kwargs.get("audio_dir")
+            ),
+        )
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.cross_model_evaluation",
+            lambda **kwargs: seen.setdefault(
+                "cross_model", kwargs.get("audio_dir")
+            ),
+        )
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.visualize_using_dashboard",
+            lambda **kwargs: seen.setdefault(
+                "dashboard", kwargs.get("audio_dir")
+            ),
+        )
+        monkeypatch.setattr(
+            "bacpipe.core.workflows.save_logs", lambda **kwargs: None
+        )
+
+        play(models=["mel"], audio_dir=user_audio_dir, overwrite=True)
+
+        assert seen["run_pipeline"] == user_audio_dir
+        assert seen["model_specific"] == user_audio_dir
+        assert seen["cross_model"] == user_audio_dir
+        assert seen["dashboard"] == user_audio_dir

@@ -208,9 +208,16 @@ class DashBoardHelper:
 
         # Create Plotly pane with dummy figure and reserved height to prevent accordion collapse
         self.interactive_embed_plot[widget_idx] = pn.pane.Plotly(
-            SpectrogramPlot.dummy_image(title="Loading..."),
+            SpectrogramPlot.dummy_image(
+                title="Loading...",
+                height=self.kwargs.get(
+                    "embed_fig_height", settings.embed_fig_height
+                ),
+            ),
             sizing_mode="stretch_width",
-            height=settings.embed_fig_height,
+            height=self.kwargs.get(
+                "embed_fig_height", settings.embed_fig_height
+            ),
             config={"responsive": True},
         )
 

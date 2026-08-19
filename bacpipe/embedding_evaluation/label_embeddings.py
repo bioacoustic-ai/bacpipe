@@ -504,8 +504,7 @@ def make_set_paths_func(
         )
         
         task_path = dataset_path.joinpath(
-            kwargs.get("evaluations_dir")
-            or bacpipe.settings.evaluations_dir
+            kwargs.get("evaluations_dir", bacpipe.settings.evaluations_dir)
             ).joinpath(
             model_name
         )  
@@ -702,9 +701,9 @@ def get_dt_filename(file):
     while len(datetime) < 12:
         if i > 1000:
             logger.warning(
-                f"Could not find a valid datetime in the filename {file}. "
+                f"\nCould not find a valid datetime in the filename {file}. "
                 "Please check the filename format."
-                "Creating a default datetime corresponding to 2000, 1, 1."
+                "Creating a default datetime corresponding to 2000, 1, 1.\n"
             )
             datetime = "20001010000000"
             break
@@ -729,9 +728,9 @@ def get_dt_filename(file):
     # add fix if file_date is never created as a datetime object
     if file_date is None:
         logger.warning(
-            f"Could not find a valid datetime in the filename {file}. "
+            f"\nCould not find a valid datetime in the filename {file}. "
             "Please check the filename format."
-            "Creating a default datetime corresponding to 2000, 1, 1."
+            "Creating a default datetime corresponding to 2000, 1, 1.\n"
         )
         file_date = dt.datetime.strptime("20001010000000", "%y%m%d%H%M%S")
     return file_date
@@ -781,7 +780,10 @@ def model_specific_embedding_path(
             for d in embed_paths_for_this_model
             if (
                 dim_reduction_model in d.stem
-                and return_reduced_dimensions(d) == bacpipe.settings.visualization_dimensions
+                and return_reduced_dimensions(d)
+                == kwargs.get(
+                    "visualization_dimensions", bacpipe.settings.visualization_dimensions
+                )
                 )
         ]
         
@@ -795,8 +797,8 @@ def model_specific_embedding_path(
         raise ValueError(error)
     elif len(embed_paths_for_this_model) > 1:
         logger.info(
-            f"Multiple embeddings found for model {model} in {path}. "
-            "Using the most recent path."
+            f"\nMultiple embeddings found for model {model} in {path}. "
+            "Using the most recent path.\n"
         )
     return embed_paths_for_this_model[-1]
 
@@ -958,25 +960,25 @@ def fetch_annotation_file(audio_dir, annotations_filename, paths):
                 )
             except FileNotFoundError as e:
                 logger.warning(
-                    "No annotations file found, not able to create ground_truth.npy file. "
+                    "\nNo annotations file found, not able to create ground_truth.npy file. "
                     "bacpipe should still work, but you will not be able to label by ground truth. "
-                    "You also will not be able to evaluate using classification."
+                    "You also will not be able to evaluate using classification.\n"
                 )
                 raise FileNotFoundError("No annotations file found.")
     except FileNotFoundError as e:
         try:
             logger.warning(
-                f"No annotations file found in {audio_dir}, trying in "
-                f"{str(paths.dataset_path.resolve())}."
+                f"\nNo annotations file found in {audio_dir}, trying in "
+                f"{str(paths.dataset_path.resolve())}.\n"
             )
             return pd.read_csv(
                 paths.dataset_path.joinpath(annotations_filename), index_col=False
             )
         except:
             logger.warning(
-                "No annotations file found, not able to create ground_truth.npy file. "
+                "\nNo annotations file found, not able to create ground_truth.npy file. "
                 "bacpipe should still work, but you will not be able to label by ground truth. "
-                "You also will not be able to evaluate using classification."
+                "You also will not be able to evaluate using classification.\n"
             )
             raise FileNotFoundError("No annotations file found.")
         
@@ -1137,6 +1139,9 @@ def fit_labels_to_embedding_timestamps(
         df_fitted_gt["start"] = df["start"].values
         df_fitted_gt["end"] = df["end"].values
 
+    min_annotation_length = kwargs.get(
+        "min_annotation_length", bacpipe.settings.min_annotation_length
+    )
     df.index = range(len(df))
     for _, row in df.iterrows():
         start_at_embed_nr = np.where(
@@ -1150,14 +1155,15 @@ def fit_labels_to_embedding_timestamps(
         for idx in range(start_at_embed_nr, end_at_embed_nr):
 
             # check if the annotation length is longer that the specified min_annotation_length
-            if (row.end - row.start > bacpipe.settings.min_annotation_length):
+            if (row.end - row.start > min_annotation_length):
                 df_fitted_gt.loc[idx, row[f"label:{label_column}"]] = 1
             else:
                 logger.info(
                     f"\nSkipping annotation from {row.start} to {row.end} with "
                     f"label {row['label:species']} because the annotation is "
-                    f"shorter than {bacpipe.settings.min_annotation_length=}. To change this, "
-                    "modify the value in the settings file."
+                    f"shorter than {min_annotation_length=}. To change this, "
+                    "modify the value in the settings file or pass the "
+                    "min_annotation_length kwarg.\n"
                 )
                 
     df_fitted_gt["simultaneous_labels"] = df_fitted_gt.drop(
@@ -1233,12 +1239,12 @@ def build_ground_truth_labels_by_file(
         )
         if file_labels["simultaneous_labels"].max() == 0:
             logger.warning(
-                "The simultaneous labels column of the ground truth has a "
+                "\nThe simultaneous labels column of the ground truth has a "
                 "maximum value of 0 for annotations corresponding to "
                 f"{audio_file=}. This means no annotations have been"
                 "found for your data. Something failed in building the "
                 "ground truth array. Please ensure the audio filenames "
-                "match the names in the names in the annotations file."
+                "match the names in the names in the annotations file.\n"
             )
         file_labels["audiofilename"] = audio_file
         all_labels = pd.concat([all_labels, file_labels])
@@ -1484,10 +1490,10 @@ def collect_ground_truth_labels(
     
     if ground_truth["simultaneous_labels"].max() > 1:
         logger.warning(
-            "The simultaneous labels column of the ground truth has "
+            "\nThe simultaneous labels column of the ground truth has "
             "values exceeding 1. This means you have multi-label "
             "ground truth annotations. If this should not be "
-            "happening ensure the ground truth is created correcly."
+            "happening ensure the ground truth is created correcly.\n"
         )
     return ground_truth
 
@@ -1511,7 +1517,9 @@ def assign_global_get_paths_function(audio_dir, **kwargs):
         make_set_paths_func(
             audio_dir,
             kwargs.get("main_results_dir", bapcipe_settings.main_results_dir),
-            evaluations_dir=kwargs.get("evaluations_dir"),
+            evaluations_dir=kwargs.get(
+                "evaluations_dir", bapcipe_settings.evaluations_dir
+            ),
         )
 
 
@@ -1599,7 +1607,7 @@ def ground_truth_by_model(
         try:
             path = model_specific_embedding_path(paths.main_embeds_path, model)
         except Exception as e:
-            logger.warning(f"No embeddings directory seems to exist. {str(e)}")
+            logger.warning(f"\nNo embeddings directory seems to exist. {str(e)}\n")
             path = None
 
         # get annotations is not provided
@@ -1735,8 +1743,8 @@ def ensure_audio_files(found_audio_files, annotated_audio_files, audio_dir):
         ]
         if not_found:
             logger.warning(
-                f"{not_found} were not found in {audio_dir}. "
-                "Are you sure you entered the correct path to the audio data?"
+                f"\n{not_found} were not found in {audio_dir}. "
+                "Are you sure you entered the correct path to the audio data?\n"
             )
         if len(found_annotated_audio_files) > 0:
             found_annotated_audio_files = found_audio_files

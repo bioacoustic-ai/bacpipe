@@ -110,7 +110,7 @@ class SpectrogramPlot:
         self.selected_points = selected_points
 
     @staticmethod
-    def dummy_image(title):
+    def dummy_image(title, height=None):
         """
         Create a placeholder figure to display before a point is selected.
 
@@ -118,6 +118,9 @@ class SpectrogramPlot:
         ----------
         title : str
             title of the placeholder image
+        height : int, optional
+            height of the placeholder figure, by default None in which
+            case the height is taken from ``settings.spectrogram_plot_height``
 
         Returns
         -------
@@ -129,7 +132,11 @@ class SpectrogramPlot:
         fig.update_layout(
             title=title,
             margin=dict(l=20, r=20, t=40, b=20),
-            height=settings.spectrogram_plot_height,
+            height=(
+                height
+                if height is not None
+                else settings.spectrogram_plot_height
+            ),
             xaxis={"visible": False},
             yaxis={"visible": False},
         )
@@ -158,7 +165,10 @@ class SpectrogramPlot:
         # Sohw black image initially
         if not clickData:
             return SpectrogramPlot.dummy_image(
-                "Click an embedding to see the corresponding spectrogram"
+                "Click an embedding to see the corresponding spectrogram",
+                height=self.kwargs.get(
+                    "spectrogram_plot_height", settings.spectrogram_plot_height
+                ),
             )
 
         # Extract data from click
@@ -380,7 +390,9 @@ class SpectrogramPlot:
             color_continuous_scale=self.kwargs.get("spec_colorscale"),
         )
         fig.update_layout(
-            height=self.kwargs.get("spectrogram_plot_height"),
+            height=self.kwargs.get(
+                "spectrogram_plot_height", settings.spectrogram_plot_height
+            ),
             margin=dict(l=20, r=20, t=20, b=20),
         )
         return fig
