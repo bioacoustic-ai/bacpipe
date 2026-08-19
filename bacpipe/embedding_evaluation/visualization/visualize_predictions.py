@@ -261,7 +261,8 @@ def plot_per_class_results(
     all_classes = sorted(reference, key=reference.get, reverse=True)
 
     for i, model_name in enumerate(model_list):
-        class_values = [per_class_results[model_name][cls] for cls in all_classes]
+        all_found_classes =  [cls for cls in all_classes if cls in list(per_class_results[model_name].keys())]
+        class_values = [per_class_results[model_name][cls] for cls in all_found_classes]
 
         ax.scatter(
             np.arange(len(class_values)),
@@ -286,8 +287,8 @@ def plot_per_class_results(
     )
     ax.set_ylabel("Accuracy")
     ax.set_xlabel("Classes")
-    ax.set_xticks(np.arange(len(all_classes)))
-    ax.set_xticklabels(all_classes, rotation=90)
+    ax.set_xticks(np.arange(len(all_found_classes)))
+    ax.set_xticklabels(all_found_classes, rotation=90)
 
     ax.legend(
         loc="upper left", bbox_to_anchor=(1.05, 1), title="Models", fontsize=10
