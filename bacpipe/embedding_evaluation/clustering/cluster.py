@@ -18,6 +18,19 @@ logger = logging.getLogger(__name__)
 
 
 def convert_numpy_types(obj):
+    """
+    Convert numpy types to native Python types.
+
+    Parameters
+    ----------
+    obj : numpy object
+        object to be converted
+
+    Returns
+    -------
+    int or float or list
+        object converted to a native Python type
+    """
     if isinstance(obj, np.int64):
         return int(obj)
     elif isinstance(obj, np.float32):
@@ -110,6 +123,8 @@ def eval_clustering(
         metadata labels for the dataset
     label_column : string
         label type defined in annotations.csv file
+    embeds : np.array, optional
+        embeddings, by default None
 
     Returns
     -------
@@ -279,7 +294,7 @@ def clustering_pipeline(
         if not ground_truth is None and len(ground_truth) > 0:
             
             bool_noise = get_boolean_array_for_annotated_embeddings(
-                ground_truth, model_name
+                ground_truth, model_name, **kwargs
                 )
             ground_truth_1d = get_single_label_gt_labels(
                 ground_truth, bool_noise
@@ -293,7 +308,8 @@ def clustering_pipeline(
         cluster_configs = get_clustering_models(clust_params)
 
         metadata_labels = le.create_metadata_labels(
-            paths.audio_dir, paths.clust_path.parent.stem, paths, overwrite=False,
+            paths.audio_dir, paths.clust_path.parent.stem, 
+            paths, overwrite=False, return_type='dict', 
             **kwargs
         )
         

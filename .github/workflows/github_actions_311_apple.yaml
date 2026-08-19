@@ -25,6 +25,7 @@ jobs:
           - birdaves_especies
           - biolingual
           - birdnet
+          - birdnet_v3
           - birdmae
           - convnext_birdset
           - hbdet
@@ -72,3 +73,36 @@ jobs:
           --models=${{ matrix.model }}
           --only_embed_annotations=True
           --device=cpu
+
+  # ---------------------------------------------------------------------------
+  # Unit tests that do NOT need to generate model embeddings. These run once
+  # (in parallel with the per-model jobs) because conftest.py only parametrizes
+  # tests that request the `model`/`device` fixtures, i.e. test_embedding_creation.py.
+  # ---------------------------------------------------------------------------
+  unit-tests:
+    name: Unit tests (no model embeddings)
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash  # Guarantees identical execution across Linux, Mac, and Windows
+    steps:
+      # 1. Clone repository code
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      # 2. Set up Python 3.11 with PIP caching enabled
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'  # Caches PyPI packages to make re-runs blazingly fast
+
+      # 3. Install pytest and bacpipe source package
+      - name: Install pytest and bacpipe (editable)
+        run: pip install -r requirements_no_cuda.txt
+
+      # 4. Run all unit tests that do NOT require generating model embeddings.
+      - name: Run Unit Tests
+        run: >-
+          python -m pytest -q --disable-warnings bacpipe/tests/
+          --ignore=bacpipe/tests/test_embedding_creation.py

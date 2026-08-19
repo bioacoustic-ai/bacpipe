@@ -31,6 +31,38 @@ class AugmentMelSTFT(nn.Module):
         fmin_aug_range=1,
         fmax_aug_range=1000,
     ):
+        """
+        Initialize the augmentable mel STFT module.
+
+        Parameters
+        ----------
+        n_mels : int
+            number of mel bins
+        sr : int
+            sample rate
+        win_length : int
+            window length of the STFT
+        hopsize : int
+            hop size of the STFT
+        n_fft : int
+            FFT size
+        freqm : int
+            frequency mask width for augmentation (unused for eval)
+        timem : int
+            time mask width for augmentation (unused for eval)
+        htk : bool
+            whether to use the HTK mel scale
+        fmin : float
+            minimum frequency of the mel filterbank
+        fmax : float or None
+            maximum frequency of the mel filterbank
+        norm : int
+            mel filterbank normalization type
+        fmin_aug_range : int
+            fmin augmentation range
+        fmax_aug_range : int
+            fmax augmentation range
+        """
         torch.nn.Module.__init__(self)
         # adapted from: https://github.com/CPJKU/kagglebirds2020/commit/70f8308b39011b09d41eb0f4ace5aa7d2b0e806e
         # Similar config to the spectrograms used in AST: https://github.com/YuanGongND/ast
@@ -68,7 +100,19 @@ class AugmentMelSTFT(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Convert the input waveform to a normalized mel spectrogram.
 
+        Parameters
+        ----------
+        x : torch.Tensor
+            input waveform
+
+        Returns
+        -------
+        torch.Tensor
+            normalized mel spectrogram
+        """
         x = nn.functional.conv1d(
             x.unsqueeze(1), self.preemphasis_coefficient
         ).squeeze(1)
@@ -118,11 +162,17 @@ class AugmentMelSTFT(nn.Module):
         return melspec
 
     def extra_repr(self):
+        """
+        Return the extra string representation of the module.
+        """
         return "winsize={}, hopsize={}".format(self.win_length, self.hopsize)
 
 
 class Model(ModelBaseClass):
     def __init__(self, **kwargs):
+        """
+        Initialize the AvesEcho PaSST model.
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -151,14 +201,53 @@ class Model(ModelBaseClass):
         self.classes = df.iloc[:, 1].values.tolist()
 
     def preprocess(self, audio):
+        """
+        Convert the audio samples to a mel spectrogram.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            mel spectrogram
+        """
         audio = audio.to(self.device)
         return self.preprocessor(audio)
 
     @torch.inference_mode()
     def __call__(self, input):
+        """
+        Run the model on the input spectrogram.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            input mel spectrogram
+
+        Returns
+        -------
+        torch.Tensor
+            model features
+        """
         self.logits, features = self.model.net(input.unsqueeze(1))
         return features
 
     def classifier_predictions(self, embeddings):
+        """
+        Return the sigmoid class probabilities from the last call.
+
+        Parameters
+        ----------
+        embeddings : torch.Tensor
+            embeddings from the last model call (unused)
+
+        Returns
+        -------
+        torch.Tensor
+            sigmoid class probabilities
+        """
         probs = torch.sigmoid(self.logits)
         return probs

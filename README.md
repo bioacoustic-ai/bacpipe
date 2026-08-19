@@ -1,4 +1,4 @@
-# Welcome to **bacpipe** (**B**io**A**coustic **C**ollection **Pipe**line)
+# Welcome to **bacpipe** (**B**io**Ac**oustic **Pipe**line)
 
 [![Documentation Status](https://readthedocs.org/projects/bacpipe/badge/?version=latest)](https://bacpipe.readthedocs.io/en/latest/?badge=latest)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/bacpipe?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/bacpipe)
@@ -34,7 +34,12 @@ import bacpipe
 
 bacpipe.play()
 ```
-A more detailed description of the API can be found under [API](#api). In `bacpipe/examples` you can find 3 jupyter notebooks demonstrating different use cases of the API. Full documentation can be found at [https://bacpipe.readthedocs.io](https://bacpipe.readthedocs.io). The github repository can be found at [https://github.com/bioacoustic-ai/bacpipe](https://github.com/bioacoustic-ai/bacpipe).
+A more detailed description of the API can be found under [API](#api). 
+
+In `bacpipe/examples` you can find 5 **jupyter notebooks** demonstrating different use cases of the API. A good starting point is the notebook simple_use_cases.ipynb which you can find as a file [here](bacpipe/examples/basic_examples/simple_use_cases.ipynb) or online in the documentation [here](https://bacpipe.readthedocs.io/en/latest/examples/basic_examples/simple_use_cases.html). To see how you can easily compare a model of your own to an existing model check out the notebook using_a_custom_model.ipynb which you can find as a file [here](bacpipe/examples/basic_examples/using_a_custom_model.ipynb) or online in the documentation [here](https://bacpipe.readthedocs.io/en/latest/examples/basic_examples/using_a_custom_model.html).
+
+
+Full documentation can be found at [https://bacpipe.readthedocs.io](https://bacpipe.readthedocs.io). The github repository can be found at [https://github.com/bioacoustic-ai/bacpipe](https://github.com/bioacoustic-ai/bacpipe).
 
 There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) available on youtube to install and run bacpipe.
 
@@ -117,6 +122,7 @@ available_models : [
     "birdaves_especies",
     "biolingual",
     "birdnet",
+    "birdnet_v3",
     "birdmae",
     "convnext_birdset",
     "hbdet",
@@ -222,6 +228,7 @@ Models currently include:
 |   BirdAVES_ESpecies    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 1024 |
 |   BirdMAE    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   32 kHz|   10 s| 1280 |
 |   BirdNET     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s| 1024 |
+|   BirdNET_v3     |   paper   |   [code](https://github.com/birdnet-team/birdnet-V3.0-dev)    |   32 kHz|   variable, default 3 s | 1280 |
 |   ConveNeXT_BirdSet   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |   32 kHz|   5 s| 1024 |
 |   Google_Whale       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   24 kHz|   5 s| 1280 |
 |   hbdet |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s| 2048|
@@ -492,6 +499,7 @@ Models that already contain classification heads, are the following:
 - Bat
 - BatDetect2_Clip_Avg
 - BirdNET
+- BirdNET_v3
 - ConvNeXT_birdset
 - google_whale
 - Perch_v2
@@ -748,12 +756,13 @@ This is the resulting folder structure:
 |   [AvesEcho_PaSST](#avesecho_passt)   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   sup l |   trafo | PaSST | [weights](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1/-/blob/main/checkpoints/best_model_passt.pt?ref_type=heads) |
 |   [AVES_ESpecies](#aves_especies)        |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   ssl|   trafo | HuBERT | [weights](https://storage.googleapis.com/esp-public-files/ported_aves/aves-base-all.torchaudio.pt)|
 | [Bat](#bat) | [paper](https://arxiv.org/abs/2309.11218) | [code](https://github.com/FrankFundel/BAT-cli) | sup l | trafo | CNN + trafo | [weights](https://github.com/FrankFundel/BAT-cli/tree/main/models) |
-| [BatDetect2_Clip_Avg](#batdetect2_clip_avg) | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | sup l | trafo | U-Net | included |
-| [BatDetect2_Dets_avg](#batdetect2_dets_avg) | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | sup l | trafo | U-Net | included |
+| [BatDetect2_Clip_Avg](#batdetect2_clip_avg) | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | sup l | trafo | Net2DFast | included |
+| [BatDetect2_Dets_avg](#batdetect2_dets_avg) | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | sup l | trafo | Net2DFast | included |
 | [BEATs](#beats) | [paper](https://arxiv.org/abs/2212.09058) | [code](https://github.com/microsoft/unilm/tree/master/beats) | ssl | trafo | ViT | [weights](https://1drv.ms/u/s!AqeByhGUtINrgcpoZecQbiXeaUjN8A?e=DasbeC) |
 |   [BioLingual](#biolingual)  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   ssl|   trafo| CLAP | included |
 |   [BirdAVES_ESpecies](#birdaves_especies)    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   ssl|   trafo | HuBERT | [weights](https://storage.googleapis.com/esp-public-files/birdaves/birdaves-biox-large.torchaudio.pt)|
 |   [BirdMAE](#birdmae)    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   ssl | trafo | ViT | included |
+|   [BirdNET_v3](#birdnet)     |   paper   |   [code](https://github.com/birdnet-team/birdnet-V3.0-dev)    |   sup l |   CNN | EffNetv2s | [weights](https://zenodo.org/records/20703646)|
 |   [BirdNET](#birdnet)     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   sup l|   CNN | EffNetB0 | [weights](https://github.com/kahst/BirdNET-Analyzer/tree/main/birdnet_analyzer/checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model)|
 |   [ConvNeXT_BirdSet](#convnext_birdset)   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |  sup l |   CNN | ConvNext | included|
 |   [Google_Whale](#google_whale)       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   sup l|   CNN| EffNetb0 | included|
@@ -862,6 +871,13 @@ BirdMAE is a masked autoencoder inspired by meta's AudioMAE, however the model w
 
 BirdNET (v2.4) is based on a EfficientNET(b0) architecture. The model is trained on a large amount of bird vocalizations from the xeno-canto database alongside other bird song databses. 
 
+### BirdNET_v3
+- CNN
+- supervised training model
+- trained on bird song data (xeno-canto, Macaulay Library), as well as other animal sounds
+
+BirdNET_v3 is a CNN model based on the EfficientNetv2s architecture. The model is still in a development stage, therefore explicit information about training data is not yet available. The model is trained on a large amount of bird vocalizations from the xeno-canto and Macaulay Library databases alongside other animal sound databases. The models classifier can distinguish 11,000 different species. 
+
 ### ConvNeXT_BirdSet
 - CNN
 - supervised learning
@@ -942,8 +958,8 @@ Perch_Bird is a EFficientNet B1 model trained on the entire Xeno-canto database.
 - supervised learning
 - trained on birds, amphibians, insects and mammals (xeno-canto, iNaturalis, Tierstimmenarchiv)
 
-Perch V2 or Perch 2.0 is the updated version of the Perch model from bioacousticians at Google. The model is a EfficientNetB3, trained on a very large database of various species. The classifier is able to distinguish 14795 different species. 
-**Bacpipe** uses the onnx implementation which allows the model to run through pytorch so it can be used with all operating systems and also supports cuda and mps accelleration.
+Perch V2 or Perch 2.0 is the updated version of the Perch model from bioacousticians at Google. The model is a single label model! It's architecture is an EfficientNetB3, trained on a very large database of various species. The classifier is able to distinguish 14795 different species. 
+**Bacpipe** uses the onnx implementation by [@justinchuby](https://huggingface.co/justinchuby) which allows the model to run through PyTorch so it can be used with all operating systems and also supports cuda and mps accelleration.
 
 ### SurfPerch
 - CNN

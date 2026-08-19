@@ -38,6 +38,11 @@ pn.extension("plotly")
 
 
 class DashBoard(DashBoardHelper):
+    """
+    Panel dashboard visualizing embeddings, clustering, probing results and
+    classifier predictions for one or multiple models.
+    """
+
     def __init__(
         self,
         model_names,
@@ -49,6 +54,28 @@ class DashBoard(DashBoardHelper):
         dim_reduc_parent_dir,
         **kwargs,
     ):
+        """
+        Initialize the dashboard and its widgets.
+
+        Parameters
+        ----------
+        model_names : list
+            names of the models to visualize
+        audio_dir : pathlib.Path
+            directory containing the audio files
+        main_results_dir : pathlib.Path
+            directory containing the evaluation results
+        default_label_keys : list
+            default label keys used for coloring
+        evaluation_task : str
+            evaluation tasks to display (e.g., clustering, probing)
+        dim_reduction_model : str
+            dimensionality reduction model used for the embeddings
+        dim_reduc_parent_dir : pathlib.Path
+            parent directory of the reduced embeddings
+        **kwargs
+            additional keyword arguments (e.g., plot heights, widths)
+        """
         self.models = model_names
         self.default_label_keys = default_label_keys
         self.audio_dir = audio_dir
@@ -98,7 +125,10 @@ class DashBoard(DashBoardHelper):
             len(list(le.get_paths(model_names[0]).clust_path.glob("*.npy")))
             > 0
         ):
-            self.label_by += ["kmeans"]
+            self.label_by += [
+                clustering['name'] for clustering in bacpipe.settings.clust_configs.values()
+                if clustering['bool'] is True
+            ]
 
         self.evaluation_task = evaluation_task
         self.dim_reduction_model = dim_reduction_model
@@ -142,6 +172,19 @@ class DashBoard(DashBoardHelper):
         self.kwargs = kwargs
 
     def embedding_panel(self, widget_idx=0):
+        """
+        Build the 2D embedding plot panel for a widget.
+
+        Parameters
+        ----------
+        widget_idx : int
+            index of the widget
+
+        Returns
+        -------
+        tuple of (str, pn.Column)
+            panel title and the column containing the plot
+        """
         if not self.interactive_embedding_plot:
             embedding_plot = self.init_plot(
                 # self.init_interactive_plot(
@@ -167,6 +210,14 @@ class DashBoard(DashBoardHelper):
 
             # Callback to update plot when any selector changes, while preserving accordion state.
             def update_plot_on_change(event):
+                """
+                Redraw the embedding plot when a selector value changes.
+
+                Parameters
+                ----------
+                event : object or None
+                    panel parameter change event, or None on first render
+                """
                 self.update_main_plot(
                     "interactive_embed",
                     plot_embeddings,
@@ -223,7 +274,19 @@ class DashBoard(DashBoardHelper):
         )
 
     def spectrogram_panel(self, widget_idx=0):
+        """
+        Build the spectrogram plot panel for a widget.
 
+        Parameters
+        ----------
+        widget_idx : int
+            index of the widget
+
+        Returns
+        -------
+        tuple of (str, pn.Column)
+            panel title and the column containing the plot
+        """
         self.spectrogram_plot_panel[widget_idx] = pn.pane.Plotly(
             SpectrogramPlot.dummy_image(title=""),
             sizing_mode="stretch_width",
@@ -232,7 +295,7 @@ class DashBoard(DashBoardHelper):
 
         embedding_info_dialogue = pn.widgets.StaticText(
             value="",
-            width=self.kwargs.get("accordion_width") - 80,
+            sizing_mode="stretch_width",
         )
 
         self.spec_plot_obj[widget_idx] = SpectrogramPlot(
@@ -240,6 +303,13 @@ class DashBoard(DashBoardHelper):
             self.vis_loader,
             self.model_select[widget_idx],
             embedding_info_dialogue,
+            paths=self.path_func,
+            remove_noise=(
+                self.noise_select[widget_idx]
+                if widget_idx in self.noise_select
+                and self.noise_select[widget_idx] is not None
+                else None
+            ),
             **self.kwargs,
         )
 
@@ -277,6 +347,19 @@ class DashBoard(DashBoardHelper):
         )
 
     def clustering_panel(self, widget_idx):
+        """
+        Build the clustering results panel for a widget.
+
+        Parameters
+        ----------
+        widget_idx : int
+            index of the widget
+
+        Returns
+        -------
+        tuple of (str, pn.Column)
+            panel title and the column containing the clustering plot
+        """
         return (
             "Clustering Results",
             (
@@ -305,6 +388,19 @@ class DashBoard(DashBoardHelper):
         )
 
     def probing_panel(self, widget_idx):
+        """
+        Build the probing performance panel for a widget.
+
+        Parameters
+        ----------
+        widget_idx : int
+            index of the widget
+
+        Returns
+        -------
+        tuple of (str, pn.Column)
+            panel title and the column containing the probing plot
+        """
         return (
             "Probing Performance",
             (
@@ -329,6 +425,21 @@ class DashBoard(DashBoardHelper):
         )
 
     def model_page(self, widget_idx, single_model=False):
+        """
+        Build the single model dashboard page.
+
+        Parameters
+        ----------
+        widget_idx : int
+            index of the widget
+        single_model : bool
+            if True, panels are laid out for a single model
+
+        Returns
+        -------
+        pn.Row
+            row containing the sidebar and the model content
+        """
         sidebar = self.make_sidebar(widget_idx, model=True)
         title_string = "Model Dashboard for {}".format
         accordion_title = pn.bind(title_string, self.model_select[widget_idx])
@@ -337,13 +448,14 @@ class DashBoard(DashBoardHelper):
                 pn.Accordion(
                     self.embedding_panel(widget_idx),
                     active=[0],
-                    width=self.kwargs.get("accordion_width"),
+                    sizing_mode="stretch_width",
                 ),
                 pn.Accordion(
                     self.spectrogram_panel(widget_idx),
                     self.clustering_panel(widget_idx),
                     self.probing_panel(widget_idx),
                     active=[0, 1, 2],
+                    sizing_mode="stretch_width",
                 ),
             )
         else:
@@ -353,7 +465,7 @@ class DashBoard(DashBoardHelper):
                 self.clustering_panel(widget_idx),
                 self.probing_panel(widget_idx),
                 active=[0, 1, 2, 3],
-                width=self.kwargs.get("accordion_width"),
+                sizing_mode="stretch_width",
             )
 
         main_content = pn.Column(
@@ -367,13 +479,25 @@ class DashBoard(DashBoardHelper):
                 },
             ),
             data_panels,
-            # width=self.kwargs.get('accordion_width'),
-            # sizing_mode="stretch_both",
+            sizing_mode="stretch_width",
         )
 
-        return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
+        return pn.Row(sidebar, main_content, sizing_mode="stretch_width")
 
     def all_models_page(self, widget_idx):
+        """
+        Build the dashboard page comparing all models.
+
+        Parameters
+        ----------
+        widget_idx : int
+            index of the widget
+
+        Returns
+        -------
+        pn.Row
+            row containing the sidebar and the all-models content
+        """
         sidebar = self.make_sidebar(widget_idx, model=False, all_models=True)
 
         main_content = pn.Column(
@@ -445,16 +569,28 @@ class DashBoard(DashBoardHelper):
                         )
                     ),
                 ),
-                # sizing_mode="stretch_width",
                 active=[0, 1, 2],
+                sizing_mode="stretch_width",
             ),
-            width=2 * self.kwargs.get("accordion_width"),
-            # sizing_mode="stretch_both",
+            sizing_mode="stretch_width",
         )
 
-        return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
+        return pn.Row(sidebar, main_content, sizing_mode="stretch_width")
 
     def apply_clfier_page(self, widget_idx):
+        """
+        Build the page for applying a classifier to model predictions.
+
+        Parameters
+        ----------
+        widget_idx : int
+            index of the widget
+
+        Returns
+        -------
+        pn.Row
+            row containing the sidebar and the classification content
+        """
         self.class_options[widget_idx] = []
         sidebar = self.make_sidebar(
             widget_idx, model=True, classifier_page=True
@@ -523,7 +659,7 @@ class DashBoard(DashBoardHelper):
         )
 
         main_content = pn.Column(
-            pn.pane.Markdown("## All Models Dashboard"),
+            pn.pane.Markdown("## Classifier Predictions"),
             pn.Accordion(
                 (
                     "Classification settings",
@@ -567,16 +703,36 @@ class DashBoard(DashBoardHelper):
                     ),
                 ),
                 active=[0, 1, 2],
+                sizing_mode="stretch_width",
                 # by default create all annotations as one big annotations file
                 # # add button to save as raven annotations
             ),
-            width=self.kwargs.get("accordion_width"),
+            sizing_mode="stretch_width",
         )
-        return pn.Row(sidebar, main_content)  # , sizing_mode="stretch_both")
+        return pn.Row(sidebar, main_content, sizing_mode="stretch_width")
 
     def make_sidebar(
         self, widget_idx, model=True, classifier_page=False, all_models=False
     ):
+        """
+        Build the sidebar widgets for a dashboard page.
+
+        Parameters
+        ----------
+        widget_idx : int
+            index of the widget
+        model : bool
+            whether to include the model selector
+        classifier_page : bool
+            whether the sidebar belongs to the classifier page
+        all_models : bool
+            whether the sidebar belongs to the all-models page
+
+        Returns
+        -------
+        pn.Column
+            column of sidebar widgets
+        """
         widgets = [pn.pane.Markdown("## Settings")]
 
         if model:
@@ -695,13 +851,14 @@ class DashBoard(DashBoardHelper):
         model_all_page = self.all_models_page(3)
         apply_classifier0_page = self.apply_clfier_page(4)
         apply_classifier1_page = self.apply_clfier_page(5)
+        apply_classifier2_page = self.apply_clfier_page(6)
 
         # Extract sidebars and content
         sidebar0, content0 = model0_page.objects
         sidebar1, content1 = model1_page.objects
         sidebar2, content2 = model2_page.objects
-        sidebar3, content3 = apply_classifier0_page.objects
         sidebar4, content4 = apply_classifier1_page.objects
+        sidebar5, content5 = apply_classifier2_page.objects
 
         # Wrap sidebars with titles
         sidebar0 = pn.Column(
@@ -724,22 +881,32 @@ class DashBoard(DashBoardHelper):
                 ),
             ),
             ("All models", model_all_page),
-            ("Single Model Predictions", apply_classifier1_page),
+            ("Single Model Predictions", apply_classifier0_page),
             (
                 "Two Model Predictions",
                 pn.Row(
-                    pn.Column(sidebar3, sidebar4),
-                    pn.Row(content3, content4),
+                    pn.Column(sidebar4, sidebar5),
+                    pn.Row(content4, content5),
                     sizing_mode="stretch_both",
                 ),
             ),
+            dynamic=True,
         )
 
         self.add_styling(
-            model0_page, model2_page, model_all_page, apply_classifier1_page
+            model0_page, model2_page, model_all_page, apply_classifier0_page
         )
 
     def add_styling(self, *pages):
+        """
+        Add the logo, contact info, and close button to each page sidebar.
+
+        Parameters
+        ----------
+        *pages
+            dashboard pages whose sidebars should be styled
+        """
+
         
         logo = pkg_resources.files("bacpipe") / "imgs" / "bacpipe_unlabelled.png"
             
@@ -767,6 +934,14 @@ class DashBoard(DashBoardHelper):
             close_button = pn.widgets.Button(name="❌ close dashboard")
 
             def shutdown_callback(event):
+                """
+                Shut down the dashboard server.
+
+                Parameters
+                ----------
+                event : object
+                    panel button click event
+                """
                 logger.info("Shutting down dashboard server...")
                 sys.exit(0)
 
@@ -792,6 +967,13 @@ def visualize_using_dashboard(
     ----------
     models : list
         embedding models
+    dashboard_port : int, optional
+        port the dashboard is served on, by default 5006
+    dashboard_address : str, optional
+        address the dashboard is served on, by default "localhost"
+    dashboard_websocket_origin : bool, optional
+        whether to allow cross origin websocket connections,
+        by default False
     kwargs : dict
         Dictionary with parameters for dashboard creation
     """

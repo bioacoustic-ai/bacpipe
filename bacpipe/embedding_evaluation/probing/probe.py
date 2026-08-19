@@ -18,6 +18,28 @@ from bacpipe.embedding_evaluation.visualization.visualize_embeddings import (
 
 
 def embeds_array_where_single_label(embeds, ground_truth, bool_noise, df, **kwargs):
+    """
+    Filter the embeddings to only include the segments that have exactly
+    one label.
+
+    Parameters
+    ----------
+    embeds : np.array
+        embeddings
+    ground_truth : pandas.DataFrame
+        ground truth dataframe with the simultaneous labels
+    bool_noise : np.array
+        boolean array marking the segments that are noise
+    df : pandas.DataFrame
+        classification dataframe with a predefined_set column
+
+    Returns
+    -------
+    pandas.DataFrame
+        classification dataframe filtered to the probing sets
+    np.array
+        embeddings filtered to the probing sets
+    """
     # first extract the segments that have annotations
     ground_truth = ground_truth[ground_truth.simultaneous_labels > 0]
     
@@ -54,12 +76,18 @@ def probing_pipeline(
 
     Parameters
     ----------
+    model_name : str
+        name of the model
+    ground_truth : pandas.DataFrame
+        ground truth dataframe
     paths : SimpleNamespace object
         dict with attributes corresponding to paths for loading and saving
     embeds : np.array
         embeddings
     name : string
         Type of Probing
+    label_column : str
+        name of the label column
     dataset_csv_path : string
         name of Probing dataframe as specified in settings.yaml
     overwrite : bool
@@ -157,6 +185,23 @@ def probing_pipeline(
 
 
 def prepare_probe_inference(model, probe_path=""):
+    """
+    Load a trained linear probe and its label2index mapping from disk.
+
+    Parameters
+    ----------
+    model : str
+        name of the model the probe was trained on
+    probe_path : str, optional
+        path to the saved probe checkpoint, by default ""
+
+    Returns
+    -------
+    LinearProbe
+        loaded probe in evaluation mode
+    dict
+        label2index mapping
+    """
     from bacpipe import config, settings
 
     if probe_path == "":
@@ -192,6 +237,31 @@ def run_probe_inference(
     return_binary_presence=True,
     callbacks=None,
 ):
+    """
+    Run the linear probe on the embeddings to obtain class probabilities.
+
+    Parameters
+    ----------
+    model : str
+        name of the model used to generate the embeddings
+    linear_probe : LinearProbe
+        trained linear probe
+    threshold : float
+        probability threshold used when binary presence is returned
+    embeds : np.array, optional
+        embeddings to run the probe on, by default None
+    return_binary_presence : bool, optional
+        whether to return binary presence instead of probabilities,
+        by default True
+    callbacks : object, optional
+        object with a progress_bar attribute that gets updated during
+        inference, by default None
+
+    Returns
+    -------
+    np.array
+        array with the binary presence or the probabilities per class
+    """
     if embeds is None:
         from bacpipe.core.experiment_manager import Loader
         from bacpipe import config, settings

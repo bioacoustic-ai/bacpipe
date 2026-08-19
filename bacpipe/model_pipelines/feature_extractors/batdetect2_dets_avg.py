@@ -14,6 +14,10 @@ NUM_CLASSES = 17
 
 
 class Model(ModelBaseClass):
+    """
+    BatDetect2 feature extractor averaging per-detection embeddings.
+    """
+
     def __init__(
         self,
         segment_duration=DEFAULT_SEGMENT_DURATION,
@@ -21,6 +25,20 @@ class Model(ModelBaseClass):
         top_k_detections=None,
         **kwargs,
     ):
+        """
+        Initialize the BatDetect2 detection-averaged model.
+
+        Parameters
+        ----------
+        segment_duration : float
+            duration of each audio segment in seconds
+        detection_threshold : float
+            confidence threshold for detections
+        top_k_detections : int or None
+            maximum number of detections to average per segment
+        **kwargs
+            additional keyword arguments passed to the base class
+        """
         super().__init__(
             sr=SAMPLE_RATE,
             segment_length=int(segment_duration * SAMPLE_RATE),
@@ -61,6 +79,19 @@ class Model(ModelBaseClass):
         self.classes = self.config["class_names"]
 
     def preprocess(self, audio):
+        """
+        Generate a spectrogram for each audio segment.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            stacked spectrograms
+        """
         if audio.device.type == "cuda":
             segments = audio.cpu().numpy()
         else:
@@ -73,6 +104,22 @@ class Model(ModelBaseClass):
 
     @torch.no_grad()
     def __call__(self, x, return_class_results=False):
+        """
+        Run the model on the input spectrograms and average detection features.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            preprocessed spectrograms
+        return_class_results : bool
+            whether to also return class scores
+
+        Returns
+        -------
+        torch.Tensor or tuple
+            detection-averaged features, or a tuple of
+            (features, class scores) when return_class_results is True
+        """
         x = x.unsqueeze(1)
         output = self.model(x)
 
@@ -117,6 +164,23 @@ def get_mean_detection_features(
     features,
     top_k=None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Aggregate detection features by averaging and take max class scores.
+
+    Parameters
+    ----------
+    results : dict
+        detection results with "det_probs" and "class_probs" keys
+    features : np.array
+        per-detection features
+    top_k : int or None
+        if given, only use the top-k detections by detection score
+
+    Returns
+    -------
+    tuple of torch.Tensor
+        mean features and max class scores
+    """
     detection_scores = results["det_probs"]
 
     # NOTE: Last element is the background class

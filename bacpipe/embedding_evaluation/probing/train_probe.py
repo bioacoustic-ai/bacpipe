@@ -11,6 +11,10 @@ logger = logging.getLogger("bacpipe")
 
 
 class LinearProbe(nn.Module):
+    """
+    Linear probing classifier head mapping embeddings to class logits.
+    """
+
     def __init__(self, in_dim, out_dim, device="cpu", **kwargs):
         """
         Linear classification layer.
@@ -21,12 +25,27 @@ class LinearProbe(nn.Module):
             number of input dimensions (dictated by embeddings)
         out_dim : int
             number of output dimensions (dictated by classes in ground truth)
+        device : str, optional
+            device the probe is moved to, by default "cpu"
         """
         super(LinearProbe, self).__init__()
         self.probe = nn.Linear(in_dim, out_dim)
         self.probe.to(device)
 
     def forward(self, x):
+        """
+        Run the linear probe on the input embeddings.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            input embeddings
+
+        Returns
+        -------
+        torch.Tensor
+            logits for each class
+        """
         return self.probe(x)
 
 
@@ -122,6 +141,10 @@ def train_linear_probe(
 
 
 class KNNProbe(nn.Module):
+    """
+    K-nearest-neighbor probing classifier operating on raw embeddings.
+    """
+
     def __init__(self, n_neighbors=15, testing=False, **kwargs):
         """
         K-nearest neighbor classifier.
@@ -130,20 +153,46 @@ class KNNProbe(nn.Module):
         ----------
         n_neighbors : int, optional
             hyperparameter specified in settings.yaml file, by default 15
+        testing : bool, optional
+            whether the classifier is used for testing purposes,
+            by default False
         """
         super(KNNProbe, self).__init__()
         self.knn = KNeighborsClassifier(n_neighbors=n_neighbors)
         self.is_trained = False  # Flag to track if KNN is trained
 
     def fit(self, x, y):
-        """Train KNN classifier with numpy data"""
+        """
+        Train KNN classifier with numpy data
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            embedding tensors
+        y : torch.Tensor
+            label tensors
+        """
         x_np = x.cpu().detach().numpy()  # Convert tensor to NumPy
         y_np = y.cpu().detach().numpy()
         self.knn.fit(x_np, y_np)
         self.is_trained = True
 
     def forward(self, x):
-        """Predict using KNN (only after it's trained)"""
+        """
+        Predict using KNN (only after it's trained)
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            embedding tensors
+
+        Returns
+        -------
+        torch.Tensor
+            predicted labels
+        torch.Tensor
+            prediction probabilities
+        """
         if not self.is_trained:
             error = "\nKNN model is not trained. Call `fit()` first."
             logger.exception(error)
@@ -220,19 +269,25 @@ def train_probe(
 
     Parameters
     ----------
-    paths : SimpleNamespace dict
-        dictionary object containing paths for loading and saving
-    dataset_csv_path : string
-        name of classification dataframe as secified in the settings.yaml file
     embeds : np.array
         the embeddings
+    df : pandas.DataFrame
+        classification dataframe
+    label2index : dict
+        link labels to ints
     config : str, optional
         type of classification, by default 'linear'
+    learning_rate : float, optional
+        learning rate for the linear probe, by default None
+    num_epochs : int, optional
+        number of training epochs, by default None
+    n_neighbors : int, optional
+        number of neighbors for the KNN classifier, by default None
 
     Returns
     -------
-    dict
-        performance dictionary
+    object
+        trained classifier object
     """
 
     # generate the loaders

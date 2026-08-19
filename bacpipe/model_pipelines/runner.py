@@ -44,6 +44,7 @@ class Embedder(AudioHandler):
         loader=None,
         CustomModel=None,
         dim_reduction_model=False,
+        audio_dir=None,
         **kwargs,
     ):
         """
@@ -68,9 +69,15 @@ class Embedder(AudioHandler):
         dim_reduction_model : bool, optional
             Can be bool or the string corresponding to the
             dimensionality reduction model, by default False
+        audio_dir : str, optional
+            path to the directory containing the audio files, by default None
         """
         self.file_length = {}
         self.loader = loader
+        if loader:
+            audio_dir = loader.audio_dir
+        elif not audio_dir is None:
+            audio_dir = audio_dir
 
         self.dim_reduction_model = dim_reduction_model
         if dim_reduction_model:
@@ -91,14 +98,14 @@ class Embedder(AudioHandler):
         )
         super().__init__(
             model=self.model,
-            audio_dir=loader.audio_dir if loader else None,
+            audio_dir=audio_dir,
             **kwargs,
         )
         if self.model.bool_classifier:
             self.classifier = Classifier(
                 self.model,
                 model_name,
-                audio_dir=loader.audio_dir if loader else None,
+                audio_dir=audio_dir,
                 use_folder_structure=(
                     loader.use_folder_structure if loader else False
                 ),
@@ -107,7 +114,13 @@ class Embedder(AudioHandler):
 
     def _init_model(self, CustomModel=None, **kwargs):
         """
-        Load model specific module, instantiate model and allocate device for model.
+        Load the model specific module, instantiate the model and allocate
+        the device for the model.
+
+        Parameters
+        ----------
+        CustomModel : class, optional
+            custom model class to use for processing, by default None
         """
         if self.dim_reduction_model or CustomModel is None:
             if self.dim_reduction_model:
@@ -124,6 +137,19 @@ class Embedder(AudioHandler):
         self.model.prepare_inference()
 
     def init_dataloader(self, audio):
+        """
+        Create a dataloader from the audio samples based on the model type.
+
+        Parameters
+        ----------
+        audio : torch.Tensor or tf.Tensor
+            preprocessed audio samples
+
+        Returns
+        -------
+        torch.utils.data.DataLoader or tf.data.Dataset
+            batched dataloader or dataset with batch size of the model
+        """
         if "tensorflow" in str(type(audio)):
             import tensorflow as tf
 
@@ -138,6 +164,22 @@ class Embedder(AudioHandler):
             )
 
     def batch_inference(self, batched_samples, callback=None):
+        """
+        Run the model on all batches and collect the embeddings.
+
+        Parameters
+        ----------
+        batched_samples : iterable
+            iterable with the batched samples, created by init_dataloader
+        callback : callable, optional
+            callback function that is called with the fraction of processed
+            batches, by default None
+
+        Returns
+        -------
+        torch.Tensor or np.array
+            embeddings for all batches
+        """
         if self.model_name in bacpipe.TF_MODELS:
             import tensorflow
 
@@ -215,6 +257,19 @@ class Embedder(AudioHandler):
         return embeds
 
     def get_reduced_dimensionality_embeddings(self, embeds):
+        """
+        Apply the dimensionality reduction model to a set of embeddings.
+
+        Parameters
+        ----------
+        embeds : np.array
+            embeddings to be reduced
+
+        Returns
+        -------
+        np.array
+            reduced dimensionality embeddings
+        """
         samples = self.model.preprocess(embeds)
         if "umap" in self.model.__module__:
             if samples.shape[0] <= self.model.umap_config["n_neighbors"]:
@@ -226,6 +281,13 @@ class Embedder(AudioHandler):
         return self.model(samples)
 
     def run_dimensionality_reduction_pipeline(self):
+        """
+        Run the full dimensionality reduction pipeline for all embeddings
+        and save the reduced embeddings to disk.
+
+        This method checks the total number of embeddings and subsamples
+        them if necessary to avoid running into memory errors.
+        """
         if self.loader.metadata_dict["nr_embeds_total"] > 300_000:
             self.nr_subsampled_embeds_for_umap = 300_000
             logger.info(
@@ -309,13 +371,13 @@ class Embedder(AudioHandler):
 
         Parameters
         ----------
-        fileloader_obj : Loader object
-            contains all metadata of a model specific embedding creation session
+        array_of_audios : np.array
+            array with the audio samples to embed
 
         Returns
         -------
-        Loader object
-            updated object with metadata on embedding creation session
+        list
+            list with the embeddings for the audio samples
         """
         if len(array_of_audios.shape) == 1:
             array_of_audios = torch.tensor(array_of_audios).unsqueeze(0)
@@ -334,7 +396,8 @@ class Embedder(AudioHandler):
 
         # --- Producer: load + preprocess in background ---
         def producer():
-            for idx, audio_idx_range in enumerate(range(0, len(windowed_audios), self.model.batch_size)):
+            """Load and preprocess all audio samples in the background."""
+            for idx, audio in enumerate(windowed_audios):
                 try:
                     audio = windowed_audios[audio_idx_range:audio_idx_range+self.model.batch_size].squeeze()
                     audio.to(self.model.device)
@@ -415,15 +478,8 @@ class Embedder(AudioHandler):
         - Consumer (main thread) embeds audio while producer prepares next batch
         Ensures metadata and embeddings are written exactly like in the sequential version.
 
-        Parameters
-        ----------
-        fileloader_obj : Loader object
-            contains all metadata of a model specific embedding creation session
-
-        Returns
-        -------
-        Loader object
-            updated object with metadata on embedding creation session
+        Generates embeddings for all files in the loader in a pipelined
+        manner and saves the metadata and embeddings to disk.
         """
         if not self.nr_parallel_workers:
             from multiprocessing import cpu_count
@@ -439,6 +495,7 @@ class Embedder(AudioHandler):
 
         # --- Producer: load + preprocess in background ---
         def producer():
+            """Load and preprocess all audio files in the background."""
             for idx, file in enumerate(self.loader.files):
                 try:
                     preprocessed = self.prepare_audio(file)
@@ -511,11 +568,13 @@ class Embedder(AudioHandler):
                         "do the trick. If you simply don't have enough VRAM, you can reduce the global "
                         f"batch size in the settings file. Or just compute on the cpu. {str(e)}"
                     )
+                    self.classifier.predictions = torch.tensor([])
                 except AttributeError as e:
                     logger.warning(
                         f"The results folder structure does not exist, therefore files can't be "
                         "saved. Please pass the keyword use_folder_structure=True."
                     )
+                    self.classifier.predictions = torch.tensor([])
                     pbar.update(1)
                 except Exception as e:
                     logger.warning(
@@ -525,12 +584,19 @@ class Embedder(AudioHandler):
                         # run to fail because of minor problems.
                         f"Error generating embeddings for {file}, skipping file.\nError: {str(e)}"
                     )
+                    # Do not carry a failed file's predictions over into the
+                    # next file's classifier outputs.
+                    self.classifier.predictions = torch.tensor([])
                     pbar.update(1)
                     continue
 
                 pbar.update(1)
 
     def run_inference_pipeline_sequentially(self):
+        """
+        Generate embeddings for all files in the loader sequentially and
+        save the metadata, the embeddings and classifier outputs to disk.
+        """
         for idx, file in enumerate(
             tqdm(
                 self.loader.files,
@@ -553,6 +619,9 @@ class Embedder(AudioHandler):
                     f"\n Error generating embeddings, skipping file. \n"
                     f"Error: {str(e)}"
                 )
+                # Do not carry a failed file's predictions over into the next
+                # file's classifier outputs.
+                self.classifier.predictions = torch.tensor([])
                 continue
 
             self.loader._write_audio_file_to_metadata(
@@ -608,6 +677,12 @@ class Embedder(AudioHandler):
 
 
 class Classifier:
+    """
+    Handle all tasks surrounding classification: generating predictions from
+    embeddings, collecting them into arrays and creating dataframes and
+    annotation tables from them.
+    """
+
     def __init__(
         self,
         model,
@@ -634,44 +709,69 @@ class Classifier:
             name of the model
         classifier_threshold : float, optional
             Value under which class predictions are discarded, by default None
+        audio_dir : str
+            path to the directory containing the audio files
+        main_results_dir : str
+            path to the main results directory
+        use_folder_structure : bool, optional
+            if True, the results are saved in the folder structure,
+            by default True
+        save_raven_tables : bool, optional
+            if True, Raven annotation tables are saved, by default False
         """
         self.model = model
         self.model_name = model_name
         self.classifier_threshold = classifier_threshold
         self.save_raven_tables = save_raven_tables
+        self.max_labels_per_timestamp = kwargs.get(
+            "max_labels_per_timestamp", bacpipe.settings.max_labels_per_timestamp
+        )
         if use_folder_structure:
             from bacpipe.embedding_evaluation.label_embeddings import (
                 make_set_paths_func,
             )
 
-            self.paths = make_set_paths_func(audio_dir, main_results_dir)(
-                model_name
-            )
+            self.paths = make_set_paths_func(
+                audio_dir,
+                main_results_dir,
+                evaluations_dir=kwargs.get("evaluations_dir"),
+            )(model_name)
 
         self.predictions = torch.tensor([])
 
         if kwargs.get("only_embed_annotations"):
             self.only_embed_annotations = True
-            from bacpipe.embedding_evaluation.label_embeddings import (
-                load_labels_and_build_dict,
-                assign_global_get_paths_function,
-                get_paths,
-            )
+            if not use_folder_structure:
+                from bacpipe.embedding_evaluation.label_embeddings import (
+                    load_labels_and_build_dict
+                )
+                self.df = load_labels_and_build_dict(
+                    paths=None,
+                    annotations_filename=kwargs.get("annotations_filename"),
+                    audio_dir=audio_dir,
+                    bool_filter_labels=False
+                )
+            else:
+                from bacpipe.embedding_evaluation.label_embeddings import (
+                    load_labels_and_build_dict,
+                    assign_global_get_paths_function,
+                    get_paths,
+                )
 
-            assign_global_get_paths_function(audio_dir)
-            paths = get_paths(self.model_name)
-            self.df = load_labels_and_build_dict(
-                paths,
-                kwargs.get("annotations_filename"),
-                audio_dir,
-                bool_filter_labels=False,
-            )
+                assign_global_get_paths_function(audio_dir, **kwargs)
+                paths = get_paths(self.model_name)
+                self.df = load_labels_and_build_dict(
+                    paths,
+                    kwargs.get("annotations_filename"),
+                    audio_dir,
+                    bool_filter_labels=False,
+                )
             self.start_timestamps = self.df.start.values
             self.end_timestamps = self.df.end.values
 
     @staticmethod
     def filter_top_k_classifications(
-        probabilities, class_names, threshold
+        probabilities, class_names, threshold, max_labels_per_timestamp=None
     ):
         """
         Generate a dictionary with the top k classes. By limiting the class number to
@@ -687,14 +787,22 @@ class Classifier:
             class names
         threshold : float
             values to threshold probabilities with
+        max_labels_per_timestamp : int, optional
+            number of labels to keep per timestamp, by default None. If None,
+            the value from ``bacpipe.settings.max_labels_per_timestamp``
+            is used.
 
         Returns
         -------
         dict
             dictionary of top k classes with time bin indices exceeding threshold
         """
-        if not bacpipe.settings.max_labels_per_timestamp is None:
-            k = bacpipe.settings.max_labels_per_timestamp
+        if max_labels_per_timestamp is None:
+            max_labels_per_timestamp = (
+                bacpipe.settings.max_labels_per_timestamp
+            )
+        if not max_labels_per_timestamp is None:
+            k = max_labels_per_timestamp
             
         top_k_indices = np.argsort(np.array(probabilities), axis=0)[-k:][::-1]
         top_k_probs = np.sort(probabilities, axis=0)[-k:][::-1]
@@ -717,12 +825,39 @@ class Classifier:
         return cls_results
 
     @staticmethod
-    def make_classification_dict(probabilities, classes, threshold):
+    def make_classification_dict(
+        probabilities, classes, threshold, max_labels_per_timestamp=None
+    ):
+        """
+        Make a classification dictionary for one audio file with the top k
+        classifications and a head with general information about the file.
+
+        Parameters
+        ----------
+        probabilities : np.array
+            probabilities for each class
+        classes : list
+            class names
+        threshold : float
+            value to threshold the probabilities with
+        max_labels_per_timestamp : int, optional
+            number of labels to keep per timestamp, by default None. If None,
+            the value from ``bacpipe.settings.max_labels_per_timestamp``
+            is used.
+
+        Returns
+        -------
+        dict
+            dictionary with the classification results for the audio file
+        """
         if probabilities.shape[0] != len(classes):
             probabilities = probabilities.swapaxes(0, 1)
 
         cls_results = Classifier.filter_top_k_classifications(
-            probabilities, classes, threshold
+            probabilities,
+            classes,
+            threshold,
+            max_labels_per_timestamp=max_labels_per_timestamp,
         )
 
         cls_results["head"] = {
@@ -732,6 +867,14 @@ class Classifier:
         return cls_results
 
     def classify(self, embeddings):
+        """
+        Classify embeddings and collect the predictions.
+
+        Parameters
+        ----------
+        embeddings : torch.Tensor or np.array
+            embeddings to be classified
+        """
         if not isinstance(embeddings, torch.Tensor):
             clfier_output = self.model.classifier_predictions(
                 torch.tensor(np.array(embeddings))
@@ -810,9 +953,16 @@ class Classifier:
         classifier_annotations["audiofilename"] = str(
             file.relative_to(fileloader_obj.audio_dir).as_posix()
         )
+        # Index into the classes array with an explicit 1-D
+        # numpy index array. A single-element torch index makes numpy return
+        # a plain ``str`` scalar (which has no ``.tolist()``), crashing on any
+        # file that has exactly one bin exceeding the threshold.
+        detected_bin_idxs = np.atleast_1d(
+            np.array(maxes.indices[maxes.values > self.classifier_threshold])
+        ).astype(int)
         classifier_annotations["label:default_classifier"] = np.array(
             self.model.classes
-        )[maxes.indices[maxes.values > self.classifier_threshold]].tolist()
+        )[detected_bin_idxs].tolist()
 
         classifier_annotations["label:confidence"] = np.array(
             maxes.values[maxes.values > self.classifier_threshold].tolist()
@@ -834,6 +984,17 @@ class Classifier:
     def _load_existing_clfier_outputs(
         self, fileloader_obj: bacpipe.Loader, clfier_annotations=None
     ):
+        """
+        Load the existing classifier outputs from the predictions file and
+        combine them with the new classifier annotations.
+
+        Parameters
+        ----------
+        fileloader_obj : bacpipe.Loader object
+            all paths and metadata of the embedding creation run
+        clfier_annotations : pandas.DataFrame, optional
+            dataframe with the new classifier annotations, by default None
+        """
         df_dict = {
             "start": [],
             "end": [],
@@ -843,14 +1004,30 @@ class Classifier:
 
         df = fileloader_obj.predictions(return_type="dataframe")
         if isinstance(df, pd.DataFrame):
-            df_dict = df[["audiofilename", "start", "end"]]
+            df_dict = df[["audiofilename", "start", "end"]].copy()
             if len(df) > 0:
-                cols = df.iloc[:, 4:].columns
-                maxes = np.argmax(np.array(df.iloc[:, 4:]), axis=1)
-                highest_prob_species = [cols[i] for i in maxes]
-
-                df.iloc[:, 4:].max(axis=1)
-                df_dict["label:default_classifier"] = highest_prob_species
+                # Select the species columns by name rather than by position
+                # so that a leading index column (e.g. "Unnamed: 0") in
+                # prediction files written by older bacpipe versions cannot
+                # shift the species columns and mis-assign the species that
+                # belongs to a given embedding row.
+                species_cols = [
+                    col
+                    for col in df.columns
+                    if col not in {
+                        "audiofilename",
+                        "start",
+                        "end",
+                        "simultaneous_labels",
+                    }
+                    and not str(col).startswith("Unnamed")
+                ]
+                if len(species_cols) > 0:
+                    species_df = df[species_cols]
+                    maxes = np.argmax(np.array(species_df), axis=1)
+                    df_dict["label:default_classifier"] = [
+                        species_df.columns[i] for i in maxes
+                    ]
 
         self.cumulative_annotations = pd.DataFrame(df_dict)
         self.cumulative_annotations = pd.concat(
@@ -859,6 +1036,14 @@ class Classifier:
         )
 
     def save_annotation_table(self, loader_obj: bacpipe.Loader, **kwargs):
+        """
+        Save the cumulative classifier annotations as a csv file.
+
+        Parameters
+        ----------
+        loader_obj : bacpipe.Loader object
+            all paths and metadata of the embedding creation run
+        """
         self.paths.preds_path.mkdir(exist_ok=True, parents=True)
         loader_obj.get_annotations_parquet(
             starts=self.start_timestamps, ends=self.end_timestamps, **kwargs
@@ -870,6 +1055,17 @@ class Classifier:
         self.cumulative_annotations.to_csv(save_path, index=False)
 
     def save_classifier_outputs(self, fileloader_obj, file):
+        """
+        Save the classification results for a single audio file as a json
+        file and optionally as a Raven annotation table.
+
+        Parameters
+        ----------
+        fileloader_obj : bacpipe.Loader object
+            all paths and metadata of the embedding creation run
+        file : pathlib.Path
+            path to the audio file
+        """
         if len(self.predictions.shape) == 1:
             self.predictions = self.predictions.unsqueeze(0)
         elif self.predictions.shape[-1] != len(self.model.classes):
@@ -888,21 +1084,42 @@ class Classifier:
         # if self.model.only_embed_annotations: #annotation file exists
         #     np.save(file_dest.replace('.json', '.npy'), self.predictions)
 
-        self._fill_dataframe_with_classiefier_results(fileloader_obj, file)
+        try:
+            self._fill_dataframe_with_classiefier_results(fileloader_obj, file)
 
-        cls_results = self.make_classification_dict(
-            self.predictions, self.model.classes, self.classifier_threshold
-        )
+            cls_results = self.make_classification_dict(
+                self.predictions,
+                self.model.classes,
+                self.classifier_threshold,
+                max_labels_per_timestamp=self.max_labels_per_timestamp,
+            )
 
-        with open(file_dest, "w") as f:
-            json.dump(cls_results, f, indent=2)
+            with open(file_dest, "w") as f:
+                json.dump(cls_results, f, indent=2)
 
-        if self.save_raven_tables:
-            self.save_Raven_table(file, relative_parent_path)
+            if self.save_raven_tables:
+                self.save_Raven_table(file, relative_parent_path)
+        except Exception:
+            # If anything goes wrong while saving this file, drop its
+            # predictions so they are NOT carried over into the next file's
+            # classifier outputs. 
+            self.predictions = torch.tensor([])
+            raise
 
         self.predictions = torch.tensor([])
 
     def save_Raven_table(self, file, relative_parent_path):
+        """
+        Save the classifier predictions of a single audio file as a Raven
+        annotation table.
+
+        Parameters
+        ----------
+        file : pathlib.Path
+            path to the audio file
+        relative_parent_path : pathlib.Path
+            path of the parent folder relative to the audio directory
+        """
         raven_results_path = self.paths.preds_path.joinpath(
             "raven_tables"
         ).joinpath(relative_parent_path)
@@ -912,8 +1129,8 @@ class Classifier:
         )
         raven_file_dest = str(raven_file_dest) + ".selection.table.txt"
         
-        if not bacpipe.settings.max_labels_per_timestamp is None:
-            k = bacpipe.settings.max_labels_per_timestamp
+        if not self.max_labels_per_timestamp is None:
+            k = self.max_labels_per_timestamp
             
         top_k_indices = np.argsort(np.array(self.predictions), axis=1)[:,-k:][:, ::-1]
         top_k_probs = np.sort(np.array(self.predictions), axis=1)[:,-k:][:, ::-1]
@@ -949,6 +1166,15 @@ class Classifier:
             raven_df.to_csv(raven_file_dest, sep="\t", index=False)
 
     def run_default_classifier(self, loader):
+        """
+        Run the pretrained classifier on all embeddings, save the classifier
+        outputs for every file and save the cumulative annotation table.
+
+        Parameters
+        ----------
+        loader : bacpipe.Loader object
+            all paths and metadata of the embedding creation run
+        """
         all_embeds = loader.embeddings()
         for f_name, embeddings in tqdm(
             all_embeds.items(),

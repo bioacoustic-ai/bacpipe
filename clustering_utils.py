@@ -53,8 +53,8 @@ def get_embeddings(path, models):
             snr_string = snr_dir.stem if snr_dir.is_dir() else False
             if not snr_string:
                 continue
-            # if not '0' in snr_string:
-            #     continue
+            if not '0' in snr_string:
+                continue
                 # no need to work on other snr's for now
 
             loader = Loader(snr_dir, model_name, use_folder_structure=True, audio_suffixes=['.h5'], main_results_dir=f'bacpipe_results/{audio_dir.stem}')

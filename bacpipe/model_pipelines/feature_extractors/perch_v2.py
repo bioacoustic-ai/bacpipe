@@ -22,6 +22,18 @@ class Model(ModelBaseClass):
         segment_length=LENGTH_IN_SAMPLES,
         **kwargs,
     ):
+        """
+        Initialize the Perch v2 model wrapper.
+
+        Parameters
+        ----------
+        sr : int
+            sample rate in Hz
+        segment_length : int
+            number of samples per input segment
+        **kwargs
+            additional keyword arguments passed to the base class
+        """
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
         
         label_path = self.model_utils_base_path / 'perch_v2/labels.txt'
@@ -32,27 +44,79 @@ class Model(ModelBaseClass):
         self.classes = self.model.classes
         
     def preprocess(self, audio):
+        """
+        Pass-through preprocessing.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            input audio tensor
+
+        Returns
+        -------
+        torch.Tensor
+            the unchanged input audio
+        """
         return audio
 
     def __call__(self, input):
+        """
+        Run the Perch v2 model on the input audio.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            input audio tensor
+
+        Returns
+        -------
+        torch.Tensor
+            embeddings produced by the model
+        """
         self.results = self.model(input)
 
         return self.results['embeddings']
 
     def classifier_predictions(self, embeddings):
-        inferece_results = torch.sigmoid(self.results['logits'])
-        return inferece_results
+        """
+        Return the class probabilities from the last model call.
+
+        Parameters
+        ----------
+        embeddings : torch.Tensor
+            embeddings from the last model call (unused)
+
+        Returns
+        -------
+        torch.Tensor
+            softmax probabilities over the model's classes
+        """
+        inference_results = torch.softmax(self.results['logits'], dim=-1)
+        return inference_results
 
 
 
 class PerchV2ONNX(nn.Module):
     """Perch v2 ONNX Model Wrapper with multi-platform GPU acceleration.
+    Adapted from https://huggingface.co/justinchuby/Perch-onnx.
     
     Supports: Linux (CUDA/CPU), macOS (CoreML/CPU), Windows (CUDA/DirectML/CPU).
     Input: Audio tensor of shape (batch_size, 160000) at 32kHz sample rate.
     """
 
     def __init__(self, label_path, checkpoint_path, device: str = "auto"):
+        """
+        Initialize the Perch v2 ONNX classifier.
+
+        Parameters
+        ----------
+        label_path : pathlib.Path
+            path to the taxonomy labels file
+        checkpoint_path : pathlib.Path
+            path to the ONNX checkpoint
+        device : str
+            requested device ("auto", "cpu", "gpu", or "cuda")
+        """
         super().__init__()
         
         # 2. Download taxonomy labels file (14,795 species)
@@ -78,6 +142,19 @@ class PerchV2ONNX(nn.Module):
         print(f"perch_v2 initialized using providers: {self.active_providers}")
 
     def _get_execution_providers(self, requested_device: str) -> list[str]:
+        """
+        Resolve the ONNX execution providers for the requested device.
+
+        Parameters
+        ----------
+        requested_device : str
+            requested device ("auto", "cpu", "gpu", or "cuda")
+
+        Returns
+        -------
+        list of str
+            execution providers to use for the ONNX session
+        """
         available = ort.get_available_providers()
         providers = []
 
@@ -93,26 +170,31 @@ class PerchV2ONNX(nn.Module):
         return providers
 
     def forward(self, x: torch.Tensor, return_probabilities: bool = True) -> dict[str, torch.Tensor]:
-        """Runs inference on input audio tensor.
-        
-        Returns dict containing:
-          - 'embedding': (batch, 1536)
-          - 'spatial_embedding': (batch, 16, 4, 1536)
-          - 'spectrogram': (batch, 500, 128)
-          - 'logits': (batch, 14795)
-          - 'probabilities': (batch, 14795) [optional]
+        """
+        Runs inference on input audio tensor.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            input audio tensor of shape (batch, samples)
+        return_probabilities : bool, optional
+            whether to include the probabilities in the output dict,
+            by default True
+
+        Returns
+        -------
+        dict[str, torch.Tensor]
+            dict containing:
+              - 'embedding': (batch, 1536)
+              - 'spatial_embedding': (batch, 16, 4, 1536)
+              - 'spectrogram': (batch, 500, 128)
+              - 'logits': (batch, 14795)
+              - 'probabilities': (batch, 14795) [optional]
         """        
         if x.ndim == 1:
             x = x.unsqueeze(0)
             
-        mean = torch.mean(x, dim=-1, keepdim=True)
-        x = x - mean
-
-        # 3. Peak Normalization (scale max absolute value per audio chunk to target_peak)
-        max_val = torch.max(torch.abs(x), dim=-1, keepdim=True).values
-        x_norm = x * (1 / (max_val + 1e-8))
-            
-        x_np = x_norm.detach().cpu().numpy().astype(np.float32)
+        x_np = x.detach().cpu().numpy().astype(np.float32)
 
         outputs = self.session.run(None, {self.input_name: x_np})
 

@@ -13,11 +13,25 @@ NUM_CLASSES = 17
 
 
 class Model(ModelBaseClass):
+    """
+    BatDetect2 feature extractor averaging the clip-level embeddings.
+    """
+
     def __init__(
         self,
         segment_duration=DEFAULT_SEGMENT_DURATION,
         **kwargs,
     ):
+        """
+        Initialize the BatDetect2 clip-averaged model.
+
+        Parameters
+        ----------
+        segment_duration : float
+            duration of each audio segment in seconds
+        **kwargs
+            additional keyword arguments passed to the base class
+        """
         super().__init__(
             sr=SAMPLE_RATE,
             segment_length=int(segment_duration * SAMPLE_RATE),
@@ -38,6 +52,19 @@ class Model(ModelBaseClass):
         self.classes = self.config["class_names"]
 
     def preprocess(self, audio):
+        """
+        Generate a spectrogram for each audio segment.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            stacked spectrograms
+        """
         if audio.device.type == "cuda":
             segments = audio.cpu().numpy()
         else:
@@ -52,6 +79,19 @@ class Model(ModelBaseClass):
 
     @torch.no_grad()
     def __call__(self, x):
+        """
+        Run the model on the input spectrograms.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            preprocessed spectrograms
+
+        Returns
+        -------
+        torch.Tensor
+            clip-averaged features
+        """
         self.output = self.model(x)
 
         features = self.output.features.mean(dim=(-2, -1))
@@ -59,6 +99,19 @@ class Model(ModelBaseClass):
         return features
 
     def classifier_predictions(self, embeddings):
+        """
+        Return the class scores stored during the last call.
+
+        Parameters
+        ----------
+        embeddings : torch.Tensor
+            embeddings from the last model call (unused)
+
+        Returns
+        -------
+        torch.Tensor
+            max class scores across detections (background class removed)
+        """
         # NOTE: Last element is the background class
         class_scores = self.output.pred_class.amax(dim=(-2, -1))[:, :-1]
         return class_scores

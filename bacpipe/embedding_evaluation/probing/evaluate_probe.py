@@ -67,6 +67,21 @@ def macro_accuracy(y_true, y_pred):
 
 
 def micro_accuracy(y_true, y_pred):
+    """
+    Compute micro accuracy.
+
+    Parameters
+    ----------
+    y_true : list
+        ground truth
+    y_pred : list
+        predictions
+
+    Returns
+    -------
+    float
+        micro accuracy score
+    """
     return metrics.accuracy_score(y_true, y_pred)
 
 
@@ -74,6 +89,18 @@ def micro_accuracy(y_true, y_pred):
 def auc(y_true, probability_scores):
     """
     Compute the AUC
+
+    Parameters
+    ----------
+    y_true : list
+        ground truth
+    probability_scores : np.array
+        probability scores for each class
+
+    Returns
+    -------
+    float
+        area under the ROC curve
     """
     if len(np.unique(y_true)) == 2:
         probability_scores = np.array(probability_scores)[:, 1]
@@ -84,6 +111,18 @@ def auc(y_true, probability_scores):
 def macro_f1(y_true, y_pred):
     """
     Compute the macro f1 score
+
+    Parameters
+    ----------
+    y_true : list
+        ground truth
+    y_pred : list
+        predictions
+
+    Returns
+    -------
+    float
+        macro f1 score
     """
     return metrics.f1_score(y_true, y_pred, average="macro")
 
@@ -92,6 +131,18 @@ def macro_f1(y_true, y_pred):
 def micro_f1(y_true, y_pred):
     """
     Compute the micro f1 score
+
+    Parameters
+    ----------
+    y_true : list
+        ground truth
+    y_pred : list
+        predictions
+
+    Returns
+    -------
+    float
+        micro f1 score
     """
     return metrics.f1_score(y_true, y_pred, average="micro")
 
@@ -99,6 +150,22 @@ def micro_f1(y_true, y_pred):
 def compute_task_metrics(y_pred, y_true, probability_scores, label2index):
     """
     Compute the evaluation metrics
+
+    Parameters
+    ----------
+    y_pred : list
+        predictions
+    y_true : list
+        ground truth
+    probability_scores : np.array
+        probability scores for each class
+    label2index : dict
+        link labels to ints
+
+    Returns
+    -------
+    dict
+        dictionary with the overall and per class evaluation metrics
     """
 
     metrics = dict()
@@ -170,21 +237,25 @@ def eval_probe(
     ----------
     probe : object
         trained classification object
-    test_dataloader : DataLoader object
-        dataset iterator
+    embeds : np.array
+        embeddings
+    df : pandas.DataFrame
+        classification dataframe
+    label2index : dict
+        link labels to ints
     device : str, optional
         'cpu' or 'cuda', by default "cuda:0"
     config : str, optional
         type of classification, by default "linear"
+    paths : SimpleNamespace object, optional
+        paths used for saving the probe results, by default None
+    save_probe : bool, optional
+        whether to save the trained probe and results, by default False
 
     Returns
     -------
-    list
-        prediction values in ints corresponding to labels
-    list
-        ground truth values in ints
-    np.array
-        probabilities for each class and each embedding
+    dict
+        performance metrics
     """
 
     test_dataloader = probe_dataset_loader(
@@ -238,6 +309,22 @@ def eval_probe(
 def save_confusion_matrix(
     paths, y_true, y_pred, label2index, task_name="linear"
 ):
+    """
+    Save the confusion matrix as a plot to the probe path.
+
+    Parameters
+    ----------
+    paths : SimpleNamespace object
+        paths object used for saving the plot
+    y_true : list
+        ground truth values
+    y_pred : list
+        prediction values
+    label2index : dict
+        link labels to ints
+    task_name : str, optional
+        name of the task used in the plot file name, by default "linear"
+    """
     from matplotlib import pyplot as plt
 
     i2l = {v: k for k, v in label2index.items()}

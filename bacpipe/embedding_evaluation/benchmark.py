@@ -11,16 +11,63 @@ from sklearn.metrics import classification_report, average_precision_score
 
     
 def clean_string(s):
+    """
+    Clean a string by removing hyphens and whitespace and lowercasing it.
+
+    Parameters
+    ----------
+    s : str
+        string to be cleaned
+
+    Returns
+    -------
+    str
+        cleaned string
+    """
     return re.sub(r"[-\s]", "", s).lower()
 
 
 def normalize_name(s):
+    """
+    Normalize a name by lowercasing it, standardizing grey to gray and
+    removing all non-alphanumeric characters.
+
+    Parameters
+    ----------
+    s : str
+        name to be normalized
+
+    Returns
+    -------
+    str
+        normalized name
+    """
     # Lowercase, standardize grey -> gray, and remove ALL non-alphanumeric chars
     # Handles hyphens, spaces, slashes (/), apostrophes, etc.
     s = s.lower().replace("grey", "gray")
     return re.sub(r"[^a-z0-9]", "", s)
 
 def associate_labels_to_eBird_Codes(gt_species_cols, gt_without_metadata):
+    """
+    Attempt to convert annotated species labels that are eBird Codes to
+    their corresponding common names and update the ground truth dataframe
+    accordingly.
+
+    Parameters
+    ----------
+    gt_species_cols : np.array
+        array with the ground truth species column names
+    gt_without_metadata : pandas.DataFrame
+        ground truth dataframe without the metadata columns
+
+    Returns
+    -------
+    np.array
+        array with the ground truth species column names, updated with
+        the common names where eBird Codes were found
+    pandas.DataFrame
+        ground truth dataframe with the renamed species columns
+    """
     logger.info(
         "\nNo species found on first attempt, therefore trying to see if "
         "annotated species are eBird Codes and converting them to common name."
@@ -55,6 +102,26 @@ def associate_labels_to_eBird_Codes(gt_species_cols, gt_without_metadata):
 def associate_labels_regardless_of_puctuation(
     label2idx, gt_without_metadata, found, not_found
     ):
+    """
+    Try to match ground truth labels that were not found by removing
+    hyphens, spaces and punctuation from the labels.
+
+    Parameters
+    ----------
+    label2idx : dict
+        dictionary mapping the prediction labels to their indices
+    gt_without_metadata : pandas.DataFrame
+        ground truth dataframe without the metadata columns
+    found : list
+        list of ground truth labels that were already matched
+    not_found : list
+        list of ground truth labels that were not matched yet
+
+    Returns
+    -------
+    pandas.DataFrame
+        ground truth dataframe with renamed species columns
+    """
     logger.info(
         f"\nSpecies found in ground truth but NOT exactly in predictions: {not_found}"
     )
@@ -86,6 +153,26 @@ def associate_labels_regardless_of_spelling_and_substrings(
     gt_without_metadata,
     not_found
     ):
+    """
+    Try to match ground truth labels that were not found using flexible
+    matching of normalized names and unique substrings.
+
+    Parameters
+    ----------
+    label2idx : dict
+        dictionary mapping the prediction labels to their indices
+    found : list
+        list of ground truth labels that were already matched
+    gt_without_metadata : pandas.DataFrame
+        ground truth dataframe without the metadata columns
+    not_found : list
+        list of ground truth labels that were not matched yet
+
+    Returns
+    -------
+    pandas.DataFrame
+        ground truth dataframe with renamed species columns
+    """
     logger.info(
         f"\nNext try: Flexible matching (grey/gray, slashes, and unique substrings) for: {not_found}"
     )
@@ -157,6 +244,31 @@ def associate_ground_truth_and_prediction_labels(
     label2idx, 
     gt_without_metadata
     ):
+    """
+    Associate the ground truth species labels with the prediction labels
+    by applying several matching strategies and return an aligned ground
+    truth matrix.
+
+    Parameters
+    ----------
+    gt_species_cols : np.array
+        array with the ground truth species column names
+    label2idx : dict
+        dictionary mapping the prediction labels to their indices
+    gt_without_metadata : pandas.DataFrame
+        ground truth dataframe without the metadata columns
+
+    Returns
+    -------
+    pandas.DataFrame
+        ground truth dataframe aligned to the prediction columns
+    list
+        shared labels between ground truth and predictions
+    list
+        indices of the shared labels in the predictions
+    list
+        species that were not found in the classifier class list
+    """
     # Find exact matching classes
     found = [label for label in gt_species_cols if label in label2idx]
     not_found = [label for label in gt_species_cols if label not in label2idx]

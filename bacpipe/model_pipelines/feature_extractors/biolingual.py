@@ -11,7 +11,14 @@ BATCH_SIZE = 16
 
 
 class Model(ModelBaseClass):
+    """
+    BioLingual feature extractor (contrastive language-audio pretraining).
+    """
+
     def __init__(self, **kwargs):
+        """
+        Initialize the BioLingual model.
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -26,6 +33,19 @@ class Model(ModelBaseClass):
         self.model.to(self.device)
 
     def preprocess(self, audio):
+        """
+        Preprocess the audio frames into input features for the model.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio frames to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            input features for the model
+        """
         audio_input = []
         for frame in audio:
             features = self.preprocessor(
@@ -39,4 +59,17 @@ class Model(ModelBaseClass):
         return audio_input.squeeze(1)
 
     def __call__(self, input):
+        """
+        Get the audio features from the model for the input.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            preprocessed input features
+
+        Returns
+        -------
+        torch.Tensor
+            audio features
+        """
         return self.model.get_audio_features(input)

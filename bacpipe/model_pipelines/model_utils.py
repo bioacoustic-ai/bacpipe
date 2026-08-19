@@ -10,6 +10,11 @@ logger = logging.getLogger("bacpipe")
 
 
 class ModelBaseClass:
+    """
+    Base class for all feature extraction models, defining the common
+    preprocessing and inference pipeline.
+    """
+
     def __init__(
         self,
         sr,
@@ -64,6 +69,11 @@ class ModelBaseClass:
             global batch size that is then used in comjunction with the
             segment length to calculate a model-specific batch size that
             results in approximately equal batches for different models
+        model_name : str
+            name of the model
+        dim_reduction_model : bool, optional
+            Can be bool or the string corresponding to the
+            dimensionality reduction model, by default False
         """
 
         if device is None:
@@ -131,6 +141,10 @@ class ModelBaseClass:
             )
 
     def prepare_inference(self):
+        """
+        Prepare the model for inference by setting it to evaluation mode
+        and moving it to the selected device.
+        """
         if "umap" in self.__module__:
             return
         try:
@@ -147,21 +161,66 @@ class ModelBaseClass:
             pass
 
     def preprocessing(self, audio):
+        """
+        Preprocess the audio samples. The base class returns the audio
+        without any modification. Model specific subclasses override this
+        method.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            preprocessed audio samples
+        """
         return audio
 
     def __call__(self, input):
+        """
+        Run the model on the input. The base class returns the input
+        without any modification. Model specific subclasses override this
+        method.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            input samples
+
+        Returns
+        -------
+        torch.Tensor
+            model output
+        """
         return input
 
 
 def check_if_cudnn_tensorflow_compatible():
+    """
+    Check if the installed cuDNN version is compatible with tensorflow.
+
+    Returns
+    -------
+    bool
+        True if the cuDNN version is compatible with tensorflow
+    """
     import torch
 
-    version = (torch.backends.cudnn.version() % 1000) // 100
+    cudnn_version = torch.backends.cudnn.version()
+    if cudnn_version is None:
+        # torch built without CUDA/cuDNN support (e.g. CPU-only runners)
+        logger.info(
+            "cuDNN is not available (torch was built without CUDA support). "
+            "Device is therefore set to cpu for the tensorflow models."
+        )
+        return False
+    version = (cudnn_version % 1000) // 100
     if version < 3:
         logger.info(
             "cuDNN version does not match the required 9.3 for tensorflow. "
             "Device is therefore set to cpu for the tensorflow models."
         )
         return False
-    else:
-        return True
+    return True

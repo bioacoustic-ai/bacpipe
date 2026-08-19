@@ -22,6 +22,16 @@ else:
 
 class Model(ModelBaseClass):
     def __init__(self, threshold=0.5, **kwargs):
+        """
+        Initialize the BAT model.
+
+        Parameters
+        ----------
+        threshold : float
+            detection threshold (unused in the model forward pass)
+        **kwargs
+            additional keyword arguments passed to the base class
+        """
         super().__init__(
             sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs
         )
@@ -49,7 +59,19 @@ class Model(ModelBaseClass):
         self.model.eval()
 
     def preprocess(self, audio: torch.Tensor):
+        """
+        Convert the audio samples into sliding-window spectrogram sequences.
 
+        Parameters
+        ----------
+        audio : torch.Tensor
+            audio samples to be preprocessed
+
+        Returns
+        -------
+        torch.Tensor
+            stacked spectrogram sequences
+        """
         audio = audio.to("cpu")
         b_y = audio.numpy()  # b n
 
@@ -72,11 +94,39 @@ class Model(ModelBaseClass):
         return torch.stack(input_seq, dim=0)
 
     def classifier_predictions(self, cls_token):
+        """
+        Run the classifier head on the class token.
+
+        Parameters
+        ----------
+        cls_token : torch.Tensor
+            class token from the model
+
+        Returns
+        -------
+        torch.Tensor
+            sigmoid class logits
+        """
         with torch.no_grad():
             logits = self.model.classifier(cls_token)
         return torch.sigmoid(logits)
 
     def __call__(self, x, return_class_results=False):
+        """
+        Run the model on the input.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            preprocessed spectrogram sequences
+        return_class_results : bool
+            whether to also return class predictions
+
+        Returns
+        -------
+        torch.Tensor or tuple
+            class token, or a tuple of (class token, class predictions)
+        """
         with torch.no_grad():
             cls_token = self.model(x, return_token=True)
             if not return_class_results:

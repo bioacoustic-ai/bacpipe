@@ -8,7 +8,7 @@ from clustering_utils import *
 # file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem}.h5'
 # file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem+"_snr=0"}.h5'#.split("_cleaned")[0]+
 
-models = ['birdnet', 'birdnet_v3', 'naturebeats', 'audioprotopnet', 'avesecho_passt']
+models = ['birdnet_v3', 'naturebeats', 'audioprotopnet', 'avesecho_passt']
 
 
 embeds, umaps = get_embeddings(path, models)
@@ -30,7 +30,7 @@ df.index = range(len(df))
 
 ## compute clusterings
 n_centroids = embeds[model][f'snr={SNR}'].shape[0]//100
-max_clust = 100
+max_clust = 50
 clustering_dict = {
     # 'kmeans': KMeans(n_clusters=n_centroids), # because 15 species + noise for the within and diff file ...?
     # # 'hdb': HDBSCAN(min_cluster_size=10, min_samples=None),
@@ -91,13 +91,13 @@ clust_df, centroids = fetch_clustering(embeds, df, clustering_dict, overwrite=OV
 # labels[~filtered_labels] = -2
 cluster_booleans, clust_results = evaluate_clustering(df, clust_df, embeds, clustering_dict, overwrite=OVERWRITE)
 
-#### filter clusters
+# #### filter clusters
 
 
-print(clust_results)
+# print(clust_results)
 
 
-df_vis = fetch_visualization_df(clust_df, path, clustering_dict, umaps, overwrite=True, overwrite_gt=True)
+df_vis = fetch_visualization_df(clust_df, path, clustering_dict, umaps, overwrite=OVERWRITE, overwrite_gt=False)
 
     
 

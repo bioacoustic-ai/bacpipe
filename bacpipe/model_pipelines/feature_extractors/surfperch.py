@@ -6,6 +6,9 @@ LENGTH_IN_SAMPLES = 160000
 
 class Model(Model):
     def __init__(self, **kwargs):
+        """
+        Initialize the Surfrider Reef Perch model.
+        """
         self.class_label_key = "reef_label"
         super().__init__(
             sr=SAMPLE_RATE,

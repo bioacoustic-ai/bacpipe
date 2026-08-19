@@ -214,7 +214,7 @@ class Clustering_Approach:
         print(f"Discovered Clusters: {n_clusters}")
         print(f"Noise Points Rejected: {n_noise} ({n_noise / len(X) * 100:.2f}% of data)")
         
-        return final_labels, centroids, weights
+        return final_labels#, centroids, weights
     
 
     def agglomerative_clust(self, centroids):    

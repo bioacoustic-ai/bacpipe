@@ -276,23 +276,44 @@ def plot_classification_heatmap(
     species=None,
     **kwargs,
 ):
+    """
+    Generate a presence heatmap for a species across time and hours.
+
+    Parameters
+    ----------
+    event : object or None
+        widget event triggering the update
+    predictions_loader : PredictionsLoader object
+        loader providing the binary presence data
+    model : str
+        name of the model
+    accumulate_by : str
+        time unit used to aggregate ("day", "week", or "month")
+    threshold : float or str
+        detection threshold
+    species : str or None
+        species to plot, by default None
+    **kwargs
+        additional keyword arguments (e.g., heatmap_fig_height)
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        presence heatmap figure
+    """
     if event is None and species is None:
         return SpectrogramPlot.dummy_image(
             title="Click the button to generate a prediction heatmap."
         )
     try:
         predictions_loader.get_data(model, threshold, **kwargs)
+        accumulated_presence = predictions_loader.accumulate_data(
+            species, accumulate_by
+        )
+        timestamps = predictions_loader.timestamps
     except Exception as e:
         logger.exception(e)
-        # TODO thid doesn't update the plot for some reason
         return SpectrogramPlot.dummy_image(title=str(e))
-    # if predictions_loader.binary_presence is None:
-    #     return predictions_loader.failed_fig
-    accumulated_presence = predictions_loader.accumulate_data(
-        species, accumulate_by
-    )
-    timestamps = predictions_loader.timestamps
-
     logger.info("Redrawing heatmap plot")
 
     # Prepare data - mask values below 0
@@ -323,10 +344,9 @@ def plot_classification_heatmap(
             unique_labels.append(label)
             seen.add(label)
     y_indices = list(range(len(unique_labels)))
-    if len(y_indices) > len(y_indices) / int(
-        kwargs.get("heatmap_fig_height") / 100
-    ):
-        nr_y_ticks = int(kwargs.get("heatmap_fig_height") / 100)
+    nr_y_ticks = max(
+        1, int(kwargs.get("heatmap_fig_height", 600) / 100)
+    )
 
     clfier_type = (
         f"{predictions_loader.current_clfier_type} probing"
@@ -405,6 +425,11 @@ def plot_classification_heatmap(
 
 
 class PredictionsLoader:
+    """
+    Load and cache binary presence data, ground truth and classifier
+    predictions for the predictions pages.
+    """
+
     def __init__(
         self,
         vis_loader,
@@ -415,6 +440,26 @@ class PredictionsLoader:
         loading_pane,
         thresh=0.5,
     ):
+        """
+        Initialize the predictions loader.
+
+        Parameters
+        ----------
+        vis_loader : EmbedAndLabelLoader object
+            loader providing the embeddings
+        path_func : function
+            function returning the paths for a given model
+        models : list
+            list of models
+        panel_selection : object
+            dropdown widget for selecting the species
+        progress_bar : object
+            progress bar widget
+        loading_pane : object
+            pane widget for status messages
+        thresh : float
+            default detection threshold
+        """
         self.vis_loader = vis_loader
         self.path_func = path_func
         self.models = models
@@ -426,98 +471,149 @@ class PredictionsLoader:
     def get_data(
         self, model, threshold, clfier_type=None, probe_path="", **kwargs
     ):
+        """
+        Load or recompute the binary presence data for a model.
+
+        Parameters
+        ----------
+        model : str
+            name of the model
+        threshold : float or str
+            detection threshold
+        clfier_type : str or None
+            type of classifier ("Linear", "Integrated", or None)
+        probe_path : str
+            path to the probe used for the linear classifier
+        **kwargs
+            additional keyword arguments (unused)
+
+        Returns
+        -------
+        None
+            results are cached on the instance
+        """
         threshold = self.verify_threshold(threshold)
-        if hasattr(self, "binary_presence"):
-            if all(
-                [
-                    self.current_model == model,
-                    self.current_threshold == threshold,
-                    not self.class_dict is None,
-                    (
-                        self.current_clfier_type == clfier_type
-                        or clfier_type is None
-                    ),
-                ]
-            ):
-                return
 
-        self.current_model = model
-        self.current_threshold = threshold
-        self.current_clfier_type = clfier_type
-
+        # If no trained probe exists, fall back to the integrated classifier.
+        if clfier_type is None:
+            clfier_type = getattr(self, "current_clfier_type", "Integrated")
         if not (
             self.path_func(self.models[0]).probe_path / "linear_probe.pt"
         ).exists():
             clfier_type = "Integrated"
 
-        if clfier_type == "Linear":
-            self.loading_pane.value = "Loading embeddings for classification"
-            linear_probe, self.class_dict = prepare_probe_inference(
-                model, probe_path
+        # Serve the cached result only if it matches the current request and
+        # is fully consistent. A failed run must not leave a stale cache
+        # behind, which is why the "overall" column is part of the check
+        # (it is only added after a fully successful load).
+        if hasattr(self, "binary_presence") and (
+            self.current_model == model
+            and self.current_threshold == threshold
+            and self.current_clfier_type == clfier_type
+            and self.class_dict is not None
+            and "overall" in self.class_dict
+        ):
+            return
+
+        # Only touch the cached state after everything succeeded so that a
+        # failed run cannot leave stale/inconsistent data in the cache.
+        try:
+            if clfier_type == "Linear":
+                self.loading_pane.value = "Loading embeddings for classification"
+                linear_probe, class_dict = prepare_probe_inference(
+                    model, probe_path
+                )
+                self.loading_pane.value = "Running linear probe"
+                threshold = self.verify_threshold(threshold)
+
+                binary_presence = run_probe_inference(
+                    model,
+                    linear_probe,
+                    threshold,
+                    return_binary_presence=True,
+                    callbacks={"progress_bar": self.progress_bar},
+                )
+
+            elif clfier_type == "Integrated":
+                self.loading_pane.name = "Preparing heatmap"
+                self.loading_pane.value = "Loading precomputed embeddings"
+                binary_presence, class_dict = self.load_classification(
+                    model, threshold
+                )
+
+            else:
+                raise ValueError(
+                    f"Unknown classifier type: {clfier_type!r}"
+                )
+
+            self.embed_dict = self.vis_loader.embeds[model]
+
+            if binary_presence is None:
+                warning_string = (
+                    "It seems like the classifier hasn't been run yet, or <br>"
+                    f"that {model} doesn't have a pretrained classifier. <br>"
+                    "If the model has a pretrained classifier, please rerun <br>"
+                    "bacpipe with the setting `run default classifier` set to `True`."
+                )
+                self.loading_pane.value = warning_string
+                raise FileNotFoundError(warning_string)
+
+            if not len(self.embed_dict["x"]) == len(binary_presence):
+                logger.warning(
+                    "There is a mismatch between the number of embeddings "
+                    "and the number of predictions. Going to zero pad the "
+                    "rest, but this could misalign things. "
+                )
+                binary_presence = np.pad(
+                    binary_presence,
+                    (
+                        (0, len(self.embed_dict["x"]) - len(binary_presence)),
+                        (0, 0),
+                    ),
+                    "constant",
+                )
+
+            self.get_timestamps_per_embedding(model)
+
+            class_dict["overall"] = len(class_dict)
+            binary_presence = np.concatenate(
+                [
+                    binary_presence.T,
+                    [np.sum(binary_presence, axis=1).astype(np.int8)],
+                ]
+            ).T
+
+            class_dict = self.reorder_by_most_occurrance(
+                binary_presence, class_dict
             )
-            self.loading_pane.value = "Running linear probe"
-            threshold = self.verify_threshold(threshold)
+        except Exception:
+            self.binary_presence = None
+            self.class_dict = None
+            raise
 
-            self.binary_presence = run_probe_inference(
-                model,
-                linear_probe,
-                threshold,
-                return_binary_presence=True,
-                callbacks={"progress_bar": self.progress_bar},
-            )
-
-        elif clfier_type == "Integrated":
-            self.loading_pane.name = "Preparing heatmap"
-            self.loading_pane.value = "Loading precomputed embeddings"
-            self.binary_presence, self.class_dict = self.load_classification(
-                model, threshold
-            )
-
-        self.embed_dict = self.vis_loader.embeds[model]
-
-        if self.binary_presence is None:
-            warning_string = (
-                "It seems like the classifier hasn't been run yet, or <br>"
-                f"that {model} doesn't have a pretrained classifier. <br>"
-                "If the model has a pretrained classifier, please rerun <br>"
-                "bacpipe with the setting `run default classifier` set to `True`."
-            )
-            self.loading_pane.value = warning_string
-            raise FileNotFoundError(warning_string)
-
-        if not len(self.embed_dict["x"]) == len(self.binary_presence):
-            logger.warning(
-                "There is a mismatch between the number of embeddings "
-                "and the number of predictions. Going to zero pad the "
-                "rest, but this could misalign things. "
-            )
-            self.binary_presence = np.pad(
-                self.binary_presence,
-                (
-                    (0, len(self.embed_dict["x"]) - len(self.binary_presence)),
-                    (0, 0),
-                ),
-                "constant",
-            )
-
-        self.get_timestamps_per_embedding(model)
-
-        self.class_dict["overall"] = len(self.class_dict)
-        self.binary_presence = np.concatenate(
-            [
-                self.binary_presence.T,
-                [np.sum(self.binary_presence, axis=1).astype(np.int8)],
-            ]
-        ).T
-
-        self.class_dict = self.reorder_by_most_occurrance(
-            self.binary_presence, self.class_dict
-        )
-
+        # Commit to the cache only on success.
+        self.binary_presence = binary_presence
+        self.class_dict = class_dict
+        self.current_model = model
+        self.current_threshold = threshold
+        self.current_clfier_type = clfier_type
         self.panel_selection.options = list(self.class_dict.keys())
 
     @staticmethod
     def verify_threshold(threshold):
+        """
+        Normalize a threshold widget value to a float.
+
+        Parameters
+        ----------
+        threshold : float or str
+            raw threshold value, possibly an empty string
+
+        Returns
+        -------
+        float
+            validated threshold
+        """
         if threshold == "":
             threshold = 0.5
         else:
@@ -526,6 +622,21 @@ class PredictionsLoader:
 
     @staticmethod
     def reorder_by_most_occurrance(probs, label2index):
+        """
+        Reorder the class index mapping by total occurrence count.
+
+        Parameters
+        ----------
+        probs : np.ndarray
+            binary presence array of shape (n_embeddings, n_classes)
+        label2index : dict
+            mapping of class name to column index
+
+        Returns
+        -------
+        dict
+            class to index mapping sorted by decreasing occurrence
+        """
         sums = [sum(probs[:, a]) for a in range(probs.shape[1])]
 
         sorted_l2i = dict(
@@ -534,6 +645,19 @@ class PredictionsLoader:
         return sorted_l2i
 
     def get_classes(self, path):
+        """
+        Load the class names from a probe's label2index file.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path
+            path to the probe file
+
+        Returns
+        -------
+        list
+            class names, or an empty list if no probe exists
+        """
         if path == "":
             path = (
                 self.path_func(self.models[0]).probe_path / "linear_probe.pt"
@@ -546,6 +670,22 @@ class PredictionsLoader:
             return []
 
     def load_classification(self, model, threshold):
+        """
+        Load the integrated classifier outputs as binary presence data.
+
+        Parameters
+        ----------
+        model : str
+            name of the model
+        threshold : float
+            detection threshold applied to the class probabilities
+
+        Returns
+        -------
+        tuple of (np.ndarray or None, dict or None)
+            binary presence array and class to index mapping, or
+            (None, None) if no classifier outputs exist
+        """
         integrated_clfier_path = self.path_func(model).preds_path.joinpath(
             "original_classifier_outputs"
         )
@@ -625,7 +765,29 @@ class PredictionsLoader:
         return binary_classification, keys2idx
 
     def accumulate_data(self, species, accumulate_by="day"):
+        """
+        Accumulate the binary presence of a species into a time heatmap.
+
+        Parameters
+        ----------
+        species : str or None
+            species to accumulate, or None for the overall presence
+        accumulate_by : str
+            time unit used to aggregate ("day", "week", or "month")
+
+        Returns
+        -------
+        np.ndarray
+            accumulated presence array of shape (24, n_time_bins)
+        """
         if not species:
+            species = "overall"
+        # Fall back to the overall presence instead of crashing.
+        if species not in self.class_dict:
+            logger.warning(
+                f"Species {species!r} not found in the current classifier "
+                "outputs, falling back to 'overall'."
+            )
             species = "overall"
         self.panel_selection.value = species
         species_idx = self.class_dict[species]
@@ -656,6 +818,23 @@ class PredictionsLoader:
     def transform_presence_into_hour_heatmap(
         species_presence, hours, accumulator
     ):
+        """
+        Transform per-embedding presence into a 24-hour by time-bin matrix.
+
+        Parameters
+        ----------
+        species_presence : np.ndarray
+            binary presence per embedding
+        hours : np.ndarray
+            hour of day for each embedding
+        accumulator : list of tuples
+            time bin label (e.g., (year, month, day)) for each embedding
+
+        Returns
+        -------
+        np.ndarray
+            heatmap of shape (24, n_time_bins) with -1 for empty bins
+        """
         accumulated = (
             np.ones([24, len(np.unique(accumulator, axis=0))], dtype=np.int8)
             * -1
@@ -680,6 +859,19 @@ class PredictionsLoader:
         return accumulated
 
     def get_timestamps_per_embedding(self, model):
+        """
+        Compute a datetime timestamp for each embedding.
+
+        Parameters
+        ----------
+        model : str
+            name of the model
+
+        Returns
+        -------
+        None
+            timestamps are stored on the instance
+        """
         from bacpipe.embedding_evaluation.label_embeddings import (
             get_dt_filename,
         )

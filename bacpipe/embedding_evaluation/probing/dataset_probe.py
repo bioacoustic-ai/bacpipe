@@ -9,6 +9,10 @@ logger = logging.getLogger("bacpipe")
 
 
 class ProbeDatasetLoader(Dataset):
+    """
+    PyTorch Dataset yielding embedding/label pairs for probe classification.
+    """
+
     def __init__(self, class_df, embeds, label2index, set_name=None, **kwargs):
         """
         Class to initialize and iterate through classification dataset.
@@ -40,6 +44,14 @@ class ProbeDatasetLoader(Dataset):
         self.dataset = self.dataset.sample(frac=1, random_state=42)
 
     def __len__(self):
+        """
+        Get the number of samples in the dataset.
+
+        Returns
+        -------
+        int
+            number of samples in the dataset
+        """
         return len(self.dataset)
 
     def __getitem__(self, idx):
@@ -124,6 +136,35 @@ def generate_annotations_for_probing_task(
     seed=42,
     **kwargs,
 ):
+    """
+    Generate the probing annotations dataframe from the ground truth. The
+    labels are determined from the simultaneous labels in the ground truth
+    and the samples are split into train, test and validation sets per
+    species. If the dataframe already exists, it is loaded instead.
+
+    Parameters
+    ----------
+    ground_truth : pandas.DataFrame
+        ground truth dataframe containing the species labels
+    paths : SimpleNamespace
+        object with the paths used for saving the probing dataframe
+    label_column : str
+        name of the label column
+    dataset_csv_path : str, optional
+        path to the probing dataframe csv file, by default
+        "probe_annotations.csv"
+    train_ratio : float, optional
+        proportion of samples used for training, by default None
+    test_ratio : float, optional
+        proportion of samples used for testing, by default None
+    seed : int, optional
+        random seed used for shuffling, by default 42
+
+    Returns
+    -------
+    pandas.DataFrame
+        probing annotations dataframe
+    """
     import bacpipe
 
     if train_ratio is None:
@@ -200,26 +241,3 @@ def generate_annotations_for_probing_task(
         )
         df = pd.read_csv(dataset_csv_path, index_col=False)
     return df
-
-def get_filenames_and_starts_for_probe_df(paths, ground_truth, label_column):
-    from bacpipe.embedding_evaluation.label_embeddings import (
-        get_metadata_labels,
-        get_dt_filename,
-    )
-    import datetime as dt
-
-    model_name = paths.labels_path.parent.stem
-    metadata_labels = get_metadata_labels(model_name, overwrite=False)
-    filenames = np.array(metadata_labels["audio_file_name"])[
-        ground_truth[f"label:{label_column}"] > -1
-    ]
-    times_of_day = np.array(metadata_labels["time_of_day"])[
-        ground_truth[f"label:{label_column}"] > -1
-    ]
-    starts = [
-        (
-            dt.datetime.strptime(tod_e, "%H-%M-%S") - get_dt_filename(tod_f)
-        ).seconds
-        for tod_e, tod_f in zip(times_of_day, filenames)
-    ]
-    return filenames, starts

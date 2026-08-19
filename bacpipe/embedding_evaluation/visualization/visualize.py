@@ -36,8 +36,6 @@ def visualise_results_across_models(plot_path, task_name, model_list):
 
     Parameters
     ----------
-    path_func : function
-        return the paths when given a model name
     plot_path : pathlib.Path object
         path to overview plots
     task_name : str
@@ -226,6 +224,29 @@ def plot_clusterings(
 def generate_bar_plot(
     metrics, fig, ax, x_label="Metric value", no_legend=False, **kwargs
 ):
+    """
+    Generate a grouped horizontal bar plot of model metrics.
+
+    Parameters
+    ----------
+    metrics : dict
+        mapping of comparison name to dict of metric name/value pairs
+    fig : matplotlib.figure.Figure
+        figure to draw on
+    ax : matplotlib.axes.Axes
+        axes to draw on
+    x_label : str
+        label for the x-axis
+    no_legend : bool
+        whether to suppress the legend
+    **kwargs
+        additional keyword arguments (unused)
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        the figure with the bar plot drawn
+    """
     bar_height = 1 / (len(list(metrics.values())[0].keys()) + 1)
     cmap = plt.cm.tab10
     colors = cmap(np.arange(len(list(metrics.values())[0].keys())) % cmap.N)
@@ -283,32 +304,55 @@ def plot_overview_results(
         list of models
     metrics : dict
         performance dictionary
+    path_func : callable, optional
+        function that returns the paths when given a model name,
+        by default None
+    return_fig : bool, optional
+        whether to return the figure instead of saving it, by default False
     sort_string : str
         string to sort the metrics by, defaults to "kmeans-audio_file_name"
     """
     # TODO when first ran mutliple models and then just one, metrics
     # doesn't know the current model and this should be caught
     if not metrics:
-        res_path = path_func(model_list[0]).plot_path.parent.parent.joinpath(
-            "overview"
-        )
-        try:
-            with open(res_path.joinpath(f"probing_results.json"), "r") as f:
-                metrics = json.load(f)
-        except FileNotFoundError as e:
+        # The dashboard calls this function with ``metrics=None``. Read the
+        # per-model probing results directly from disk (the same
+        # ``probe_results_*.json`` files that the per-model probing plots in
+        # the dashboard read) instead of the aggregated
+        # ``overview/probing_results.json``. That aggregated file is only
+        # written by ``cross_model_evaluation`` (i.e. it is missing when only
+        # a single model was evaluated) and can be stale after re-runs, which
+        # made the overview plot diverge from the actual generated results.
+        metrics = load_results(path_func, "probing", model_list)
+        if not metrics:
             logger.warning(
-                f"\nThe file {res_path.joinpath(f'probing_results.json')} was not found. Perhaps "
-                "you are only computing one model and that is the reason no overview plot is created. "
+                "\nNo probing result files were found. Perhaps probing was not "
+                "computed for the selected models, or you are only computing one "
+                "model and that is the reason no overview plot is created."
             )
             return {}
+        subtask = task_name.split(" ")[0]
         metrics = {
             k.split("(")[0]: v["overall"]
             for k, v in metrics.items()
-            if task_name in k
+            if subtask in k
         }
 
     if "probing" in task_name:
         metrics = {k: v["overall"] for k, v in metrics.items()}
+
+    # Keep the overview consistent with the per-model probing plots
+    # (``plot_classification_results``), which only show the macro metrics
+    # and the AUC. The micro-averaged metrics are dropped so that the
+    # overview corresponds to the model-comparison plots in the dashboard.
+    metrics = {
+        model: {
+            metric: value
+            for metric, value in overall.items()
+            if not "micro" in metric
+        }
+        for model, overall in metrics.items()
+    }
 
     fig = Figure(figsize=(12, 6))
     ax = fig.subplots()
@@ -378,7 +422,7 @@ def plot_overview_results(
     if return_fig:
         return fig
     file = (
-        f"overview_metrics_{task_name}_"
+        f"overview_metrics_{task_name.replace(' ', '_')}_"
         + "-".join([m[:2] for m in metrics.keys()])
         + ".png"
     )

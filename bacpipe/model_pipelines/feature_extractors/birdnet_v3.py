@@ -22,6 +22,18 @@ class Model(ModelBaseClass):
         segment_length=LENGTH_IN_SAMPLES,
         **kwargs,
     ):
+        """
+        Initialize the BirdNET v3 model wrapper.
+
+        Parameters
+        ----------
+        sr : int
+            sample rate in Hz
+        segment_length : int
+            number of samples per input segment
+        **kwargs
+            additional keyword arguments passed to the base class
+        """
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
         
         label_path = self.model_utils_base_path / 'birdnet_v3/BirdNET+_V3.0-preview3.1_Global_11K_Labels.csv'
@@ -32,27 +44,77 @@ class Model(ModelBaseClass):
         self.classes = pd.read_csv(label_path, sep=';')['com_name'].values
         
     def preprocess(self, audio):
+        """
+        Pass-through preprocessing.
+
+        Parameters
+        ----------
+        audio : torch.Tensor
+            input audio tensor
+
+        Returns
+        -------
+        torch.Tensor
+            the unchanged input audio
+        """
         return audio
 
     def __call__(self, input):
+        """
+        Run the BirdNET v3 model on the input audio.
+
+        Parameters
+        ----------
+        input : torch.Tensor
+            input audio tensor
+
+        Returns
+        -------
+        torch.Tensor
+            embeddings produced by the model
+        """
         input = input.cpu()
         self.predictions, self.embeddings = self.model(np.array(input))
 
         return self.embeddings
 
     def classifier_predictions(self, embeddings):
+        """
+        Return the class predictions from the last model call.
+
+        Parameters
+        ----------
+        embeddings : torch.Tensor
+            embeddings from the last model call (unused)
+
+        Returns
+        -------
+        torch.Tensor
+            class predictions produced by the model
+        """
         return self.predictions
 
 
 
 class birdnet_v3_ONNX(nn.Module):
-    """Perch v2 ONNX Model Wrapper with multi-platform GPU acceleration.
+    """ONNX Model Wrapper with multi-platform GPU acceleration.
+    Adapted from https://huggingface.co/justinchuby/Perch-onnx.
     
     Supports: Linux (CUDA/CPU), macOS (CoreML/CPU), Windows (CUDA/DirectML/CPU).
     Input: Audio tensor of shape (batch_size, 160000) at 32kHz sample rate.
     """
 
     def __init__(self, checkpoint_path, device: str = "auto"):
+        """
+        Initialize the BirdNET v3 ONNX classifier.
+
+        Parameters
+        ----------
+        checkpoint_path : pathlib.Path
+            path to the ONNX checkpoint
+        device : str
+            requested device ("auto", "cpu", or "cuda")
+        """
         super().__init__()
         
         try:
@@ -66,6 +128,19 @@ class birdnet_v3_ONNX(nn.Module):
             sys.exit(1)
 
     def _get_execution_providers(self, device: str) -> list[str]:
+        """
+        Resolve the ONNX execution providers for the requested device.
+
+        Parameters
+        ----------
+        device : str
+            requested device ("auto", "cpu", or "cuda")
+
+        Returns
+        -------
+        list of str
+            execution providers to use for the ONNX session
+        """
         providers = []
 
         # Select execution provider based on device
@@ -75,58 +150,6 @@ class birdnet_v3_ONNX(nn.Module):
             providers = ["CPUExecutionProvider"]
 
         providers.append("CPUExecutionProvider")
-        return providers
-    
-    
-    def chunk_audio(
-        y: np.ndarray, 
-        chunk_length: float = LENGTH_IN_SAMPLES / SAMPLE_RATE, 
-        overlap: float = 0.0, 
-        sr: int = SAMPLE_RATE
-        ):
-        """
-        Split audio into chunks with optional temporal overlap.
-
-        Args:
-            y: 1D numpy array (mono audio).
-            chunk_length: Length of each chunk in seconds (>0).
-            overlap: Overlap between consecutive chunks in seconds (0 <= overlap < chunk_length).
-            sr: Sample rate.
-
-        Returns:
-            chunks: Float32 array of shape [N, chunk_samples]
-            spans: List of (start_sec, end_sec) for each chunk (end_sec truncated to original audio length).
-        """
-        chunk_len = int(round(chunk_length * sr))
-        if chunk_len <= 0:
-            raise ValueError("chunk_length must be > 0")
-        if overlap < 0:
-            raise ValueError("overlap must be >= 0")
-        if overlap >= chunk_length:
-            raise ValueError("overlap must be < chunk_length")
-
-        step = chunk_len - int(round(overlap * sr))
-        if step <= 0:
-            raise ValueError("Invalid step size (adjust overlap/chunk_length).")
-
-        n = len(y)
-        if n == 0:
-            return np.zeros((0, chunk_len), dtype=np.float32), []
-
-        starts = np.arange(0, n, step)
-        chunks = []
-        spans = []
-        for s in starts:
-            e = min(s + chunk_len, n)
-            seg = y[s:e]
-            if len(seg) < chunk_len:
-                pad = np.zeros(chunk_len - len(seg), dtype=seg.dtype)
-                seg = np.concatenate([seg, pad], axis=0)
-            chunks.append(seg.astype(np.float32, copy=False))
-            spans.append((s / sr, min(e, n) / sr))
-            if e >= n:
-                break
-        return np.stack(chunks, axis=0), spans
     
 
     def forward(
@@ -137,15 +160,21 @@ class birdnet_v3_ONNX(nn.Module):
     ):
         """
         Run inference with ONNX model.
-        
-        Args:
-            session: ONNX Runtime inference session.
-            chunks: [N, T] float32 mono audio.
-            batch_size: batch size.
-            return_embeddings: if True, also return stacked embeddings [N, D].
-        
-        Returns:
+
+        Parameters
+        ----------
+        chunks : np.ndarray
+            [N, T] float32 mono audio
+        batch_size : int, optional
+            batch size, by default 16
+        return_embeddings : bool, optional
+            if True, also return stacked embeddings [N, D], by default True
+
+        Returns
+        -------
+        np.ndarray
             predictions: [N, C] float32
+        np.ndarray or None
             embeddings: [N, D] float32 or None
         """
         if chunks.shape[0] == 0:
@@ -179,6 +208,6 @@ class birdnet_v3_ONNX(nn.Module):
             
             preds_out.append(pred.astype(np.float32))
         
-        predictions = np.concatenate(preds_out, axis=0)
-        embeddings = np.concatenate(embs_out, axis=0) if return_embeddings and embs_out else None
+        predictions = torch.tensor(np.concatenate(preds_out, axis=0))
+        embeddings = torch.tensor(np.concatenate(embs_out, axis=0))
         return predictions, embeddings
