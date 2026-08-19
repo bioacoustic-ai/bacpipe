@@ -7,10 +7,33 @@ from pathlib import Path
 import pytest
 
 from bacpipe.core.workflows import (
+    _normalize_evaluation_task,
     confirm_model_name,
     evaluation_with_settings_already_exists,
     get_model_names,
 )
+
+
+class TestNormalizeEvaluationTask:
+    """``evaluation_task`` may be passed as a single string by API users; it
+    must be normalized to a list so the downstream ``in`` checks behave."""
+
+    def test_string_is_wrapped_in_list(self):
+        assert _normalize_evaluation_task("probing") == ["probing"]
+
+    def test_list_passes_through(self):
+        assert _normalize_evaluation_task(
+            ["probing", "clustering"]
+        ) == ["probing", "clustering"]
+
+    def test_tuple_is_converted_to_list(self):
+        assert _normalize_evaluation_task(("probing", "clustering")) == [
+            "probing",
+            "clustering",
+        ]
+
+    def test_none_becomes_empty_list(self):
+        assert _normalize_evaluation_task(None) == []
 
 
 class TestConfirmModelName:

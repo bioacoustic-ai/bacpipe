@@ -82,6 +82,98 @@ def _friendly_export_error(exc):
     return None
 
 
+def _capture_view_ranges(relayout_data):
+    """
+    Extract 2D axis ranges from a plotly ``relayout_data`` event.
+
+    Plotly reports zoom/pan through ``relayout_data`` using either the list
+    form ``{"xaxis.range": [lo, hi], ...}`` or the indexed form
+    ``{"xaxis.range[0]": lo, "xaxis.range[1]": hi, ...}``. Both are handled
+    here so the current view can be re-applied before a static export.
+
+    Parameters
+    ----------
+    relayout_data : dict or None
+        the ``relayout_data`` payload emitted by the Plotly pane
+
+    Returns
+    -------
+    dict
+        maps ``"xaxis"`` and/or ``"yaxis"`` to ``(lo, hi)`` tuples, or is
+        empty when no ranges were reported (e.g. a double-click reset)
+    """
+    if not relayout_data:
+        return {}
+    ranges = {}
+    for axis in ("xaxis", "yaxis"):
+        value = relayout_data.get(f"{axis}.range")
+        if isinstance(value, (list, tuple)) and len(value) == 2:
+            ranges[axis] = (value[0], value[1])
+            continue
+        lo = relayout_data.get(f"{axis}.range[0]")
+        hi = relayout_data.get(f"{axis}.range[1]")
+        if lo is not None and hi is not None:
+            ranges[axis] = (lo, hi)
+    return ranges
+
+
+def _apply_view_ranges(fig, ranges):
+    """
+    Apply previously captured axis ranges to a figure so a static export
+    reflects the zoomed-in view the user is currently looking at.
+
+    Parameters
+    ----------
+    fig : plotly.graph_objects.Figure
+        figure to update
+    ranges : dict
+        output of :func:`_capture_view_ranges`
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        the same figure with the ranges applied
+    """
+    if not ranges:
+        return fig
+    if "xaxis" in ranges:
+        fig.update_xaxes(range=list(ranges["xaxis"]), autorange=False)
+    if "yaxis" in ranges:
+        fig.update_yaxes(range=list(ranges["yaxis"]), autorange=False)
+    return fig
+
+
+def _static_export_figure(fig):
+    """
+    Return a copy of ``fig`` with webgl traces converted to regular SVG
+    scatter traces.
+
+    ``plot_embeddings_px`` renders 2D embeddings with ``render_mode="webgl"``.
+    Kaleido's headless-Chrome export is unreliable for webgl traces (markers
+    and especially the continuous colorbar can be missing), so export a
+    plain-SVG copy instead.
+
+    Parameters
+    ----------
+    fig : plotly.graph_objects.Figure
+        figure to prepare for export
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        copy of ``fig`` without webgl traces
+    """
+    import json
+
+    import plotly.graph_objects as go
+
+    fig_dict = json.loads(fig.to_json())
+    for trace in fig_dict.get("data", []):
+        if trace.get("type") == "scattergl":
+            trace["type"] = "scatter"
+    return go.Figure(fig_dict)
+
+
 class DashBoardHelper:
     """
     Helper class providing shared widget event handlers and figure update
@@ -228,6 +320,11 @@ class DashBoardHelper:
         self.interactive_embed_plot[widget_idx].param.watch(
             lambda x: self.handle_selection(x, widget_idx), "selected_data"
         )
+        # Track zoom/pan so the "Save Figure" button can export the currently
+        # displayed view rather than the full (unzoomed) figure.
+        self.interactive_embed_plot[widget_idx].param.watch(
+            lambda x: self._store_view_ranges(x, widget_idx), "relayout_data"
+        )
         button = pn.widgets.Button(name="Save Figure", button_type="primary")
         notification = pn.pane.Markdown("")
 
@@ -236,6 +333,24 @@ class DashBoardHelper:
 
         self.embed_save_button[widget_idx] = button
         self.embed_notification[widget_idx] = notification
+
+    def _store_view_ranges(self, event, widget_idx):
+        """
+        Store the current zoom/pan ranges of the embedding plot.
+
+        Parameters
+        ----------
+        event : panel event
+            the ``relayout_data`` event triggered by the user zooming/panning
+        widget_idx : int
+            index of the widget whose view changed
+        """
+        ranges = _capture_view_ranges(event.new if event else None)
+        if ranges:
+            self._embed_view_ranges[widget_idx] = ranges
+        else:
+            # e.g. a double-click reset returned to the full view
+            self._embed_view_ranges.pop(widget_idx, None)
 
     def _on_save_button_click(self, event, widget_idx):
         """
@@ -257,7 +372,16 @@ class DashBoardHelper:
         save_path = self.path_func(model_name).plot_path / filename
 
         try:
-            displayed_fig.write_image(save_path, width=1200, height=800)
+            # Rebuild a non-webgl copy of the figure (so kaleido renders the
+            # continuous colorbar reliably) and re-apply the current zoom/pan
+            # so the exported PNG matches what the user is looking at. The
+            # canvas is fixed so the plot dimensions never depend on the
+            # width of the legend/colorbar.
+            export_fig = _static_export_figure(displayed_fig)
+            export_fig = _apply_view_ranges(
+                export_fig, self._embed_view_ranges.get(widget_idx, {})
+            )
+            export_fig.write_image(save_path, width=1200, height=800)
             self.embed_notification[widget_idx].object = (
                 f"✓ Saved to: {save_path}"
             )
@@ -341,7 +465,10 @@ class DashBoardHelper:
             panel object containing the plot
         """
         if kwargs.get("return_fig", False):
-            return pn.bind(plot_func, **kwargs)
+            fig_panel = pn.panel(pn.bind(plot_func, **kwargs))
+            # Make the plot fill the available accordion width
+            fig_panel.sizing_mode = "stretch_width"
+            return fig_panel
         else:
             return self.add_save_button(plot_func, **kwargs)
 
@@ -480,7 +607,7 @@ class DashBoardHelper:
             # Determine save path
             if model_name == "all_models":
                 save_dir = (
-                    self.path_func(model_name).plot_path.parent.parent
+                    self.path_func(self.models[0]).plot_path.parent.parent
                     / "overview"
                 )
             else:

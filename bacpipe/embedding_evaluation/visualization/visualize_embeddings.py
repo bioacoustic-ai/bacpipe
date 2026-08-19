@@ -646,7 +646,9 @@ def set_colorbar_or_legend(
         cbar.set_label(label_by.replace("_", " "), fontsize=10)
     else:
         hands, labs = axes.get_legend_handles_labels()
-        fig, axes = set_legend(hands, labs, fig, axes, **kwargs)
+        fig, axes = set_legend(
+            hands, labs, fig, axes, label_by=label_by, **kwargs
+        )
     return fig, axes
 
 
@@ -739,6 +741,7 @@ def set_legend(
     axes,
     bool_plot_centroids=False,
     dashboard=False,
+    label_by=None,
     **kwargs,
 ):
     """
@@ -758,6 +761,10 @@ def set_legend(
         if True centroids of each class will be plotted, by default True
     dashboard : bool
         if dashboard called this function or not
+    label_by : str, optional
+        key of the label dict used for coloring. Audio file names are long, so
+        their legend is forced to a single column to avoid taking up too much
+        horizontal space.
 
     Returns
     -------
@@ -791,6 +798,8 @@ def set_legend(
         ncol = max(1, int(np.ceil(num_labels / max_rows)))
         max_cols = max(1, 2)#int((0.45 * fig_w) / 0.7))
         ncol = min(ncol, max_cols)
+        if label_by == "audio_file_name":
+            ncol = 1
 
         fontsize = 6 if num_labels > 40 else 7
         markerscale = 3 if num_labels > 40 else 4
@@ -814,6 +823,8 @@ def set_legend(
         )
     else:
 
+        if label_by == "audio_file_name":
+            ncol = 1
         fig.subplots_adjust(bottom=0.2)
         fig.legend(
             new_handles,

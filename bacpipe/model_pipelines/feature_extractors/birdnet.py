@@ -117,7 +117,11 @@ class Model(ModelBaseClass):
             sigmoid class logits
         """
         logits = self.classifier(embeddings).numpy()
-        return tf.nn.sigmoid(logits).numpy()
+        try:
+            return tf.nn.sigmoid(logits).numpy()
+        except:
+            import torch
+            return torch.sigmoid(torch.tensor(logits)).numpy()
 
 
 class Rebuilder:

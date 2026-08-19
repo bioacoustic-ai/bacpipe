@@ -3,6 +3,7 @@ import matplotlib
 import sys
 import seaborn as sns
 import numpy as np
+import pandas as pd
 import logging
 from pathlib import Path
 
@@ -19,12 +20,12 @@ from . import tooltips
 from .visualize import (
     plot_clusterings,
     clustering_overview,
-    plot_overview_results,
 )
 from .visualize_spectrograms import SpectrogramPlot
 from .visualize_predictions import (
     plot_classification_results,
     plot_classification_heatmap,
+    plot_per_class_results,
     PredictionsLoader,
 )
 
@@ -158,6 +159,7 @@ class DashBoard(DashBoardHelper):
         self.embed_notification = dict()
 
         self.interactive_embed_plot = dict()
+        self._embed_view_ranges = dict()
         self.spectrogram_plot_panel = dict()
         self.spec_plot_obj = dict()
         self._trigger_spec_obj_update = dict()
@@ -591,9 +593,9 @@ class DashBoard(DashBoardHelper):
                     "Probing Metrics",
                     (
                         self.plot_widget(
-                            plot_overview_results,
+                            plot_per_class_results,
                             plot_path=None,
-                            metrics=None,
+                            results=None,
                             task_name=self.class_select[widget_idx],
                             path_func=self.path_func,
                             model_list=self.models,
@@ -705,11 +707,21 @@ class DashBoard(DashBoardHelper):
                         self.clfier_path[widget_idx],
                         # after that show me the classes that this
                         # linear classifier will classify
-                        pn.widgets.StaticText(
-                            name="Classes",
-                            value=pn.bind(
-                                self.preds_data[widget_idx].get_classes,
-                                self.clfier_path[widget_idx],
+                        pn.Column(
+                            pn.pane.Markdown("**Classes**"),
+                            pn.pane.DataFrame(
+                                pn.bind(
+                                    lambda path: pd.DataFrame(
+                                        {
+                                            "Classes": self.preds_data[
+                                                widget_idx
+                                            ].get_classes(path)
+                                        }
+                                    ),
+                                    self.clfier_path[widget_idx],
+                                ),
+                                width=400,
+                                height=300,
                             ),
                         ),
                         # input section to give a threshold for classification
@@ -745,6 +757,9 @@ class DashBoard(DashBoardHelper):
                 # # add button to save as raven annotations
             ),
             sizing_mode="stretch_width",
+            # The predictions only need half the window width; keep the page
+            # compact so the heatmap does not stretch across the full browser.
+            styles={"max-width": "50%"},
         )
         return pn.Row(sidebar, main_content, sizing_mode="stretch_width")
 

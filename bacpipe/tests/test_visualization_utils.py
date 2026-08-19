@@ -25,12 +25,16 @@ from bacpipe.embedding_evaluation.visualization.visualize_spectrograms import (
 )
 from bacpipe.embedding_evaluation.visualization.visualize_predictions import (
     PredictionsLoader,
+    plot_per_class_results,
 )
 from bacpipe.embedding_evaluation.visualization.visualize import (
     plot_overview_results,
 )
 from bacpipe.embedding_evaluation.visualization.dashboard_utils import (
+    _apply_view_ranges,
+    _capture_view_ranges,
     _friendly_export_error,
+    _static_export_figure,
 )
 
 
@@ -77,6 +81,18 @@ class TestTransformPresenceIntoHourHeatmap:
         assert heatmap[1, 1] == 0
         # hours without any embeddings stay at -1
         assert heatmap[2, 0] == -1
+
+    def test_large_counts_do_not_overflow(self):
+        # Sums larger than 127 must not wrap to negative values: the heatmap
+        # renders any negative cell as an empty (NaN) cell, which used to make
+        # the "overall" view show gaps even though individual classes had data.
+        presence = np.ones(200, dtype=np.int8)
+        hours = np.array([5] * 200)
+        accumulator = [(2024, 1, 1)] * 200
+        heatmap = PredictionsLoader.transform_presence_into_hour_heatmap(
+            presence, hours, accumulator
+        )
+        assert heatmap[5, 0] == 200
 
 
 class TestGetSingleLabelGtLabels:
@@ -352,6 +368,121 @@ class TestPlotEmbeddingsPxDiscreteVsContinuous:
         assert "coloraxis" in layout
 
 
+class TestPlotPerClassResults:
+    """The cross-model comparison plot must align each model's per-class
+    values with the x-axis labels and stay consistent with the per-model
+    probe plots (which sort classes by accuracy)."""
+
+    def test_labels_match_values_and_use_accuracy_order(
+        self, tmp_path, monkeypatch
+    ):
+        # Prevent the figure from being closed so we can inspect it.
+        monkeypatch.setattr(plt, "close", lambda *a, **k: None)
+
+        results = {
+            "model_a": {
+                # insertion order differs from alphabetical AND from
+                # accuracy order on purpose, to catch misalignment
+                "per_class_accuracy": {"cat": 0.9, "ant": 0.3, "bat": 0.6},
+                "overall": {"macro_accuracy": 0.6},
+            },
+            "model_b": {
+                "per_class_accuracy": {"bat": 0.7, "ant": 0.4, "cat": 0.8},
+                "overall": {"macro_accuracy": 0.7},
+            },
+        }
+        plot_per_class_results(
+            tmp_path, "linear probing", ["model_a", "model_b"], results
+        )
+
+        ax = plt.gca()
+        # model_b has the highest macro_accuracy -> reference model. Its
+        # classes sorted by accuracy descending are cat, bat, ant.
+        assert [t.get_text() for t in ax.get_xticklabels()] == [
+            "cat",
+            "bat",
+            "ant",
+        ]
+
+        # The first scatter is the reference model (sorted first). Its points
+        # must sit at x = 0, 1, 2 with the values for cat, bat, ant.
+        offsets = ax.collections[0].get_offsets()
+        np.testing.assert_allclose(offsets[:, 0], [0, 1, 2])
+        np.testing.assert_allclose(offsets[:, 1], [0.8, 0.7, 0.4])
+
+        # The figure was written to the plot path.
+        assert len(list(tmp_path.glob("*.png"))) == 1
+
+    def test_loads_results_from_disk_and_returns_figure(
+        self, tmp_path
+    ):
+        # The dashboard calls with results=None, path_func=... and
+        # return_fig=True; the results must then be read from the per-model
+        # ``probe_results_*.json`` files instead of saving to disk.
+        import json
+
+        from types import SimpleNamespace
+
+        models = ["model_a", "model_b"]
+        probe_dirs = {}
+        for m_idx, model in enumerate(models):
+            probe_dir = tmp_path / model / "probing"
+            probe_dir.mkdir(parents=True)
+            probe_dirs[model] = probe_dir
+            results = {
+                "overall": {"macro_accuracy": 0.5 + m_idx / 10},
+                "per_class_accuracy": {
+                    "cat": 0.9,
+                    "ant": 0.3 + m_idx / 10,
+                    "bat": 0.6,
+                },
+            }
+            with open(probe_dir / "probe_results_linear.json", "w") as f:
+                json.dump(results, f)
+
+        def path_func(model_name):
+            return SimpleNamespace(probe_path=probe_dirs[model_name])
+
+        fig = plot_per_class_results(
+            None,
+            "linear",
+            models,
+            results=None,
+            path_func=path_func,
+            return_fig=True,
+        )
+
+        assert type(fig).__name__ == "Figure"
+        ax = fig.axes[0]
+        # model_b has the higher macro_accuracy -> reference model; classes
+        # sorted by accuracy descending are cat, bat, ant.
+        assert [t.get_text() for t in ax.get_xticklabels()] == [
+            "cat",
+            "bat",
+            "ant",
+        ]
+
+    def test_return_fig_caps_width_for_dashboard(self):
+        # The dashboard requests ``return_fig=True`` so the figure is embedded
+        # in a Panel accordion. For many classes the default width formula
+        # (num_classes * 0.5) used to produce huge figures that extended
+        # beyond the accordion; the dashboard figure must stay at a fixed,
+        # modest width.
+        results = {
+            "model_a": {
+                "per_class_accuracy": {
+                    f"class_{i}": 0.9 for i in range(60)
+                },
+                "overall": {"macro_accuracy": 0.5},
+            },
+        }
+        fig = plot_per_class_results(
+            None, "linear", ["model_a"], results=results, return_fig=True
+        )
+        assert fig.get_size_inches()[0] == 12
+        plt.close(fig)
+
+
 class TestPredictionsLoaderCacheConsistency:
     """A failed load must not poison the PredictionsLoader cache. Otherwise
     the single model predictions tab crashes with a KeyError when switching
@@ -489,6 +620,29 @@ class TestPredictionsLoaderCacheConsistency:
         assert captured["audio_dir"] == str(tmp_path / "audio")
         assert captured["main_results_dir"] == str(tmp_path / "results")
 
+
+class TestPlotWidgetResponsive:
+    """``DashBoardHelper.plot_widget`` must make ``return_fig=True`` plots
+    fill the available accordion width instead of rendering at their natural
+    (potentially very wide) size."""
+
+    def test_return_fig_panel_stretches_to_accordion_width(self):
+        import panel as pn
+
+        from bacpipe.embedding_evaluation.visualization.dashboard_utils import (
+            DashBoardHelper,
+        )
+
+        helper = object.__new__(DashBoardHelper)
+        slider = pn.widgets.IntSlider(value=1, start=1, end=10)
+
+        def fake_plot(x, return_fig=False):
+            fig, ax = plt.subplots()
+            ax.plot([1, 2, 3])
+            return fig
+
+        panel = helper.plot_widget(fake_plot, x=slider, return_fig=True)
+        assert panel.sizing_mode == "stretch_width"
 
 
 class TestTimestampsMatch:
@@ -683,6 +837,60 @@ class TestPlotEmbeddingsPxCustomData:
         # column 7 is the model name, column 6 the numeric label id
         assert set(customdata[:, 7]) == {"birdnet"}
         assert set(customdata[:, 6]) == {0, 1}
+
+class TestDashboardExportHelpers:
+    """The Save Figure button must re-apply the zoomed view and export a
+    non-webgl figure so kaleido reliably renders colorbars/legends."""
+
+    def test_capture_view_ranges_list_form(self):
+        ranges = _capture_view_ranges(
+            {"xaxis.range": [-1, 2], "yaxis.range": [3, 4]}
+        )
+        assert ranges == {"xaxis": (-1, 2), "yaxis": (3, 4)}
+
+    def test_capture_view_ranges_indexed_form(self):
+        ranges = _capture_view_ranges(
+            {
+                "xaxis.range[0]": -1,
+                "xaxis.range[1]": 2,
+                "yaxis.range[0]": 3,
+                "yaxis.range[1]": 4,
+            }
+        )
+        assert ranges == {"xaxis": (-1, 2), "yaxis": (3, 4)}
+
+    def test_capture_view_ranges_empty_when_no_ranges(self):
+        assert _capture_view_ranges(None) == {}
+        assert _capture_view_ranges({"xaxis.autorange": True}) == {}
+
+    def test_apply_view_ranges_disables_autorange(self):
+        import plotly.graph_objects as go
+
+        fig = go.Figure(go.Scatter(x=[0, 1], y=[0, 1]))
+        _apply_view_ranges(fig, {"xaxis": (-1, 2), "yaxis": (3, 4)})
+        assert list(fig.layout.xaxis.range) == [-1, 2]
+        assert list(fig.layout.yaxis.range) == [3, 4]
+        assert fig.layout.xaxis.autorange is False
+        assert fig.layout.yaxis.autorange is False
+
+    def test_static_export_converts_scattergl_to_scatter(self):
+        import plotly.express as px
+
+        fig = px.scatter(
+            x=[0, 1, 2],
+            y=[0, 1, 2],
+            color=[0, 1, 2],
+            render_mode="webgl",
+        )
+        assert {t.type for t in fig.data} == {"scattergl"}
+
+        converted = _static_export_figure(fig)
+        assert {t.type for t in converted.data} == {"scatter"}
+        # the colorbar/coloraxis survives the round-trip
+        assert converted.layout.coloraxis is not None
+        # the original figure is left untouched
+        assert {t.type for t in fig.data} == {"scattergl"}
+
 
 class TestFriendlyExportError:
     """The Save Figure button must surface friendly, actionable messages instead
