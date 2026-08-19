@@ -19,6 +19,81 @@ import bacpipe
 logger = logging.getLogger("bacpipe")
 
 
+def deduplicate_annotation_pairs(df):
+    """
+    Remove exact duplicate annotation rows, keeping the first occurrence.
+
+    Several species can vocalize at exactly the same ``(start, end)`` time,
+    so the annotations of a single audio file often contain multiple rows
+    with the same pair. Those rows are NOT duplicates: each of them labels
+    a different species and must be preserved so that the shared window
+    keeps every species (multi-label ground truth). Rows from different
+    audio files are never duplicates either, even when they share the same
+    pair. Only rows that agree on the pair, the source file and every
+    ``label:`` column are removed.
+
+    This is the row-level deduplication to use wherever the annotations
+    themselves are consumed (e.g. building the ground truth). The distinct
+    one-row-per-embedded-segment operation that mirrors the audio loader is
+    ``unique_start_end_annot_pairs``.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        dataframe with the annotations (must have ``start`` and ``end``
+        columns)
+
+    Returns
+    -------
+    pandas.DataFrame
+        dataframe with only the first occurrence of each exact duplicate
+        annotation row
+    """
+    subset = ["start", "end"]
+    if "audiofilename" in df.columns:
+        subset.append("audiofilename")
+    label_cols = [c for c in df.columns if c.startswith("label:")]
+    if label_cols:
+        subset += label_cols
+    return df.drop_duplicates(subset=subset)
+
+
+def unique_start_end_annot_pairs(df):
+    """
+    Keep one row per unique ``(start, end)`` pair.
+
+    The audio loader (``_only_load_annotated_segments``) embeds each unique
+    window exactly once, regardless of how many species vocalize in it, so
+    this is the operation that mirrors it. It is used for counting embedded
+    segments and for the one-label-per-segment metadata labels
+    (``time_of_day``, ``continuous_timestamp``, ``default_classifier``),
+    where the species identity plays no role: every species in a window
+    receives the same metadata value.
+
+    Unlike ``deduplicate_annotation_pairs`` this intentionally collapses
+    rows of different species that share a window - those rows describe the
+    SAME embedded segment, not different annotations. The ground-truth path
+    (``fit_labels_to_embedding_timestamps``) must NOT collapse them.
+
+    Call this on a per-file dataframe (or group by the source file
+    yourself): identical pairs from different audio files must count once
+    per file.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        annotations of a single audio file (must have ``start`` and
+        ``end`` columns)
+
+    Returns
+    -------
+    pandas.DataFrame
+        dataframe with only the first occurrence of each ``(start, end)``
+        pair
+    """
+    return df.drop_duplicates(subset=["start", "end"])
+
+
 class DefaultLabels:
     """
     Generate the default metadata labels (e.g. species, time of day) for
@@ -172,7 +247,12 @@ class DefaultLabels:
                         self.df,
                         Path(self.paths.audio_dir) / file,
                     )
-                    starts = df.start.values
+                    # Several species can share the same window, so the
+                    # annotations hold duplicate (start, end) pairs while the
+                    # audio loader embeds each unique pair once. Keep one
+                    # start per embedded segment so they line up with the
+                    # embeddings.
+                    starts = unique_start_end_annot_pairs(df).start.values
                     timestamp = (
                         (
                             time_of_day
@@ -282,7 +362,8 @@ class DefaultLabels:
                         self.df,
                         Path(self.paths.audio_dir) / file,
                     )
-                    starts = df.start.values
+                    # keep one start per embedded segment, see ``time_of_day``
+                    starts = unique_start_end_annot_pairs(df).start.values
                     timestamp = (
                         (
                             datetime_per_file
@@ -408,8 +489,8 @@ class DefaultLabels:
                     self.df,
                     Path(self.paths.audio_dir) / file,
                 )
-                starts = df_tmp.start.values
-                # starts = self.df.start[self.df.audiofilename == file]
+                # keep one start per embedded segment, see ``time_of_day``
+                starts = unique_start_end_annot_pairs(df_tmp).start.values
                 all_time_bins = np.round(starts, 4).tolist()
             else:
                 all_time_bins = np.round(
@@ -1107,6 +1188,17 @@ def fit_labels_to_embedding_timestamps(
     """
     Fit the annotations of a single file onto the timestamps of the
     embeddings.
+    For only_embed_annotations=True:
+    The audio loader embeds each unique (start, end) pair exactly
+    once, so the ground truth holds one row per unique pair (one per
+    embedded segment). Different species can vocalize in the same
+    window: their annotation rows are NOT duplicates and must all
+    survive so the shared segment is labelled with every one of them
+    (multi-label ground truth).
+    In annotated-segment mode the number of rows is defined by the
+    (unique-pair) annotations themselves, not by ``num_embeds`` from
+    the metadata file (which may stem from a run that was created
+    before pair-level deduplication existed).
 
     Parameters
     ----------
@@ -1129,16 +1221,29 @@ def fit_labels_to_embedding_timestamps(
     pandas.DataFrame
         ground truth dataframe fitted to the embedding timestamps
     """
+    df = df.sort_values("start")
+
+    if only_embed_annotations:
+        pairs_for_grid = unique_start_end_annot_pairs(df)
+        num_embeds = len(pairs_for_grid)
+    else:
+        pairs_for_grid = None
+
     for col in df_fitted_gt.columns:
         df_fitted_gt[col] = np.zeros(num_embeds, dtype=np.int8)
-    df = df.sort_values("start")
 
     if not only_embed_annotations:
         df_fitted_gt["start"] = np.arange(num_embeds) * segment_s
         df_fitted_gt["end"] = df_fitted_gt["start"] + segment_s
     else:
-        df_fitted_gt["start"] = df["start"].values
-        df_fitted_gt["end"] = df["end"].values
+        df_fitted_gt["start"] = pairs_for_grid["start"].values
+        df_fitted_gt["end"] = pairs_for_grid["end"].values
+
+    # Remove only exact duplicate annotation rows (same pair, same species
+    # and same source file). Rows of different species at the same
+    # (start, end) are kept so the shared segment receives all of their
+    # labels.
+    df = deduplicate_annotation_pairs(df)
 
     min_annotation_length = kwargs.get(
         "min_annotation_length", bacpipe.settings.min_annotation_length
@@ -1803,8 +1908,18 @@ def get_files_if_no_embeds(audio_dir, model, label_df=None, only_embed_annotatio
     metadata["sample_rate (Hz)"] = module.SAMPLE_RATE
     metadata["files"]["audio_files"] = matching_audio_files
     if only_embed_annotations:
+        # One embedding per unique annotated segment: several species can
+        # share the same (start, end) window, so count the pairs after
+        # collapsing to one row per window (mirroring
+        # ``_only_load_annotated_segments``). ``unique_start_end_annot_pairs``
+        # keeps rows of different species at the same window intact for the
+        # ground truth, but here the *count* is what matters.
         metadata["files"]["nr_embeds_per_file"] = [
-            len(filter_df_by_filename(label_df, f, model=model)) 
+            len(
+                unique_start_end_annot_pairs(
+                    filter_df_by_filename(label_df, f, model=model)
+                )
+            )
             for f in matching_audio_files
         ]
     else:

@@ -166,6 +166,10 @@ class Embedder(AudioHandler):
     def batch_inference(self, batched_samples, callback=None):
         """
         Run the model on all batches and collect the embeddings.
+        Move every batch to the model device (cpu, cuda or mps).
+        Only ``cuda`` was special-cased before, so on a Mac the
+        input stayed on the cpu while the weights lived on ``mps``,
+        which raised "input and weight are not on the same device".
 
         Parameters
         ----------
@@ -195,8 +199,9 @@ class Embedder(AudioHandler):
             )
         ):
             with torch.no_grad():
-                if self.model.device == "cuda" and hasattr(batch, "cuda"):
-                    batch = batch.cuda()
+                if self.model.device != "cpu":
+                    if hasattr(batch, "to"):
+                        batch = batch.to(self.model.device)
                 embeddings = self.model(batch)
                 if self.model.bool_classifier:
                     try:
@@ -879,11 +884,11 @@ class Classifier:
         else:
             clfier_output = self.model.classifier_predictions(embeddings)
 
-        if self.model.device == "cuda" and isinstance(
+        if self.model.device != "cpu" and isinstance(
             clfier_output, torch.Tensor
         ):
-            self.predictions = self.predictions.cuda()
-            clfier_output = clfier_output.cuda()
+            self.predictions = self.predictions.to(self.model.device)
+            clfier_output = clfier_output.to(self.model.device)
 
         if isinstance(clfier_output, torch.Tensor):
             self.predictions = torch.cat(
@@ -898,6 +903,8 @@ class Classifier:
         """
         Append or create a dataframe and fill it with the results from the
         classifier to later be saved as a csv file.
+        Deduplicate (start, end) pairs together, mirroring the audio
+        loader (``_only_load_annotated_segments``).
 
         Parameters
         ----------
@@ -914,19 +921,36 @@ class Classifier:
             self, "only_embed_annotations"
         ):
             from bacpipe import Loader
+            from bacpipe.embedding_evaluation.label_embeddings import (
+                unique_start_end_annot_pairs,
+            )
 
             df = Loader.filter_df_by_file(
                 fileloader_obj.audio_dir, self.df, file
             )
-            starts = (
-                df.start.values
-            )  # self.start_timestamps[self.df.audiofilename == str(file.relative_to(fileloader_obj.audio_dir))]
-            ends = (
-                df.end.values
-            )  # self.end_timestamps[self.df.audiofilename == str(file.relative_to(fileloader_obj.audio_dir))]
-            starts, ends = list(set(starts)), list(set(ends))
-            starts.sort(), ends.sort()
-            starts, ends = np.array(starts), np.array(ends)
+            # One row per embedded segment: several species can share a
+            # window but the classifier predicts per segment, so collapse to
+            # the unique (start, end) pairs (mirroring the audio loader).
+            df = unique_start_end_annot_pairs(df)
+            starts = df["start"].to_numpy()
+            ends = df["end"].to_numpy()
+            if len(starts) != len(maxes.values):
+                # if this is true, then an out-of-range annotation was skipped while the audio
+                # was loaded. Do not raise: the embeddings are still valid,
+                # only this file's annotation rows cannot be aligned.
+                logger.warning(
+                    f"The number of embedded segments ({len(maxes.values)}) "
+                    f"does not match the number of annotated segments "
+                    f"({len(starts)}) for {file}. Skipping classifier "
+                    "annotation rows for this file."
+                )
+                return
+            # Per-file annotation pairs, aligned with the prediction rows of
+            # this file. ``save_Raven_table`` uses them instead of the
+            # dataset-wide ``start_timestamps``/``end_timestamps``, which
+            # would misalign across files in annotated-segment mode.
+            self.current_file_starts = starts
+            self.current_file_ends = ends
             classifier_annotations["start"] = starts[
                 maxes.values > self.classifier_threshold
             ]
@@ -1101,9 +1125,23 @@ class Classifier:
             # predictions so they are NOT carried over into the next file's
             # classifier outputs. 
             self.predictions = torch.tensor([])
+            self._clear_current_file_pairs()
             raise
 
         self.predictions = torch.tensor([])
+        self._clear_current_file_pairs()
+
+    def _clear_current_file_pairs(self):
+        """
+        Forget the per-file annotation timestamps of the last processed file.
+
+        They are recomputed by ``_fill_dataframe_with_classiefier_results``
+        for every file, but clearing them makes sure ``save_Raven_table``
+        cannot accidentally reuse the previous file's pairs if the
+        annotation rows of the current file could not be aligned.
+        """
+        self.current_file_starts = None
+        self.current_file_ends = None
 
     def save_Raven_table(self, file, relative_parent_path):
         """
@@ -1142,10 +1180,33 @@ class Classifier:
         ]
         specs = [self.model.classes[sp] for sp in species]
 
+        if hasattr(self, "only_embed_annotations") and getattr(
+            self, "only_embed_annotations"
+        ):
+            # The dataset-wide ``start_timestamps``/``end_timestamps`` are in
+            # annotation-file order and cannot be indexed with the per-file
+            # prediction rows of this file (they would return another file's
+            # timestamps in only_embed_annotations mode). Use the per-file pairs
+            # captured by ``_fill_dataframe_with_classiefier_results``.
+            starts = getattr(self, "current_file_starts", None)
+            ends = getattr(self, "current_file_ends", None)
+            if starts is None or ends is None:
+                logger.warning(
+                    f"No per-file annotation timestamps are available for "
+                    f"{file}, so the Raven table is skipped. This happens "
+                    "when the annotation rows could not be aligned with the "
+                    "embedded segments (e.g. an out-of-range annotation was "
+                    "skipped while loading the audio)."
+                )
+                return
+        else:
+            starts = self.start_timestamps
+            ends = self.end_timestamps
+
         df = pd.DataFrame()
         df["label:species"] = specs
-        df["start"] = self.start_timestamps[timestamps]
-        df["end"] = self.end_timestamps[timestamps]
+        df["start"] = starts[timestamps]
+        df["end"] = ends[timestamps]
         from bacpipe.embedding_evaluation.label_embeddings import (
             create_Raven_annotation_table,
         )
@@ -1187,6 +1248,10 @@ class Classifier:
                 clfier_output = self.model.classifier_predictions(embeddings)
 
             if isinstance(clfier_output, torch.Tensor):
+                # Keep predictions on the model device (cuda/mps) so the
+                # ``torch.cat`` below does not raise a device mismatch.
+                clfier_output = clfier_output.to(self.model.device)
+                self.predictions = self.predictions.to(self.model.device)
                 self.predictions = torch.cat(
                     [self.predictions, clfier_output.clone().detach()]
                 )

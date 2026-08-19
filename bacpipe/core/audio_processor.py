@@ -152,6 +152,13 @@ class AudioHandler:
         """
         Load only the segments of an audio file that are covered by
         annotations in the annotations CSV file.
+        
+        Several species can share the same time window, so the raw
+        annotations can contain multiple rows with the same (start, end)
+        pair. Deduplicate the *pairs* as a unit. 
+        ``filter_df_by_file`` already sorted the annotations by start and
+        ``drop_duplicates`` keeps that order, so the segments are loaded in
+        the same order in which the classifier predictions are collected.
 
         Parameters
         ----------
@@ -182,32 +189,51 @@ class AudioHandler:
                 "Continuing with next file."
             )
 
-        starts = np.array(file_annots.start.unique(), dtype=np.float32)
-        ends = np.array(file_annots.end.unique(), dtype=np.float32)
+        file_annots = file_annots.drop_duplicates(subset=["start", "end"])
 
-        # audio = audio.cpu().squeeze()
-        for idx, (s, e) in enumerate(zip(starts, ends)):
-            self.get_file_length(file_path)
-            if s > self.file_length[file_path.stem]:
+        self.get_file_length(file_path)
+        file_duration = self.file_length[file_path.stem]
+
+        segments = []
+        for s, e in zip(file_annots["start"], file_annots["end"]):
+            s, e = float(s), float(e)
+            if e <= s:
                 logger.warning(
-                    f"Annotation with start {s} and end {str(e)} is outside of "
+                    f"Annotation with start {s} and end {e} has duration "
+                    f"zero or negative, which doesn't make any sense. "
+                    f"Skipping annotation for {file_path}."
+                )
+                continue
+            if s >= file_duration:
+                logger.warning(
+                    f"Annotation with start {s} and end {e} is outside of "
                     f"range of {file_path}. Skipping annotation."
                 )
                 continue
-            
-            audio, sr = lb.load(str(file_path), sr=self.model.sr, mono=True, offset=s, duration=e-s)
-            segments = lb.util.fix_length(
-                audio,
-                size=self.model.segment_length,
-                mode=self.padding
+            duration = min(e - s, file_duration - s)
+            audio, _ = lb.load(
+                str(file_path),
+                sr=self.model.sr,
+                mono=True,
+                offset=s,
+                duration=duration,
+            )
+            segments.append(
+                lb.util.fix_length(
+                    audio,
+                    size=self.model.segment_length,
+                    mode=self.padding,
                 )
-            if idx == 0:
-                cumulative_segments = segments
-            else:
-                cumulative_segments = np.vstack(
-                    [cumulative_segments, segments]
-                )
-        cumulative_segments = torch.Tensor(cumulative_segments)
+            )
+
+        if len(segments) == 0:
+            raise AssertionError(
+                f"No valid annotations found for audio file "
+                f"{file_path.relative_to(self.audio_dir)}. "
+                "Continuing with next file."
+            )
+
+        cumulative_segments = torch.Tensor(np.vstack(segments))
         return cumulative_segments
 
     def _load_audio_based_on_fixed_segment_length(
