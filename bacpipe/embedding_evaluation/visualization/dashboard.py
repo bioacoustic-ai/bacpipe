@@ -218,6 +218,7 @@ class DashBoard(DashBoardHelper):
                 loader=self.vis_loader,
                 model_name=self.model_select[widget_idx],
                 label_by=self.label_select[widget_idx],
+                default_label_keys=self.default_label_keys,
                 ground_truth=self.ground_truth,
                 dim_reduction_model=self.dim_reduction_model,
                 remove_noise=(
@@ -250,6 +251,7 @@ class DashBoard(DashBoardHelper):
                     loader=self.vis_loader,
                     model_name=self.model_select[widget_idx].value,
                     label_by=self.label_select[widget_idx].value,
+                    default_label_keys=self.default_label_keys,
                     ground_truth=self.ground_truth,
                     dim_reduction_model=self.dim_reduction_model,
                     remove_noise=(

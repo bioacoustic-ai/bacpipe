@@ -1464,6 +1464,8 @@ class Loader:
         bool
             True if the classifier should be run, False otherwise
         """
+        if not run_pretrained_classifier:
+            return False
         if not paths:
             if hasattr(self, "paths"):
                 paths = self.paths

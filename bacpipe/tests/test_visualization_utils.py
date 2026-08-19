@@ -393,7 +393,8 @@ class TestPredictionsLoaderCacheConsistency:
 
     @staticmethod
     def _fake_run_probe_success(
-        model, probe, threshold, return_binary_presence=True, callbacks=None
+        model, probe, threshold, return_binary_presence=True, callbacks=None,
+        **kwargs,
     ):
         binary_presence = np.zeros((6, 2), dtype=np.int8)
         binary_presence[:3, 0] = 1
@@ -412,6 +413,8 @@ class TestPredictionsLoaderCacheConsistency:
             return SimpleNamespace(
                 probe_path=tmp_path / "probing",
                 preds_path=tmp_path / "predictions",
+                audio_dir=str(tmp_path / "audio"),
+                main_results_dir=str(tmp_path / "results"),
             )
 
         loader = PredictionsLoader(
@@ -467,6 +470,24 @@ class TestPredictionsLoaderCacheConsistency:
         # not crash the heatmap; it falls back to the overall presence.
         accumulated = loader.accumulate_data("not_a_species", "day")
         assert accumulated.shape[0] == 24
+
+    def test_linear_probe_forwards_audio_and_results_dir(self, tmp_path):
+        captured = {}
+
+        def capturing_run_probe(model, probe, threshold, **kwargs):
+            captured.update(kwargs)
+            return self._fake_run_probe_success(model, probe, threshold)
+
+        loader = self._make_loader(tmp_path, capturing_run_probe)
+        loader.get_data("birdnet", 0.5, clfier_type="Linear")
+
+        # ``DashBoard.__init__`` consumes ``audio_dir``/``main_results_dir`` as
+        # named parameters, so they are absent from ``self.kwargs``. The
+        # predictions loader must re-supply them from the path helper;
+        # otherwise ``run_probe_inference`` silently falls back to the
+        # config/settings defaults and loads embeddings from the wrong place.
+        assert captured["audio_dir"] == str(tmp_path / "audio")
+        assert captured["main_results_dir"] == str(tmp_path / "results")
 
 
 
@@ -761,6 +782,7 @@ class TestDashboardEmbeddingPanelKwargs:
         dash.vis_loader = object()
         dash.model_select = {0: "model_a"}
         dash.label_select = {0: "time_of_day"}
+        dash.default_label_keys = ["time_of_day"]
         dash.noise_select = {}
         dash.ground_truth = None
         dash.dim_reduction_model = "umap"
@@ -783,6 +805,9 @@ class TestDashboardEmbeddingPanelKwargs:
         assert captured["dashboard_idx"] == 0
         assert captured["model_name"] == "model_a"
         assert captured["label_by"] == "time_of_day"
+        # ``default_label_keys`` is a named ``DashBoard.__init__`` parameter and
+        # therefore absent from ``self.kwargs``; it must still reach the plot.
+        assert captured["default_label_keys"] == ["time_of_day"]
         # user kwargs are still forwarded, just without the colliding keys
         assert captured["overwrite"] is False
         assert captured["models"] == ["model_a"]

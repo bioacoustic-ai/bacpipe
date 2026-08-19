@@ -151,6 +151,45 @@ class TestRunProbeInference:
         )
         assert preds.shape == (4, 2)
 
+    def test_kwargs_main_results_dir_overrides_settings(self, monkeypatch):
+        """
+        ``main_results_dir`` is consumed as a named parameter by
+        ``DashBoard.__init__`` and therefore does not survive in the kwargs
+        that reach the dashboard callbacks. When the dashboard runs a linear
+        probe it must forward the value explicitly, otherwise the Loader built
+        inside ``run_probe_inference`` would look in
+        ``settings.main_results_dir`` instead of the user's directory.
+        """
+        import bacpipe
+
+        captured = {}
+
+        class FakeLoader:
+            def __init__(self, audio_dir, model_name=None, **kwargs):
+                captured["audio_dir"] = audio_dir
+                captured["model_name"] = model_name
+                captured["kwargs"] = kwargs
+
+            def embeddings(self, return_type="array"):
+                return make_embeds()
+
+        monkeypatch.setattr(
+            "bacpipe.core.experiment_manager.Loader", FakeLoader
+        )
+
+        run_probe_inference(
+            "testmodel",
+            make_probe(),
+            threshold=0.5,
+            embeds=None,
+            audio_dir="my_audio",
+            main_results_dir="my_results",
+            device="cpu",
+        )
+
+        assert captured["audio_dir"] == "my_audio"
+        assert captured["kwargs"]["main_results_dir"] == "my_results"
+
 
 class TestPrepareProbeInference:
     def test_loads_probe_and_label_mapping(self, tmp_path, monkeypatch):

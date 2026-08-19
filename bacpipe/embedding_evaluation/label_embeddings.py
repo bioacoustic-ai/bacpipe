@@ -511,6 +511,7 @@ def make_set_paths_func(
 
         paths = {
             "audio_dir": audio_dir,
+            "main_results_dir": main_results_dir,
             "dataset_path": dataset_path,
             "dim_reduc_parent_dir": dataset_path.joinpath(
                 dim_reduc_parent_dir

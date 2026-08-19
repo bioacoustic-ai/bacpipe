@@ -168,9 +168,9 @@ def generate_annotations_for_probing_task(
     import bacpipe
 
     if train_ratio is None:
-        train_ratio = bacpipe.settings.probe_configs["config_1"]["train_ratio"]
+        train_ratio = bacpipe.settings.train_ratio
     if test_ratio is None:
-        test_ratio = bacpipe.settings.probe_configs["config_1"]["test_ratio"]
+        test_ratio = bacpipe.settings.test_ratio
 
     if paths is None or not Path(dataset_csv_path).exists():
         rng = np.random.default_rng(seed=seed)

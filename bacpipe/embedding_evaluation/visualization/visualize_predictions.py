@@ -539,6 +539,8 @@ class PredictionsLoader:
                     threshold,
                     return_binary_presence=True,
                     callbacks={"progress_bar": self.progress_bar},
+                    audio_dir=self.path_func(model).audio_dir,
+                    main_results_dir=self.path_func(model).main_results_dir,
                     **kwargs,
                 )
 
