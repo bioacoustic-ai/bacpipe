@@ -283,7 +283,8 @@ def clustering_pipeline(
         kwargs.pop("label_column")
     if not paths:
         get_paths_func = bacpipe.make_set_paths_func(
-            bacpipe.config.audio_dir, bacpipe.settings.main_results_dir
+            kwargs.get("audio_dir", bacpipe.config.audio_dir),
+            kwargs.get("main_results_dir", bacpipe.settings.main_results_dir),
         )
         paths = get_paths_func(model_name)
     if overwrite or not len(list(paths.clust_path.glob("*.json"))) > 0:
@@ -332,9 +333,9 @@ def clustering_pipeline(
 
     else:
         logger.info(
-            "Clustering file cluster_metrics.json already exists and"
+            "\nClustering file cluster_metrics.json already exists and"
             " so is not computed. If you want to overwrite existing results, "
-            "set overwrite to True in settings.yaml."
+            "set overwrite to True in settings.yaml.\n"
         )
         clusterings = np.load(
             paths.clust_path.joinpath(f"clust_labels.npy"), allow_pickle=True

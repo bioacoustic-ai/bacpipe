@@ -619,6 +619,37 @@ def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
     return loader_dict
 
 
+def _normalize_evaluation_task(evaluation_task):
+    """
+    Normalize ``evaluation_task`` to a list of task name strings.
+
+    API users may pass a single task as a string (e.g.
+    ``evaluation_task="probing"``) instead of a list. Downstream code checks
+    membership with ``"probing" in evaluation_task``, which silently "works"
+    for a string through substring matching but misbehaves for ``None`` (a
+    ``TypeError``) or for strings that are only substrings of a task name.
+    Normalizing here makes the string, list, tuple and ``None`` forms behave
+    identically.
+
+    Parameters
+    ----------
+    evaluation_task : str, list, tuple or None
+        task or tasks to evaluate
+
+    Returns
+    -------
+    list
+        list of task name strings (empty when ``evaluation_task`` is ``None``)
+    """
+    if evaluation_task is None:
+        return []
+    if isinstance(evaluation_task, str):
+        return [evaluation_task]
+    if isinstance(evaluation_task, (list, tuple)):
+        return list(evaluation_task)
+    return [evaluation_task]
+
+
 def model_specific_evaluation(
     loader_dict,
     evaluation_task,
@@ -640,8 +671,10 @@ def model_specific_evaluation(
     ----------
     loader_dict : dict
         dictionary containing the loader objects for each model
-    evaluation_task : string
-        name of the evaluation task to be performed.
+    evaluation_task : string or list
+        name of the evaluation task(s) to be performed. A single task may be
+        passed as a string (e.g. ``"probing"``) or a list
+        (e.g. ``["probing", "clustering"]``).
     probe_configs : dict
         dictionary containing the configuration for the
         probing tasks. The configurations are specified
@@ -675,6 +708,8 @@ def model_specific_evaluation(
             models=['birdnet'],
         )
     """
+    evaluation_task = _normalize_evaluation_task(evaluation_task)
+
     if "CustomModels" in kwargs:
         CustomModels = kwargs.get("CustomModels")
         if not isinstance(CustomModels, (list, tuple)):
@@ -812,12 +847,13 @@ def cross_model_evaluation(
         )
         for i, model in enumerate(models)
     ]
+    evaluation_task = _normalize_evaluation_task(evaluation_task)
     if len(models) > 1:
         plot_path = get_paths(models[0]).plot_path.parent.parent.joinpath(
             "overview"
         )
         plot_path.mkdir(exist_ok=True, parents=True)
-        if not len(evaluation_task) == 0:
+        if evaluation_task:
             for task in evaluation_task:
                 visualise_results_across_models(plot_path, task, models)
         if not dim_reduction_model in [None, "None", False]:

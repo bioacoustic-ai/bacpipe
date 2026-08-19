@@ -210,13 +210,20 @@ def save_probe_results(paths, config, metrics, **kwargs):
     for k, v in kwargs.items():
         if isinstance(v, Path):
             kwargs[k] = v.as_posix()
+        elif isinstance(v, np.ndarray):
+            kwargs[k] = v.tolist()
+        elif isinstance(v, (np.integer, np.floating, np.bool_)):
+            kwargs[k] = v.item()
 
     metrics["config"] = kwargs
 
     save_path = paths.probe_path.joinpath(f"probe_results_{config}.json")
 
     with open(save_path, "w") as f:
-        json.dump(metrics, f, indent=2)
+        # ``default=str`` keeps the dump from crashing on non-serializable
+        # values (e.g. a ``CustomModel``/``CustomModels`` class object that is
+        # forwarded through kwargs when a custom model is used).
+        json.dump(metrics, f, indent=2, default=str)
 
 
 def eval_probe(

@@ -3,6 +3,7 @@ import matplotlib
 import sys
 import seaborn as sns
 import numpy as np
+import pandas as pd
 import logging
 from pathlib import Path
 
@@ -19,12 +20,12 @@ from . import tooltips
 from .visualize import (
     plot_clusterings,
     clustering_overview,
-    plot_overview_results,
 )
 from .visualize_spectrograms import SpectrogramPlot
 from .visualize_predictions import (
     plot_classification_results,
     plot_classification_heatmap,
+    plot_per_class_results,
     PredictionsLoader,
 )
 
@@ -126,7 +127,10 @@ class DashBoard(DashBoardHelper):
             > 0
         ):
             self.label_by += [
-                clustering['name'] for clustering in bacpipe.settings.clust_configs.values()
+                clustering['name']
+                for clustering in kwargs.get(
+                    "clust_configs", bacpipe.settings.clust_configs
+                ).values()
                 if clustering['bool'] is True
             ]
 
@@ -155,6 +159,7 @@ class DashBoard(DashBoardHelper):
         self.embed_notification = dict()
 
         self.interactive_embed_plot = dict()
+        self._embed_view_ranges = dict()
         self.spectrogram_plot_panel = dict()
         self.spec_plot_obj = dict()
         self._trigger_spec_obj_update = dict()
@@ -185,6 +190,27 @@ class DashBoard(DashBoardHelper):
         tuple of (str, pn.Column)
             panel title and the column containing the plot
         """
+        # ``self.kwargs`` holds the merged config/settings dict and includes
+        # the ``dashboard`` flag from ``config.yaml``. Splatting it verbatim
+        # next to the explicitly passed ``dashboard=True``/``dashboard_idx=...``
+        # (and the other keys below) would raise
+        # "TypeError: got multiple values for keyword argument 'dashboard'".
+        # Filter those keys out so user kwargs still forward without colliding.
+        plot_kwargs = {
+            key: value
+            for key, value in self.kwargs.items()
+            if key
+            not in {
+                "loader",
+                "model_name",
+                "label_by",
+                "ground_truth",
+                "dim_reduction_model",
+                "remove_noise",
+                "dashboard",
+                "dashboard_idx",
+            }
+        }
         if not self.interactive_embedding_plot:
             embedding_plot = self.init_plot(
                 # self.init_interactive_plot(
@@ -194,6 +220,7 @@ class DashBoard(DashBoardHelper):
                 loader=self.vis_loader,
                 model_name=self.model_select[widget_idx],
                 label_by=self.label_select[widget_idx],
+                default_label_keys=self.default_label_keys,
                 ground_truth=self.ground_truth,
                 dim_reduction_model=self.dim_reduction_model,
                 remove_noise=(
@@ -203,6 +230,7 @@ class DashBoard(DashBoardHelper):
                 ),
                 dashboard=True,
                 dashboard_idx=widget_idx,
+                **plot_kwargs,
             )
         else:
 
@@ -225,6 +253,7 @@ class DashBoard(DashBoardHelper):
                     loader=self.vis_loader,
                     model_name=self.model_select[widget_idx].value,
                     label_by=self.label_select[widget_idx].value,
+                    default_label_keys=self.default_label_keys,
                     ground_truth=self.ground_truth,
                     dim_reduction_model=self.dim_reduction_model,
                     remove_noise=(
@@ -235,6 +264,7 @@ class DashBoard(DashBoardHelper):
                     ),
                     dashboard=True,
                     dashboard_idx=widget_idx,
+                    **plot_kwargs,
                 )
 
             # Only attach watchers once per widget (check if already attached)
@@ -288,9 +318,18 @@ class DashBoard(DashBoardHelper):
             panel title and the column containing the plot
         """
         self.spectrogram_plot_panel[widget_idx] = pn.pane.Plotly(
-            SpectrogramPlot.dummy_image(title=""),
+            SpectrogramPlot.dummy_image(
+                title="",
+                height=self.kwargs.get(
+                    "spectrogram_plot_height",
+                    bacpipe.settings.spectrogram_plot_height,
+                ),
+            ),
             sizing_mode="stretch_width",
-            height=self.kwargs.get("spectrogram_plot_height"),
+            height=self.kwargs.get(
+                "spectrogram_plot_height",
+                bacpipe.settings.spectrogram_plot_height,
+            ),
         )
 
         embedding_info_dialogue = pn.widgets.StaticText(
@@ -554,9 +593,9 @@ class DashBoard(DashBoardHelper):
                     "Probing Metrics",
                     (
                         self.plot_widget(
-                            plot_overview_results,
+                            plot_per_class_results,
                             plot_path=None,
-                            metrics=None,
+                            results=None,
                             task_name=self.class_select[widget_idx],
                             path_func=self.path_func,
                             model_list=self.models,
@@ -668,11 +707,21 @@ class DashBoard(DashBoardHelper):
                         self.clfier_path[widget_idx],
                         # after that show me the classes that this
                         # linear classifier will classify
-                        pn.widgets.StaticText(
-                            name="Classes",
-                            value=pn.bind(
-                                self.preds_data[widget_idx].get_classes,
-                                self.clfier_path[widget_idx],
+                        pn.Column(
+                            pn.pane.Markdown("**Classes**"),
+                            pn.pane.DataFrame(
+                                pn.bind(
+                                    lambda path: pd.DataFrame(
+                                        {
+                                            "Classes": self.preds_data[
+                                                widget_idx
+                                            ].get_classes(path)
+                                        }
+                                    ),
+                                    self.clfier_path[widget_idx],
+                                ),
+                                width=400,
+                                height=300,
                             ),
                         ),
                         # input section to give a threshold for classification
@@ -708,6 +757,9 @@ class DashBoard(DashBoardHelper):
                 # # add button to save as raven annotations
             ),
             sizing_mode="stretch_width",
+            # The predictions only need half the window width; keep the page
+            # compact so the heatmap does not stretch across the full browser.
+            styles={"max-width": "50%"},
         )
         return pn.Row(sidebar, main_content, sizing_mode="stretch_width")
 

@@ -100,6 +100,96 @@ class TestRunProbeInference:
         )
         assert preds.shape == (1, 2)
 
+    def test_kwargs_audio_dir_and_model_name_do_not_collide_with_loader(
+        self, monkeypatch
+    ):
+        """
+        Passing ``audio_dir`` (or ``model_name``) in kwargs must not crash
+        when the Loader is constructed. Regression: the old
+        ``**{**vars(settings), **kwargs}`` merge raised
+        "TypeError: got multiple values for keyword argument 'audio_dir'"
+        because ``audio_dir`` was passed both explicitly and via the merged
+        dict.
+        """
+        import bacpipe
+
+        captured = {}
+
+        class FakeLoader:
+            def __init__(self, audio_dir, model_name=None, **kwargs):
+                captured["audio_dir"] = audio_dir
+                captured["model_name"] = model_name
+                captured["kwargs"] = kwargs
+
+            def embeddings(self, return_type="array"):
+                return make_embeds()
+
+        monkeypatch.setattr(
+            "bacpipe.core.experiment_manager.Loader", FakeLoader
+        )
+
+        preds = run_probe_inference(
+            "testmodel",
+            make_probe(),
+            threshold=0.5,
+            embeds=None,
+            audio_dir="my_audio",
+            model_name="ignored",
+            device="cpu",
+        )
+
+        # the explicit ``model`` argument wins over the kwarg
+        assert captured["model_name"] == "testmodel"
+        assert captured["audio_dir"] == "my_audio"
+        # the merged dict must not contain the explicitly-passed keys
+        assert "audio_dir" not in captured["kwargs"]
+        assert "model_name" not in captured["kwargs"]
+        # settings defaults are still forwarded (merge behavior preserved)
+        assert (
+            captured["kwargs"].get("main_results_dir")
+            == bacpipe.settings.main_results_dir
+        )
+        assert preds.shape == (4, 2)
+
+    def test_kwargs_main_results_dir_overrides_settings(self, monkeypatch):
+        """
+        ``main_results_dir`` is consumed as a named parameter by
+        ``DashBoard.__init__`` and therefore does not survive in the kwargs
+        that reach the dashboard callbacks. When the dashboard runs a linear
+        probe it must forward the value explicitly, otherwise the Loader built
+        inside ``run_probe_inference`` would look in
+        ``settings.main_results_dir`` instead of the user's directory.
+        """
+        import bacpipe
+
+        captured = {}
+
+        class FakeLoader:
+            def __init__(self, audio_dir, model_name=None, **kwargs):
+                captured["audio_dir"] = audio_dir
+                captured["model_name"] = model_name
+                captured["kwargs"] = kwargs
+
+            def embeddings(self, return_type="array"):
+                return make_embeds()
+
+        monkeypatch.setattr(
+            "bacpipe.core.experiment_manager.Loader", FakeLoader
+        )
+
+        run_probe_inference(
+            "testmodel",
+            make_probe(),
+            threshold=0.5,
+            embeds=None,
+            audio_dir="my_audio",
+            main_results_dir="my_results",
+            device="cpu",
+        )
+
+        assert captured["audio_dir"] == "my_audio"
+        assert captured["kwargs"]["main_results_dir"] == "my_results"
+
 
 class TestPrepareProbeInference:
     def test_loads_probe_and_label_mapping(self, tmp_path, monkeypatch):
@@ -133,3 +223,88 @@ class TestPrepareProbeInference:
         )
         x = torch.tensor([[1.0, 0.0, 0.0, 0.0]])
         torch.testing.assert_close(loaded(x), probe(x))
+
+
+class TestProbingPipelineKwargsOverride:
+    """
+    Reproduces the bug found via ``bacpipe.play(..., audio_dir=<path>)`` where
+    ``kwargs['audio_dir']`` differed from ``config.audio_dir``: downstream
+    helpers that ignored the kwarg silently used the config default and wrote
+    the probing results into the wrong directory.
+    """
+
+    def test_paths_use_kwarg_audio_dir_not_config_default(
+        self, tmp_path, monkeypatch
+    ):
+        from types import SimpleNamespace
+
+        import pandas as pd
+
+        import bacpipe
+        from bacpipe import config, settings
+        from bacpipe.embedding_evaluation.probing.probe import probing_pipeline
+
+        # mimic ``bacpipe.play(audio_dir=...)``: the kwarg differs from the
+        # config/settings defaults
+        user_audio_dir = str(tmp_path / "user_audio")
+        user_results_dir = str(tmp_path / "user_results")
+        monkeypatch.setattr(config, "audio_dir", str(tmp_path / "config_audio"))
+        monkeypatch.setattr(
+            settings, "main_results_dir", str(tmp_path / "settings_results")
+        )
+        assert config.audio_dir != user_audio_dir
+        assert settings.main_results_dir != user_results_dir
+
+        seen = {}
+
+        def fake_make_set_paths_func(audio_dir, main_results_dir=None, **kwargs):
+            seen["audio_dir"] = audio_dir
+            seen["main_results_dir"] = main_results_dir
+            return lambda model: SimpleNamespace(
+                probe_path=tmp_path / "probe",
+                labels_path=tmp_path / "labels",
+            )
+
+        monkeypatch.setattr(bacpipe, "make_set_paths_func", fake_make_set_paths_func)
+        monkeypatch.setattr(
+            "bacpipe.embedding_evaluation.probing.probe."
+            "generate_annotations_for_probing_task",
+            lambda *a, **k: pd.DataFrame(
+                {"predefined_set": ["train", "train"], "label": ["a", "b"]}
+            ),
+        )
+        monkeypatch.setattr(
+            "bacpipe.embedding_evaluation.probing.probe."
+            "get_boolean_array_for_annotated_embeddings",
+            lambda *a, **k: np.array([False, False]),
+        )
+        monkeypatch.setattr(
+            "bacpipe.embedding_evaluation.probing.probe."
+            "embeds_array_where_single_label",
+            lambda embeds, ground_truth, bool_noise, df, **k: (df, embeds),
+        )
+        monkeypatch.setattr(
+            "bacpipe.embedding_evaluation.probing.probe.train_probe",
+            lambda *a, **k: "probe",
+        )
+        monkeypatch.setattr(
+            "bacpipe.embedding_evaluation.probing.probe.eval_probe",
+            lambda *a, **k: {},
+        )
+
+        _, label2index, _ = probing_pipeline(
+            "mel",
+            ground_truth="unused",
+            embeds=np.zeros((2, 4)),
+            paths=None,
+            overwrite=True,
+            name="linear",
+            audio_dir=user_audio_dir,
+            main_results_dir=user_results_dir,
+        )
+
+        # the probing paths must be derived from the kwargs, not from the
+        # config/settings defaults
+        assert seen["audio_dir"] == user_audio_dir
+        assert seen["main_results_dir"] == user_results_dir
+        assert label2index == {"a": 0, "b": 1}

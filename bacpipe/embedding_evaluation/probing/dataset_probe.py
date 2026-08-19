@@ -168,9 +168,9 @@ def generate_annotations_for_probing_task(
     import bacpipe
 
     if train_ratio is None:
-        train_ratio = bacpipe.settings.probe_configs["config_1"]["train_ratio"]
+        train_ratio = bacpipe.settings.train_ratio
     if test_ratio is None:
-        test_ratio = bacpipe.settings.probe_configs["config_1"]["test_ratio"]
+        test_ratio = bacpipe.settings.test_ratio
 
     if paths is None or not Path(dataset_csv_path).exists():
         rng = np.random.default_rng(seed=seed)
@@ -235,9 +235,9 @@ def generate_annotations_for_probing_task(
             )
     else:
         logger.info(
-            f"Found file: {str(dataset_csv_path)}. Loading dataframe probing "
+            f"\nFound file: {str(dataset_csv_path)}. Loading dataframe probing "
             "dataframe. If you would like to automatically create a new probing "
-            "dataframe. Please delete the existing one."
+            "dataframe. Please delete the existing one.\n"
         )
         df = pd.read_csv(dataset_csv_path, index_col=False)
     return df

@@ -3,6 +3,7 @@ Unit tests for the audio loading and windowing helpers in
 ``bacpipe.core.audio_processor``.
 """
 
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -138,6 +139,50 @@ class TestOnlyLoadAnnotatedSegments:
         with pytest.raises(AssertionError):
             handler._only_load_annotated_segments(
                 TEST_DATA_DIR / "audio" / "unannotated_file.wav"
+            )
+
+    def test_duplicate_pairs_load_each_window_once(self, tmp_path):
+        # Several species can share one time window, and annotations can even
+        # re-use the same start value for different windows. Regression test
+        # for the old ``Series.unique()``-per-column deduplication, which
+        # mispaired starts with ends (negative durations -> exceptions) or
+        # loaded one segment per duplicate row.
+        shutil.copy(TEST_AUDIO_FILE, tmp_path / TEST_AUDIO_FILE.name)
+        (tmp_path / "annotations.csv").write_text(
+            "audiofilename,start,end,label:species\n"
+            f"{TEST_AUDIO_FILE.name},0,5,Species A\n"
+            f"{TEST_AUDIO_FILE.name},0,5,Species B\n"  # duplicate pair
+            f"{TEST_AUDIO_FILE.name},0,10,Species C\n"  # shared start
+            f"{TEST_AUDIO_FILE.name},5,10,Species D\n"
+            f"{TEST_AUDIO_FILE.name},100,105,Species E\n"  # out of range
+            f"{TEST_AUDIO_FILE.name},10,10,Species F\n"  # zero duration
+        )
+        handler = AudioHandler(
+            DummyModel(), padding="wrap", audio_dir=tmp_path
+        )
+        handler.file_length = {}
+        segments = handler._only_load_annotated_segments(
+            tmp_path / TEST_AUDIO_FILE.name
+        )
+        assert isinstance(segments, torch.Tensor)
+        assert segments.shape[1] == handler.model.segment_length
+        # (0,5), (0,10) and (5,10) survive; the duplicate row, the
+        # out-of-range row and the zero-duration row are dropped
+        assert segments.shape[0] == 3
+
+    def test_only_out_of_range_annotations_raises(self, tmp_path):
+        shutil.copy(TEST_AUDIO_FILE, tmp_path / TEST_AUDIO_FILE.name)
+        (tmp_path / "annotations.csv").write_text(
+            "audiofilename,start,end,label:species\n"
+            f"{TEST_AUDIO_FILE.name},500,505,Species A\n"
+        )
+        handler = AudioHandler(
+            DummyModel(), padding="wrap", audio_dir=tmp_path
+        )
+        handler.file_length = {}
+        with pytest.raises(AssertionError):
+            handler._only_load_annotated_segments(
+                tmp_path / TEST_AUDIO_FILE.name
             )
 
 

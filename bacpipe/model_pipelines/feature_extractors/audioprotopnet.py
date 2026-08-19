@@ -1,10 +1,13 @@
 import torch
 import os
+import logging
 
 # Force Hugging Face to use PyTorch and ignore TensorFlow
 os.environ["USE_TF"] = "0"
 os.environ["TRANSFORMERS_NO_TF"] = "1"
 
+
+logger = logging.getLogger("bacpipe")
 
 from transformers import (
     AutoFeatureExtractor,
@@ -69,12 +72,12 @@ class Model(ModelBaseClass):
 
         Parameters
         ----------
-        audio : torch.Tensor
-            audio samples to be preprocessed
+        audio : torch.Tensor or numpy.ndarray
+            audio samples to be preprocessed (one row per window)
 
         Returns
         -------
-        dict
+        torch.Tensor
             preprocessor outputs
         """
         return self.preprocessor(audio)
@@ -110,5 +113,26 @@ class Model(ModelBaseClass):
         torch.Tensor
             sigmoid class logits
         """
+        if not hasattr(self, "results") or self.results is None:
+            # The classifier head consumes the last hidden state of the
+            # backbone, which only exists after a forward pass of the model
+            # itself. This makes the offline path (``run_default_classifier``
+            # on already-computed embeddings) impossible for this model.
+            logger.warning(
+                "AudioProtoPNet's classifier head needs the last hidden "
+                "state of a backbone forward pass (`self.results`), which "
+                "is only set when the model itself is called. Running the "
+                "pretrained classifier offline on already-computed "
+                "embeddings (e.g. `run_default_classifier`) is therefore "
+                "not supported for this model. Please recompute the "
+                "embeddings with `run_pretrained_classifier=True` so the "
+                "classifier can be run while the backbone is being called."
+            )
+            raise AttributeError(
+                "AudioProtoPNet.classifier_predictions() requires the last "
+                "hidden state from a prior forward pass of the backbone "
+                "(self.results); the classifier cannot be run offline on "
+                "precomputed embeddings."
+            )
         logits, _ = self.classifier(self.results.last_hidden_state)
         return torch.sigmoid(logits).detach()
