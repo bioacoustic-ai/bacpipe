@@ -1120,7 +1120,11 @@ def fetch_annotation_file(audio_dir, annotations_filename, paths):
                     "bacpipe should still work, but you will not be able to label by ground truth. "
                     "You also will not be able to evaluate using classification.\n"
                 )
-                raise FileNotFoundError("No annotations file found.")
+                raise FileNotFoundError(
+                    "No annotations file found. This is just a routine check and will not impact "
+                    "further processing of bacpipe, unless you explicitly passed a ground truth file "
+                    "or selected probing as evaluation task."
+                    )
     except FileNotFoundError as e:
         try:
             logger.warning(
@@ -1136,7 +1140,11 @@ def fetch_annotation_file(audio_dir, annotations_filename, paths):
                 "bacpipe should still work, but you will not be able to label by ground truth. "
                 "You also will not be able to evaluate using classification.\n"
             )
-            raise FileNotFoundError("No annotations file found.")
+            raise FileNotFoundError(
+                "No annotations file found. This is just a routine check and will not impact "
+                "further processing of bacpipe, unless you explicitly passed a ground truth file "
+                "or selected probing as evaluation task."
+                )
         
 def filter_annotations(
     label_df,

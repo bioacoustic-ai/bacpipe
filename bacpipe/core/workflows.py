@@ -815,11 +815,16 @@ def model_specific_evaluation(
             )
         except FileNotFoundError as e:
             logger.exception(
-                f"unable to process ground truth, no annotations file found."
+                f"{str(e)}.\n Bacpipe tried finding annotation files but was "
+                "unable to find any corresponding files. This is not a problem "
+                "it's just a routine check. Continuing without annotations. \n"
             )
             ground_truth = None
         except IndexError as e:
-            logger.exception(f"unable to process ground truth, {str(e)}")
+            logger.exception(
+                f"{str(e)}.\n Bacpipe found annotation files but was "
+                "unable to process ground truth.\n"
+                )
             ground_truth = None
 
         ####################################################################
