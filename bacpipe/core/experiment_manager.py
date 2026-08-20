@@ -82,6 +82,20 @@ class Loader:
     as an attribute and will be saved after the successful run.
     kwargs that are not specifically passed will be taken from
     bacpipe.config and bacpipe.settings.
+
+    Examples::
+    
+        # Load the embeddings that were already computed for ``birdnet`` on the
+        # test data (stored under ``bacpipe_results``):
+
+        loader = bacpipe.Loader(
+            audio_dir='bacpipe/tests/test_data',
+            model_name='birdnet',
+            use_folder_structure=True,
+        )
+        embeddings = loader.embeddings(return_type='array')
+        loader.metadata_dict
+
     """
 
     def __init__(

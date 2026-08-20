@@ -71,6 +71,22 @@ def run_clustering(
     """
     Fit clustering algorithms to embeddings.
 
+    Examples::
+        #Fit a k-means clustering to the already computed ``birdnet`` embeddings:
+
+        from sklearn.cluster import KMeans
+
+        loader = bacpipe.Loader(
+            'bacpipe/tests/test_data',
+            model_name='birdnet',
+            use_folder_structure=True,
+        )
+        embeds = loader.embeddings(return_type='array')
+        clusterings = bacpipe.run_clustering(
+            embeds=embeds,
+            cluster_configs={'kmeans': KMeans(n_clusters=3, n_init=10)},
+        )
+
     Parameters
     ----------
     embeds : np.array
@@ -112,6 +128,47 @@ def eval_clustering(
 ):
     """
     Evaluate clustering performance.
+
+    Examples::
+    
+        # Evaluate the k-means clustering against the ground truth and the
+        # metadata labels of the ``birdnet`` embeddings:
+
+        from sklearn.cluster import KMeans
+
+        loader = bacpipe.Loader(
+            'bacpipe/tests/test_data',
+            model_name='birdnet',
+            use_folder_structure=True,
+        )
+        embeds = loader.embeddings(return_type='array')
+        gt_labels = bacpipe.ground_truth_by_model(
+            model='birdnet',
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+            overwrite=False,
+        )['simultaneous_labels'].values
+        
+        clusterings = bacpipe.run_clustering(
+            embeds=embeds,
+            cluster_configs={'kmeans': KMeans(n_clusters=3, n_init=10)},
+            ground_truth=gt_labels,
+        )
+        
+        metadata = bacpipe.create_metadata_labels(
+            model='birdnet',
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+            overwrite=False,
+            return_type='dict',
+        )
+        
+        results = bacpipe.eval_clustering(
+            clusterings,
+            ground_truth=gt_labels,
+            embeds=embeds,
+            metadata_labels=metadata,
+        )
 
     Parameters
     ----------
@@ -163,6 +220,29 @@ def eval_clustering(
 def eval_with_silhouette(embeds, ground_truth, metrics=None):
     """
     Evaluate clustering using Silhouette Score.
+
+    Examples::
+    
+        # Compute the silhouette score of the already computed ``birdnet``
+        # embeddings:
+
+        loader = bacpipe.Loader(
+            'bacpipe/tests/test_data',
+            model_name='birdnet',
+            use_folder_structure=True,
+        )
+        embeds = loader.embeddings(return_type='array')
+        
+        gt_labels = bacpipe.ground_truth_by_model(
+            model='birdnet',
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+            overwrite=False,
+        )['simultaneous_labels'].values
+        
+        metrics = bacpipe.eval_with_silhouette(
+            embeds, ground_truth=gt_labels
+        )
 
     Parameters
     ----------
@@ -262,6 +342,35 @@ def clustering_pipeline(
     Clustering pipeline, generating clusterings based on the
     settings file. Clusterings are then evaluated and a dictionary
     with the evaluation scores is saved and returned
+
+    Examples::
+    
+        # Run (or load, if ``overwrite=False``) the full clustering pipeline for
+        # the already computed ``birdnet`` embeddings:
+
+        loader = bacpipe.Loader(
+            'bacpipe/tests/test_data',
+            model_name='birdnet',
+            use_folder_structure=True,
+        )
+        
+        embeds = loader.embeddings(return_type='array')
+        
+        gt = bacpipe.ground_truth_by_model(
+            model='birdnet',
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+            overwrite=False,
+        )
+        
+        clusterings, clust_results = bacpipe.clustering_pipeline(
+            model_name='birdnet',
+            ground_truth=gt,
+            embeds=embeds,
+            overwrite=False,
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+        )
 
     Parameters
     ----------

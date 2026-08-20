@@ -72,6 +72,36 @@ def probing_pipeline(
     Probing pipeline consisting of building the classifier,
     evaluating it and saving metrics and plots of performance.
 
+    Examples::
+    
+        # Run (or load, if ``overwrite=False``) the linear probing evaluation
+        # for the already computed ``birdnet`` embeddings:
+
+        loader = bacpipe.Loader(
+            'bacpipe/tests/test_data',
+            model_name='birdnet',
+            use_folder_structure=True,
+        )
+        
+        embeds = loader.embeddings(return_type='array')
+        
+        gt = bacpipe.ground_truth_by_model(
+            model='birdnet',
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+            overwrite=False,
+        )
+        
+        probe, label2index, metrics = bacpipe.probing_pipeline(
+            model_name='birdnet',
+            ground_truth=gt,
+            embeds=embeds,
+            name='linear',
+            overwrite=False,
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+        )
+
     Parameters
     ----------
     model_name : str

@@ -1015,6 +1015,18 @@ def visualize_using_dashboard(
     An example file can be found in 'bacpipe/tests/test_data/annotations.csv'.
     Multiple dashboards can be opened, the port will simply increment.
 
+    Examples::
+    
+        # Serve the interactive dashboard for the ``birdnet`` embeddings on the
+        # test data. This starts a blocking server, so it is usually run as a
+        # standalone command and not inside a script:
+
+        bacpipe.visualize_using_dashboard(
+            models=['birdnet'],
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+        )
+
     Parameters
     ----------
     models : list

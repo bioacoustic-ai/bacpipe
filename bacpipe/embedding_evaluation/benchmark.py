@@ -357,6 +357,19 @@ def benchmark(
     This function expects a threshold. Threshold-independent
     performance evaluation is currently not supported.
 
+    Examples::
+    
+        # Benchmark the ``birdnet`` classifier on the test data using the
+        # saved predictions:
+
+        report = bacpipe.benchmark(
+            model='birdnet',
+            dataset='bacpipe/tests/test_data',
+            annotations_file='annotations.csv',
+            overwrite=False,
+        )
+        report['report']
+
     Parameters
     ----------
     model : string

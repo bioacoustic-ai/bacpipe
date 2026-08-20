@@ -20,18 +20,20 @@ class AudioHandler:
     These attributes can be changed by changing Embedder.model.sr before
     passing the object to AudioHandler.
     
-    Example::
+    Examples::
     
+        # Load the ``birdnet`` model and use it to window the test audio files
+        # into frames that match the model input length:
+
         from bacpipe import Embedder, get_audio_files, AudioHandler
         import numpy as np
 
-
         embed = Embedder('birdnet')
 
-        aud = AudioHandler( 
+        aud = AudioHandler(
             model=embed.model,
             audio_dir='bacpipe/tests/test_data'
-            )
+        )
         files = get_audio_files('bacpipe/tests/test_data')
 
         all_frames = []
@@ -40,7 +42,7 @@ class AudioHandler:
             frames = aud.window_audio(audio)
             all_frames.extend(frames)
         all_frames = np.stack(all_frames)
-    
+
     """
 
     def __init__(
@@ -198,15 +200,13 @@ class AudioHandler:
         
             from bacpipe import Embedder, get_audio_files, AudioHandler
             import numpy as np
-            import pandas as pd
-
             embed = Embedder('birdnet')
 
-            aud = AudioHandler( 
+            aud = AudioHandler(
                 model=embed.model,
                 audio_dir='bacpipe/tests/test_data',
                 only_embed_annotations=True
-                )
+            )
             files = get_audio_files('bacpipe/tests/test_data')
 
             all_frames = []

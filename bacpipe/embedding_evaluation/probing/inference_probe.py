@@ -17,6 +17,18 @@ def prepare_probe_inference(model, probe_path="", **kwargs):
     so that the probe is ready and in the exact same state as after
     training.
 
+    Examples::
+    
+        # Load the linear probe that was trained on the ``birdnet`` embeddings
+        # of the test data:
+
+        probe, label2index = bacpipe.prepare_probe_inference(
+            model='birdnet',
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+            device='cpu',
+        )
+
     Parameters
     ----------
     model : str
@@ -84,6 +96,26 @@ def run_probe_inference(
     See the examples notebooks for an example use case.
     This function then loads the embeddings and applies the
     linear probe to classify the data.
+
+    Examples::
+    
+        # Apply the trained linear probe to the already computed ``birdnet``
+        # embeddings of the test data:
+
+        probe, label2index = bacpipe.prepare_probe_inference(
+            model='birdnet',
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+            device='cpu',
+        )
+        predictions = bacpipe.run_probe_inference(
+            model='birdnet',
+            linear_probe=probe,
+            device='cpu',
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+        )
+        predictions.shape
 
     Parameters
     ----------

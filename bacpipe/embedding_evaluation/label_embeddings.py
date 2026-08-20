@@ -98,6 +98,27 @@ class DefaultLabels:
     """
     Generate the default metadata labels (e.g. species, time of day) for
     the embeddings of a single model.
+
+    Examples::
+    
+        # Generate the default metadata labels for the already computed
+        # ``birdnet`` embeddings:
+
+        paths = bacpipe.make_set_paths_func(
+            'bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+        )('birdnet')
+        
+        default_labels = bacpipe.DefaultLabels(
+            paths=paths,
+            model='birdnet',
+            default_label_keys=bacpipe.settings.default_label_keys,
+        )
+        default_labels.generate()
+        # the attribute default_label_dict will now contain a dictionary
+        # with all the label keys and values
+        print(default_labels.default_label_dict)
+        
     """
 
     def __init__(self, paths, model, default_label_keys, **kwargs):
@@ -543,6 +564,19 @@ def make_set_paths_func(
     labels, clustering, probing, predictions, and plots based on the audio
     directory and the model name.
 
+    Examples::
+    
+        # Create the ``get_paths`` function for the test data and get the model
+        # specific paths for ``birdnet``:
+
+        get_paths = bacpipe.make_set_paths_func(
+            'bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+        )
+        paths = get_paths('birdnet')
+        paths.dataset_path
+        paths.probe_path
+
     Parameters
     ----------
     audio_dir : str
@@ -713,6 +747,18 @@ def get_metadata_labels(model_name, **kwargs):
     The metadata labels are calculated based on the metadata labels specified in the
     settings.yaml file.
 
+    Examples::
+    
+        # Return the metadata labels for the already computed ``birdnet``
+        # embeddings. The ``get_paths`` function of the dataset is set first:
+
+        bacpipe.make_set_paths_func(
+            'bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+        )('birdnet')
+        
+        metadata = bacpipe.get_metadata_labels('birdnet', overwrite=False)
+
     Parameters
     ----------
     model_name : str
@@ -762,6 +808,14 @@ def get_dt_filename(file):
     Return the timestamp within a filename as a datetime object based on
     the most common naming conventions in bioacoustics. This is not bullet
     proof but it works with the vast majority of naming conventions for files.
+
+    Examples::
+    
+        # Extract the recording time from a bioacoustics filename:
+
+        dt = bacpipe.get_dt_filename('CHE_01_20190101_163410.wav')
+        dt
+        # datetime.datetime(2019, 1, 1, 16, 34, 10)
 
     Parameters
     ----------
@@ -894,13 +948,23 @@ def create_metadata_labels(
     match the number of embeddings created per file for visualization
     and clustering purposes.
     
-    Example::
+    Examples::
     
+        # Create (or load, if ``overwrite=False``) the metadata labels for the
+        # already computed ``birdnet`` embeddings:
+
         df_metadata_labels = bacpipe.create_metadata_labels(
             model='birdnet',
-            audio_dir='bacpipe/tests/test_data'
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+            overwrite=False,
         )
-        # will return a dataframe with metadata_labels
+        metadata_df = bacpipe.create_metadata_labels(
+            model='birdnet',
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+            overwrite=False,
+        )
 
     Parameters
     ----------
@@ -1670,15 +1734,19 @@ def ground_truth_by_model(
     as a numpy file and upon reexecution is simply loaded for
     shorter runtime.
     
-    Example::
+    Examples::
     
+        # Generate (or load, if ``overwrite=False``) the ground truth labels
+        # mapped onto the timestamps of the ``birdnet`` embeddings of the test
+        # data:
+
         ground_truth = bacpipe.ground_truth_by_model(
             model='birdnet',
             audio_dir='bacpipe/tests/test_data',
-            annotations_filename='annotations.csv',
+            main_results_dir='bacpipe_results',
+            overwrite=False,
         )
-        # will return a dataframe with ground truth labels
-    
+        ground_truth
 
     Parameters
     ----------
