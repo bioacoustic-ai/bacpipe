@@ -11,13 +11,43 @@ logger = logging.getLogger("bacpipe")
 class AudioHandler:
     """
     Helper class for all methods related to loading and padding audio.
+    This class takes care of loading the audio files as a whole
+    or just the annotated segments, resampling, windowing, resampling, etc.
+    
+    The class is built around extracting audio relative to what different
+    deep learning models require, therefore it requires a Embedder.model object
+    which has information like the sampling rate, the segment length included.
+    These attributes can be changed by changing Embedder.model.sr before
+    passing the object to AudioHandler.
+    
+    Example::
+    
+        from bacpipe import Embedder, get_audio_files, AudioHandler
+        import numpy as np
+
+
+        embed = Embedder('birdnet')
+
+        aud = AudioHandler( 
+            model=embed.model,
+            audio_dir='bacpipe/tests/test_data'
+            )
+        files = get_audio_files('bacpipe/tests/test_data')
+
+        all_frames = []
+        for audio_file in files:
+            audio, sr = aud.load_and_resample(audio_file)
+            frames = aud.window_audio(audio)
+            all_frames.extend(frames)
+        all_frames = np.stack(all_frames)
+    
     """
 
     def __init__(
         self,
         model,
-        padding,
         audio_dir,
+        padding='constant',
         bool_change_speed=False,
         new_speed=None,
         **kwargs,
@@ -31,10 +61,11 @@ class AudioHandler:
             has attributes for all the model characteristics like
             sample rate, segment length etc. as well as the methods
             to run the model
-        padding : str
-            padding function to use for where padding is necessary
         audio_dir : pathlib.Path object
             path to audio dir
+        padding : str, optional
+            padding function to use for where padding is necessary.
+            Detaults to constant.
         bool_change_speed : bool, optional
             whether to change the speed of the audio before processing,
             by default False
@@ -52,9 +83,11 @@ class AudioHandler:
     def prepare_audio(self, sample):
         """
         Use bacpipe pipeline to load audio file, window it according to
-        model specific window length and preprocess the data, ready for
-        batch inference computation. Also log file length and shape for
-        metadata files.
+        model specific window length.
+        The audio then gets preprocessed based on the model-specific
+        preprocessing, i.e. transforming it into spectrograms.
+        Following that, the data is ready for batch inference computation. 
+        Also log file length and shape for metadata files.
 
         Parameters
         ----------
@@ -68,13 +101,13 @@ class AudioHandler:
         """
         
         if self.model.only_embed_annotations:
-            frames = self._only_load_annotated_segments(
+            frames = self.only_load_annotated_segments(
                 sample, **self.kwargs
             )
             sr = None
         else:
-            audio, sr = self._load_and_resample(sample)
-            frames = self._window_audio(audio)
+            audio, sr = self.load_and_resample(sample)
+            frames = self.window_audio(audio)
         preprocessed_frames = self.model.preprocess(frames)
         self.preprocessed_shape = tuple(preprocessed_frames.shape)
         if self.model.device == "cuda":
@@ -99,12 +132,14 @@ class AudioHandler:
         """
         with audioread.audio_open(str(path)) as f:
             length = f.duration
+        if not hasattr(self, 'file_length'):
+            self.file_length = dict()
         if not self.bool_change_speed:
             self.file_length[path.stem] = length
         else:
             self.file_length[path.stem] = length / self.new_speed
 
-    def _load_and_resample(self, path):
+    def load_and_resample(self, path):
         """
         Load an audio file and resample it to the model sample rate.
 
@@ -125,7 +160,6 @@ class AudioHandler:
             if not self.bool_change_speed:
                 audio, sr = lb.load(str(path), sr=self.model.sr, mono=True)
             else:
-                # TODO Need to ensure that input length get's prolonged accordingly
                 audio, sr = lb.load(str(path), sr=None, mono=True)
                 if "batdetect2" in self.model_name:
                     fake_original_sr = self.model.sr
@@ -146,7 +180,7 @@ class AudioHandler:
             raise ValueError(error)
         return torch.tensor(audio), sr
 
-    def _only_load_annotated_segments(
+    def only_load_annotated_segments(
         self, file_path, annotations_filename="annotations.csv", **_
     ):
         """
@@ -159,6 +193,27 @@ class AudioHandler:
         ``filter_df_by_file`` already sorted the annotations by start and
         ``drop_duplicates`` keeps that order, so the segments are loaded in
         the same order in which the classifier predictions are collected.
+        
+        Example::
+        
+            from bacpipe import Embedder, get_audio_files, AudioHandler
+            import numpy as np
+            import pandas as pd
+
+            embed = Embedder('birdnet')
+
+            aud = AudioHandler( 
+                model=embed.model,
+                audio_dir='bacpipe/tests/test_data',
+                only_embed_annotations=True
+                )
+            files = get_audio_files('bacpipe/tests/test_data')
+
+            all_frames = []
+            for audio_file in files:
+                frames = aud.only_load_annotated_segments(audio_file)
+                all_frames.extend(frames)
+            all_frames = np.stack(all_frames)
 
         Parameters
         ----------
@@ -309,7 +364,7 @@ class AudioHandler:
         cumulative_segments = cumulative_segments.to(self.device)
         return cumulative_segments
 
-    def _window_audio(self, audio):
+    def window_audio(self, audio):
         """
         Split an audio signal into windows of the model segment length and
         pad the final window if necessary.

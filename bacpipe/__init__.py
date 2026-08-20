@@ -36,6 +36,8 @@ settings = SimpleNamespace(**_settings_dict)
 
 from bacpipe.core.experiment_manager import Loader
 
+from bacpipe.core.audio_processor import AudioHandler
+
 get_audio_files = Loader.get_audio_files
 
 from bacpipe.model_pipelines.runner import Embedder
@@ -95,6 +97,7 @@ __all__ = [
     ## loading files and computing embeddings
     "Loader",
     "Embedder",
+    "AudioHandler",
     ## return audio files in specified dir
     "get_audio_files",
     ## automatic creation of labels and ground truth

@@ -62,7 +62,7 @@ def unique_start_end_annot_pairs(df):
     """
     Keep one row per unique ``(start, end)`` pair.
 
-    The audio loader (``_only_load_annotated_segments``) embeds each unique
+    The audio loader (``only_load_annotated_segments``) embeds each unique
     window exactly once, regardless of how many species vocalize in it, so
     this is the operation that mirrors it. It is used for counting embedded
     segments and for the one-label-per-segment metadata labels
@@ -585,7 +585,7 @@ def make_set_paths_func(
         )
         
         task_path = dataset_path.joinpath(
-            kwargs.get("evaluations_dir", bacpipe.settings.evaluations_dir)
+            kwargs.get("evaluations_dir", bacpipe.settings.evaluations_dir) or 'evaluations'
             ).joinpath(
             model_name
         )  
@@ -893,6 +893,14 @@ def create_metadata_labels(
     Create metadata labels based on audio files and model timestamps to
     match the number of embeddings created per file for visualization
     and clustering purposes.
+    
+    Example::
+    
+        df_metadata_labels = bacpipe.create_metadata_labels(
+            model='birdnet',
+            audio_dir='bacpipe/tests/test_data'
+        )
+        # will return a dataframe with metadata_labels
 
     Parameters
     ----------
@@ -1661,6 +1669,16 @@ def ground_truth_by_model(
     After processing the ground truth, the dictionary is saved
     as a numpy file and upon reexecution is simply loaded for
     shorter runtime.
+    
+    Example::
+    
+        ground_truth = bacpipe.ground_truth_by_model(
+            model='birdnet',
+            audio_dir='bacpipe/tests/test_data',
+            annotations_filename='annotations.csv',
+        )
+        # will return a dataframe with ground truth labels
+    
 
     Parameters
     ----------
@@ -1911,7 +1929,7 @@ def get_files_if_no_embeds(audio_dir, model, label_df=None, only_embed_annotatio
         # One embedding per unique annotated segment: several species can
         # share the same (start, end) window, so count the pairs after
         # collapsing to one row per window (mirroring
-        # ``_only_load_annotated_segments``). ``unique_start_end_annot_pairs``
+        # ``only_load_annotated_segments``). ``unique_start_end_annot_pairs``
         # keeps rows of different species at the same window intact for the
         # ground truth, but here the *count* is what matters.
         metadata["files"]["nr_embeds_per_file"] = [

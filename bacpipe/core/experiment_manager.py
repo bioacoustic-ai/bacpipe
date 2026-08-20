@@ -101,6 +101,37 @@ class Loader:
         as an attribute and will be saved after the successful run.
         kwargs that are not specifically passed will be taken from
         bacpipe.config and bacpipe.settings.
+        
+        Example::
+        
+            import bacpipe
+
+            MODEL_NAME = 'birdnet'
+
+            # Create a loader object that will handle all the audio file, path and parameters needed to compute the embeddings for instance
+            loader_obj = bacpipe.Loader(
+                audio_dir='bacpipe/tests/test_data',
+                model_name=MODEL_NAME,
+                use_folder_structure=True
+            )
+
+            # Create an embededding object with the selected model (MODEL_NAME) passing the loader object in order to have the audio directory mapping
+            embed_obj = bacpipe.Embedder(
+                model_name=MODEL_NAME,
+                loader=loader_obj
+                )
+
+            # Process all files using multithreading
+            embed_obj.run_inference_pipeline_using_multithreading()
+
+            print('Metadata dict:', loader_obj.metadata_dict)
+
+            print('Embeddings (array):', loader_obj.embeddings(return_type='array'))
+
+            print('Predictions (array):', loader_obj.predictions(return_type='array'))
+
+            print('Predictions (dataframe):', loader_obj.predictions(return_type='dataframe'))
+        
 
         Parameters
         ----------
@@ -553,6 +584,14 @@ class Loader:
         """
         Collect all audio files in a given directory that have
         file endings that can be processed by bacpipe.
+        
+        Example::
+        
+            list_of_files = bacpipe.get_audio_files(
+                'bacpipe/tests/test_data', return_type='str'
+            )
+            # will return a list of audio files as strings 
+            # in a specified directory
 
         Parameters
         ----------

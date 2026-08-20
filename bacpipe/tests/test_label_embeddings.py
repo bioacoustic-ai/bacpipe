@@ -640,7 +640,7 @@ class TestFitLabelsToEmbeddingTimestamps:
 class TestGetFilesIfNoEmbeds:
     """``get_files_if_no_embeds`` must count the embeddings a run will
     create. In annotated-segment mode that is the number of *unique*
-    ``(start, end)`` pairs, matching ``_only_load_annotated_segments``."""
+    ``(start, end)`` pairs, matching ``only_load_annotated_segments``."""
 
     def _monkeypatch_deps(self, monkeypatch, le, bacpipe, duration=4.0):
         fake_module = SimpleNamespace(

@@ -1040,12 +1040,13 @@ def visualize_using_dashboard(
     try:
         dashboard.build_layout()
     except Exception as e:
-        logger.exception(
+        error_string = (
             f"\nError building dashboard layout: {str(e)}\n \n "
             "Are you sure all the evaluations have been performed? "
             "If not, rerun the pipeline with `overwrite=True`.\n \n "
         )
-        raise e
+        logger.exception(error_string)
+        raise ValueError(error_string)
 
     favicon_logo = pkg_resources.files("bacpipe") / "imgs" / "bacpipe_favicon_white.png"
     

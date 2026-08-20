@@ -49,6 +49,14 @@ def play(bool_save_logs=False, **kwargs):
     bacpipe.settings.results_dir. For more details see the ReadMe file on the
     repository page https://github.com/bioacoustic-ai/bacpipe or the documentation
     under https://bacpipe.readthedocs.io/en/latest/.
+    
+    Example::
+
+        bacpipe.play(
+            models=['birdnet', 'perch_bird'],
+            audio_dir='path/to/audio',
+            dashboard=True,
+        )
 
     Parameters
     ----------
@@ -96,13 +104,6 @@ def play(bool_save_logs=False, **kwargs):
         If no audio files are found we can't compute any embeddings. So make
         sure the path is correct :)
 
-    Example::
-
-        bacpipe.play(
-            models=['birdnet', 'perch_bird'],
-            audio_dir='path/to/audio',
-            dashboard=True,
-        )
     """
     kwargs = replace_default_kwargs_with_user_kwargs(**kwargs)
 
@@ -667,6 +668,20 @@ def model_specific_evaluation(
     The results of the evaluation are saved in the directory
     specified by the audio_dir parameter.
 
+    Example::
+
+        loader_dict = bacpipe.run_pipeline_for_models(
+            models=['birdnet'],
+            audio_dir='path/to/audio',
+            dim_reduction_model=None,
+        )
+        bacpipe.model_specific_evaluation(
+            loader_dict,
+            evaluation_task='probing',
+            probe_configs=bacpipe.settings.probe_configs,
+            models=['birdnet'],
+        )
+
     Parameters
     ----------
     loader_dict : dict
@@ -693,20 +708,6 @@ def model_specific_evaluation(
     ``probe_configs``, ``clust_configs``, ``overwrite`` or
     ``only_embed_annotations``. See https://bacpipe.readthedocs.io/en/latest/
     for the complete list.
-
-    Example::
-
-        loader_dict = bacpipe.run_pipeline_for_models(
-            models=['birdnet'],
-            audio_dir='path/to/audio',
-            dim_reduction_model=None,
-        )
-        bacpipe.model_specific_evaluation(
-            loader_dict,
-            evaluation_task='probing',
-            probe_configs=bacpipe.settings.probe_configs,
-            models=['birdnet'],
-        )
     """
     evaluation_task = _normalize_evaluation_task(evaluation_task)
 
@@ -809,6 +810,14 @@ def cross_model_evaluation(
     """
     Generate plots to compare models by the specified tasks.
 
+    Example::
+
+        bacpipe.cross_model_evaluation(
+            dim_reduction_model='umap',
+            evaluation_task=['probing', 'clustering'],
+            models=['birdnet', 'perch_bird'],
+        )
+
     Parameters
     ----------
     dim_reduction_model : str
@@ -825,14 +834,6 @@ def cross_model_evaluation(
     passed kwargs always override those defaults, e.g. ``evaluation_task``,
     ``dashboard``, ``overwrite`` or ``only_embed_annotations``. See
     https://bacpipe.readthedocs.io/en/latest/ for the complete list.
-
-    Example::
-
-        bacpipe.cross_model_evaluation(
-            dim_reduction_model='umap',
-            evaluation_task=['probing', 'clustering'],
-            models=['birdnet', 'perch_bird'],
-        )
     """
     CustomModels = kwargs.get("CustomModels")
     if CustomModels is not None and not isinstance(CustomModels, (list, tuple)):
@@ -888,6 +889,14 @@ def run_pipeline_for_single_model(
     kwargs that are not specifically passed will be taken from
     bacpipe.config and bacpipe.settings.
 
+    Example::
+
+        loader = bacpipe.run_pipeline_for_single_model(
+            model_name='birdnet',
+            audio_dir='path/to/audio',
+            dim_reduction_model='None',
+        )
+
     Parameters
     ----------
     model_name : string
@@ -936,14 +945,6 @@ def run_pipeline_for_single_model(
     -------
     bacpipe.Loader
         object to processed embeddings and classifier predictions
-
-    Example::
-
-        loader = bacpipe.run_pipeline_for_single_model(
-            model_name='birdnet',
-            audio_dir='path/to/audio',
-            dim_reduction_model='None',
-        )
     """
     if dim_reduction_model is None:
         # ``None`` (python None) means the same as the string ``"None"``:
@@ -1027,6 +1028,18 @@ def generate_embeddings(
     kwargs that are not specifically passed will be taken from
     bacpipe.config and bacpipe.settings.
 
+    Example::
+
+        loader = bacpipe.generate_embeddings(
+            model_name='birdnet',
+            audio_dir='path/to/audio',
+        )
+        embeddings = loader.embeddings()
+        # embeddings is a dict mapping file stems to numpy arrays
+        
+        # for embeddings as numpy arrays use
+        embeddings = loader.embeddings(return_type='array')
+
 
     Parameters
     ----------
@@ -1074,18 +1087,6 @@ def generate_embeddings(
     -------
     bacpipe.Loader
         loader object to access embeddings and classifier predictions
-
-    Example::
-
-        loader = bacpipe.generate_embeddings(
-            model_name='birdnet',
-            audio_dir='path/to/audio',
-        )
-        embeddings = loader.embeddings()
-        # embeddings is a dict mapping file stems to numpy arrays
-        
-        # for embeddings as numpy arrays use
-        embeddings = loader.embeddings(return_type='array')
     """
     model_name = confirm_model_name(model_name, **kwargs)
     ensure_models_exist(

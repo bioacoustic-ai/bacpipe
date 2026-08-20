@@ -31,6 +31,36 @@ class Embedder(AudioHandler):
     model is associated with the specified device.
     kwargs that are not specifically passed will be taken from
     bacpipe.config and bacpipe.settings.
+    
+    Example::
+    
+        import bacpipe
+
+        MODEL_NAME = 'birdnet'
+
+        # Create a loader object that will handle all the audio file, path and parameters needed to compute the embeddings for instance
+        loader_obj = bacpipe.Loader(
+            audio_dir='bacpipe/tests/test_data',
+            model_name=MODEL_NAME,
+            use_folder_structure=True
+        )
+
+        # Create an embededding object with the selected model (MODEL_NAME) passing the loader object in order to have the audio directory mapping
+        embed_obj = bacpipe.Embedder(
+            model_name=MODEL_NAME,
+            loader=loader_obj
+            )
+
+        # Process all files using multithreading
+        embed_obj.run_inference_pipeline_using_multithreading()
+
+        print('Metadata dict:', loader_obj.metadata_dict)
+
+        print('Embeddings (array):', loader_obj.embeddings(return_type='array'))
+
+        print('Predictions (array):', loader_obj.predictions(return_type='array'))
+
+        print('Predictions (dataframe):', loader_obj.predictions(return_type='dataframe'))
 
     Parameters
     ----------
@@ -296,7 +326,7 @@ class Embedder(AudioHandler):
         if self.loader.metadata_dict["nr_embeds_total"] > 300_000:
             self.nr_subsampled_embeds_for_umap = 300_000
             logger.info(
-                "Your dataset is very large, with a total of "
+                "\nYour dataset is very large, with a total of "
                 f"{self.loader.metadata_dict['nr_embeds_total']}. "
                 "Because umap requires loading all embeddings into memory to then "
                 "calculate the low dimensional manifold, this is likely to cause "
@@ -305,7 +335,11 @@ class Embedder(AudioHandler):
                 "calculate a umap transformation based on those files and then apply "
                 "the learned transformation to your entire dataset. It will not be "
                 "super quick, but it will give you a 2d visualization for your "
-                "dataset and it should prevent you running into out-of-memory problems."
+                "dataset and it should prevent you running into out-of-memory problems. "
+                "Ensure that unnecessary programs are closed because this process is likely "
+                "to consume up to 24 GB or RAM. If you do not have that much RAM available "
+                "lower the number 300_000 in the function run_dimensionality_reduction_pipeline "
+                "to something your machine can handle.\n"
             )
             use_sample_of_files = True
             sample_file_size = int(
@@ -386,7 +420,7 @@ class Embedder(AudioHandler):
         """
         if len(array_of_audios.shape) == 1:
             array_of_audios = torch.tensor(array_of_audios).unsqueeze(0)
-        windowed_audios = self._window_audio(array_of_audios)
+        windowed_audios = self.window_audio(array_of_audios)
         windowed_audios = torch.tensor(windowed_audios).unsqueeze(1)
         if not self.nr_parallel_workers:
             from multiprocessing import cpu_count
@@ -904,7 +938,7 @@ class Classifier:
         Append or create a dataframe and fill it with the results from the
         classifier to later be saved as a csv file.
         Deduplicate (start, end) pairs together, mirroring the audio
-        loader (``_only_load_annotated_segments``).
+        loader (``only_load_annotated_segments``).
 
         Parameters
         ----------

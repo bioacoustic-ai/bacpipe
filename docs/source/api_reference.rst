@@ -23,6 +23,12 @@ Constants
 Main Processing Classes
 -----------------------
 
+.. autoclass:: AudioHandler
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :inherited-members:
+
 .. autoclass:: Loader
    :members:
    :undoc-members:
@@ -30,11 +36,11 @@ Main Processing Classes
    :inherited-members:
 
 .. autoclass:: Embedder
-   :no-index:
    :members:
    :undoc-members:
    :show-inheritance:
    :inherited-members:
+
 
 Main Pipeline Functions
 -----------------------
