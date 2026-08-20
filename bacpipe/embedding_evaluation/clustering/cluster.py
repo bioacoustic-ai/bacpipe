@@ -155,7 +155,7 @@ def eval_clustering(
             ground_truth=gt_labels,
         )
         
-        metadata = bacpipe.create_metadata_labels(
+        metadata = bacpipe.metadata_labels(
             model='birdnet',
             audio_dir='bacpipe/tests/test_data',
             main_results_dir='bacpipe_results',
@@ -387,9 +387,8 @@ def clustering_pipeline(
     label_column : str, optional
         name of column in annotations file, defaults to bacpipe.settings.label_column
     """
-    if not kwargs:
-        kwargs = {**vars(bacpipe.settings)}
-        kwargs.pop("label_column")
+    kwargs = {**vars(bacpipe.settings), **kwargs}
+    kwargs.pop("label_column", None)
     if not paths:
         get_paths_func = bacpipe.make_set_paths_func(
             kwargs.get("audio_dir", bacpipe.config.audio_dir),
@@ -417,7 +416,7 @@ def clustering_pipeline(
 
         cluster_configs = get_clustering_models(clust_params)
 
-        metadata_labels = le.create_metadata_labels(
+        metadata_labels = le.metadata_labels(
             paths.audio_dir, paths.clust_path.parent.stem, 
             paths, overwrite=False, return_type='dict', 
             **kwargs

@@ -54,7 +54,7 @@ def train_linear_probe(
     train_dataloader,
     learning_rate,
     num_epochs,
-    device="cuda:0",
+    device="cpu",
     **kwargs,
 ):
     """
@@ -72,7 +72,7 @@ def train_linear_probe(
     num_epochs : int
         number of epochs for training
     device : str, optional
-        'cpu' or 'cuda', by default "cuda:0"
+        'cpu' or 'cuda', by default "cpu"
 
     Returns
     -------

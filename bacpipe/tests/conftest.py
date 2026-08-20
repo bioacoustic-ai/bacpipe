@@ -171,11 +171,23 @@ def kwargs(request):
             pass
 
     # 3. Sync with global bacpipe.settings
+    # Snapshot the current values first so they can be restored after the test,
+    # otherwise e.g. ``testing=True`` set here would leak into every subsequent
+    # test that does not use this fixture.
+    original_settings = {
+        k: getattr(bacpipe.settings, k, None) for k in settings_dict
+    }
     for k, v in settings_dict.items():
         if hasattr(bacpipe.settings, k):
             setattr(bacpipe.settings, k, v)
-        
+
     audio_dir_resource = pkg_resources.files("bacpipe") / "tests" / "test_data"
     config_dict["audio_dir"] = Path(str(audio_dir_resource))
 
-    return {**config_dict, **settings_dict}
+    yield {**config_dict, **settings_dict}
+
+    # 4. Restore the global settings mutated above so that values such as
+    # ``testing=True`` do not leak into tests that do not use this fixture.
+    for k, v in settings_dict.items():
+        if hasattr(bacpipe.settings, k):
+            setattr(bacpipe.settings, k, original_settings.get(k))

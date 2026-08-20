@@ -65,7 +65,7 @@ def probing_pipeline(
     name="linear",
     overwrite=True,
     label_column=bacpipe.settings.label_column,
-    dataset_csv_path="annotations.csv",
+    dataset_csv_path="probing_dataframe.csv",
     **kwargs,
 ):
     """
@@ -121,9 +121,8 @@ def probing_pipeline(
     overwrite : bool
         overwrite existing Probing?, defaults to False
     """
-    if not kwargs:
-        kwargs = {**vars(bacpipe.settings)}
-        kwargs.pop("label_column")
+    kwargs = {**vars(bacpipe.settings), **kwargs}
+    kwargs.pop("label_column", None)
     if not paths:
         get_paths_func = bacpipe.make_set_paths_func(
             kwargs.get("audio_dir", bacpipe.config.audio_dir),
@@ -135,7 +134,7 @@ def probing_pipeline(
         ground_truth,
         paths,
         label_column=label_column,
-        dataset_csv_path=paths.labels_path / dataset_csv_path,
+        dataset_csv_path=dataset_csv_path,
         **kwargs,
     )
 
@@ -196,7 +195,12 @@ def probing_pipeline(
             LinearProbe,
         )
 
-        state_dict = torch.load(paths.probe_path / f"{name}_probe.pt")
+        state_dict = torch.load(
+            paths.probe_path / f"{name}_probe.pt",
+            map_location=torch.device(
+                kwargs.get("device", bacpipe.settings.device)
+            ),
+        )
         probe = LinearProbe(
             in_dim=embeds.shape[-1],
             out_dim=list(state_dict.values())[-1].shape[0],

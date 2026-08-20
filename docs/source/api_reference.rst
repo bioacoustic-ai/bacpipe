@@ -14,11 +14,11 @@ re-exported in ``__init__.py``.
 Constants
 --------------
 
-.. autofunction:: supported_models 
-.. autofunction:: models_needing_checkpoint
-.. autofunction:: TF_MODELS
-.. autofunction:: EMBEDDING_DIMENSIONS
-.. autofunction:: NEEDS_CHECKPOINT
+.. autodata:: supported_models
+.. autodata:: models_needing_checkpoint
+.. autodata:: TF_MODELS
+.. autodata:: EMBEDDING_DIMENSIONS
+.. autodata:: NEEDS_CHECKPOINT
 
 Main Processing Classes
 -----------------------
@@ -58,10 +58,11 @@ Return audio files in specified dir
 Automatic creation of labels and ground truth
 -------------------------------------------------
 
-.. autofunction:: DefaultLabels 
-.. autofunction:: create_metadata_labels
+.. autoclass:: MetadataLabelMaker
+   :members:
+
+.. autofunction:: metadata_labels
 .. autofunction:: ground_truth_by_model
-.. autofunction:: get_metadata_labels
 .. autofunction:: get_dt_filename
 
 Probing functions
@@ -89,6 +90,7 @@ Evaluation pipelines
 Experiment managing functions
 --------------------------------
 
+.. autofunction:: confirm_model_name
 .. autofunction:: ensure_models_exist
 .. autofunction:: evaluation_with_settings_already_exists
 .. autofunction:: get_model_names

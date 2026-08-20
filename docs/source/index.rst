@@ -32,6 +32,7 @@ The github repository can be found at https://github.com/bioacoustic-ai/bacpipe.
    :caption: Example Gallery:
 
    Simple Use Cases <examples/basic_examples/simple_use_cases>
+   Using Different Bacpipe Functions <examples/basic_examples/using_different_bacpipe_functions>
    Clustering <examples/advanced_examples/clustering>
    Extending an Existing Model <examples/advanced_examples/extending_an_existing_model>
    Probing a Model <examples/advanced_examples/probing_a_model>

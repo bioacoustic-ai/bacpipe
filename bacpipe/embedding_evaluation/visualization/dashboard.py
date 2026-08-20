@@ -11,6 +11,10 @@ logger = logging.getLogger("bacpipe")
 
 import importlib.resources as pkg_resources
 import bacpipe.imgs
+
+from bacpipe.core.experiment_manager import (
+    replace_default_kwargs_with_user_kwargs
+    )
 from .visualize_embeddings import (
     plot_embeddings,
     plot_comparison,
@@ -48,11 +52,11 @@ class DashBoard(DashBoardHelper):
         self,
         model_names,
         audio_dir,
-        main_results_dir,
-        default_label_keys,
-        evaluation_task,
-        dim_reduction_model,
-        dim_reduc_parent_dir,
+        main_results_dir=None,
+        metadata_label_keys=None,
+        evaluation_task=None,
+        dim_reduction_model=None,
+        dim_reduc_parent_dir=None,
         **kwargs,
     ):
         """
@@ -66,7 +70,7 @@ class DashBoard(DashBoardHelper):
             directory containing the audio files
         main_results_dir : pathlib.Path
             directory containing the evaluation results
-        default_label_keys : list
+        metadata_label_keys : list
             default label keys used for coloring
         evaluation_task : str
             evaluation tasks to display (e.g., clustering, probing)
@@ -78,12 +82,22 @@ class DashBoard(DashBoardHelper):
             additional keyword arguments (e.g., plot heights, widths)
         """
         self.models = model_names
-        self.default_label_keys = default_label_keys
+        kwargs = replace_default_kwargs_with_user_kwargs(remove_keys=['audio_dir'], **kwargs)
+        
+        self.evaluation_task = kwargs.pop('evaluation_task', evaluation_task)
+        self.dim_reduction_model = kwargs.pop('dim_reduction_model', dim_reduction_model)
+        self.metadata_label_keys = kwargs.pop('metadata_label_keys', metadata_label_keys)
+        self.main_results_dir = kwargs.pop('main_results_dir', main_results_dir)
+        self.dim_reduc_parent_dir = kwargs.pop('dim_reduc_parent_dir', dim_reduc_parent_dir)
+        
         self.audio_dir = audio_dir
         self.path_func = le.make_set_paths_func(
-            audio_dir, main_results_dir, dim_reduc_parent_dir, **kwargs
+            audio_dir, 
+            self.main_results_dir, 
+            self.dim_reduc_parent_dir, 
+            **kwargs
         )
-        self.label_by = default_label_keys.copy()
+        self.label_by = self.metadata_label_keys.copy()
         if (
             self.path_func(model_names[0]).preds_path
         ).exists() and not "default_classifier" in self.label_by:
@@ -96,7 +110,6 @@ class DashBoard(DashBoardHelper):
                 if clfier_paths[0].exists():
                     self.label_by += ["default_classifier"]
         self.plot_path = self.path_func(model_names[0]).plot_path.parent.parent
-        self.dim_reduc_parent_dir = dim_reduc_parent_dir
 
         self.ground_truth = None
         ground_truth_files = list(
@@ -134,12 +147,10 @@ class DashBoard(DashBoardHelper):
                 if clustering['bool'] is True
             ]
 
-        self.evaluation_task = evaluation_task
-        self.dim_reduction_model = dim_reduction_model
         self.widget_width = 100
         self.vis_loader = EmbedAndLabelLoader(
-            dim_reduction_model=dim_reduction_model,
-            default_label_keys=default_label_keys,
+            dim_reduction_model=self.dim_reduction_model,
+            metadata_label_keys=self.metadata_label_keys,
             **kwargs,
         )
 
@@ -220,7 +231,7 @@ class DashBoard(DashBoardHelper):
                 loader=self.vis_loader,
                 model_name=self.model_select[widget_idx],
                 label_by=self.label_select[widget_idx],
-                default_label_keys=self.default_label_keys,
+                metadata_label_keys=self.metadata_label_keys,
                 ground_truth=self.ground_truth,
                 dim_reduction_model=self.dim_reduction_model,
                 remove_noise=(
@@ -253,7 +264,7 @@ class DashBoard(DashBoardHelper):
                     loader=self.vis_loader,
                     model_name=self.model_select[widget_idx].value,
                     label_by=self.label_select[widget_idx].value,
-                    default_label_keys=self.default_label_keys,
+                    metadata_label_keys=self.metadata_label_keys,
                     ground_truth=self.ground_truth,
                     dim_reduction_model=self.dim_reduction_model,
                     remove_noise=(
@@ -558,7 +569,7 @@ class DashBoard(DashBoardHelper):
                             if len(self.noise_select.keys()) > 0
                             else False
                         ),
-                        default_label_keys=self.default_label_keys,
+                        metadata_label_keys=self.metadata_label_keys,
                         dashboard=True,
                     ),
                 ),

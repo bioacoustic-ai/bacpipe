@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 from bacpipe.embedding_evaluation.label_embeddings import (
     assign_global_get_paths_function,
-    create_metadata_labels,
+    metadata_labels,
     ensure_windoof_path_to_posix,
     fetch_annotation_file,
     filter_annotations,
@@ -289,7 +289,7 @@ class TestGetGroundTruth:
 
 
 class TestCreateMetadataLabels:
-    """Tests for ``create_metadata_labels``, which powers the default labels
+    """Tests for ``metadata_labels``, which powers the default labels
     used in the ``simple_use_cases`` notebook (cell 15) and by the clustering
     pipeline."""
 
@@ -326,13 +326,13 @@ class TestCreateMetadataLabels:
             le, "get_files_if_no_embeds", lambda *a, **k: ([], 1.0, self._fake_metadata())
         )
 
-        dl = create_metadata_labels(
+        dl = metadata_labels(
             audio_dir=self.TEST_AUDIO_DIR,
             model="testmodel",
             paths=paths,
             overwrite=True,
             return_type="dataframe",
-            default_label_keys=["time_of_day", "audio_file_name"],
+            metadata_label_keys=["time_of_day", "audio_file_name"],
         )
         # two embeddings for the single audio file
         assert len(dl) == 2
@@ -353,13 +353,13 @@ class TestCreateMetadataLabels:
         monkeypatch.setattr(
             le, "get_files_if_no_embeds", lambda *a, **k: ([], 1.0, self._fake_metadata())
         )
-        labels = create_metadata_labels(
+        labels = metadata_labels(
             audio_dir=self.TEST_AUDIO_DIR,
             model="testmodel",
             paths=paths,
             overwrite=True,
             return_type="dict",
-            default_label_keys=["audio_file_name"],
+            metadata_label_keys=["audio_file_name"],
         )
         assert isinstance(labels, dict)
         assert len(labels["audio_file_name"]) == 2
@@ -373,7 +373,7 @@ class TestCreateMetadataLabels:
             }
         ).to_csv(paths.labels_path / "metadata_labels.csv", index=False)
 
-        dl = create_metadata_labels(
+        dl = metadata_labels(
             audio_dir=self.TEST_AUDIO_DIR,
             model="testmodel",
             paths=paths,
@@ -397,13 +397,13 @@ class TestCreateMetadataLabels:
         monkeypatch.setattr(bacpipe.settings, "only_embed_annotations", True)
         # ...but an explicitly passed kwarg must win: a regular time grid is
         # generated instead of annotation based labels
-        dl = create_metadata_labels(
+        dl = metadata_labels(
             audio_dir=self.TEST_AUDIO_DIR,
             model="testmodel",
             paths=paths,
             overwrite=True,
             return_type="dataframe",
-            default_label_keys=["time_of_day", "audio_file_name"],
+            metadata_label_keys=["time_of_day", "audio_file_name"],
             only_embed_annotations=False,
         )
         assert dl["start"].tolist() == [0.0, 1.0]
@@ -702,7 +702,7 @@ class TestGetFilesIfNoEmbeds:
         # 4 s / 1 s segment length -> 4 embeddings regardless of annotations
         assert metadata["files"]["nr_embeds_per_file"] == [4]
 
-class TestDefaultLabelsOnlyEmbedAnnotations:
+class TestMetadataLabelMakerOnlyEmbedAnnotations:
     """The per-embedding metadata labels (``time_of_day``,
     ``continuous_timestamp``, ``default_classifier``) index into the
     per-file annotation ``starts`` once per embedding. In annotated-segment
@@ -710,10 +710,10 @@ class TestDefaultLabelsOnlyEmbedAnnotations:
     indexing cannot run past the end of the ``starts`` array when the
     annotations contain duplicate/shared pairs."""
 
-    def _make_default_labels(self, tmp_path, nr_embeds=3):
-        from bacpipe.embedding_evaluation.label_embeddings import DefaultLabels
+    def _make_metadata_labels(self, tmp_path, nr_embeds=3):
+        from bacpipe.embedding_evaluation.label_embeddings import MetadataLabelMaker
 
-        dl = object.__new__(DefaultLabels)
+        dl = object.__new__(MetadataLabelMaker)
         dl.only_embed_annotations = True
         dl.paths = SimpleNamespace(audio_dir=tmp_path)
         audio_file = "CHE_01_20190101_163410.wav"
@@ -735,7 +735,7 @@ class TestDefaultLabelsOnlyEmbedAnnotations:
         return dl
 
     def test_time_of_day_indexes_deduplicated_starts(self, tmp_path):
-        dl = self._make_default_labels(tmp_path)
+        dl = self._make_metadata_labels(tmp_path)
         dl.time_of_day()
         # one label per embedded segment (unique pair), starting at 16:34:10
         assert dl.time_of_day_per_embedding == [
@@ -745,11 +745,47 @@ class TestDefaultLabelsOnlyEmbedAnnotations:
         ]
 
     def test_continuous_timestamp_indexes_deduplicated_starts(self, tmp_path):
-        dl = self._make_default_labels(tmp_path)
+        dl = self._make_metadata_labels(tmp_path)
         dl.continuous_timestamp()
         assert dl.continuous_timestamp_per_embedding == [
             "1900-01-01_16:34:10",  # start 0
             "1900-01-01_16:34:15",  # start 5
             "1900-01-01_16:34:20",  # start 10
         ]
+
+
+class TestMetadataLabelMakerDefaultClassifier:
+    """``default_classifier()`` must not depend on ``parent_directory`` having
+    been generated: ``default_classifier`` is auto-added to
+    ``metadata_label_keys`` whenever classifier outputs exist, even when the
+    user requests a custom subset of labels that does not include
+    ``parent_directory``."""
+
+    def test_does_not_require_parent_directory(self, tmp_path):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            MetadataLabelMaker,
+        )
+
+        dl = object.__new__(MetadataLabelMaker)
+        dl.paths = SimpleNamespace(
+            audio_dir=tmp_path,
+            preds_path=tmp_path / "preds",
+        )
+        dl.paths.preds_path.mkdir(parents=True)
+        dl.nr_embeds_total = 3
+        dl.metadata_label_keys = ["default_classifier"]
+
+        pd.DataFrame(
+            {"label:default_classifier": ["c1", "c2", "c3"]}
+        ).to_csv(
+            dl.paths.preds_path / "model_classifier_annotations.csv",
+            index=False,
+        )
+
+        # No ``parent_directory_per_embedding`` attribute is set on purpose:
+        # the method must not rely on it.
+        dl.default_classifier()
+
+        assert dl.default_classifier_per_embedding == ["c1", "c2", "c3"]
+
 

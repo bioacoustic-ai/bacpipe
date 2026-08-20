@@ -472,7 +472,14 @@ def evaluation_with_settings_already_exists(
     return True
 
 
-def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
+def run_pipeline_for_models(
+    models,
+    audio_dir,
+    dim_reduction_model,
+    check_if_already_processed=None,
+    check_if_already_dim_reduced=None,
+    **kwargs,
+):
     """
     Generate embeddings for each model in the list of model names.
     The embeddings are generated using the generate_embeddings function
@@ -531,6 +538,16 @@ def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
         name of the dimensionality reduction model to be used
         for the embeddings. If "None" is selected, no
         dimensionality reduction is performed.
+    check_if_already_processed : bool, optional
+        if True, embeddings that already exist for the combination
+        of model and dataset are loaded instead of being recomputed.
+        Only forwarded to ``run_pipeline_for_single_model`` when
+        explicitly passed, by default None
+    check_if_already_dim_reduced : bool, optional
+        if True, already existing dimensionality reduced embeddings
+        are loaded instead of being recomputed. Only forwarded to
+        ``run_pipeline_for_single_model`` when explicitly passed,
+        by default None
 
     Notable kwargs
     --------------
@@ -569,6 +586,11 @@ def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
         nr_models = len(models)
     else:
         nr_models = 1
+
+    if check_if_already_processed is not None:
+        kwargs["check_if_already_processed"] = check_if_already_processed
+    if check_if_already_dim_reduced is not None:
+        kwargs["check_if_already_dim_reduced"] = check_if_already_dim_reduced
 
     if "CustomModels" in kwargs:
         CustomModels = kwargs.get("CustomModels")
@@ -685,8 +707,7 @@ def _normalize_evaluation_task(evaluation_task):
 def model_specific_evaluation(
     loader_dict,
     evaluation_task,
-    probe_configs,
-    models,
+    probe_configs=None,
     dim_reduction_model=False,
     **kwargs,
 ):
@@ -714,7 +735,6 @@ def model_specific_evaluation(
             loader_dict,
             evaluation_task='probing',
             probe_configs=bacpipe.settings.probe_configs,
-            models=['birdnet'],
             audio_dir='bacpipe/tests/test_data',
             overwrite=False,
             device='cpu',
@@ -723,7 +743,8 @@ def model_specific_evaluation(
     Parameters
     ----------
     loader_dict : dict
-        dictionary containing the loader objects for each model
+        dictionary containing the loader objects for each model. The model
+        names are taken from the keys of this dictionary.
     evaluation_task : string or list
         name of the evaluation task(s) to be performed. A single task may be
         passed as a string (e.g. ``"probing"``) or a list
@@ -732,8 +753,6 @@ def model_specific_evaluation(
         dictionary containing the configuration for the
         probing tasks. The configurations are specified
         in the bacpipe/settings.yaml file.
-    models : list
-        embedding models
     dim_reduction_model : bool or str, optional
         Can be bool or the string corresponding to the
         dimensionality reduction model, by default False
@@ -748,6 +767,7 @@ def model_specific_evaluation(
     for the complete list.
     """
     evaluation_task = _normalize_evaluation_task(evaluation_task)
+    models = list(loader_dict.keys())
 
     if "CustomModels" in kwargs:
         CustomModels = kwargs.get("CustomModels")
@@ -786,8 +806,12 @@ def model_specific_evaluation(
         # if not evaluation_task in ["None", [], None, False]:
         embeds = loader_dict[model_name].embeddings(return_type="array")
         try:
+            if not kwargs.get('audio_dir'):
+                kwargs['audio_dir'] = loader_dict[model_name].audio_dir
             ground_truth = ground_truth_by_model(
-                model_name, paths=paths, **kwargs
+                model_name, 
+                paths=paths, 
+                **kwargs
             )
         except FileNotFoundError as e:
             logger.exception(
@@ -814,7 +838,8 @@ def model_specific_evaluation(
                 "Too few files to evaluate embeddings with probing. "
                 "Are you sure you have selected the right data?"
             )
-
+            if not probe_configs:
+                probe_configs = settings.probe_configs
             for class_config in probe_configs.values():
                 if class_config["bool"]:
                     probing_pipeline(
@@ -843,7 +868,7 @@ def model_specific_evaluation(
 
 
 def cross_model_evaluation(
-    dim_reduction_model, evaluation_task, models, **kwargs
+    audio_dir, evaluation_task, models, dim_reduction_model=None, **kwargs
 ):
     """
     Generate plots to compare models by the specified tasks.
@@ -863,12 +888,14 @@ def cross_model_evaluation(
 
     Parameters
     ----------
-    dim_reduction_model : str
-        name of dimensionality reduction model
+    audio_dir : str
+        path to audio data
     evaluation_task : list
         tasks to evaluate models by
     models : list
         embedding models
+    dim_reduction_model : str, optional
+        name of dimensionality reduction model, by default is None
 
     Notable kwargs
     --------------
@@ -893,6 +920,7 @@ def cross_model_evaluation(
     ]
     evaluation_task = _normalize_evaluation_task(evaluation_task)
     if len(models) > 1:
+        get_paths = make_set_paths_func(audio_dir, **kwargs)
         plot_path = get_paths(models[0]).plot_path.parent.parent.joinpath(
             "overview"
         )
@@ -901,7 +929,7 @@ def cross_model_evaluation(
             for task in evaluation_task:
                 visualise_results_across_models(plot_path, task, models)
         if not dim_reduction_model in [None, "None", False]:
-            kwargs.pop("dashboard")
+            kwargs.pop("dashboard", None)
             if "audio_dir" in kwargs:
                 kwargs.pop("audio_dir")
             plot_comparison(
@@ -1027,7 +1055,7 @@ def run_pipeline_for_single_model(
             **kwargs,
         )
         if (
-            not (paths.plot_path.joinpath("embeddings.png").exists())
+            paths.plot_path.joinpath("embeddings.png").exists()
             or testing
         ):
             logger.debug(
@@ -1065,9 +1093,11 @@ def run_pipeline_for_single_model(
 def generate_embeddings(
     model_name,
     audio_dir,
-    avoid_pipelined_gpu_inference=False, 
-    **kwargs
-    ):
+    avoid_pipelined_gpu_inference=False,
+    check_if_already_processed=None,
+    check_if_already_dim_reduced=None,
+    **kwargs,
+):
     """
     Run the embedding generation pipeline including classification
     using the pretrained classifier (if included).
@@ -1101,6 +1131,14 @@ def generate_embeddings(
         path to audio data
     avoid_pipelined_gpu_inference : bool, optional
         set to True to avoid multiprocessing, by default False
+    check_if_already_processed : bool, optional
+        if True, embeddings that already exist for the combination
+        of model and dataset are loaded instead of being recomputed.
+        Only forwarded when explicitly passed, by default None
+    check_if_already_dim_reduced : bool, optional
+        if True, already existing dimensionality reduced embeddings
+        are loaded instead of being recomputed. Only forwarded when
+        explicitly passed, by default None
 
     Notable kwargs
     --------------
@@ -1121,9 +1159,6 @@ def generate_embeddings(
 
     ``dim_reduction_model`` : str, e.g. ``"umap"``, to generate dimensionality
     reduced embeddings instead of regular ones
-
-    ``check_if_already_processed`` : bool, load existing embeddings instead of
-    recomputing them (default True)
 
     ``device`` : str, ``"cpu"``, ``"cuda"`` or ``"mps"`` (for mac) (default ``settings.device``)
 
@@ -1157,6 +1192,10 @@ def generate_embeddings(
     # Merge config/settings defaults so that a direct API call (without kwargs)
     # behaves the same as running through bacpipe.play(). Explicitly passed
     # kwargs always override the defaults. 
+    if check_if_already_processed is not None:
+        kwargs["check_if_already_processed"] = check_if_already_processed
+    if check_if_already_dim_reduced is not None:
+        kwargs["check_if_already_dim_reduced"] = check_if_already_dim_reduced
     kwargs = replace_default_kwargs_with_user_kwargs(
         remove_keys=["audio_dir", "dim_reduction_model", "testing"],
         **kwargs,

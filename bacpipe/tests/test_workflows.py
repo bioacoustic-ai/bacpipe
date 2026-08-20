@@ -296,9 +296,12 @@ class TestDimReductionNoneQuirk:
             "bacpipe.core.workflows.confirm_model_name",
             lambda name, **kwargs: name,
         )
+        fake_get_paths = lambda model: SimpleNamespace(
+            plot_path=tmp_path / "audio" / model
+        )
         monkeypatch.setattr(
-            "bacpipe.core.workflows.get_paths",
-            lambda model: SimpleNamespace(plot_path=tmp_path / "audio" / model),
+            "bacpipe.core.workflows.make_set_paths_func",
+            lambda *args, **kwargs: fake_get_paths,
         )
         monkeypatch.setattr(
             "bacpipe.core.workflows.visualise_results_across_models",
@@ -311,9 +314,10 @@ class TestDimReductionNoneQuirk:
         )
 
         cross_model_evaluation(
-            dim_reduction_model=None,
+            audio_dir=tmp_path / "audio",
             evaluation_task=["probing"],
             models=["mel", "perch_bird"],
+            dim_reduction_model=None,
             CustomModels=["MyModel", None],
         )
 

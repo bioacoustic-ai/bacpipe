@@ -94,7 +94,7 @@ def unique_start_end_annot_pairs(df):
     return df.drop_duplicates(subset=["start", "end"])
 
 
-class DefaultLabels:
+class MetadataLabelMaker:
     """
     Generate the default metadata labels (e.g. species, time of day) for
     the embeddings of a single model.
@@ -109,19 +109,19 @@ class DefaultLabels:
             main_results_dir='bacpipe_results',
         )('birdnet')
         
-        default_labels = bacpipe.DefaultLabels(
+        metadata_labels = bacpipe.MetadataLabelMaker(
             paths=paths,
             model='birdnet',
-            default_label_keys=bacpipe.settings.default_label_keys,
+            metadata_label_keys=bacpipe.settings.metadata_label_keys,
         )
-        default_labels.generate()
-        # the attribute default_label_dict will now contain a dictionary
+        metadata_labels.generate()
+        # the attribute metadata_label_dict will now contain a dictionary
         # with all the label keys and values
-        print(default_labels.default_label_dict)
+        print(metadata_labels.metadata_label_dict)
         
     """
 
-    def __init__(self, paths, model, default_label_keys, **kwargs):
+    def __init__(self, paths, model, metadata_label_keys, **kwargs):
         """
         Class to generate metadata labels based on audio files and
         number of generated embeddings per file.
@@ -132,7 +132,7 @@ class DefaultLabels:
             convenient object for path handling
         model : str
             model name
-        default_label_keys : list
+        metadata_label_keys : list
             list of metadata labels, see settings.yaml
 
         Raises
@@ -141,7 +141,7 @@ class DefaultLabels:
             if no embeddings were found
         """
         self.model = model
-        self.default_label_keys = default_label_keys
+        self.metadata_label_keys = metadata_label_keys
         self.paths = paths
         if kwargs.get("only_embed_annotations"):
             self.only_embed_annotations = True
@@ -153,10 +153,10 @@ class DefaultLabels:
             )
 
         if (self.paths.preds_path / "original_classifier_outputs").exists():
-            if not "default_classifier" in self.default_label_keys:
-                self.default_label_keys += ["default_classifier"]
-        elif "default_classifier" in self.default_label_keys:
-            self.default_label_keys.remove("default_classifier")
+            if not "default_classifier" in self.metadata_label_keys:
+                self.metadata_label_keys += ["default_classifier"]
+        elif "default_classifier" in self.metadata_label_keys:
+            self.metadata_label_keys.remove("default_classifier")
 
         try:
             embed_path = model_specific_embedding_path(
@@ -188,21 +188,21 @@ class DefaultLabels:
         """
         Generate all default metadata labels.
 
-        For each key in ``default_label_keys`` the corresponding method is
+        For each key in ``metadata_label_keys`` the corresponding method is
         called and the per-embedding labels are collected in
-        ``default_label_dict``.
+        ``metadata_label_dict``.
         """
-        self.default_label_dict = {}
-        for default_label in tqdm(
-            self.default_label_keys, "Building metadata labels"
+        self.metadata_label_dict = {}
+        for metadata_label in tqdm(
+            self.metadata_label_keys, "Building metadata labels"
         ):
-            getattr(self, default_label)()
+            getattr(self, metadata_label)()
 
-            if hasattr(self, f"{default_label}_per_embedding"):
-                self.default_label_dict.update(
+            if hasattr(self, f"{metadata_label}_per_embedding"):
+                self.metadata_label_dict.update(
                     {
-                        default_label: getattr(
-                            self, f"{default_label}_per_embedding"
+                        metadata_label: getattr(
+                            self, f"{metadata_label}_per_embedding"
                         )
                     }
                 )
@@ -441,17 +441,17 @@ class DefaultLabels:
 
         The results are stored in ``default_classifier_per_embedding``. If no
         classifier annotations exist, the key is removed from
-        ``default_label_keys``.
+        ``metadata_label_keys``.
         """
         clfier_paths = list(
             self.paths.preds_path.rglob("*_classifier_annotations.csv")
         )
         if len(clfier_paths) == 0:
-            self.default_label_keys.remove("default_classifier")
+            self.metadata_label_keys.remove("default_classifier")
         else:
             path = clfier_paths[0]
             df = pd.read_csv(path, index_col=False)
-            if not len(self.parent_directory_per_embedding) == len(df):
+            if not self.nr_embeds_total == len(df):
                 df = self.fill_remaining_labels(df)
             self.default_classifier_per_embedding = df[
                 "label:default_classifier"
@@ -530,7 +530,7 @@ class DefaultLabels:
                     "embeddings and evaluations folder to avoid problems."
                 )
                 logger.exception(exception_label)
-                self.default_label_keys.remove("default_classifier")
+                self.metadata_label_keys.remove("default_classifier")
                 raise ValueError(exception_label)
                 # import sys
                 # sys.exit(1)
@@ -597,7 +597,15 @@ def make_set_paths_func(
     """
     global get_paths
 
-    def get_paths(model_name):
+    def get_paths(
+        model_name,
+        # Default to the values captured from ``make_set_paths_func`` so that
+        # ``make_set_paths_func(audio_dir, main_results_dir=...)`` is actually
+        # respected, while still allowing per-call overrides.
+        main_results_dir=main_results_dir,
+        audio_dir=audio_dir,
+        dim_reduc_parent_dir=dim_reduc_parent_dir,
+        ):
         """
         Generate model specific paths for the results of the embedding evaluation.
         This includes paths for the embeddings, labels, clustering, classification,
@@ -614,6 +622,12 @@ def make_set_paths_func(
         paths : SimpleNamespace
             object containing the paths for the results of the embedding evaluation
         """
+        if not main_results_dir:
+            main_results_dir = bacpipe.settings.main_results_dir
+        if not audio_dir:
+            audio_dir = bacpipe.config.audio_dir
+        if not dim_reduc_parent_dir:
+            dim_reduc_parent_dir = bacpipe.settings.dim_reduc_parent_dir
         dataset_path = Path(main_results_dir).joinpath(
             Path(audio_dir).parts[-1]
         )
@@ -739,25 +753,13 @@ def load_metadata_file(folder):
     return metadata_dict
 
 
-def get_metadata_labels(model_name, **kwargs):
+def _get_metadata_labels(model_name, **kwargs):
     """
     Return dictionary of the metadata labels based on the files that were
     already processed and saved. This is model dependent, as the input length is
     model dependent and therefore this function requires a model name as input.
     The metadata labels are calculated based on the metadata labels specified in the
     settings.yaml file.
-
-    Examples::
-    
-        # Return the metadata labels for the already computed ``birdnet``
-        # embeddings. The ``get_paths`` function of the dataset is set first:
-
-        bacpipe.make_set_paths_func(
-            'bacpipe/tests/test_data',
-            main_results_dir='bacpipe_results',
-        )('birdnet')
-        
-        metadata = bacpipe.get_metadata_labels('birdnet', overwrite=False)
 
     Parameters
     ----------
@@ -770,7 +772,7 @@ def get_metadata_labels(model_name, **kwargs):
         dictionary of metadata labels
     """
     paths = get_paths(model_name)
-    return create_metadata_labels(paths.audio_dir, model_name, paths, **kwargs)
+    return metadata_labels(paths.audio_dir, model_name, paths, **kwargs)
 
 
 def get_ground_truth(model_name, file_path=None, return_type="dataframe"):
@@ -939,7 +941,7 @@ def model_specific_embedding_path(
     return embed_paths_for_this_model[-1]
 
 
-def create_metadata_labels(
+def metadata_labels(
     audio_dir=None, model=None, paths=None, 
     overwrite=True, return_type='dataframe', **kwargs
 ):
@@ -953,13 +955,13 @@ def create_metadata_labels(
         # Create (or load, if ``overwrite=False``) the metadata labels for the
         # already computed ``birdnet`` embeddings:
 
-        df_metadata_labels = bacpipe.create_metadata_labels(
+        df_metadata_labels = bacpipe.metadata_labels(
             model='birdnet',
             audio_dir='bacpipe/tests/test_data',
             main_results_dir='bacpipe_results',
             overwrite=False,
         )
-        metadata_df = bacpipe.create_metadata_labels(
+        metadata_df = bacpipe.metadata_labels(
             model='birdnet',
             audio_dir='bacpipe/tests/test_data',
             main_results_dir='bacpipe_results',
@@ -998,16 +1000,16 @@ def create_metadata_labels(
             and not (paths.labels_path / "default_labels.npy").exists()
             )
     ):
-        if not kwargs.get("default_label_keys"):
+        if not kwargs.get("metadata_label_keys"):
             from bacpipe import settings as bacpipe_settings
 
-            kwargs["default_label_keys"] = bacpipe_settings.default_label_keys
-        metadata_labels = DefaultLabels(
+            kwargs["metadata_label_keys"] = bacpipe_settings.metadata_label_keys
+        metadata_labels = MetadataLabelMaker(
             paths, model=model, audio_dir=audio_dir, **kwargs
         )
         metadata_labels.generate()
 
-        df_labels = pd.DataFrame(metadata_labels.default_label_dict)
+        df_labels = pd.DataFrame(metadata_labels.metadata_label_dict)
         input_length = (
             metadata_labels.metadata['segment_length (samples)']
             / metadata_labels.metadata['sample_rate (Hz)']
@@ -1790,9 +1792,16 @@ def ground_truth_by_model(
         assign_global_get_paths_function(audio_dir, **kwargs)
         paths = get_paths(model)
 
+    # Isolate the cached ground truth per ``only_embed_annotations`` mode so
+    # that switching modes with ``overwrite=False`` does not silently reuse a
+    # ground truth that was generated for the other mode.
+    ground_truth_suffix = "_only_annotated" if only_embed_annotations else ""
+
     if (
         overwrite
-        or not paths.labels_path.joinpath(f"ground_truth_species.csv").exists()
+        or not paths.labels_path.joinpath(
+            f"ground_truth_species{ground_truth_suffix}.csv"
+        ).exists()
     ):
 
         # check if embeddings exist
@@ -1861,7 +1870,7 @@ def ground_truth_by_model(
             ).reset_index(drop=True)
             ground_truth.to_csv(
                 paths.labels_path.joinpath(
-                    f"ground_truth_{clean_label_column}.csv"
+                    f"ground_truth_{clean_label_column}{ground_truth_suffix}.csv"
                 ),
                 index=False,
             )
@@ -1873,7 +1882,9 @@ def ground_truth_by_model(
                 label_column = label_column.split(":")[-1]
 
             ground_truth = pd.read_csv(
-                paths.labels_path.joinpath(f"ground_truth_{label_column}.csv"),
+                paths.labels_path.joinpath(
+                    f"ground_truth_{label_column}{ground_truth_suffix}.csv"
+                ),
                 index_col=False,
             )
 
@@ -1881,7 +1892,7 @@ def ground_truth_by_model(
         clean_label_column = label_column.split("label:")[-1]
         ground_truth = pd.read_csv(
             paths.labels_path.joinpath(
-                f"ground_truth_{clean_label_column}.csv"
+                f"ground_truth_{clean_label_column}{ground_truth_suffix}.csv"
             ),
             index_col=False,
         )

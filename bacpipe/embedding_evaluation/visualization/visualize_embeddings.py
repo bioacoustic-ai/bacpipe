@@ -403,7 +403,7 @@ def get_boolean_array_for_annotated_embeddings(
     overwrite : bool
         whether to force regeneration of the metadata labels
     **kwargs
-        additional keyword arguments passed to create_metadata_labels
+        additional keyword arguments passed to metadata_labels
 
     Returns
     -------
@@ -411,7 +411,7 @@ def get_boolean_array_for_annotated_embeddings(
         boolean array that is True for unannotated (noise) embeddings
     """
         
-    df_metadata_labels = le.create_metadata_labels(
+    df_metadata_labels = le.metadata_labels(
         model=model_name, overwrite=overwrite,
         return_type='dataframe', **kwargs
         )
@@ -530,7 +530,7 @@ def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
         labels by label key and the noise boolean mask
     """
     labels = dict()
-    labels = le.get_metadata_labels(model_name, overwrite=overwrite, return_type='dict', **kwargs)
+    labels = le._get_metadata_labels(model_name, overwrite=overwrite, return_type='dict', **kwargs)
 
     paths = le.get_paths(model_name)
     ground_truth_files = list(
@@ -1055,7 +1055,7 @@ def get_arrays_for_spectrogram_text(labels, label_by, data_dict, embeds, **kwarg
         embeddings dict with metadata
     **kwargs : dict
         Explicitly passed kwargs override the defaults from
-        ``bacpipe/settings.yaml``, e.g. ``default_label_keys``,
+        ``bacpipe/settings.yaml``, e.g. ``metadata_label_keys``,
         ``evaluations_dir`` and ``nr_predictions_to_display``.
 
     Returns
@@ -1063,7 +1063,7 @@ def get_arrays_for_spectrogram_text(labels, label_by, data_dict, embeds, **kwarg
     dict
         additional label arrays for the hover text
     """
-    dlk = kwargs.get("default_label_keys", settings.default_label_keys)
+    dlk = kwargs.get("metadata_label_keys", settings.metadata_label_keys)
     label_copy = labels.copy()
     # remove clustering labels from dict
     

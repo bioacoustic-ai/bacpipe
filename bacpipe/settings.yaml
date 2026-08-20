@@ -103,7 +103,7 @@ min_annotation_length: 0
 # kinds of metadata labels that are created for the embeddings.
 # only modify these if you are ready to modify the 
 # corresponding code in label_embeddings.py
-default_label_keys: [
+metadata_label_keys: [
   "time_of_day",
   "week_of_year",
   "day_of_year",

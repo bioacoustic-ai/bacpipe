@@ -16,7 +16,7 @@ EXPECTED_PIPELINES = {
     "generate_embeddings",
 }
 EXPECTED_LABEL_HELPERS = {
-    "create_metadata_labels",
+    "metadata_labels",
     "ground_truth_by_model",
     "get_dt_filename",
 }

@@ -35,32 +35,18 @@ class Embedder(AudioHandler):
     Example::
     
         import bacpipe
+        import numpy as np
 
-        MODEL_NAME = 'birdnet'
 
-        # Create a loader object that will handle all the audio file, path and parameters needed to compute the embeddings for instance
-        loader_obj = bacpipe.Loader(
-            audio_dir='bacpipe/tests/test_data',
-            model_name=MODEL_NAME,
-            use_folder_structure=True
-        )
-
-        # Create an embededding object with the selected model (MODEL_NAME) passing the loader object in order to have the audio directory mapping
         embed_obj = bacpipe.Embedder(
-            model_name=MODEL_NAME,
-            loader=loader_obj
+            model_name='insect459'
             )
-
-        # Process all files using multithreading
-        embed_obj.run_inference_pipeline_using_multithreading()
-
-        print('Metadata dict:', loader_obj.metadata_dict)
-
-        print('Embeddings (array):', loader_obj.embeddings(return_type='array'))
-
-        print('Predictions (array):', loader_obj.predictions(return_type='array'))
-
-        print('Predictions (dataframe):', loader_obj.predictions(return_type='dataframe'))
+        audio_files = bacpipe.get_audio_files('bacpipe/tests/test_data')
+        all_embeds = []
+        for audio_file in audio_files:
+            embeds = embed_obj.get_embeddings_from_model(audio_file)
+            all_embeds.extend(embeds)
+        all_embeds = np.stack(all_embeds)
 
     Parameters
     ----------

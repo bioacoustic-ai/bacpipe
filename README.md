@@ -437,6 +437,8 @@ The only two files that need to be modified are the [config.yaml](bacpipe/config
 
 The [settings.yaml](bacpipe/settings.yaml) file is used for more advanced configurations and does not need to be modified unless you have specific preferences. It includes settings such as to run on CPU, then use `cpu` or a GPU, then use `cuda` (linux)/`mps` (mac) (by default `cpu`). Other advances settings are the paths where results are saved, configurations for the evaluation tasks and more. 
 
+It is highly recommended to use `mps` on mac as it is significantly faster than `cpu`. If you have a GPU on linux, use `cuda` as it is also significantly faster than `cpu`.
+
 Modify the [config.yaml](bacpipe/config.yaml) file in the root directory to specify the path to your `dataset`. Define what models to run by specifying the strings in the `models` list (copy and paste as needed, I usually just comment the model's I don't want to run). 
 
 

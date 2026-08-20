@@ -59,11 +59,10 @@ from bacpipe.core.workflows import (
 from bacpipe.embedding_evaluation.benchmark import benchmark
 
 from bacpipe.embedding_evaluation.label_embeddings import (
-    DefaultLabels,
-    get_metadata_labels,
+    MetadataLabelMaker,
     get_dt_filename,
     make_set_paths_func,
-    create_metadata_labels,
+    metadata_labels,
     ground_truth_by_model,
 )
 
@@ -101,10 +100,9 @@ __all__ = [
     ## return audio files in specified dir
     "get_audio_files",
     ## automatic creation of labels and ground truth
-    "DefaultLabels",
-    "create_metadata_labels",
+    "MetadataLabelMaker",
+    "metadata_labels",
     "ground_truth_by_model",
-    "get_metadata_labels",
     "get_dt_filename",
     ## probing functions
     "probing_pipeline",

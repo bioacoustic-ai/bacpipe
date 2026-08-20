@@ -466,20 +466,41 @@ def benchmark(
     logger.info(f"Annotated timestamps: {annotated_mask.sum()} of {len(preds)}")
 
     # --- Performance Evaluation ---
-    report = classification_report(
-        gt_binary,
-        pred_binary,
-        target_names=shared_labels,
-        zero_division=0,
-        output_dict=True,
-    )
-
-    logger.info("\n--- Overall Report ---")
-    logger.info(
-        classification_report(
+    # scikit-learn treats a single-column binary matrix as a plain binary
+    # (presence/absence) problem rather than a multilabel indicator, which
+    # crashes ``classification_report`` with "Number of classes, 2, does not
+    # match size of target_names, 1". Flatten the single-class case and report
+    # on the "present" class (label 1) so the metrics stay correct.
+    if len(shared_labels) == 1:
+        report = classification_report(
+            gt_binary.ravel(),
+            pred_binary.ravel(),
+            labels=[1],
+            target_names=shared_labels,
+            zero_division=0,
+            output_dict=True,
+        )
+        report_str = classification_report(
+            gt_binary.ravel(),
+            pred_binary.ravel(),
+            labels=[1],
+            target_names=shared_labels,
+            zero_division=0,
+        )
+    else:
+        report = classification_report(
+            gt_binary,
+            pred_binary,
+            target_names=shared_labels,
+            zero_division=0,
+            output_dict=True,
+        )
+        report_str = classification_report(
             gt_binary, pred_binary, target_names=shared_labels, zero_division=0
         )
-    )
+
+    logger.info("\n--- Overall Report ---")
+    logger.info(report_str)
     map_score = average_precision_score(
         gt_binary, 
         preds[:, shared_indices][annotated_mask, :], 
