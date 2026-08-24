@@ -8,8 +8,19 @@ from clustering_utils import *
 # file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem}.h5'
 # file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem+"_snr=0"}.h5'#.split("_cleaned")[0]+
 
-models = ['birdnet_v3', 'naturebeats', 'audioprotopnet', 'avesecho_passt']
+models = [
+    'birdnet_v3', 
+    # 'birdnet', 
+    # 'perch_v2', 
+    # 'insect459', 
+    # 'aves_especies', 
+    'naturebeats', 
+    'audioprotopnet', 
+    'avesecho_passt'
+    ]
 
+from bacpipe.core.workflows import ensure_models_exist
+ensure_models_exist(model_names = models)
 
 embeds, umaps = get_embeddings(path, models)
 
@@ -41,34 +52,7 @@ clustering_dict = {
         n_centroids=n_centroids,
         initial_clustering='kmeans',
         agglomerative_clustering=True
-        ),
-    # f'kmeans_w_agg_{max_clust+100}': Clustering_Approach(
-    #     max_cluster_size=max_clust,
-    #     n_centroids=n_centroids,
-    #     initial_clustering='kmeans',
-    #     agglomerative_clustering=True
-    #     ),
-    # f'kmeans_w_dbscan_{max_clust}': Clustering_Approach(
-    #     max_cluster_size=max_clust,
-    #     n_centroids=n_centroids,
-    #     initial_clustering='kmeans'
-    #     ),
-    # f'kmeans_w_dbscan_{max_clust}_filt_cent': Clustering_Approach(
-    #     max_cluster_size=max_clust,
-    #     n_centroids=n_centroids,
-    #     initial_clustering='kmeans',
-    #     filter_centroids=True
-    #     ),
-    # f'kmeans_umap-init_w_dbscan_{max_clust}': Clustering_Approach(
-    #     max_cluster_size=max_clust,
-    #     n_centroids=n_centroids, 
-    #     initial_clustering='kmeans+umap'
-    #     ),
-    # f'kmeans_umap-init_half_w_dbscan_{max_clust}': Clustering_Approach(
-    #     max_cluster_size=max_clust,
-    #     n_centroids=2, 
-    #     initial_clustering='kmeans+umap'
-    #     )
+    )
 }
 
 import umap
@@ -110,12 +94,12 @@ vis_settings = {
     'audio_dir':path / snr_str, 
     'audio_suffixes' : ['.h5'],
     'main_results_dir':Path(settings.main_results_dir) / path.stem, 
-    'default_label_keys':settings.default_label_keys,#{}, 
+    'default_label_keys':settings.metadata_label_keys,#{}, 
     'evaluation_task':config.evaluation_task, 
     'dim_reduction_model':config.dim_reduction_model, 
     'dim_reduc_parent_dir':settings.dim_reduc_parent_dir,
     'only_embed_annotations':True,
-    'annotations_df' : df_vis,#[df_vis.snr.isin([snr_val, -1])],
+    # 'annotations_df' : df_vis,#[df_vis.snr.isin([snr_val, -1])],
     'constant_sr' : 32_000
 }
 
@@ -130,6 +114,92 @@ visualize_using_dashboard(
     **remaining_settings
     )
 
+
+def show_spec_of_h5idx(idx, df_vis, model='birdnet_v3'):
+    from bacpipe.embedding_evaluation.visualization.visualize_spectrograms import SpectrogramPlot
+    from types import SimpleNamespace
+    import matplotlib.pyplot as plt
+    
+    model_name = SimpleNamespace(**{'options': []})
+    spec = SpectrogramPlot(
+        audio_dir=path,
+        loader=None,
+        model_name=model_name,
+        paths=None,
+        panel_static_text=None
+        )
+    spec.sample_rate = umaps[model][snr_str]['metadata']['sample_rate (Hz)']
+    spec.segment_length = umaps[model][snr_str]['metadata']['segment_length (samples)']
+    
+    h5_file = df_vis.iloc[idx].audiofilename
+    h5_idx = idx % 1180
+    
+    import h5py
+    with h5py.File(path / snr_str / h5_file, 'r') as data:
+        audio = data['audio'][h5_idx]
+    
+    
+    fig = spec.create_specs(audio)
+    fig.show()
+
+def check_emb_from_idx_matches_saved_emb(idx, df_vis, model='birdnet_v3'):
+    from bacpipe import Embedder
+    import torch
+    import numpy as np
+    
+    emb = Embedder(model_name=model)
+    
+    h5_file = df_vis.iloc[idx].audiofilename
+    h5_idx = idx % 1180
+    
+    import h5py
+    with h5py.File(path / snr_str / h5_file, 'r') as data:
+        audio = data['audio'][h5_idx]
+    audio = torch.tensor(audio.reshape(1, -1))
+    
+    embedding1 = emb.get_embeddings_for_audio(audio)
+    
+    embed_dir = Path(umaps[model][snr_str]['metadata']['embed_dir'])
+    embedding2 = np.load(embed_dir / h5_file.replace('.h5', f'_{model}.npy'), mmap_mode='r')[h5_idx]
+    
+    return np.all(np.isclose(embedding1, embedding2, rtol=1e-4))
+
+def check_umap_from_idx_matches_saved_umap(idx, df_vis, model='birdnet_v3'):
+    from bacpipe import Loader
+    import numpy as np
+    import json
+    
+    loader = Loader(
+        umaps[model][snr_str]['metadata']['audio_dir'], 
+        model, 
+        use_folder_structure=True,
+        audio_suffixes=['.h5'], 
+        dim_reduction_model='umap',
+        main_results_dir=f'bacpipe_results/{path.stem}'
+        )
+    
+    h5_file = df_vis.iloc[idx].audiofilename
+    h5_idx = idx % 1180
+    
+    embed_dir = Path(umaps[model][snr_str]['metadata']['embed_dir'])
+    embedding = np.load(embed_dir / h5_file.replace('.h5', f'_{model}.npy'), mmap_mode='r')[h5_idx]
+    
+    umap_dir = Path(loader.embed_dir)
+    umap_data = json.load(open(umap_dir / f'{snr_str}_{model}.json', 'r'))
+    x_and_y = umap_data['x'][idx], umap_data['y'][idx]
+    
+    from umap import UMAP
+    import pickle
+
+    umap_func = pickle.load((open(loader.embed_dir / 'umap_model.pkl', 'rb')))
+    calc_umap = umap_func.transform(embedding.reshape(1, -1))
+    
+    # umap transforming after the fact is not not exactly representing it
+    # therefore we have to use quite a weak tolerance
+    return np.all(np.isclose(x_and_y, calc_umap, rtol=1e-1)) 
+    
+    
+    
 
 if False:
     ### check association when inside update_spectrogram:

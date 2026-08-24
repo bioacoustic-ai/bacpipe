@@ -26,7 +26,7 @@ from sklearn.metrics import homogeneity_score as HS
 
 from tqdm import tqdm
 
-from bacpipe.embedding_evaluation.label_embeddings import DefaultLabels as Labels
+from bacpipe.embedding_evaluation.label_embeddings import MetadataLabelMaker as Labels
 
 from bacpipe import Embedder, Loader, get_audio_files, visualize_using_dashboard, settings, config, ground_truth_by_model
 
@@ -53,7 +53,7 @@ def get_embeddings(path, models):
             snr_string = snr_dir.stem if snr_dir.is_dir() else False
             if not snr_string:
                 continue
-            if not '0' in snr_string:
+            if not '0' in snr_string and not '6' in snr_string:
                 continue
                 # no need to work on other snr's for now
 
@@ -130,7 +130,7 @@ def load_umap_model(path):
 
 
 def fetch_clustering(embeds, df, clustering_dict, overwrite=False):
-    if overwrite:
+    if overwrite or not (main_results_path / f'clusters.csv').exists():
         clust_df = df.copy()
         centroid_dict = dict()
 
@@ -421,7 +421,7 @@ def load_df_same_order_as_embeddings(audio_dir, model, snr):
             if not (snr_string in str(snr_dir) and str(snr).split('.')[-1] in snr_string):
                 continue
     
-        loader = Loader(snr_string, model, use_folder_structure=True, audio_suffixes=['.h5'], main_results_dir=f'bacpipe_results/{Path(audio_dir).stem}')
+        loader = Loader(audio_dir / snr_string, model, use_folder_structure=True, audio_suffixes=['.h5'], main_results_dir=f'bacpipe_results/{Path(audio_dir).stem}')
         
         
         snr_model_df = pd.DataFrame()
