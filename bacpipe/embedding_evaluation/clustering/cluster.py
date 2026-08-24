@@ -37,6 +37,10 @@ def convert_numpy_types(obj):
         return float(obj)
     elif isinstance(obj, np.ndarray):
         return obj.tolist()
+    elif isinstance(obj, str):
+        return obj
+    else:
+        return obj
 
 
 def save_clustering_performance(paths, clusterings, metrics, label_column):

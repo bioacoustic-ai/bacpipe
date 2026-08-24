@@ -145,7 +145,7 @@ class MetadataLabelMaker:
         self.paths = paths
         if kwargs.get("only_embed_annotations"):
             self.only_embed_annotations = True
-            if len(kwargs.get('annotations_df')) > 0:
+            if not kwargs.get('annotations_df') is None:
                 self.df = kwargs.get('annotations_df')
             else:
                 self.df = load_labels_and_build_dict(

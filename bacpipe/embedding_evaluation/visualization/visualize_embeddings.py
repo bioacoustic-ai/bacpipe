@@ -1262,12 +1262,21 @@ def plot_embeddings_px(
     if not embeds.get('z') is None:
         data_dict['z'] = z_data
         
+    if not kwargs.get('annotations_df') is None:
+        df_kwargs = kwargs.get('annotations_df')
+        df = df_kwargs[df_kwargs.model == embeds['metadata']['model_name']]
+        assert all(df.start.values == starts), ("dataframe and embeddings do not align.")
+    else:
+        data_dict = {**data_dict}
+        df = pd.DataFrame(data_dict)
+
+
     df_lab = get_arrays_for_spectrogram_text(
         labels, label_by, data_dict, embeds, **kwargs
         )
     from bacpipe.embedding_evaluation.clustering.cluster import convert_numpy_types
     # Pack variable labels as JSON string to preserve order and labels
-    data_dict["variable_labels_json"] = (
+    df["variable_labels_json"] = (
         [
             json.dumps({k: convert_numpy_types(v) for k, v in zip(df_lab.keys(), row)})
             for row in zip(*df_lab.values())
@@ -1276,12 +1285,7 @@ def plot_embeddings_px(
         else [json.dumps({})] * len(labels[label_by])
     )
 
-    data_dict = {**data_dict}
-
-    df = pd.DataFrame(data_dict)
-    df = df.sort_values("label")
-
-    hover_data = {k: False for k in data_dict}
+    hover_data = {k: False for k in df.columns}
     for k in hover_data.keys():
         if k in ["label", "audiofilename", "start", "end"]:
             hover_data[k] = True

@@ -123,28 +123,31 @@ class DashBoard(DashBoardHelper):
         self.plot_path = self.path_func(model_names[0]).plot_path.parent.parent
 
         self.ground_truth = None
-        ground_truth_files = list(
-            le.get_paths(model_names[0]).labels_path.glob("ground_truth*")
-        )
-        if len(ground_truth_files) > 0:
-            labels = []
+        for model_name in model_names:
+            ground_truth_files = list(
+                le.get_paths(model_name).labels_path.glob("ground_truth*")
+            )
             if len(ground_truth_files) > 0:
-                for gt_file in ground_truth_files:
-                    if gt_file.suffix == ".csv":
-                        ground_truth_df = le.get_ground_truth(
-                            model_names[0],
-                            file_path=gt_file,
-                            return_type="dataframe",
-                        )
-                    elif gt_file.suffix == ".npy":
-                        ground_truth_df = le.get_ground_truth(
-                            model_names[0],
-                            file_path=gt_file,
-                            return_type="array",
-                        )
-                    labels.append(gt_file.stem.replace("ground_truth_", ""))
-            self.ground_truth = True
-            self.label_by += labels
+                labels = []
+                if len(ground_truth_files) > 0:
+                    for gt_file in ground_truth_files:
+                        if gt_file.suffix == ".csv":
+                            ground_truth_df = le.get_ground_truth(
+                                model_name,
+                                file_path=gt_file,
+                                return_type="dataframe",
+                            )
+                        elif gt_file.suffix == ".npy":
+                            ground_truth_df = le.get_ground_truth(
+                                model_name,
+                                file_path=gt_file,
+                                return_type="array",
+                            )
+                        labels.append(gt_file.stem.replace("ground_truth_", ""))
+                self.ground_truth = True
+                self.label_by += labels
+        self.label_by = list(set(self.label_by))
+        self.label_by.sort(reverse=True)
 
         if (
             len(list(le.get_paths(model_names[0]).clust_path.glob("*.npy")))

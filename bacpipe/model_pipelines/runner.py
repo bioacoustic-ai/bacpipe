@@ -421,7 +421,7 @@ class Embedder(AudioHandler):
         # --- Producer: load + preprocess in background ---
         def producer():
             """Load and preprocess all audio samples in the background."""
-            for idx, audio in enumerate(windowed_audios):
+            for idx, audio_idx_range in enumerate(range(0, len(windowed_audios), self.model.batch_size)):
                 try:
                     audio = windowed_audios[audio_idx_range:audio_idx_range+self.model.batch_size].squeeze()
                     audio.to(self.model.device)
