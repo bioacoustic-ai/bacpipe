@@ -145,7 +145,7 @@ class MetadataLabelMaker:
         self.paths = paths
         if kwargs.get("only_embed_annotations"):
             self.only_embed_annotations = True
-            if kwargs.get('annotations_df'):
+            if len(kwargs.get('annotations_df')) > 0:
                 self.df = kwargs.get('annotations_df')
             else:
                 self.df = load_labels_and_build_dict(
@@ -175,7 +175,18 @@ class MetadataLabelMaker:
                 "No embeddings found. Gathering files and nr of embeddings "
                 "per file from audio files."
             )
-            _, _, metadata = get_files_if_no_embeds(paths.audio_dir, model)
+            _, _, metadata = get_files_if_no_embeds(
+                paths.audio_dir, 
+                model, 
+                only_embed_annotations=kwargs.get(
+                    'only_embed_annotations', 
+                    bacpipe.settings.only_embed_annotations
+                    ),
+                audio_suffixes=kwargs.get(
+                    'audio_suffixes', 
+                    bacpipe.settings.audio_suffixes
+                    )
+                )
             self.metadata = metadata
             self.nr_embeds_per_file = metadata["files"]["nr_embeds_per_file"]
             self.nr_embeds_total = sum(metadata["files"]["nr_embeds_per_file"])
@@ -1967,7 +1978,13 @@ def ensure_audio_files(found_audio_files, annotated_audio_files, audio_dir):
     return [str(f) for f in found_audio_files]
 
 
-def get_files_if_no_embeds(audio_dir, model, label_df=None, only_embed_annotations=False):
+def get_files_if_no_embeds(
+    audio_dir, 
+    model, 
+    label_df=None, 
+    only_embed_annotations=False,
+    audio_suffixes=None
+    ):
     """
     Get the files and metadata for a model when no embeddings exist yet.
 
@@ -1992,6 +2009,8 @@ def get_files_if_no_embeds(audio_dir, model, label_df=None, only_embed_annotatio
     metadata : dict
         dictionary with the metadata content
     """
+    if not audio_suffixes:
+        audio_suffixes = bacpipe.settings.audio_suffixes
     if label_df is None:
         annotated_audio_files = []
     else:
@@ -2007,7 +2026,7 @@ def get_files_if_no_embeds(audio_dir, model, label_df=None, only_embed_annotatio
     metadata["files"] = {}
     from bacpipe import get_audio_files
 
-    found_audio_files = get_audio_files(audio_dir)
+    found_audio_files = get_audio_files(audio_dir, audio_suffixes=audio_suffixes)
     matching_audio_files = ensure_audio_files(
         found_audio_files, annotated_audio_files, audio_dir
     )

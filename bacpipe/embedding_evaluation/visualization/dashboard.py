@@ -82,13 +82,24 @@ class DashBoard(DashBoardHelper):
             additional keyword arguments (e.g., plot heights, widths)
         """
         self.models = model_names
-        kwargs = replace_default_kwargs_with_user_kwargs(remove_keys=['audio_dir'], **kwargs)
-        
         self.evaluation_task = kwargs.pop('evaluation_task', evaluation_task)
         self.dim_reduction_model = kwargs.pop('dim_reduction_model', dim_reduction_model)
         self.metadata_label_keys = kwargs.pop('metadata_label_keys', metadata_label_keys)
         self.main_results_dir = kwargs.pop('main_results_dir', main_results_dir)
         self.dim_reduc_parent_dir = kwargs.pop('dim_reduc_parent_dir', dim_reduc_parent_dir)
+        
+        kwargs = replace_default_kwargs_with_user_kwargs(
+            remove_keys=[
+                'audio_dir',
+                'evaluation_task',
+                'dim_reduction_model',
+                'metadata_label_keys',
+                'main_results_dir',
+                'dim_reduc_parent_dir'
+                ], 
+            **kwargs
+            )
+        
         
         self.audio_dir = audio_dir
         self.path_func = le.make_set_paths_func(

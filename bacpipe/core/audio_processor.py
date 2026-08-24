@@ -42,7 +42,6 @@ class AudioHandler:
             frames = aud.window_audio(audio)
             all_frames.extend(frames)
         all_frames = np.stack(all_frames)
-
     """
 
     def __init__(

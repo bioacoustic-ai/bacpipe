@@ -171,6 +171,7 @@ class Loader:
         self.testing = testing
         self.use_folder_structure = use_folder_structure
         self.continue_incomplete_run = False
+        self.audio_suffixes = kwargs.get('audio_suffixes', settings.audio_suffixes)
 
         self._initialize_path_structure(testing=testing, **kwargs)
 
@@ -488,7 +489,7 @@ class Loader:
                 return
             else:
                 logger.info(f"Found {num_files} embedding files.")
-                num_audio_files = len(self.get_audio_files(self.audio_dir))
+                num_audio_files = len(self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes))
         except AssertionError as e:
             self._get_metadata_dict(d)
             self.combination_already_exists = True
@@ -569,7 +570,7 @@ class Loader:
         Collect all audio files in the audio directory and initialize
         ``self.embed_dir`` with a timestamp-based directory name.
         """
-        self.files = self.get_audio_files(self.audio_dir)
+        self.files = self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes)
         self.files.sort()
         if not hasattr(self, "embed_parent_dir"):
             from bacpipe import settings as settings
