@@ -130,7 +130,7 @@ def generate_annotations_for_probing_task(
     ground_truth,
     paths,
     label_column,
-    dataset_csv_path="probe_annotations.csv",
+    dataset_csv_path="probing_dataframe.csv",
     train_ratio=None,
     test_ratio=None,
     seed=42,
@@ -152,7 +152,8 @@ def generate_annotations_for_probing_task(
         name of the label column
     dataset_csv_path : str, optional
         path to the probing dataframe csv file, by default
-        "probe_annotations.csv"
+        "probing_dataframe.csv". Relative paths are resolved against
+        ``paths.labels_path`` when a ``paths`` object is available.
     train_ratio : float, optional
         proportion of samples used for training, by default None
     test_ratio : float, optional
@@ -171,6 +172,25 @@ def generate_annotations_for_probing_task(
         train_ratio = bacpipe.settings.train_ratio
     if test_ratio is None:
         test_ratio = bacpipe.settings.test_ratio
+
+    # The probing dataframe is cached inside the labels directory of the model
+    # evaluation results whenever a ``paths`` object is available. Relative
+    # ``dataset_csv_path`` values (e.g. ``probing_dataframe.csv`` from the probe
+    # configs in settings.yaml) are therefore resolved against ``labels_path``.
+    if paths is not None:
+        dataset_csv_path = Path(dataset_csv_path)
+        if not dataset_csv_path.is_absolute():
+            dataset_csv_path = Path(paths.labels_path) / dataset_csv_path
+
+    # Isolate the cached probing dataframe per ``only_embed_annotations`` mode
+    # so that switching modes with ``overwrite=False`` does not silently reuse
+    # a dataframe that was generated for the other mode.
+    if kwargs.get("only_embed_annotations"):
+        dataset_csv_path = Path(dataset_csv_path)
+        if not dataset_csv_path.name.endswith("_only_annotated.csv"):
+            dataset_csv_path = dataset_csv_path.with_name(
+                dataset_csv_path.stem + "_only_annotated.csv"
+            )
 
     if paths is None or not Path(dataset_csv_path).exists():
         rng = np.random.default_rng(seed=seed)
@@ -226,13 +246,8 @@ def generate_annotations_for_probing_task(
 
         df = df.sort_values(by=["audiofilename", "start"])
 
-        if paths is None:
-            df.to_csv(dataset_csv_path, index=False)
-        else:
-            df.to_csv(
-                paths.labels_path.joinpath("probing_dataframe.csv"),
-                index=False,
-            )
+        Path(dataset_csv_path).parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(dataset_csv_path, index=False)
     else:
         logger.info(
             f"\nFound file: {str(dataset_csv_path)}. Loading dataframe probing "

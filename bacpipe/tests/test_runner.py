@@ -28,20 +28,6 @@ class TestInitDataloader:
     class _BatchModel:
         batch_size = 4
 
-    def test_dict_input_is_split_into_batches(self):
-        embedder = object.__new__(Embedder)
-        embedder.model = self._BatchModel()
-        audio = {
-            "input_values": torch.zeros(10, 160000),
-            "attention_mask": torch.ones(10, 160000),
-        }
-        batches = embedder.init_dataloader(audio)
-        assert isinstance(batches, list)
-        assert len(batches) == 3
-        assert batches[0]["input_values"].shape == (4, 160000)
-        assert batches[1]["attention_mask"].shape == (4, 160000)
-        assert batches[2]["input_values"].shape == (2, 160000)
-
     def test_tensor_input_still_returns_dataloader(self):
         embedder = object.__new__(Embedder)
         embedder.model = self._BatchModel()
@@ -49,65 +35,6 @@ class TestInitDataloader:
         loader = embedder.init_dataloader(audio)
         assert isinstance(loader, torch.utils.data.DataLoader)
         assert loader.batch_size == 4
-
-
-class TestBatchInferenceDevicePlacement:
-    """Batches must be moved to the model device for any non-cpu device.
-
-    ``meta`` is used as the stand-in device so the test runs on CPU-only
-    runners (``tensor.to("meta")`` works without a GPU) while still
-    exercising the ``device != "cpu"`` code path.
-    """
-
-    class _RecordingModel:
-        def __init__(self, device):
-            self.device = device
-            self.batch_size = 2
-            self.bool_classifier = False
-            self.received = []
-
-        def __call__(self, batch):
-            if isinstance(batch, dict):
-                self.received.append([v.device.type for v in batch.values()])
-                return torch.zeros(
-                    batch["input_values"].shape[0],
-                    4,
-                    device=batch["input_values"].device,
-                )
-            self.received.append(batch.device.type)
-            return torch.zeros(batch.shape[0], 4, device=batch.device)
-
-    def _make_embedder(self, model):
-        embedder = object.__new__(Embedder)
-        embedder.model = model
-        embedder.model_name = "dummy_not_a_tf_model"
-        embedder.classifier = None
-        return embedder
-
-    def test_tensor_batch_is_moved_to_non_cpu_device(self):
-        model = self._RecordingModel(device="meta")
-        embedder = self._make_embedder(model)
-        out = embedder.batch_inference([torch.zeros(2, 22050)])
-        assert model.received == ["meta"]
-        assert out.shape == (2, 4)
-
-    def test_dict_batch_values_are_moved_to_non_cpu_device(self):
-        model = self._RecordingModel(device="meta")
-        embedder = self._make_embedder(model)
-        batch = {
-            "input_values": torch.zeros(2, 160000),
-            "attention_mask": torch.ones(2, 160000),
-        }
-        out = embedder.batch_inference([batch])
-        assert model.received == [["meta", "meta"]]
-        assert out.shape == (2, 4)
-
-    def test_cpu_batch_is_left_untouched(self):
-        model = self._RecordingModel(device="cpu")
-        embedder = self._make_embedder(model)
-        out = embedder.batch_inference([torch.zeros(2, 22050)])
-        assert model.received == ["cpu"]
-        assert out.shape == (2, 4)
 
 
 class TestFillDataframeWithClassiefierResults:

@@ -49,6 +49,14 @@ def play(bool_save_logs=False, **kwargs):
     bacpipe.settings.results_dir. For more details see the ReadMe file on the
     repository page https://github.com/bioacoustic-ai/bacpipe or the documentation
     under https://bacpipe.readthedocs.io/en/latest/.
+    
+    Example::
+
+        bacpipe.play(
+            models=['birdnet', 'perch_bird'],
+            audio_dir='path/to/audio',
+            dashboard=True,
+        )
 
     Parameters
     ----------
@@ -96,13 +104,6 @@ def play(bool_save_logs=False, **kwargs):
         If no audio files are found we can't compute any embeddings. So make
         sure the path is correct :)
 
-    Example::
-
-        bacpipe.play(
-            models=['birdnet', 'perch_bird'],
-            audio_dir='path/to/audio',
-            dashboard=True,
-        )
     """
     kwargs = replace_default_kwargs_with_user_kwargs(**kwargs)
 
@@ -165,6 +166,15 @@ def ensure_models_exist(
     """
     Ensure that the model checkpoints for the selected models are
     available locally. Downloads from Hugging Face Hub if missing.
+
+    Examples::
+    
+        # Make sure the checkpoints for the selected models are available. 
+
+        model_base_path = bacpipe.ensure_models_exist(
+            'bacpipe_model_checkpoints',
+            model_names=['birdnet'],
+        )
 
     Parameters
     ----------
@@ -270,6 +280,12 @@ def ensure_models_exist(
 def confirm_model_name(model_name, **kwargs):
     """
     Confirm that the model name is supported by bacpipe.
+
+    Examples::
+    
+        # Check that ``'birdnet'`` is supported by bacpipe:
+
+        bacpipe.confirm_model_name('birdnet')
 
     Parameters
     ----------
@@ -403,6 +419,18 @@ def evaluation_with_settings_already_exists(
     results do not exist, the function returns False. Otherwise,
     it returns True.
 
+    Examples::
+    
+        # Check whether the probing and clustering evaluation results already
+        # exist for ``birdnet`` on the test data:
+
+        bacpipe.evaluation_with_settings_already_exists(
+            audio_dir='bacpipe/tests/test_data',
+            dim_reduction_model='umap',
+            models=['birdnet'],
+            main_results_dir='bacpipe_results',
+        )
+
     Parameters
     ----------
     audio_dir : string
@@ -444,7 +472,14 @@ def evaluation_with_settings_already_exists(
     return True
 
 
-def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
+def run_pipeline_for_models(
+    models,
+    audio_dir,
+    dim_reduction_model,
+    check_if_already_processed=None,
+    check_if_already_dim_reduced=None,
+    **kwargs,
+):
     """
     Generate embeddings for each model in the list of model names.
     The embeddings are generated using the generate_embeddings function
@@ -456,10 +491,14 @@ def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
     bacpipe.config and bacpipe.settings.
 
 
-    Example::
+    Examples::
+    
+        # Load the embeddings that were already computed for ``birdnet`` on the
+        # test data (stored under ``bacpipe_results``). The returned loader
+        # objects give access to the embeddings and metadata:
 
-        loader = bacpipe.run_pipeline_for_models(
-            models=['birdnet', 'naturebeats'],
+        loader_dict = bacpipe.run_pipeline_for_models(
+            models=['birdnet', 'insect459'],
             audio_dir='bacpipe/tests/test_data',
             dim_reduction_model='umap'
         )
@@ -499,6 +538,16 @@ def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
         name of the dimensionality reduction model to be used
         for the embeddings. If "None" is selected, no
         dimensionality reduction is performed.
+    check_if_already_processed : bool, optional
+        if True, embeddings that already exist for the combination
+        of model and dataset are loaded instead of being recomputed.
+        Only forwarded to ``run_pipeline_for_single_model`` when
+        explicitly passed, by default None
+    check_if_already_dim_reduced : bool, optional
+        if True, already existing dimensionality reduced embeddings
+        are loaded instead of being recomputed. Only forwarded to
+        ``run_pipeline_for_single_model`` when explicitly passed,
+        by default None
 
     Notable kwargs
     --------------
@@ -537,6 +586,11 @@ def run_pipeline_for_models(models, audio_dir, dim_reduction_model, **kwargs):
         nr_models = len(models)
     else:
         nr_models = 1
+
+    if check_if_already_processed is not None:
+        kwargs["check_if_already_processed"] = check_if_already_processed
+    if check_if_already_dim_reduced is not None:
+        kwargs["check_if_already_dim_reduced"] = check_if_already_dim_reduced
 
     if "CustomModels" in kwargs:
         CustomModels = kwargs.get("CustomModels")
@@ -653,8 +707,7 @@ def _normalize_evaluation_task(evaluation_task):
 def model_specific_evaluation(
     loader_dict,
     evaluation_task,
-    probe_configs,
-    models,
+    probe_configs=None,
     dim_reduction_model=False,
     **kwargs,
 ):
@@ -667,10 +720,31 @@ def model_specific_evaluation(
     The results of the evaluation are saved in the directory
     specified by the audio_dir parameter.
 
+    Examples::
+    
+        # Evaluate the ``birdnet`` embeddings on the test data with the probing
+        # task. If the evaluation results already exist, they are loaded
+        # instead of recomputed:
+
+        loader_dict = bacpipe.run_pipeline_for_models(
+            models=['birdnet'],
+            audio_dir='bacpipe/tests/test_data',
+            dim_reduction_model='None'
+        )
+        bacpipe.model_specific_evaluation(
+            loader_dict,
+            evaluation_task='probing',
+            probe_configs=bacpipe.settings.probe_configs,
+            audio_dir='bacpipe/tests/test_data',
+            overwrite=False,
+            device='cpu',
+        )
+
     Parameters
     ----------
     loader_dict : dict
-        dictionary containing the loader objects for each model
+        dictionary containing the loader objects for each model. The model
+        names are taken from the keys of this dictionary.
     evaluation_task : string or list
         name of the evaluation task(s) to be performed. A single task may be
         passed as a string (e.g. ``"probing"``) or a list
@@ -679,8 +753,6 @@ def model_specific_evaluation(
         dictionary containing the configuration for the
         probing tasks. The configurations are specified
         in the bacpipe/settings.yaml file.
-    models : list
-        embedding models
     dim_reduction_model : bool or str, optional
         Can be bool or the string corresponding to the
         dimensionality reduction model, by default False
@@ -693,22 +765,9 @@ def model_specific_evaluation(
     ``probe_configs``, ``clust_configs``, ``overwrite`` or
     ``only_embed_annotations``. See https://bacpipe.readthedocs.io/en/latest/
     for the complete list.
-
-    Example::
-
-        loader_dict = bacpipe.run_pipeline_for_models(
-            models=['birdnet'],
-            audio_dir='path/to/audio',
-            dim_reduction_model=None,
-        )
-        bacpipe.model_specific_evaluation(
-            loader_dict,
-            evaluation_task='probing',
-            probe_configs=bacpipe.settings.probe_configs,
-            models=['birdnet'],
-        )
     """
     evaluation_task = _normalize_evaluation_task(evaluation_task)
+    models = list(loader_dict.keys())
 
     if "CustomModels" in kwargs:
         CustomModels = kwargs.get("CustomModels")
@@ -747,16 +806,25 @@ def model_specific_evaluation(
         # if not evaluation_task in ["None", [], None, False]:
         embeds = loader_dict[model_name].embeddings(return_type="array")
         try:
+            if not kwargs.get('audio_dir'):
+                kwargs['audio_dir'] = loader_dict[model_name].audio_dir
             ground_truth = ground_truth_by_model(
-                model_name, paths=paths, **kwargs
+                model_name, 
+                paths=paths, 
+                **kwargs
             )
         except FileNotFoundError as e:
             logger.exception(
-                f"unable to process ground truth, no annotations file found."
+                f"{str(e)}.\n Bacpipe tried finding annotation files but was "
+                "unable to find any corresponding files. This is not a problem "
+                "it's just a routine check. Continuing without annotations. \n"
             )
             ground_truth = None
         except IndexError as e:
-            logger.exception(f"unable to process ground truth, {str(e)}")
+            logger.exception(
+                f"{str(e)}.\n Bacpipe found annotation files but was "
+                "unable to process ground truth.\n"
+                )
             ground_truth = None
 
         ####################################################################
@@ -775,7 +843,8 @@ def model_specific_evaluation(
                 "Too few files to evaluate embeddings with probing. "
                 "Are you sure you have selected the right data?"
             )
-
+            if not probe_configs:
+                probe_configs = settings.probe_configs
             for class_config in probe_configs.values():
                 if class_config["bool"]:
                     probing_pipeline(
@@ -804,19 +873,34 @@ def model_specific_evaluation(
 
 
 def cross_model_evaluation(
-    dim_reduction_model, evaluation_task, models, **kwargs
+    audio_dir, evaluation_task, models, dim_reduction_model=None, **kwargs
 ):
     """
     Generate plots to compare models by the specified tasks.
 
+    Examples::
+    
+        # Generate overview plots comparing ``birdnet`` and ``insect459`` on the test
+        # data. ``dashboard=False`` is passed because this function only creates
+        # the comparison plots, it does not serve the interactive dashboard:
+
+        bacpipe.cross_model_evaluation(
+            audio_dir='bacpipe/tests/test_data',
+            models=['birdnet', 'insect459'],
+            evaluation_task=['probing'],
+            device='cpu'
+        )
+
     Parameters
     ----------
-    dim_reduction_model : str
-        name of dimensionality reduction model
+    audio_dir : str
+        path to audio data
     evaluation_task : list
         tasks to evaluate models by
     models : list
         embedding models
+    dim_reduction_model : str, optional
+        name of dimensionality reduction model, by default is None
 
     Notable kwargs
     --------------
@@ -825,14 +909,6 @@ def cross_model_evaluation(
     passed kwargs always override those defaults, e.g. ``evaluation_task``,
     ``dashboard``, ``overwrite`` or ``only_embed_annotations``. See
     https://bacpipe.readthedocs.io/en/latest/ for the complete list.
-
-    Example::
-
-        bacpipe.cross_model_evaluation(
-            dim_reduction_model='umap',
-            evaluation_task=['probing', 'clustering'],
-            models=['birdnet', 'perch_bird'],
-        )
     """
     CustomModels = kwargs.get("CustomModels")
     if CustomModels is not None and not isinstance(CustomModels, (list, tuple)):
@@ -849,6 +925,7 @@ def cross_model_evaluation(
     ]
     evaluation_task = _normalize_evaluation_task(evaluation_task)
     if len(models) > 1:
+        get_paths = make_set_paths_func(audio_dir, **kwargs)
         plot_path = get_paths(models[0]).plot_path.parent.parent.joinpath(
             "overview"
         )
@@ -857,7 +934,7 @@ def cross_model_evaluation(
             for task in evaluation_task:
                 visualise_results_across_models(plot_path, task, models)
         if not dim_reduction_model in [None, "None", False]:
-            kwargs.pop("dashboard")
+            kwargs.pop("dashboard", None)
             if "audio_dir" in kwargs:
                 kwargs.pop("audio_dir")
             plot_comparison(
@@ -887,6 +964,19 @@ def run_pipeline_for_single_model(
     so that subsequent processing runs will be very fast, as they then only load the data.
     kwargs that are not specifically passed will be taken from
     bacpipe.config and bacpipe.settings.
+
+    Examples::
+    
+        # Force recomputation of the embeddings for ``birdnet`` on the test data:
+
+        loader = bacpipe.run_pipeline_for_single_model(
+            model_name='birdnet',
+            audio_dir='bacpipe/tests/test_data',
+            dim_reduction_model='None',
+            check_if_already_processed=False,
+        )
+        embeddings = loader.embeddings(return_type='array')
+        # a numpy array of shape (n_segments, n_dimensions)
 
     Parameters
     ----------
@@ -936,14 +1026,6 @@ def run_pipeline_for_single_model(
     -------
     bacpipe.Loader
         object to processed embeddings and classifier predictions
-
-    Example::
-
-        loader = bacpipe.run_pipeline_for_single_model(
-            model_name='birdnet',
-            audio_dir='path/to/audio',
-            dim_reduction_model='None',
-        )
     """
     if dim_reduction_model is None:
         # ``None`` (python None) means the same as the string ``"None"``:
@@ -978,7 +1060,7 @@ def run_pipeline_for_single_model(
             **kwargs,
         )
         if (
-            not (paths.plot_path.joinpath("embeddings.png").exists())
+            paths.plot_path.joinpath("embeddings.png").exists()
             or testing
         ):
             logger.debug(
@@ -1016,9 +1098,11 @@ def run_pipeline_for_single_model(
 def generate_embeddings(
     model_name,
     audio_dir,
-    avoid_pipelined_gpu_inference=False, 
-    **kwargs
-    ):
+    avoid_pipelined_gpu_inference=False,
+    check_if_already_processed=None,
+    check_if_already_dim_reduced=None,
+    **kwargs,
+):
     """
     Run the embedding generation pipeline including classification
     using the pretrained classifier (if included).
@@ -1027,6 +1111,22 @@ def generate_embeddings(
     kwargs that are not specifically passed will be taken from
     bacpipe.config and bacpipe.settings.
 
+    Examples::
+    
+        # Load the embeddings that were already generated for ``birdnet`` on the
+        # test data (``check_if_already_processed=True`` reuses existing results
+        # instead of recomputing them, this is True by default - so not passing 
+        # it results in the same behavior.):
+
+        loader = bacpipe.generate_embeddings(
+            model_name='birdnet',
+            audio_dir='bacpipe/tests/test_data',
+            check_if_already_processed=True,
+        )
+        embeddings = loader.embeddings()
+        # a dict mapping file stems to numpy arrays
+        embeddings = loader.embeddings(return_type='array')
+        # or a single numpy array of shape (n_segments, n_dimensions)
 
     Parameters
     ----------
@@ -1036,6 +1136,14 @@ def generate_embeddings(
         path to audio data
     avoid_pipelined_gpu_inference : bool, optional
         set to True to avoid multiprocessing, by default False
+    check_if_already_processed : bool, optional
+        if True, embeddings that already exist for the combination
+        of model and dataset are loaded instead of being recomputed.
+        Only forwarded when explicitly passed, by default None
+    check_if_already_dim_reduced : bool, optional
+        if True, already existing dimensionality reduced embeddings
+        are loaded instead of being recomputed. Only forwarded when
+        explicitly passed, by default None
 
     Notable kwargs
     --------------
@@ -1057,9 +1165,6 @@ def generate_embeddings(
     ``dim_reduction_model`` : str, e.g. ``"umap"``, to generate dimensionality
     reduced embeddings instead of regular ones
 
-    ``check_if_already_processed`` : bool, load existing embeddings instead of
-    recomputing them (default True)
-
     ``device`` : str, ``"cpu"``, ``"cuda"`` or ``"mps"`` (for mac) (default ``settings.device``)
 
     ``global_batch_size`` : int, batch size used during embedding generation
@@ -1074,18 +1179,6 @@ def generate_embeddings(
     -------
     bacpipe.Loader
         loader object to access embeddings and classifier predictions
-
-    Example::
-
-        loader = bacpipe.generate_embeddings(
-            model_name='birdnet',
-            audio_dir='path/to/audio',
-        )
-        embeddings = loader.embeddings()
-        # embeddings is a dict mapping file stems to numpy arrays
-        
-        # for embeddings as numpy arrays use
-        embeddings = loader.embeddings(return_type='array')
     """
     model_name = confirm_model_name(model_name, **kwargs)
     ensure_models_exist(
@@ -1104,6 +1197,10 @@ def generate_embeddings(
     # Merge config/settings defaults so that a direct API call (without kwargs)
     # behaves the same as running through bacpipe.play(). Explicitly passed
     # kwargs always override the defaults. 
+    if check_if_already_processed is not None:
+        kwargs["check_if_already_processed"] = check_if_already_processed
+    if check_if_already_dim_reduced is not None:
+        kwargs["check_if_already_dim_reduced"] = check_if_already_dim_reduced
     kwargs = replace_default_kwargs_with_user_kwargs(
         remove_keys=["audio_dir", "dim_reduction_model", "testing"],
         **kwargs,

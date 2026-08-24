@@ -39,8 +39,8 @@ def make_handler(model=None, **kwargs):
         model = DummyModel()
     return AudioHandler(
         model,
-        padding="wrap",
         audio_dir=TEST_DATA_DIR,
+        padding="wrap",
         **kwargs,
     )
 
@@ -69,7 +69,7 @@ class TestLoadAndResample:
     def test_returns_mono_tensor_and_model_sr(self):
         handler = make_handler()
         handler.file_length = {}
-        audio, sr = handler._load_and_resample(TEST_AUDIO_FILE)
+        audio, sr = handler.load_and_resample(TEST_AUDIO_FILE)
         assert isinstance(audio, torch.Tensor)
         assert audio.shape[0] == 1
         assert sr == handler.model.sr
@@ -79,7 +79,7 @@ class TestLoadAndResample:
         handler = make_handler()
         handler.file_length = {}
         with pytest.raises(Exception):
-            handler._load_and_resample(
+            handler.load_and_resample(
                 TEST_DATA_DIR / "does_not_exist.wav"
             )
 
@@ -88,13 +88,13 @@ class TestWindowAudio:
     def test_splits_into_segments_and_pads(self):
         handler = make_handler()
         audio = np.ones((1, 50_000))
-        frames = handler._window_audio(audio)
+        frames = handler.window_audio(audio)
         assert frames.shape == (3, handler.model.segment_length)
 
     def test_torch_input_is_supported(self):
         handler = make_handler()
         audio = torch.ones(1, 50_000)
-        frames = handler._window_audio(audio)
+        frames = handler.window_audio(audio)
         assert isinstance(frames, torch.Tensor)
         assert frames.shape == (3, handler.model.segment_length)
 
@@ -128,7 +128,7 @@ class TestOnlyLoadAnnotatedSegments:
     def test_loads_annotated_segments(self):
         handler = make_handler()
         handler.file_length = {}
-        segments = handler._only_load_annotated_segments(TEST_AUDIO_FILE)
+        segments = handler.only_load_annotated_segments(TEST_AUDIO_FILE)
         assert isinstance(segments, torch.Tensor)
         assert segments.shape[1] == handler.model.segment_length
         assert segments.shape[0] > 0
@@ -137,7 +137,7 @@ class TestOnlyLoadAnnotatedSegments:
         handler = make_handler()
         handler.file_length = {}
         with pytest.raises(AssertionError):
-            handler._only_load_annotated_segments(
+            handler.only_load_annotated_segments(
                 TEST_DATA_DIR / "audio" / "unannotated_file.wav"
             )
 
@@ -158,10 +158,10 @@ class TestOnlyLoadAnnotatedSegments:
             f"{TEST_AUDIO_FILE.name},10,10,Species F\n"  # zero duration
         )
         handler = AudioHandler(
-            DummyModel(), padding="wrap", audio_dir=tmp_path
+            DummyModel(), audio_dir=tmp_path, padding="wrap"
         )
         handler.file_length = {}
-        segments = handler._only_load_annotated_segments(
+        segments = handler.only_load_annotated_segments(
             tmp_path / TEST_AUDIO_FILE.name
         )
         assert isinstance(segments, torch.Tensor)
@@ -177,11 +177,11 @@ class TestOnlyLoadAnnotatedSegments:
             f"{TEST_AUDIO_FILE.name},500,505,Species A\n"
         )
         handler = AudioHandler(
-            DummyModel(), padding="wrap", audio_dir=tmp_path
+            DummyModel(), audio_dir=tmp_path, padding="wrap"
         )
         handler.file_length = {}
         with pytest.raises(AssertionError):
-            handler._only_load_annotated_segments(
+            handler.only_load_annotated_segments(
                 tmp_path / TEST_AUDIO_FILE.name
             )
 

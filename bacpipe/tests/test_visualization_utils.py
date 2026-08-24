@@ -141,7 +141,7 @@ class TestGetBooleanArrayForAnnotatedEmbeddings:
         import bacpipe.embedding_evaluation.label_embeddings as le
 
         monkeypatch.setattr(
-            le, "create_metadata_labels", lambda **kwargs: self._metadata_labels()
+            le, "metadata_labels", lambda **kwargs: self._metadata_labels()
         )
 
     def test_marks_unannotated_embeddings_as_noise(self, monkeypatch):
@@ -990,7 +990,7 @@ class TestDashboardEmbeddingPanelKwargs:
         dash.vis_loader = object()
         dash.model_select = {0: "model_a"}
         dash.label_select = {0: "time_of_day"}
-        dash.default_label_keys = ["time_of_day"]
+        dash.metadata_label_keys = ["time_of_day"]
         dash.noise_select = {}
         dash.ground_truth = None
         dash.dim_reduction_model = "umap"
@@ -1013,9 +1013,9 @@ class TestDashboardEmbeddingPanelKwargs:
         assert captured["dashboard_idx"] == 0
         assert captured["model_name"] == "model_a"
         assert captured["label_by"] == "time_of_day"
-        # ``default_label_keys`` is a named ``DashBoard.__init__`` parameter and
+        # ``metadata_label_keys`` is a named ``DashBoard.__init__`` parameter and
         # therefore absent from ``self.kwargs``; it must still reach the plot.
-        assert captured["default_label_keys"] == ["time_of_day"]
+        assert captured["metadata_label_keys"] == ["time_of_day"]
         # user kwargs are still forwarded, just without the colliding keys
         assert captured["overwrite"] is False
         assert captured["models"] == ["model_a"]
@@ -1065,7 +1065,7 @@ class TestDashboardInitClustConfigs:
             model_names=["model_a"],
             audio_dir=str(tmp_path),
             main_results_dir=tmp_path,
-            default_label_keys=["label"],
+            metadata_label_keys=["label"],
             evaluation_task="linear",
             dim_reduction_model=None,
             dim_reduc_parent_dir="dim_reduced",

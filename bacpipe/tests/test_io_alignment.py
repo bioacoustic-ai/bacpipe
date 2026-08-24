@@ -27,7 +27,7 @@ import torch
 from bacpipe import Loader
 from bacpipe.core.workflows import generate_embeddings
 from bacpipe.embedding_evaluation.label_embeddings import (
-    create_metadata_labels,
+    metadata_labels,
     ground_truth_by_model,
     make_set_paths_func,
 )
@@ -129,13 +129,13 @@ class TestMetadataLabelsRoundTrip:
             lambda *a, **k: ([], 1.0, self._fake_metadata()),
         )
 
-        labels = create_metadata_labels(
+        labels = metadata_labels(
             audio_dir=TEST_AUDIO_DIR,
             model="testmodel",
             paths=paths,
             overwrite=True,
             return_type="dataframe",
-            default_label_keys=["audio_file_name"],
+            metadata_label_keys=["audio_file_name"],
         )
         csv_path = paths.labels_path / "metadata_labels.csv"
         assert csv_path.exists()
@@ -145,7 +145,7 @@ class TestMetadataLabelsRoundTrip:
         assert "Unnamed" not in header
 
         # read back through the exact production read path
-        reloaded = create_metadata_labels(
+        reloaded = metadata_labels(
             audio_dir=TEST_AUDIO_DIR,
             model="testmodel",
             paths=paths,
@@ -174,7 +174,7 @@ class TestMetadataLabelsRoundTrip:
             paths.labels_path / "metadata_labels.parquet", index=False
         )
 
-        reloaded = create_metadata_labels(
+        reloaded = metadata_labels(
             audio_dir=TEST_AUDIO_DIR,
             model="testmodel",
             paths=paths,
@@ -390,13 +390,13 @@ class TestEmbeddingAlignment:
             TEST_AUDIO_DIR, main_results_dir=results_dir
         )
         paths = get_paths(ALIGNMENT_MODEL)
-        labels = create_metadata_labels(
+        labels = metadata_labels(
             audio_dir=TEST_AUDIO_DIR,
             model=ALIGNMENT_MODEL,
             paths=paths,
             overwrite=True,
             return_type="dataframe",
-            default_label_keys=["audio_file_name"],
+            metadata_label_keys=["audio_file_name"],
             only_embed_annotations=annotations_only,
         )
 
@@ -404,7 +404,7 @@ class TestEmbeddingAlignment:
         assert len(labels) == embeds.shape[0] == len(plot_points["x"])
 
         # the file that was just written (index=False) imports cleanly
-        reloaded = create_metadata_labels(
+        reloaded = metadata_labels(
             audio_dir=TEST_AUDIO_DIR,
             model=ALIGNMENT_MODEL,
             paths=paths,

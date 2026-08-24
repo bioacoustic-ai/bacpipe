@@ -4,6 +4,7 @@
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/bacpipe?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/bacpipe)
 [![PyPI version](https://badge.fury.io/py/bacpipe.svg?icon=si%3Apython&icon_color=%23f66151)](https://badge.fury.io/py/bacpipe)
 [![arXiv](https://img.shields.io/badge/arXiv-2604.11560-b31b1b.svg)](https://arxiv.org/abs/2604.11560)
+[![DOI](https://zenodo.org/badge/874895988.svg)](https://doi.org/10.5281/zenodo.22035528)
 
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_311_linux.yaml?label=3.11&&logo=linux)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_311_linux.yaml)
@@ -436,6 +437,8 @@ The only two files that need to be modified are the [config.yaml](bacpipe/config
 - whether to run the dashboard or not
 
 The [settings.yaml](bacpipe/settings.yaml) file is used for more advanced configurations and does not need to be modified unless you have specific preferences. It includes settings such as to run on CPU, then use `cpu` or a GPU, then use `cuda` (linux)/`mps` (mac) (by default `cpu`). Other advances settings are the paths where results are saved, configurations for the evaluation tasks and more. 
+
+It is highly recommended to use `mps` on mac as it is significantly faster than `cpu`. If you have a GPU on linux, use `cuda` as it is also significantly faster than `cpu`.
 
 Modify the [config.yaml](bacpipe/config.yaml) file in the root directory to specify the path to your `dataset`. Define what models to run by specifying the strings in the `models` list (copy and paste as needed, I usually just comment the model's I don't want to run). 
 

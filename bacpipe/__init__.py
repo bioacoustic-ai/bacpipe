@@ -36,6 +36,8 @@ settings = SimpleNamespace(**_settings_dict)
 
 from bacpipe.core.experiment_manager import Loader
 
+from bacpipe.core.audio_processor import AudioHandler
+
 get_audio_files = Loader.get_audio_files
 
 from bacpipe.model_pipelines.runner import Embedder
@@ -57,11 +59,10 @@ from bacpipe.core.workflows import (
 from bacpipe.embedding_evaluation.benchmark import benchmark
 
 from bacpipe.embedding_evaluation.label_embeddings import (
-    DefaultLabels,
-    get_metadata_labels,
+    MetadataLabelMaker,
     get_dt_filename,
     make_set_paths_func,
-    create_metadata_labels,
+    metadata_labels,
     ground_truth_by_model,
 )
 
@@ -95,13 +96,13 @@ __all__ = [
     ## loading files and computing embeddings
     "Loader",
     "Embedder",
+    "AudioHandler",
     ## return audio files in specified dir
     "get_audio_files",
     ## automatic creation of labels and ground truth
-    "DefaultLabels",
-    "create_metadata_labels",
+    "MetadataLabelMaker",
+    "metadata_labels",
     "ground_truth_by_model",
-    "get_metadata_labels",
     "get_dt_filename",
     ## probing functions
     "probing_pipeline",
