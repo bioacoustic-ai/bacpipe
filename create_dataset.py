@@ -11,7 +11,7 @@ import h5py
 SEED = 42 # ensure that always the same context files get selected
 GLOBAL_LENGTH = 3 # 5s is the standard for bird volcalizations
 SR = 32_000 # a lot of the data is sampled lower than that anyway
-RATIO_NOISE_TO_TARGET = 50 # ratio between total target to total noise
+RATIO_NOISE_TO_TARGET = 100 # ratio between total target to total noise
 
 # This is the number of vocalizations per species that is superimposed
 # with each noise environment. so total number of vocalizations for one
@@ -80,7 +80,7 @@ np.random.seed(SEED)
 
 import torch
 import bacpipe
-from bacpipe.core.audio_processor import AudioHandler
+from bacpipe import AudioHandler
 
 def get_noise_df(paths_dict):
     df = pd.DataFrame()
@@ -135,10 +135,11 @@ def load_noise(species_df):
             aud = AudioHandler(
                 padding=PAD_FUNC, 
                 audio_dir=noise_srcs[noise_env], 
-                segment_length=GLOBAL_LENGTH*SR, 
-                sr=SR, 
+                model='birdnet',
                 only_embed_annotations=True
                 )
+            aud.model.sr = SR
+            aud.model.segment_length = GLOBAL_LENGTH * SR
             files = bacpipe.get_audio_files(noise_srcs[noise_env])
             selected_files = [f for f in files if f.stem in this_env_noise_df.file_stem.unique()]
             rand_order = np.random.permutation(len(selected_files))
@@ -152,7 +153,7 @@ def load_noise(species_df):
                 position=3
                 ):
                 tmp_df = this_env_noise_df[this_env_noise_df.file_stem == file.stem]
-                frames, sr = aud.return_windowed_audio(file, annotations_df=tmp_df)
+                frames = aud.only_load_annotated_segments(file, annotations_df=tmp_df)
                 noise.append(frames)        
                 
                 df_cumulative_noise = pd.concat([df_cumulative_noise, tmp_df])
@@ -200,19 +201,21 @@ def load_audios(paths_dict):
     for k, v in paths_dict.items():
         species_audio = []
         df_species = pd.DataFrame()
-        aud = AudioHandler(padding=PAD_FUNC, audio_dir=v, segment_length=GLOBAL_LENGTH*SR, sr=SR, device='cuda')
+        aud = AudioHandler(padding=PAD_FUNC, audio_dir=v, model='birdnet', device='cuda')
+        aud.model.sr = SR
+        aud.model.segment_length = GLOBAL_LENGTH * SR
         
         audio_files = bacpipe.get_audio_files(v)
 
         for file in tqdm(audio_files, desc='load audio', total=len(audio_files)):
-            raw_audio, sr = aud._load_and_resample(file)
+            raw_audio, sr = aud.load_and_resample(file)
             
             input_length = SR * GLOBAL_LENGTH
             
             rand_timeshift_offset = np.random.randint(input_length // 2)
             rand_shifted_audio = raw_audio[:, rand_timeshift_offset:]
             
-            win_audio = aud._window_audio(rand_shifted_audio)
+            win_audio = aud.window_audio(rand_shifted_audio)
             win_audio = win_audio.cpu()
             species_audio.append(win_audio)
             df_tmp = pd.DataFrame()

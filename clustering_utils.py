@@ -36,7 +36,7 @@ from create_dataset import read_dataset, PAD_FUNC
 
 
 main_path = Path('/media/siriussound/Extreme SSD/identifying_unknown_sounds')
-path = main_path / Path('data_h5_files/10_ratio-n2t_50')
+path = main_path / Path('data_h5_files/10_ratio-n2t_100')
 
 
 main_results_path = main_path / Path('data') / 'clusterings' / path.stem
@@ -53,7 +53,7 @@ def get_embeddings(path, models):
             snr_string = snr_dir.stem if snr_dir.is_dir() else False
             if not snr_string:
                 continue
-            if not '0' in snr_string and not '6' in snr_string:
+            if not '0' in snr_string:# and not '6' in snr_string:
                 continue
                 # no need to work on other snr's for now
 
@@ -130,7 +130,7 @@ def load_umap_model(path):
 
 
 def fetch_clustering(embeds, df, clustering_dict, overwrite=False):
-    if overwrite or not (main_results_path / f'clusters.csv').exists():
+    if False:#overwrite or not (main_results_path / f'clusters.csv').exists():
         clust_df = df.copy()
         centroid_dict = dict()
 
@@ -238,7 +238,7 @@ def evaluate_clustering(df, clust_df, embeds, clustering_dict, overwrite=False):
             # If cluster_booleans already exists, combine them; otherwise, assign it directly
             cluster_booleans = pd.concat([cluster_booleans, new_booleans], axis=1)
 
-        cluster_booleans.to_csv(main_results_path / 'cluster_booleans.csv', index=False)
+        cluster_booleans.to_parquet(main_results_path / 'cluster_booleans.parquet', index=False)
         
         with open(main_results_path / 'clust_results.json', 'w') as f:
             json.dump(clust_results, f)
@@ -257,7 +257,7 @@ def evaluate_clustering(df, clust_df, embeds, clustering_dict, overwrite=False):
                         save_path.mkdir(exist_ok=True)
                         plot_clusterings(clust_results, df, model, clust_name, eval_name, save_path)
     else:
-        cluster_booleans = pd.read_csv(main_results_path / 'cluster_booleans.csv', index_col=False)
+        cluster_booleans = pd.read_parquet(main_results_path / 'cluster_booleans.parquet', index_col=False)
         
         with open(main_results_path / 'clust_results.json', 'r') as f:
             clust_results = json.load(f)

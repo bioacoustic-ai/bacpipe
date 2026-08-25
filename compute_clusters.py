@@ -9,14 +9,14 @@ from clustering_utils import *
 # file_name = f'unknown_sounds_len_3_sr_32000_repetitions_{path.stem+"_snr=0"}.h5'#.split("_cleaned")[0]+
 
 models = [
-    'birdnet_v3', 
-    # 'birdnet', 
-    # 'perch_v2', 
-    # 'insect459', 
-    # 'aves_especies', 
-    'naturebeats', 
-    'audioprotopnet', 
-    'avesecho_passt'
+    'birdnet', 
+    'perch_v2', 
+    'insect459', 
+    'aves_especies', 
+    # 'naturebeats', 
+    # 'audioprotopnet', 
+    # 'avesecho_passt',
+    # 'birdnet_v3', 
     ]
 
 from bacpipe.core.workflows import ensure_models_exist
@@ -41,7 +41,7 @@ df.index = range(len(df))
 
 ## compute clusterings
 n_centroids = embeds[model][f'snr={SNR}'].shape[0]//100
-max_clust = 50
+max_clust = 70
 clustering_dict = {
     # 'kmeans': KMeans(n_clusters=n_centroids), # because 15 species + noise for the within and diff file ...?
     # # 'hdb': HDBSCAN(min_cluster_size=10, min_samples=None),
@@ -68,7 +68,7 @@ def umap_kmeans(X, n_clusters, random_state):
     centroids = clusterer.fit_transform(X)
     return centroids#.swapaxes(0, 1)
 
-OVERWRITE = False
+OVERWRITE = True
 
 clust_df, centroids = fetch_clustering(embeds, df, clustering_dict, overwrite=OVERWRITE)
 # filtered_labels = weights < max_cluster_size
