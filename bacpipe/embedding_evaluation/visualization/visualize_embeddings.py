@@ -305,6 +305,20 @@ def plot_embeddings(
     )
 
     fig, axes, return_axes = init_embed_figure(fig, axes, **kwargs)
+    
+    if len(labels) == 0:
+        warning_str = (
+            "\nThis model does not have values for the selected label "
+            f"{label_by}. Please select a different model. If this is "
+            "incorrect and it should have values, then set "
+            "overwrite=True. If you are looking for classifications "
+            "prduced by the pretrained classifier, keep in mind "
+            "that most models require you to regenerate embeddings "
+            "to also generate classifications, as the two are generated "
+            "in one step."
+        )
+        logger.warning(warning_str)
+        raise AttributeError(warning_str)
 
     if len(labels[label_by]) == 0 and len(embeds) == 0:
         return fig
@@ -515,6 +529,13 @@ def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
     """
     Build the label dict and noise mask used for embedding plots.
 
+    Next to the metadata labels, one label key is added per ground truth file
+    of the model. Only the ground truth files of the active
+    ``only_embed_annotations`` mode are used, because the files of the other
+    mode hold a different number of rows and would therefore not align with
+    the embeddings. The ``_only_annotated`` suffix of the file names is
+    removed, so that the label keys are the same in both modes.
+
     Parameters
     ----------
     model_name : str or None
@@ -522,7 +543,8 @@ def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
     overwrite : bool
         whether to force regeneration of the metadata labels
     **kwargs
-        additional keyword arguments passed to the label helpers
+        additional keyword arguments passed to the label helpers, e.g.
+        ``only_embed_annotations``
 
     Returns
     -------
@@ -533,37 +555,41 @@ def get_labels_for_plot(model_name=None, overwrite=False, **kwargs):
     labels = le._get_metadata_labels(model_name, overwrite=overwrite, return_type='dict', **kwargs)
 
     paths = le.get_paths(model_name)
-    ground_truth_files = list(
-        paths.labels_path.glob("ground_truth*csv")
+    # ground truth files of both only_embed_annotations modes can be present,
+    # but only the ones of the active mode align with the embeddings
+    ground_truth_files = le.select_ground_truth_files_for_mode(
+        list(paths.labels_path.glob("ground_truth*csv")),
+        only_embed_annotations=kwargs.get(
+            "only_embed_annotations", settings.only_embed_annotations
+        ),
     )
-    if len(ground_truth_files) > 0:        
-        for gt_file in ground_truth_files:
-            try:
-                ground_truth_df = le.get_ground_truth(
-                    model_name, file_path=gt_file, return_type="dataframe"
-                )
-                
-                bool_noise = get_boolean_array_for_annotated_embeddings(
-                    ground_truth_df, model_name,
-                    gt_file=gt_file, ground_truth_files=ground_truth_files, 
-                    **kwargs
-                )
-                label = gt_file.stem.replace("ground_truth_", "")
-                
-                labels[label] = get_single_label_gt_labels(
-                    ground_truth_df, bool_noise
-                    )
-            except Exception as e:
-                logger.warning(
-                    "\nBuilding of ground truth labels for plots failed "
-                    f"due to {str(e)}. Continuing without ground truth labels. \n"
-                )
-                bool_noise = np.array([False] * len(list(labels.values())[0]))
-                
+    bool_noise = np.array([False] * len(list(labels.values())[0]))
+    for gt_file in ground_truth_files:
+        try:
+            ground_truth_df = le.get_ground_truth(
+                model_name, file_path=gt_file, return_type="dataframe"
+            )
 
-        
-    else:
-        bool_noise = np.array([False] * len(list(labels.values())[0]))
+            gt_bool_noise = get_boolean_array_for_annotated_embeddings(
+                ground_truth_df, model_name,
+                gt_file=gt_file, ground_truth_files=ground_truth_files,
+                **kwargs
+            )
+            # the mode suffix is a detail of the caching, not a label name
+            label = le.strip_only_annotated_suffix(
+                gt_file.stem.replace("ground_truth_", "")
+            )
+
+            labels[label] = get_single_label_gt_labels(
+                ground_truth_df, gt_bool_noise
+                )
+            bool_noise = gt_bool_noise
+        except Exception as e:
+            logger.warning(
+                "\nBuilding of ground truth labels for plots failed "
+                f"due to {str(e)}. Continuing without ground truth labels. \n"
+            )
+
     if len(list(le.get_paths(model_name).clust_path.glob("*.npy"))) > 0:
         clusts = [
             np.load(f, allow_pickle=True).item()
@@ -867,6 +893,21 @@ def data_split_by_labels(embeds_dict, labels, **kwargs):
             ]
         )
     else:
+        if not len(embeds_dict["x"]) == len(labels):
+            error_str = (
+                "\nThe number of embeddings does not match the number "
+                "of timestamps that was created. This is most likely the "
+                "case if the embeddings were generated using "
+                "only_embed_annotations=True and now they are evaluated "
+                "with only_embed_annotations=False, or vice versa. "
+                "Unfortunately if these things are misaligned the easiest "
+                "fix is to regenerate the embeddings. "
+                "To do so, either delete the existing embeddings or simply "
+                "set the parameters check_if_already_processed and "
+                "check_if_already_dim_reduced to False.\n"
+            )
+            logger.exception(error_str)
+            raise AttributeError(error_str)
         for label in uni_labels:
             split_data[str(label)] = np.array(
                 [
@@ -1176,12 +1217,199 @@ def reorder_embeddings_by_clustering_performance(
             continue
         ax.set_position(positions[model])
 
+def generate_strings_for_spectrogram_text(
+    labels, label_by, data_dict, embeds, extra_label_arrays=None, **kwargs
+):
+    """
+    Build one json string per embedding holding the additional label values
+    that are displayed with the spectrogram of a clicked point.
+
+    The strings are returned in the order of the embeddings, i.e. the i-th
+    string belongs to ``embeds["x"][i]``. Keeping this order is crucial: the
+    strings are attached to the plot dataframe **before** it is sorted, so
+    that plotly always keeps a point together with its own labels.
+
+    Label arrays whose length does not match the number of embeddings are
+    dropped (with a warning). Zipping them together with the correctly sized
+    arrays would truncate all label values to the shortest array and thereby
+    silently misalign the labels of every point.
+
+    Parameters
+    ----------
+    labels : dict
+        labels by label key
+    label_by : str
+        key of the label dict currently used for coloring
+    data_dict : dict
+        data arrays already included in the figure
+    embeds : dict
+        embeddings dict with x, y (and optional z) arrays and metadata
+    extra_label_arrays : dict, optional
+        additional arrays to display, e.g. the columns of a user provided
+        annotations dataframe, by default None
+    **kwargs : dict
+        Explicitly passed kwargs override the defaults from
+        ``bacpipe/settings.yaml``, e.g. ``metadata_label_keys``,
+        ``evaluations_dir`` and ``nr_predictions_to_display``.
+
+    Returns
+    -------
+    list
+        json strings with the additional labels, one string per embedding
+    """
+    from bacpipe.embedding_evaluation.clustering.cluster import (
+        convert_numpy_types,
+    )
+
+    df_lab = get_arrays_for_spectrogram_text(
+        labels, label_by, data_dict, embeds, **kwargs
+    )
+    if extra_label_arrays:
+        for k, v in extra_label_arrays.items():
+            if not k in df_lab:
+                df_lab[k] = list(v)
+    nr_embeds = len(embeds["x"])
+
+    # only keep the label arrays that have exactly one value per embedding
+    df_lab_cleaned = {k: v for k, v in df_lab.items() if len(v) == nr_embeds}
+    for k in df_lab.keys():
+        if not k in df_lab_cleaned:
+            logger.warning(
+                f"The values of {k} have a different length than the "
+                "embeddings and will therefore be omitted from the "
+                "visualizations."
+            )
+
+    if not df_lab_cleaned:
+        # no additional labels -> one empty json object per embedding
+        return [json.dumps({})] * nr_embeds
+
+    variable_labels_json = []
+    for row in zip(*df_lab_cleaned.values()):
+        variable_labels_json.append(
+            json.dumps(
+                {
+                    k: convert_numpy_types(v)
+                    for k, v in zip(df_lab_cleaned.keys(), row)
+                }
+            )
+        )
+    return variable_labels_json
+
+
+def align_annotations_df_with_embeddings(df, annotations_df, embeds):
+    """
+    Align the additional columns of a user provided annotations dataframe
+    with the embeddings of the plot.
+
+    The columns needed for plotting (``x``, ``y``, ``label``, ``start``,
+    ``idx``, ...) always come from the embeddings, only the additional
+    columns of the annotations are returned, so that the click data of the
+    figure keeps its fixed layout. Whenever the annotations contain an
+    ``audiofilename`` and a ``start`` column the values are matched on those
+    two keys, which makes a misalignment impossible. If those keys are
+    missing the values are attached by position, which is only possible if
+    the annotations have exactly one row per embedding.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        dataframe of the embedding plot, one row per embedding
+    annotations_df : pandas.DataFrame or None
+        annotations passed by the user via the ``annotations_df`` kwarg. The
+        kwarg is optional, so ``None`` is the normal case and simply yields
+        no additional columns.
+    embeds : dict
+        embeddings dict with x, y (and optional z) arrays and metadata
+
+    Returns
+    -------
+    dict
+        one list per additional annotation column, each holding one value
+        per embedding in the order of the rows of ``df``. Empty if no
+        annotations were passed or if they could not be aligned with the
+        embeddings.
+    """
+    if annotations_df is None:
+        # the default case: no annotations_df kwarg was passed, so the plot
+        # only shows the labels that bacpipe generated itself
+        return {}
+    if not isinstance(annotations_df, pd.DataFrame):
+        logger.warning(
+            "\nThe annotations_df kwarg has to be a pandas.DataFrame, but a "
+            f"{type(annotations_df).__name__} was passed. Continuing without "
+            "the additional annotation columns.\n"
+        )
+        return {}
+
+    model = embeds["metadata"]["model_name"]
+    annots = annotations_df
+    # annotations can be built for several models (the segment grid is model
+    # specific), so only the rows of the current model may be used
+    if "model" in annots.columns:
+        annots = annots[annots.model == model]
+
+    if len(annots) == 0:
+        logger.warning(
+            f"\nThe annotations_df has no rows for {model=}. Continuing "
+            "without the additional annotation columns.\n"
+        )
+        return {}
+
+    keys = ["audiofilename", "start"]
+    if all([k in annots.columns for k in keys]):
+        annots = annots.copy()
+        annots["start"] = np.round(annots["start"].astype(float), 4)
+        # simultaneous labels share a segment, one row per segment suffices
+        annots = annots.drop_duplicates(subset=keys)
+        new_cols = [c for c in annots.columns if not c in df.columns]
+        if len(new_cols) == 0:
+            return {}
+        aligned = df[keys].merge(annots[keys + new_cols], on=keys, how="left")
+        if not len(aligned) == len(df):
+            logger.warning(
+                "\nThe annotations_df could not be matched to the "
+                "embeddings unambiguously. Continuing without the "
+                "additional annotation columns.\n"
+            )
+            return {}
+        if aligned[new_cols].isna().all(axis=None):
+            logger.warning(
+                "\nNone of the rows of the annotations_df could be matched "
+                f"to the embeddings of {model=}. The audiofilename and "
+                "start values of the annotations do not correspond to the "
+                "embedded segments.\n"
+            )
+        return {c: aligned[c].tolist() for c in new_cols}
+
+    if not len(annots) == len(df):
+        logger.warning(
+            f"\nThe annotations_df has {len(annots)} rows while {len(df)} "
+            "embeddings are plotted, and it has no audiofilename and start "
+            "columns to align it with the embeddings. Continuing without "
+            "the additional annotation columns.\n"
+        )
+        return {}
+
+    annots = annots.reset_index(drop=True)
+    return {
+        col: annots[col].tolist()
+        for col in annots.columns
+        if not col in df.columns
+    }
+
 
 def plot_embeddings_px(
     embeds, labels, label_by="label", **kwargs
 ):
     """
     Create a plotly embedding scatter plot.
+
+    The dataframe underlying the figure is built from the embeddings, so that
+    the coordinates, the hover data and the custom data of every point
+    belong to the same embedding. Rows are sorted by label afterwards to get
+    an alphabetically ordered legend, which keeps the alignment intact
+    because whole rows are moved.
 
     Parameters
     ----------
@@ -1192,7 +1420,10 @@ def plot_embeddings_px(
     label_by : str
         key of the label dict used for coloring
     **kwargs
-        additional keyword arguments (e.g., color_continuous)
+        additional keyword arguments, e.g. ``color_continuous``,
+        ``max_nr_categories`` or an ``annotations_df`` (pandas.DataFrame)
+        whose additional columns are displayed with the spectrogram of a
+        clicked point
 
     Returns
     -------
@@ -1261,27 +1492,30 @@ def plot_embeddings_px(
     
     if not embeds.get('z') is None:
         data_dict['z'] = z_data
-        
-    df_lab = get_arrays_for_spectrogram_text(
-        labels, label_by, data_dict, embeds, **kwargs
-        )
-    from bacpipe.embedding_evaluation.clustering.cluster import convert_numpy_types
-    # Pack variable labels as JSON string to preserve order and labels
-    data_dict["variable_labels_json"] = (
-        [
-            json.dumps({k: convert_numpy_types(v) for k, v in zip(df_lab.keys(), row)})
-            for row in zip(*df_lab.values())
-        ]
-        if df_lab
-        else [json.dumps({})] * len(labels[label_by])
-    )
-
-    data_dict = {**data_dict}
 
     df = pd.DataFrame(data_dict)
+
+    # ``annotations_df`` is an optional kwarg, so it is usually absent (or
+    # None), in which case no additional annotation columns are returned
+    annotation_arrays = align_annotations_df_with_embeddings(
+        df, kwargs.get("annotations_df"), embeds
+    )
+
+    # the json strings are created in the order of the embeddings, so they
+    # have to be added before the dataframe is sorted
+    df['variable_labels_json'] = generate_strings_for_spectrogram_text(
+        labels,
+        label_by,
+        data_dict,
+        embeds,
+        extra_label_arrays=annotation_arrays,
+        **kwargs,
+    )
+    # sorting moves entire rows, therefore every point keeps its own
+    # coordinates, hover_data and custom_data
     df = df.sort_values("label")
 
-    hover_data = {k: False for k in data_dict}
+    hover_data = {k: False for k in df.columns}
     for k in hover_data.keys():
         if k in ["label", "audiofilename", "start", "end"]:
             hover_data[k] = True

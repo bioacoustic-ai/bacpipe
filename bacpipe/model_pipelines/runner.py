@@ -387,16 +387,25 @@ class Embedder(AudioHandler):
 
         self.loader.save_embedding_file(file, dim_reduced_embeddings)
 
-    def embeddings_using_multithreading(self, array_of_audios):
+    def generate_embeddings_from_audio_array(self, array_of_audios):
         """
-        Generate embeddings for all files in a pipelined manner:
-        - Producer thread loads and preprocesses audio
-        - Consumer (main thread) embeds audio while producer prepares next batch
-        Ensures metadata and embeddings are written exactly like in the sequential version.
+        Generate embeddings for audio samples that are passed as an array
+        instead of being read from files. The audio is windowed to the model
+        segment length and embedded batch by batch:
+        - Producer thread preprocesses one batch of windows in the background
+        - Consumer (main thread) embeds a batch while the producer prepares
+          the next one
+
+        The following inputs are supported:
+        - one long recording, i.e. a 1D array or a ``(1, num_samples)`` array,
+          which is split into as many segments as fit into it
+        - an already stacked array of shape ``(num_segments, segment_length)``
+        - a stack of segments that are shorter than the model segment length,
+          which are padded (see ``AudioHandler.window_audio``)
 
         Parameters
         ----------
-        array_of_audios : np.array
+        array_of_audios : np.ndarray or torch.Tensor
             array with the audio samples to embed
 
         Returns
@@ -404,10 +413,15 @@ class Embedder(AudioHandler):
         list
             list with the embeddings for the audio samples
         """
+        if not isinstance(array_of_audios, torch.Tensor):
+            array_of_audios = torch.as_tensor(np.asarray(array_of_audios))
         if len(array_of_audios.shape) == 1:
-            array_of_audios = torch.tensor(array_of_audios).unsqueeze(0)
+            # a single long recording -> window_audio expects rows of samples
+            array_of_audios = array_of_audios.unsqueeze(0)
         windowed_audios = self.window_audio(array_of_audios)
-        windowed_audios = torch.tensor(windowed_audios).unsqueeze(1)
+        if not isinstance(windowed_audios, torch.Tensor):
+            windowed_audios = torch.as_tensor(windowed_audios)
+        windowed_audios = windowed_audios.unsqueeze(1)
         if not self.nr_parallel_workers:
             from multiprocessing import cpu_count
 
@@ -418,11 +432,20 @@ class Embedder(AudioHandler):
             maxsize=available_workers
         )  # small buffer to balance I/O vs compute
 
+        batch_starts = range(0, len(windowed_audios), self.model.batch_size)
+
         # --- Producer: load + preprocess in background ---
         def producer():
             """Load and preprocess all audio samples in the background."""
-            for idx, audio in enumerate(windowed_audios):
+            for idx, audio_idx_range in enumerate(batch_starts):
                 try:
+                    audio = windowed_audios[
+                        audio_idx_range : audio_idx_range
+                        + self.model.batch_size
+                    ].squeeze()
+                    audio = audio.to(self.model.device)
+                    if len(audio.shape) == 1:
+                        audio = audio.unsqueeze(0)
                     preprocessed = self.model.preprocess(audio)
                     task_queue.put((idx, preprocessed))
 
@@ -445,7 +468,7 @@ class Embedder(AudioHandler):
         # --- Consumer: embed + save metadata/embeddings ---
         embeddings = []
         with tqdm(
-            total=len(windowed_audios),
+            total=len(batch_starts),
             desc="processing audio",
             position=1,
             leave=False,
@@ -481,6 +504,7 @@ class Embedder(AudioHandler):
                         "saved. Please pass the keyword use_folder_structure=True."
                     )
                     pbar.update(1)
+                    continue
                 except Exception as e:
                     logger.warning(
                         f"Error generating embeddings for audio, skipping file.\nError: {str(e)}"

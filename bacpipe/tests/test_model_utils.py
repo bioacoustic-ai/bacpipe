@@ -189,7 +189,7 @@ class TestCustomModelEmbedder:
             run_pretrained_classifier=False,
             nr_parallel_workers=2,
         )
-        embeddings = embedder.embeddings_using_multithreading(audio)
+        embeddings = embedder.generate_embeddings_from_audio_array(audio)
         # one 1D feature vector per 1-second window; the list is extended
         # with each row of the per-batch model output
         assert len(embeddings) == 2
@@ -218,4 +218,62 @@ class TestCustomModelEmbedder:
         assert model.segment_length == 48000 * 3
         # batch_size = 100000 * global_batch_size / segment_length
         assert model.batch_size == int(100_000 * 8 / (48000 * 3))
+
+
+
+class TestInsectModelPreprocessDevice:
+    """The insect models compute their mel spectrogram inside ``preprocess``,
+    i.e. with the weights of ``self.model``, which live on ``self.device``.
+
+    Regression: the audio was handed to ``wav2timefreq`` on whatever device it
+    came from (the cpu), so runs on ``mps``/``cuda`` raised "Input type and
+    weight type should be the same" / "input and weight are not on the same
+    device".
+
+    A ``meta`` device is used to check the move without requiring a gpu.
+    """
+
+    class _DummyInnerModel:
+        """Stand-in for ``SpectrogramCNN``, recording the device it sees."""
+
+        def __init__(self):
+            self.seen_devices = []
+            self.seen_shapes = []
+
+        def wav2timefreq(self, audio):
+            self.seen_devices.append(str(audio.device))
+            self.seen_shapes.append(tuple(audio.shape))
+            return audio
+
+    def _model(self, module_name, device):
+        import importlib
+
+        module = importlib.import_module(
+            f"bacpipe.model_pipelines.feature_extractors.{module_name}"
+        )
+        # the real __init__ loads a checkpoint from disk, which is not needed
+        # to test the device handling of preprocess
+        model = object.__new__(module.Model)
+        model.device = device
+        model.model = self._DummyInnerModel()
+        return model
+
+    @pytest.mark.parametrize("module_name", ["insect66", "insect459"])
+    def test_audio_is_moved_to_the_model_device(self, module_name):
+        model = self._model(module_name, "meta")
+        model.preprocess(torch.zeros(2, 100))
+        assert model.model.seen_devices == ["meta"]
+
+    @pytest.mark.parametrize("module_name", ["insect66", "insect459"])
+    def test_cpu_audio_stays_on_the_cpu(self, module_name):
+        model = self._model(module_name, "cpu")
+        model.preprocess(torch.zeros(2, 100))
+        assert model.model.seen_devices == ["cpu"]
+
+    @pytest.mark.parametrize("module_name", ["insect66", "insect459"])
+    def test_channel_dimension_is_added(self, module_name):
+        model = self._model(module_name, "cpu")
+        model.preprocess(torch.zeros(2, 100))
+        # (batch_size, channel, samples) is expected by wav2timefreq
+        assert model.model.seen_shapes == [(2, 1, 100)]
 

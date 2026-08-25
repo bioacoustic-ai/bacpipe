@@ -42,6 +42,89 @@ matplotlib.use("agg")
 pn.extension("plotly")
 
 
+def _prefer_passed_value(passed_value, key, kwargs):
+    """
+    Prefer an explicitly passed argument over the default from ``kwargs``.
+
+    ``replace_default_kwargs_with_user_kwargs`` fills ``kwargs`` with the
+    defaults of ``config.yaml``/``settings.yaml``, including the keys that
+    :class:`DashBoard` takes as explicit arguments. Those arguments are bound
+    to the parameters and are therefore no longer part of ``kwargs``, so
+    reading the value from ``kwargs`` first would silently override them
+    (e.g. a ``main_results_dir`` passed by the user would be replaced by the
+    default ``"bacpipe_results"`` and no embeddings would be found).
+
+    The key is always removed from ``kwargs``, so that the value cannot
+    collide with the explicitly passed arguments of the plot functions later
+    on.
+
+    Parameters
+    ----------
+    passed_value : object
+        value that was passed to the parameter, ``None`` if it was omitted
+    key : str
+        name of the parameter, i.e. the key of the default in ``kwargs``
+    kwargs : dict
+        merged config/settings dict, the key is popped from it
+
+    Returns
+    -------
+    object
+        the passed value, or the default from ``kwargs`` if it was omitted
+    """
+    default_value = kwargs.pop(key, None)
+    return default_value if passed_value is None else passed_value
+
+
+def get_ground_truth_label_names(model_names, only_embed_annotations=False):
+    """
+    Collect the names of the ground truth labels that are available for the
+    given models.
+
+    Only the ground truth files of the active ``only_embed_annotations`` mode
+    are taken into account, because the files of the other mode hold a
+    different number of rows and would therefore not align with the
+    embeddings of this run. The ``_only_annotated`` suffix of the file names
+    is removed, as it is a detail of the caching of the ground truth files
+    and not part of the label name.
+
+    Parameters
+    ----------
+    model_names : list
+        names of the models to check
+    only_embed_annotations : bool, optional
+        if True, only the annotated segments were embedded, by default False
+
+    Returns
+    -------
+    list
+        ground truth label names, e.g. ``["species"]``
+    """
+    label_names = []
+    for model_name in model_names:
+        ground_truth_files = le.select_ground_truth_files_for_mode(
+            list(le.get_paths(model_name).labels_path.glob("ground_truth*")),
+            only_embed_annotations=only_embed_annotations,
+        )
+        for gt_file in ground_truth_files:
+            if gt_file.suffix == ".csv":
+                le.get_ground_truth(
+                    model_name, file_path=gt_file, return_type="dataframe"
+                )
+            elif gt_file.suffix == ".npy":
+                le.get_ground_truth(
+                    model_name, file_path=gt_file, return_type="array"
+                )
+            else:
+                continue
+            label_names.append(
+                le.strip_only_annotated_suffix(
+                    gt_file.stem.replace("ground_truth_", "")
+                )
+            )
+    return label_names
+
+
 class DashBoard(DashBoardHelper):
     """
     Panel dashboard visualizing embeddings, clustering, probing results and
@@ -62,6 +145,12 @@ class DashBoard(DashBoardHelper):
         """
         Initialize the dashboard and its widgets.
 
+        The ``label_by`` options are built from the ``metadata_label_keys``,
+        the available ground truth labels and the clustering results. Only the
+        ground truth files of the active ``only_embed_annotations`` mode are
+        offered, and their ``_only_annotated`` suffix is removed so that the
+        label names are identical in both modes.
+
         Parameters
         ----------
         model_names : list
@@ -79,16 +168,28 @@ class DashBoard(DashBoardHelper):
         dim_reduc_parent_dir : pathlib.Path
             parent directory of the reduced embeddings
         **kwargs
-            additional keyword arguments (e.g., plot heights, widths)
+            additional keyword arguments (e.g., plot heights, widths,
+            ``only_embed_annotations``)
         """
         self.models = model_names
         kwargs = replace_default_kwargs_with_user_kwargs(remove_keys=['audio_dir'], **kwargs)
         
-        self.evaluation_task = kwargs.pop('evaluation_task', evaluation_task)
-        self.dim_reduction_model = kwargs.pop('dim_reduction_model', dim_reduction_model)
-        self.metadata_label_keys = kwargs.pop('metadata_label_keys', metadata_label_keys)
-        self.main_results_dir = kwargs.pop('main_results_dir', main_results_dir)
-        self.dim_reduc_parent_dir = kwargs.pop('dim_reduc_parent_dir', dim_reduc_parent_dir)
+        self.evaluation_task = _prefer_passed_value(
+            evaluation_task, "evaluation_task", kwargs
+        )
+        self.dim_reduction_model = _prefer_passed_value(
+            dim_reduction_model, "dim_reduction_model", kwargs
+        )
+        self.metadata_label_keys = _prefer_passed_value(
+            metadata_label_keys, "metadata_label_keys", kwargs
+        )
+        self.main_results_dir = _prefer_passed_value(
+            main_results_dir, "main_results_dir", kwargs
+        )
+        self.dim_reduc_parent_dir = _prefer_passed_value(
+            dim_reduc_parent_dir, "dim_reduc_parent_dir", kwargs
+        )
+
         
         self.audio_dir = audio_dir
         self.path_func = le.make_set_paths_func(
@@ -112,28 +213,22 @@ class DashBoard(DashBoardHelper):
         self.plot_path = self.path_func(model_names[0]).plot_path.parent.parent
 
         self.ground_truth = None
-        ground_truth_files = list(
-            le.get_paths(model_names[0]).labels_path.glob("ground_truth*")
+        # ground truth files of both only_embed_annotations modes can be
+        # present, only the files of the active mode align with the
+        # embeddings of this run. The mode of the run is taken from the
+        # settings unless the user overrides it with a kwarg.
+        gt_label_names = get_ground_truth_label_names(
+            model_names,
+            only_embed_annotations=kwargs.get(
+                "only_embed_annotations",
+                bacpipe.settings.only_embed_annotations,
+            ),
         )
-        if len(ground_truth_files) > 0:
-            labels = []
-            if len(ground_truth_files) > 0:
-                for gt_file in ground_truth_files:
-                    if gt_file.suffix == ".csv":
-                        ground_truth_df = le.get_ground_truth(
-                            model_names[0],
-                            file_path=gt_file,
-                            return_type="dataframe",
-                        )
-                    elif gt_file.suffix == ".npy":
-                        ground_truth_df = le.get_ground_truth(
-                            model_names[0],
-                            file_path=gt_file,
-                            return_type="array",
-                        )
-                    labels.append(gt_file.stem.replace("ground_truth_", ""))
+        if len(gt_label_names) > 0:
             self.ground_truth = True
-            self.label_by += labels
+            self.label_by += gt_label_names
+        self.label_by = list(set(self.label_by))
+        self.label_by.sort(reverse=True)
 
         if (
             len(list(le.get_paths(model_names[0]).clust_path.glob("*.npy")))
@@ -1038,6 +1133,31 @@ def visualize_using_dashboard(
             main_results_dir='bacpipe_results',
         )
 
+        # Additional information about the recordings can be passed as a
+        # dataframe. Its extra columns (here 'annotator' and
+        # 'recording_site') are shown next to the spectrogram of a clicked
+        # point. The rows are matched to the embedded segments on
+        # 'audiofilename' and 'start', so an unsorted or incomplete table
+        # is fine:
+
+        import pandas as pd
+
+        annotations_df = pd.read_csv(
+            'bacpipe/tests/test_data/annotations.csv'
+        )
+        annotations_df['annotator'] = 'reviewer_1'
+        annotations_df['recording_site'] = [
+            'site_a' if 'FewShot' in name else 'site_b'
+            for name in annotations_df.audiofilename
+        ]
+
+        bacpipe.visualize_using_dashboard(
+            models=['birdnet'],
+            audio_dir='bacpipe/tests/test_data',
+            main_results_dir='bacpipe_results',
+            annotations_df=annotations_df,
+        )
+
     Parameters
     ----------
     models : list
@@ -1050,9 +1170,52 @@ def visualize_using_dashboard(
         whether to allow cross origin websocket connections,
         by default False
     kwargs : dict
-        Dictionary with parameters for dashboard creation
+        Dictionary with parameters for dashboard creation. Next to the
+        settings of ``config.yaml``/``settings.yaml`` the most relevant ones
+        are:
+
+        ``audio_dir`` : str, path to the audio files the embeddings were
+        computed from
+
+        ``main_results_dir`` : str, top level directory of the results
+
+        ``annotations_df`` : pandas.DataFrame, optional table with additional
+        information about the segments. Its extra columns are displayed with
+        the spectrogram of a clicked point. The rows are matched on
+        ``audiofilename`` and ``start``, so unsorted or incomplete tables are
+        fine. Without this kwarg only the labels bacpipe generated itself are
+        shown.
+
+        ``CustomModels`` : list, one model class per entry of ``models``
+        (``None`` for the models integrated in bacpipe)
     """
-    models = [bacpipe.confirm_model_name(model, **kwargs) for model in models]
+    # ``CustomModels`` pairs one model class (or None for an integrated
+    # model) with every entry of ``models``, while ``confirm_model_name``
+    # validates a single model at a time and therefore expects the singular
+    # ``CustomModel``. Forwarding the plural kwarg verbatim would make the
+    # name check reject the names of custom models.
+    custom_models = kwargs.get("CustomModels")
+    if custom_models is not None and not isinstance(
+        custom_models, (list, tuple)
+    ):
+        custom_models = [custom_models] * len(models)
+    if custom_models is None:
+        custom_models = [None] * len(models)
+    if not len(custom_models) == len(models):
+        raise AssertionError(
+            "If you provide custom models, the array needs to be the same "
+            "length as the model name array. That way the association is "
+            "clear. \n For example: models = ['birdnet', 'my_model'] and "
+            "CustomModels=[None, MyModel]."
+        )
+    models = [
+        (
+            bacpipe.confirm_model_name(model, **kwargs)
+            if custom_model is None
+            else bacpipe.confirm_model_name(model, CustomModel=custom_model)
+        )
+        for model, custom_model in zip(models, custom_models)
+    ]
     from bacpipe.embedding_evaluation.visualization.dashboard import DashBoard
     import panel as pn
 

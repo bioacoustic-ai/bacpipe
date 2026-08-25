@@ -191,3 +191,189 @@ class TestSaveRavenTable:
         table = pd.read_csv(self._dest(tmp_path, file), sep="\t", index_col=False)
         assert table["Begin Time (s)"].tolist() == [0.0, 1.0]
         assert table["End Time (s)"].tolist() == [1.0, 2.0]
+
+
+class TestGenerateEmbeddingsFromAudioArray:
+    """``Embedder.generate_embeddings_from_audio_array`` embeds audio that is
+    passed as an array instead of being read from files (see the
+    ``simple_use_cases`` notebook).
+
+    Regressions:
+    1. The producer looped over single windows instead of batches, so the
+       model was called once per window and the progress bar total did not
+       match the number of batches.
+    2. ``torch.tensor(...)`` was called on tensors (which warns and copies)
+       and the batch was not moved to the model device, which broke ``mps``
+       and ``cuda`` runs.
+    3. Stacked segments that were longer than the model segment length were
+       not windowed (see ``AudioHandler.window_audio``).
+    """
+
+    class _DummyModel:
+        segment_length = 100
+        batch_size = 4
+        device = "cpu"
+        sr = 100
+
+        def __init__(self):
+            self.batch_shapes = []
+            self.devices = []
+
+        def preprocess(self, audio):
+            self.batch_shapes.append(tuple(audio.shape))
+            self.devices.append(str(audio.device))
+            return audio
+
+    def _embedder(self, padding="wrap"):
+        embedder = object.__new__(Embedder)
+        embedder.model = self._DummyModel()
+        embedder.padding = padding
+        embedder.nr_parallel_workers = 1
+        # one "embedding" per window: its mean, so that the order of the
+        # embeddings can be checked against the order of the input
+        embedder.get_embeddings_for_audio = lambda data: [
+            float(row.mean()) for row in data
+        ]
+        return embedder
+
+    def _long_recording(self, n_windows=10):
+        # every window holds a constant value -> the mean identifies the window
+        return np.concatenate(
+            [np.full(100, float(i)) for i in range(n_windows)]
+        )
+
+    def test_long_recording_is_split_into_segments(self):
+        embedder = self._embedder()
+        embeddings = embedder.generate_embeddings_from_audio_array(
+            self._long_recording()
+        )
+        # one embedding per segment, in the order of the recording
+        assert embeddings == [float(i) for i in range(10)]
+
+    def test_batches_use_the_model_batch_size(self):
+        embedder = self._embedder()
+        embedder.generate_embeddings_from_audio_array(self._long_recording())
+        # 10 windows with batch_size 4 -> 3 batches (the progress bar total)
+        assert embedder.model.batch_shapes == [(4, 100), (4, 100), (2, 100)]
+
+    def test_two_dimensional_long_recording_is_supported(self):
+        embedder = self._embedder()
+        audio = self._long_recording().reshape(1, -1)
+        embeddings = embedder.generate_embeddings_from_audio_array(audio)
+        assert embeddings == [float(i) for i in range(10)]
+
+    def test_stacked_segments_produce_one_embedding_each(self):
+        embedder = self._embedder()
+        audio = np.stack([np.full(100, float(i)) for i in range(5)])
+        embeddings = embedder.generate_embeddings_from_audio_array(audio)
+        assert embeddings == [float(i) for i in range(5)]
+        assert embedder.model.batch_shapes == [(4, 100), (1, 100)]
+
+    def test_stacked_short_segments_are_padded(self):
+        embedder = self._embedder()
+        # segments shorter than the model segment length are padded, one
+        # window per segment
+        audio = np.stack([np.full(40, float(i)) for i in range(3)])
+        embeddings = embedder.generate_embeddings_from_audio_array(audio)
+        assert embeddings == [float(i) for i in range(3)]
+        assert embedder.model.batch_shapes == [(3, 100)]
+
+    def test_stacked_long_segments_are_windowed(self):
+        embedder = self._embedder()
+        # segments longer than the model segment length are split up
+        audio = np.stack([np.full(150, float(i)) for i in range(2)])
+        embeddings = embedder.generate_embeddings_from_audio_array(audio)
+        assert embeddings == [0.0, 0.0, 1.0, 1.0]
+        assert embedder.model.batch_shapes == [(4, 100)]
+
+    def test_single_window_batch_keeps_the_batch_dimension(self):
+        embedder = self._embedder()
+        embeddings = embedder.generate_embeddings_from_audio_array(
+            np.full(100, 1.0)
+        )
+        # squeezing a batch of one window must not drop the batch dimension,
+        # models expect (batch_size, samples)
+        assert embedder.model.batch_shapes == [(1, 100)]
+        assert embeddings == [1.0]
+
+    def test_torch_input_is_supported(self):
+        embedder = self._embedder()
+        audio = torch.as_tensor(self._long_recording())
+        embeddings = embedder.generate_embeddings_from_audio_array(audio)
+        assert embeddings == [float(i) for i in range(10)]
+
+    def test_list_input_is_supported(self):
+        embedder = self._embedder()
+        audio = [[float(i)] * 100 for i in range(3)]
+        embeddings = embedder.generate_embeddings_from_audio_array(audio)
+        assert embeddings == [float(i) for i in range(3)]
+
+    def test_batches_are_moved_to_the_model_device(self):
+        embedder = self._embedder()
+        embedder.generate_embeddings_from_audio_array(self._long_recording())
+        assert set(embedder.model.devices) == {"cpu"}
+
+    class _FakeTqdm:
+        """Minimal tqdm stand-in that records the total and the updates."""
+
+        def __init__(self, *args, **kwargs):
+            self.total = kwargs.get("total")
+            self.updates = 0
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def update(self, n=1):
+            self.updates += n
+
+    def _patch_tqdm(self, monkeypatch):
+        import bacpipe.model_pipelines.runner as runner
+
+        bars = []
+
+        def fake_tqdm(*args, **kwargs):
+            bar = self._FakeTqdm(*args, **kwargs)
+            bars.append(bar)
+            return bar
+
+        monkeypatch.setattr(runner, "tqdm", fake_tqdm)
+        return bars
+
+    def test_progress_bar_counts_batches_not_windows(self, monkeypatch):
+        bars = self._patch_tqdm(monkeypatch)
+        embedder = self._embedder()
+        embedder.generate_embeddings_from_audio_array(self._long_recording())
+        # 10 windows with batch_size 4 -> 3 batches
+        assert [bar.total for bar in bars] == [3]
+        assert [bar.updates for bar in bars] == [3]
+
+    def test_failing_batches_update_the_progress_bar_once(self, monkeypatch):
+        bars = self._patch_tqdm(monkeypatch)
+        embedder = self._embedder()
+
+        def failing_embeddings(data):
+            # the folder structure of a run is missing
+            raise AttributeError("no folder structure")
+
+        embedder.get_embeddings_for_audio = failing_embeddings
+        embedder.generate_embeddings_from_audio_array(self._long_recording())
+        # a skipped batch counts once, not twice
+        assert [bar.updates for bar in bars] == [3]
+
+    def test_failing_batches_are_skipped(self, caplog):
+        embedder = self._embedder()
+
+        def failing_preprocess(audio):
+            raise ValueError("preprocessing failed")
+
+        embedder.model.preprocess = failing_preprocess
+        with caplog.at_level("WARNING", logger="bacpipe"):
+            embeddings = embedder.generate_embeddings_from_audio_array(
+                self._long_recording()
+            )
+        assert embeddings == []
+        assert "preprocessing failed" in caplog.text
+

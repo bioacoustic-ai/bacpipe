@@ -103,6 +103,8 @@ class Model(ModelBaseClass):
         audio = audio[:, None, :]
 
         # (bs, channel, mel, time)
+        if self.device != 'cpu':
+            audio = audio.to(self.device)
         return self.model.wav2timefreq(audio)
 
     @torch.inference_mode()

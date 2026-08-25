@@ -14,12 +14,14 @@ deterministic; the notebook itself additionally demonstrates ``umap`` (which
 adds the embedding-space comparison plot ``overview/comp_fig.png``).
 """
 
+import json
 import shutil
 from pathlib import Path
 
 import librosa
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 
 import bacpipe
@@ -262,6 +264,44 @@ class TestNotebookWorkflow:
         assert annotated_frames.ndim == 2
         assert annotated_frames.shape[1] == model.segment_length
 
+    def test_audio_handling_with_model_name(self):
+        # Notebook section 5: the model can also be passed by name, the
+        # sample rate and the segment length can be changed and the
+        # annotations can be passed as a dataframe. None of this loads a
+        # model, so no checkpoint is needed.
+        aud = bacpipe.AudioHandler(
+            model="birdnet", audio_dir=str(TEST_AUDIO_DIR)
+        )
+        files = bacpipe.get_audio_files(str(TEST_AUDIO_DIR))
+
+        audio, sr = aud.load_and_resample(files[0])
+        assert sr == aud.model.sr
+        assert aud.window_audio(audio).shape[1] == aud.model.segment_length
+
+        # the notebook cell that deviates from the model defaults
+        aud.model.sr = 32_000
+        aud.model.segment_length = 3 * aud.model.sr
+        audio, sr = aud.load_and_resample(files[0])
+        assert sr == 32_000
+        assert aud.window_audio(audio).shape[1] == 3 * 32_000
+
+        # the notebook cell that passes its own annotations dataframe
+        aud_annotated = bacpipe.AudioHandler(
+            model="birdnet",
+            audio_dir=str(TEST_AUDIO_DIR),
+            only_embed_annotations=True,
+        )
+        annots = pd.read_csv(TEST_AUDIO_DIR / "annotations.csv")
+        annots = annots[annots.start < 10]
+        annotated_frames = aud_annotated.only_load_annotated_segments(
+            files[0], annotations_df=annots
+        )
+        # only the two annotated segments of the first ten seconds
+        assert annotated_frames.shape == (
+            2,
+            aud_annotated.model.segment_length,
+        )
+
     def test_embeddings_from_audio(self):
         # Notebook section 6: Embedder + get_embeddings_from_model.
         embed_obj = bacpipe.Embedder(
@@ -287,6 +327,193 @@ class TestNotebookWorkflow:
             16,
             34,
             10,
+        )
+
+
+class TestNotebookDashboard:
+    """Mirrors the dashboard section of the notebook.
+
+    ``visualize_using_dashboard`` is called twice on the same results: once
+    without an ``annotations_df`` (the default case, in which the kwarg is
+    ``None``) and once with a dataframe the "user" built themselves. Both
+    calls have to build the complete dashboard, the second one additionally
+    has to attach the extra annotation columns to the click data of the
+    embedding points.
+
+    ``BootstrapTemplate.show`` is replaced with a recorder so no panel
+    server is started. Everything up to serving is real: the dashboard
+    widgets, the eager rendering of the 2D embedding plots and the
+    alignment of the annotations with the embeddings.
+    """
+
+    MODELS = ["mel_mock_a", "mel_mock_b"]
+    CUSTOM_MODELS = [MelMockModelA, MelMockModelB]
+
+    @pytest.fixture(scope="class")
+    def results(self, tmp_path_factory):
+        """Embeddings, dim reduction and evaluations the dashboard reads."""
+        tmp_path = tmp_path_factory.mktemp("dashboard")
+        audio_dir = tmp_path / "audio_data"
+        _copy_test_data(audio_dir)
+        results_dir = tmp_path / "results"
+
+        # ``umap`` (instead of "None") because the dashboard plots the
+        # 2D reduced embeddings
+        shared = dict(
+            audio_dir=str(audio_dir),
+            main_results_dir=str(results_dir),
+            dim_reduction_model="umap",
+            device="cpu",
+            run_pretrained_classifier=False,
+            only_embed_annotations=True,
+            label_column="call_type",
+            CustomModels=self.CUSTOM_MODELS,
+        )
+        loader_dict = bacpipe.run_pipeline_for_models(
+            models=self.MODELS,
+            check_if_already_processed=False,
+            **shared,
+        )
+        bacpipe.model_specific_evaluation(
+            loader_dict=loader_dict,
+            evaluation_task=["probing", "clustering"],
+            **shared,
+        )
+        return audio_dir, results_dir
+
+    def _dashboard_kwargs(self, audio_dir, results_dir, **extra):
+        """Kwargs of a dashboard call, mirroring the notebook cell."""
+        return dict(
+            models=self.MODELS,
+            audio_dir=str(audio_dir),
+            main_results_dir=str(results_dir),
+            dim_reduction_model="umap",
+            evaluation_task=["probing", "clustering"],
+            only_embed_annotations=True,
+            label_column="call_type",
+            CustomModels=self.CUSTOM_MODELS,
+            device="cpu",
+            run_pretrained_classifier=False,
+            **extra,
+        )
+
+    @staticmethod
+    def _serve_dashboard(monkeypatch, **kwargs):
+        """Build (but don't serve) the dashboard and return its plotly figures.
+
+        The real ``plot_embeddings_px`` is wrapped instead of replaced, so the
+        figures inspected here are the ones the dashboard displays.
+        """
+        import panel as pn
+        from bacpipe.embedding_evaluation.visualization import (
+            visualize_embeddings as ve,
+        )
+
+        shown = []
+        monkeypatch.setattr(
+            pn.template.BootstrapTemplate,
+            "show",
+            lambda self, **show_kwargs: shown.append(self),
+        )
+
+        figures = []
+        real_plot_embeddings_px = ve.plot_embeddings_px
+
+        def spy(embeds, labels, label_by="label", **plot_kwargs):
+            fig = real_plot_embeddings_px(
+                embeds, labels, label_by=label_by, **plot_kwargs
+            )
+            figures.append(fig)
+            return fig
+
+        monkeypatch.setattr(ve, "plot_embeddings_px", spy)
+
+        bacpipe.visualize_using_dashboard(**kwargs)
+
+        # the template is shown once, i.e. the port was available
+        assert len(shown) == 1
+        assert len(figures) > 0, "no embedding plot was created"
+        return figures
+
+    @staticmethod
+    def _click_labels(figures):
+        """Decode the json labels the dashboard attaches to every point.
+
+        ``customdata`` index 5 holds the json string that is displayed next to
+        the spectrogram of a clicked point.
+        """
+        labels = []
+        for fig in figures:
+            for trace in fig.data:
+                if trace.customdata is None:
+                    continue
+                for row in trace.customdata:
+                    # the click data layout is fixed, see plot_embeddings_px
+                    assert len(row) == 8
+                    labels.append(json.loads(row[5]))
+        return labels
+
+    def test_dashboard_without_annotations_df(self, monkeypatch, results):
+        # The default case: no annotations_df is passed, so
+        # ``kwargs.get("annotations_df")`` is None. This must not raise.
+        audio_dir, results_dir = results
+        figures = self._serve_dashboard(
+            monkeypatch, **self._dashboard_kwargs(audio_dir, results_dir)
+        )
+
+        click_labels = self._click_labels(figures)
+        assert len(click_labels) > 0
+        # only the labels bacpipe generated itself, no user columns
+        for labels in click_labels:
+            assert "annotator" not in labels
+            assert "recording_site" not in labels
+
+    def test_dashboard_with_user_annotations_df(self, monkeypatch, results):
+        # A user passes their own dataframe: its additional columns show up in
+        # the click data of the embedding points, aligned by audiofilename and
+        # start so that every point keeps its own annotation values.
+        audio_dir, results_dir = results
+        annotations_df = pd.read_csv(audio_dir / "annotations.csv")
+        annotations_df["annotator"] = "reviewer_1"
+        annotations_df["recording_site"] = [
+            "site_a" if "FewShot" in name else "site_b"
+            for name in annotations_df.audiofilename
+        ]
+
+        figures = self._serve_dashboard(
+            monkeypatch,
+            **self._dashboard_kwargs(
+                audio_dir, results_dir, annotations_df=annotations_df
+            ),
+        )
+
+        click_labels = self._click_labels(figures)
+        matched = [
+            labels
+            for labels in click_labels
+            if labels.get("annotator") == "reviewer_1"
+        ]
+        assert len(matched) > 0, "the annotations were not matched at all"
+        # the extra columns are attached per point, so the site of a point has
+        # to be the site of its own audio file
+        sites = {labels["recording_site"] for labels in matched}
+        assert sites and sites <= {"site_a", "site_b"}
+
+    def test_dashboard_label_options_include_ground_truth(self, results):
+        # The ground truth files of an only_embed_annotations run carry the
+        # "_only_annotated" suffix, the dashboard still has to offer the plain
+        # label name for coloring.
+        from bacpipe.embedding_evaluation.visualization.dashboard import (
+            DashBoard,
+        )
+
+        audio_dir, results_dir = results
+        dashboard = DashBoard(
+            self.MODELS, **self._dashboard_kwargs(audio_dir, results_dir)
+        )
+        assert "call_type" in dashboard.label_by
+        assert not any(
+            label.endswith("_only_annotated") for label in dashboard.label_by
         )
 
 

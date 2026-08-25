@@ -19,24 +19,36 @@ logger = logging.getLogger(__name__)
 
 def convert_numpy_types(obj):
     """
-    Convert numpy types to native Python types.
+    Make an object json serializable by converting numpy types into their
+    native Python equivalents.
+
+    The sole purpose of this function is to catch numpy types (which
+    ``json.dumps`` cannot serialize). Every other object - most importantly
+    strings, which is what the majority of label values are - is returned
+    unchanged, so that label values always cascade through to the caller.
+    Returning ``None`` for unknown types would silently drop all string
+    labels from the hover text of the embedding plots.
 
     Parameters
     ----------
-    obj : numpy object
-        object to be converted
+    obj : object
+        object to be converted, typically a numpy scalar, a numpy array,
+        a string or a native Python type
 
     Returns
     -------
-    int or float or list
-        object converted to a native Python type
+    int or float or bool or str or list or object
+        numpy arrays are converted to lists, numpy scalars (e.g. np.int32,
+        np.int64, np.float32) to their native Python type, any other object
+        is returned unchanged
     """
-    if isinstance(obj, np.int64):
-        return int(obj)
-    elif isinstance(obj, np.float32):
-        return float(obj)
-    elif isinstance(obj, np.ndarray):
+    if isinstance(obj, np.ndarray):
         return obj.tolist()
+    elif isinstance(obj, np.generic):
+        # covers np.int32, np.int64, np.float32, np.bool_, np.str_, ...
+        return obj.item()
+    else:
+        return obj
 
 
 def save_clustering_performance(paths, clusterings, metrics, label_column):
