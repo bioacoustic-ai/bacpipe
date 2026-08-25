@@ -25,13 +25,11 @@ class AudioHandler:
         # Load the ``birdnet`` model and use it to window the test audio files
         # into frames that match the model input length:
 
-        from bacpipe import Embedder, get_audio_files, AudioHandler
+        from bacpipe import get_audio_files, AudioHandler
         import numpy as np
 
-        embed = Embedder('birdnet')
-
         aud = AudioHandler(
-            model=embed.model,
+            model='birdnet',
             audio_dir='bacpipe/tests/test_data'
         )
         files = get_audio_files('bacpipe/tests/test_data')
@@ -75,7 +73,30 @@ class AudioHandler:
             new speed to use when changing the playback speed of the
             audio, by default None
         """
-        self.model = model
+        
+        if isinstance(model, str):
+            from importlib import import_module
+            try:
+                model_module = import_module(
+                        f"bacpipe.model_pipelines.feature_extractors.{model}"
+                    )
+            except:
+                import bacpipe
+                raise NameError(
+                    f"\nUnable to find the model module {model}.py "
+                    "Please ensure that you spelled the model correctly. "
+                    f"Available models are: {bacpipe.supported_models}\n"
+                    )
+            class SimpleModel(object):
+                pass
+
+            model_obj = SimpleModel()
+            model_obj.name = model
+            model_obj.sr = model_module.SAMPLE_RATE
+            model_obj.segment_length = model_module.LENGTH_IN_SAMPLES
+            self.model = model_obj
+        else:
+            self.model = model
         self.padding = padding
         self.audio_dir = audio_dir
         self.bool_change_speed = bool_change_speed
@@ -110,6 +131,10 @@ class AudioHandler:
         else:
             audio, sr = self.load_and_resample(sample)
             frames = self.window_audio(audio)
+        if not hasattr(self.model, 'preprocess'):
+            from bacpipe import Embedder
+            emb = Embedder(self.model.name)
+            self.model = emb.model
         preprocessed_frames = self.model.preprocess(frames)
         self.preprocessed_shape = tuple(preprocessed_frames.shape)
         if self.model.device == "cuda":
@@ -183,7 +208,7 @@ class AudioHandler:
         return torch.tensor(audio), sr
 
     def only_load_annotated_segments(
-        self, file_path, annotations_filename="annotations.csv", **_
+        self, file_path, annotations_filename="annotations.csv", annotations_df=None, **_
     ):
         """
         Load only the segments of an audio file that are covered by
@@ -232,19 +257,21 @@ class AudioHandler:
         import pandas as pd
         from bacpipe import Loader
 
-
-        annots = pd.read_csv(Path(self.audio_dir) / annotations_filename)
-        # filter current file
-        file_annots = Loader.filter_df_by_file(
-            self.audio_dir, annots, file_path
-        )
-        if len(file_annots) == 0:
-            raise AssertionError(
-                f"No annotations found for audio file {file_path.relative_to(self.audio_dir)}. "
-                "Continuing with next file."
+        if isinstance(annotations_df, pd.DataFrame):
+            file_annots = annotations_df
+        else:
+            annots = pd.read_csv(Path(self.audio_dir) / annotations_filename)
+            # filter current file
+            file_annots = Loader.filter_df_by_file(
+                self.audio_dir, annots, file_path
             )
+            if len(file_annots) == 0:
+                raise AssertionError(
+                    f"No annotations found for audio file {file_path.relative_to(self.audio_dir)}. "
+                    "Continuing with next file."
+                )
 
-        file_annots = file_annots.drop_duplicates(subset=["start", "end"])
+            file_annots = file_annots.drop_duplicates(subset=["start", "end"])
 
         self.get_file_length(file_path)
         file_duration = self.file_length[file_path.stem]
