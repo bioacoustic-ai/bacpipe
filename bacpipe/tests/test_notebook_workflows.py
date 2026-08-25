@@ -270,7 +270,7 @@ class TestNotebookWorkflow:
         # annotations can be passed as a dataframe. None of this loads a
         # model, so no checkpoint is needed.
         aud = bacpipe.AudioHandler(
-            model="birdnet", audio_dir=str(TEST_AUDIO_DIR)
+            model="insect459", audio_dir=str(TEST_AUDIO_DIR)
         )
         files = bacpipe.get_audio_files(str(TEST_AUDIO_DIR))
 
@@ -287,7 +287,7 @@ class TestNotebookWorkflow:
 
         # the notebook cell that passes its own annotations dataframe
         aud_annotated = bacpipe.AudioHandler(
-            model="birdnet",
+            model="insect459",
             audio_dir=str(TEST_AUDIO_DIR),
             only_embed_annotations=True,
         )
@@ -499,6 +499,55 @@ class TestNotebookDashboard:
         sites = {labels["recording_site"] for labels in matched}
         assert sites and sites <= {"site_a", "site_b"}
 
+    def test_dashboard_matches_annotations_across_platforms(
+        self, monkeypatch, results
+    ):
+        # The embeddings store the audio file names with the separators of
+        # the operating system they were created on (backslashes on windows),
+        # while annotation tables are usually written with forward slashes.
+        # Rewriting the audio file names of the stored embeddings with
+        # backslashes therefore has to keep the annotations matched.
+        audio_dir, results_dir = results
+        annotations_df = pd.read_csv(audio_dir / "annotations.csv")
+        annotations_df["annotator"] = "reviewer_1"
+
+        # simulate embeddings created on windows: every stored audio file name
+        # uses backslashes, the annotations keep their forward slashes
+        metadata_files = list(results_dir.rglob("metadata.yml"))
+        embed_json_files = list(
+            results_dir.glob("audio_data/dim_reduced_embeddings/*/*.json")
+        )
+        originals = {
+            file: file.read_text() for file in metadata_files + embed_json_files
+        }
+        for file in metadata_files:
+            file.write_text(file.read_text().replace("/", "\\"))
+        for file in embed_json_files:
+            content = json.loads(file.read_text())
+            content["metadata"]["audio_files"] = [
+                name.replace("/", "\\")
+                for name in content["metadata"]["audio_files"]
+            ]
+            file.write_text(json.dumps(content))
+
+        try:
+            figures = self._serve_dashboard(
+                monkeypatch,
+                **self._dashboard_kwargs(
+                    audio_dir, results_dir, annotations_df=annotations_df
+                ),
+            )
+        finally:
+            for file, text in originals.items():
+                file.write_text(text)
+
+        matched = [
+            labels
+            for labels in self._click_labels(figures)
+            if labels.get("annotator") == "reviewer_1"
+        ]
+        assert len(matched) > 0, "the separators broke the matching"
+
     def test_dashboard_label_options_include_ground_truth(self, results):
         # The ground truth files of an only_embed_annotations run carry the
         # "_only_annotated" suffix, the dashboard still has to offer the plain
@@ -540,7 +589,7 @@ class TestNotebookBenchmark:
     @staticmethod
     def _stub_benchmark_deps(monkeypatch, gt, preds, label2idx):
         monkeypatch.setattr(
-            bacpipe, "confirm_model_name", lambda model, **kw: "birdnet"
+            bacpipe, "confirm_model_name", lambda model, **kw: "insect459"
         )
         monkeypatch.setattr(
             bacpipe, "ground_truth_by_model", lambda *a, **kw: gt
@@ -567,7 +616,7 @@ class TestNotebookBenchmark:
         self._stub_benchmark_deps(monkeypatch, gt, preds, label2idx)
 
         report = bacpipe.benchmark(
-            model="birdnet",
+            model="insect459",
             dataset="bacpipe/tests/test_data",
             annotations_file="annotations.csv",
             overwrite=False,
@@ -593,7 +642,7 @@ class TestNotebookBenchmark:
         self._stub_benchmark_deps(monkeypatch, gt, preds, label2idx)
 
         report = bacpipe.benchmark(
-            model="birdnet",
+            model="insect459",
             dataset="bacpipe/tests/test_data",
             annotations_file="annotations.csv",
             overwrite=True,
@@ -618,7 +667,7 @@ class TestNotebookBenchmark:
         self._stub_benchmark_deps(monkeypatch, gt, None, None)
 
         report = bacpipe.benchmark(
-            model="birdnet",
+            model="insect459",
             dataset="bacpipe/tests/test_data",
             annotations_file="annotations.csv",
         )

@@ -715,7 +715,7 @@ def ensure_windoof_path_to_posix(path):
 
     Parameters
     ----------
-    path : str
+    path : str or pathlib.Path
         path that may contain windows separators
 
     Returns
@@ -723,6 +723,7 @@ def ensure_windoof_path_to_posix(path):
     str
         path converted to posix separators
     """
+    path = str(path)
     if "\\" in path:
         from pathlib import PureWindowsPath
 

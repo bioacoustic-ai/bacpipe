@@ -1297,6 +1297,33 @@ def generate_strings_for_spectrogram_text(
     return variable_labels_json
 
 
+def posix_audiofilenames(filenames):
+    """
+    Return audio file names with posix separators.
+
+    The file names of the embeddings come from ``metadata.yml``, where the
+    path relative to the audio directory is stored with the separators of
+    the operating system the embeddings were created on (backslashes on
+    windows). Annotation tables on the other hand are usually written with
+    posix separators. Comparing the file names of the two therefore
+    requires a common notation.
+
+    Parameters
+    ----------
+    filenames : iterable
+        audio file names, either as str or as pathlib.Path
+
+    Returns
+    -------
+    list
+        file names with posix separators
+    """
+    return [
+        le.ensure_windoof_path_to_posix(file_name)
+        for file_name in filenames
+    ]
+
+
 def align_annotations_df_with_embeddings(df, annotations_df, embeds):
     """
     Align the additional columns of a user provided annotations dataframe
@@ -1307,7 +1334,9 @@ def align_annotations_df_with_embeddings(df, annotations_df, embeds):
     columns of the annotations are returned, so that the click data of the
     figure keeps its fixed layout. Whenever the annotations contain an
     ``audiofilename`` and a ``start`` column the values are matched on those
-    two keys, which makes a misalignment impossible. If those keys are
+    two keys, which makes a misalignment impossible. The file names are
+    compared with posix separators, so annotations written on one operating
+    system also match embeddings created on another one. If those keys are
     missing the values are attached by position, which is only possible if
     the annotations have exactly one row per embedding.
 
@@ -1360,12 +1389,26 @@ def align_annotations_df_with_embeddings(df, annotations_df, embeds):
     if all([k in annots.columns for k in keys]):
         annots = annots.copy()
         annots["start"] = np.round(annots["start"].astype(float), 4)
+        # the embeddings and the annotations can come from different
+        # operating systems (windows stores the file names with backslashes,
+        # annotation tables are usually written with forward slashes), so
+        # both sides are converted to posix separators before they are
+        # matched
+        annots["audiofilename"] = posix_audiofilenames(
+            annots["audiofilename"]
+        )
         # simultaneous labels share a segment, one row per segment suffices
         annots = annots.drop_duplicates(subset=keys)
         new_cols = [c for c in annots.columns if not c in df.columns]
         if len(new_cols) == 0:
             return {}
-        aligned = df[keys].merge(annots[keys + new_cols], on=keys, how="left")
+        embed_keys = df[keys].copy()
+        embed_keys["audiofilename"] = posix_audiofilenames(
+            embed_keys["audiofilename"]
+        )
+        aligned = embed_keys.merge(
+            annots[keys + new_cols], on=keys, how="left"
+        )
         if not len(aligned) == len(df):
             logger.warning(
                 "\nThe annotations_df could not be matched to the "
@@ -1374,11 +1417,19 @@ def align_annotations_df_with_embeddings(df, annotations_df, embeds):
             )
             return {}
         if aligned[new_cols].isna().all(axis=None):
+            # an example of both sides makes mismatching file names (e.g.
+            # bare file names vs paths relative to the audio_dir) obvious
+            examples = ""
+            if len(embed_keys) > 0:
+                examples = (
+                    f"An embedded segment: {embed_keys.iloc[0].tolist()}, "
+                    f"an annotation: {annots[keys].iloc[0].tolist()}\n"
+                )
             logger.warning(
                 "\nNone of the rows of the annotations_df could be matched "
                 f"to the embeddings of {model=}. The audiofilename and "
                 "start values of the annotations do not correspond to the "
-                "embedded segments.\n"
+                "embedded segments.\n" + examples
             )
         return {c: aligned[c].tolist() for c in new_cols}
 

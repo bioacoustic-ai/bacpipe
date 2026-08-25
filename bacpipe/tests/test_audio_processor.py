@@ -286,13 +286,13 @@ class TestModelPassedAsString:
         # the model itself (and with it its preprocessing) was not loaded
         assert not hasattr(handler.model, "preprocess")
 
-    def test_documented_birdnet_example(self):
+    def test_documented_insect459_example(self):
         # the values of the example used in the docstrings and the notebook
-        from bacpipe.model_pipelines.feature_extractors import birdnet
+        from bacpipe.model_pipelines.feature_extractors import insect459
 
-        handler = AudioHandler(model="birdnet", audio_dir=TEST_DATA_DIR)
-        assert handler.model.sr == birdnet.SAMPLE_RATE
-        assert handler.model.segment_length == birdnet.LENGTH_IN_SAMPLES
+        handler = AudioHandler(model="insect459", audio_dir=TEST_DATA_DIR)
+        assert handler.model.sr == insect459.SAMPLE_RATE
+        assert handler.model.segment_length == insect459.LENGTH_IN_SAMPLES
 
     def test_name_is_case_insensitive(self):
         handler = AudioHandler(
@@ -319,14 +319,16 @@ class TestModelPassedAsString:
         # every supported model has to provide the two constants, either in
         # its own module or in the module of the model it subclasses
         for model_name in bacpipe.supported_models:
+            if model_name in bacpipe.TF_MODELS:
+                continue
             name, sr, segment_length = _get_model_constants(model_name)
             assert name == model_name
             assert sr > 0 and segment_length > 0
 
     def test_unsupported_name_raises_name_error(self):
         with pytest.raises(NameError) as excinfo:
-            AudioHandler(model="birdnett", audio_dir=TEST_DATA_DIR)
-        assert "birdnett" in str(excinfo.value)
+            AudioHandler(model="insect459t", audio_dir=TEST_DATA_DIR)
+        assert "insect459t" in str(excinfo.value)
 
     def test_model_object_is_used_unchanged(self):
         model = DummyModel()

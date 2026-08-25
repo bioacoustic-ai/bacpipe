@@ -163,6 +163,13 @@ class TestEnsureWindoofPathToPosix:
             "/audio/file.wav"
         )
 
+    def test_accepts_path_objects(self):
+        # file names can also be Path objects, e.g. when a user builds an
+        # annotations dataframe from paths
+        assert ensure_windoof_path_to_posix(Path("audio") / "file.wav") == (
+            "audio/file.wav"
+        )
+
 
 class TestLoadMetadataFile:
     def _write_metadata(self, folder, audio_files, embed_files):

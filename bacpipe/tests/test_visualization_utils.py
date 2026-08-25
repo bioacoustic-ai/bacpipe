@@ -151,7 +151,7 @@ class TestGetBooleanArrayForAnnotatedEmbeddings:
     def test_marks_unannotated_embeddings_as_noise(self, monkeypatch):
         self._patch_metadata_labels(monkeypatch)
         is_noise = get_boolean_array_for_annotated_embeddings(
-            self._ground_truth(), "birdnet"
+            self._ground_truth(), "insect459"
         )
         # a.wav@0 and b.wav@0 are annotated; a.wav@3 has no annotation
         assert is_noise.tolist() == [False, True, False]
@@ -159,7 +159,7 @@ class TestGetBooleanArrayForAnnotatedEmbeddings:
     def test_returns_boolean_array(self, monkeypatch):
         self._patch_metadata_labels(monkeypatch)
         is_noise = get_boolean_array_for_annotated_embeddings(
-            self._ground_truth(), "birdnet"
+            self._ground_truth(), "insect459"
         )
         assert isinstance(is_noise, np.ndarray)
         assert is_noise.dtype == bool
@@ -175,7 +175,7 @@ class TestGetBooleanArrayForAnnotatedEmbeddings:
                 "sp_a": [1, 1, 1],
             }
         )
-        is_noise = get_boolean_array_for_annotated_embeddings(gt, "birdnet")
+        is_noise = get_boolean_array_for_annotated_embeddings(gt, "insect459")
         assert is_noise.tolist() == [False, False, False]
 
 
@@ -329,7 +329,7 @@ def _make_embeds(n=40):
             "audio_files": [f"file_{i % 4}.wav" for i in range(n)],
             "segment_length (samples)": [32000] * n,
             "sample_rate (Hz)": [32000] * n,
-            "model_name": "birdnet",
+            "model_name": "insect459",
             "embed_dir": "/tmp/does/not/matter",
         },
     }
@@ -496,7 +496,7 @@ class TestPredictionsLoaderCacheConsistency:
         def __init__(self):
             n = 6
             self.embeds = {
-                "birdnet": {
+                "insect459": {
                     "x": np.arange(n).tolist(),
                     "y": np.arange(n).tolist(),
                     "timestamp": np.arange(n).tolist(),
@@ -555,7 +555,7 @@ class TestPredictionsLoaderCacheConsistency:
         loader = PredictionsLoader(
             vis_loader=self._FakeVisLoader(),
             path_func=path_func,
-            models=["birdnet"],
+            models=["insect459"],
             panel_selection=self._FakePanelSelection(),
             progress_bar=SimpleNamespace(value=0),
             loading_pane=SimpleNamespace(value="", name=""),
@@ -569,14 +569,14 @@ class TestPredictionsLoaderCacheConsistency:
 
     def test_integrated_load_adds_overall_and_options(self, tmp_path):
         loader = self._make_loader(tmp_path, self._fake_run_probe_success)
-        loader.get_data("birdnet", 0.5, clfier_type="Integrated")
+        loader.get_data("insect459", 0.5, clfier_type="Integrated")
         assert loader.binary_presence.shape[1] == 3  # 2 classes + overall
         assert "overall" in loader.class_dict
         assert "overall" in loader.panel_selection.options
 
     def test_failed_linear_run_clears_cache(self, tmp_path):
         loader = self._make_loader(tmp_path, self._fake_run_probe_success)
-        loader.get_data("birdnet", 0.5, clfier_type="Integrated")
+        loader.get_data("insect459", 0.5, clfier_type="Integrated")
         assert loader.binary_presence is not None
 
         # The probe inference fails -> no stale state may be left behind.
@@ -584,23 +584,23 @@ class TestPredictionsLoaderCacheConsistency:
             self._fake_run_probe_failure
         )
         with pytest.raises(RuntimeError, match="simulated"):
-            loader.get_data("birdnet", 0.5, clfier_type="Linear")
+            loader.get_data("insect459", 0.5, clfier_type="Linear")
         assert loader.binary_presence is None
         assert loader.class_dict is None
 
         # A repeated Linear request must retry (not hit a stale cache).
         with pytest.raises(RuntimeError, match="simulated"):
-            loader.get_data("birdnet", 0.5, clfier_type="Linear")
+            loader.get_data("insect459", 0.5, clfier_type="Linear")
 
         # Switching back to the integrated classifier still works.
         loader.load_classification = self._fake_load_classification
-        loader.get_data("birdnet", 0.5, clfier_type="Integrated")
+        loader.get_data("insect459", 0.5, clfier_type="Integrated")
         assert "overall" in loader.class_dict
         assert loader.binary_presence.shape[1] == 3
 
     def test_accumulate_data_falls_back_to_overall(self, tmp_path):
         loader = self._make_loader(tmp_path, self._fake_run_probe_success)
-        loader.get_data("birdnet", 0.5, clfier_type="Integrated")
+        loader.get_data("insect459", 0.5, clfier_type="Integrated")
         # A species that is not part of the current classifier outputs must
         # not crash the heatmap; it falls back to the overall presence.
         accumulated = loader.accumulate_data("not_a_species", "day")
@@ -614,7 +614,7 @@ class TestPredictionsLoaderCacheConsistency:
             return self._fake_run_probe_success(model, probe, threshold)
 
         loader = self._make_loader(tmp_path, capturing_run_probe)
-        loader.get_data("birdnet", 0.5, clfier_type="Linear")
+        loader.get_data("insect459", 0.5, clfier_type="Linear")
 
         # ``DashBoard.__init__`` consumes ``audio_dir``/``main_results_dir`` as
         # named parameters, so they are absent from ``self.kwargs``. The
@@ -685,7 +685,7 @@ class TestCheckTimestampOfClickDataAgainstMetadata:
             }
 
     class _FakeModelSelect:
-        options = ["birdnet"]
+        options = ["insect459"]
 
     def _make_spec_plot(self, tmp_path):
         def path_func(model_name):
@@ -702,7 +702,7 @@ class TestCheckTimestampOfClickDataAgainstMetadata:
         )
 
     def _write_csv(self, spec, tmp_path, starts):
-        labels_path = tmp_path / "birdnet" / "labels"
+        labels_path = tmp_path / "insect459" / "labels"
         labels_path.mkdir(parents=True, exist_ok=True)
         pd.DataFrame({"start": starts}).to_csv(
             labels_path / "metadata_labels.csv", index=False
@@ -713,7 +713,7 @@ class TestCheckTimestampOfClickDataAgainstMetadata:
         self._write_csv(spec, tmp_path, [0.0, 1.0])
         with caplog.at_level("WARNING", logger="bacpipe"):
             spec.check_timestamp_of_click_data_against_metadata(
-                "birdnet", 0, 0.0
+                "insect459", 0, 0.0
             )
         assert not any("do not match" in r.message for r in caplog.records)
 
@@ -722,7 +722,7 @@ class TestCheckTimestampOfClickDataAgainstMetadata:
         self._write_csv(spec, tmp_path, [0.0, 1.0])
         with caplog.at_level("WARNING", logger="bacpipe"):
             spec.check_timestamp_of_click_data_against_metadata(
-                "birdnet", 0, 5.0
+                "insect459", 0, 5.0
             )
         assert any("do not match" in r.message for r in caplog.records)
 
@@ -730,20 +730,20 @@ class TestCheckTimestampOfClickDataAgainstMetadata:
         spec = self._make_spec_plot(tmp_path)
         with caplog.at_level("WARNING", logger="bacpipe"):
             spec.check_timestamp_of_click_data_against_metadata(
-                "birdnet", 0, 0.0
+                "insect459", 0, 0.0
             )
         assert any("No metadata_labels file" in r.message for r in caplog.records)
 
     def test_parquet_fallback(self, tmp_path, caplog):
         spec = self._make_spec_plot(tmp_path)
-        labels_path = tmp_path / "birdnet" / "labels"
+        labels_path = tmp_path / "insect459" / "labels"
         labels_path.mkdir(parents=True, exist_ok=True)
         pd.DataFrame({"start": [0.0, 1.0]}).to_parquet(
             labels_path / "metadata_labels.parquet"
         )
         with caplog.at_level("WARNING", logger="bacpipe"):
             spec.check_timestamp_of_click_data_against_metadata(
-                "birdnet", 1, 1.0
+                "insect459", 1, 1.0
             )
         assert not any("do not match" in r.message for r in caplog.records)
 
@@ -755,7 +755,7 @@ class TestCheckTimestampOfClickDataAgainstMetadata:
         self._write_csv(spec, tmp_path, [0.0, 1.0])
         with caplog.at_level("WARNING", logger="bacpipe"):
             spec.check_timestamp_of_click_data_against_metadata(
-                "birdnet", 99, 0.0
+                "insect459", 99, 0.0
             )
         assert any("Could not find a metadata label" in r.message for r in caplog.records)
 
@@ -782,7 +782,7 @@ class TestCheckTimestampOfClickDataAgainstMetadata:
             caplog.clear()
             with caplog.at_level("WARNING", logger="bacpipe"):
                 spec.check_timestamp_of_click_data_against_metadata(
-                    "birdnet", 0, 5.0
+                    "insect459", 0, 5.0
                 )
             # timestamps deliberately mismatch, yet no warning is logged
             assert len(caplog.records) == 0
@@ -799,8 +799,8 @@ class TestCheckTimestampOfClickDataAgainstMetadata:
             return real_read_csv(*args, **kwargs)
 
         monkeypatch.setattr("pandas.read_csv", counting_read_csv)
-        spec.check_timestamp_of_click_data_against_metadata("birdnet", 0, 0.0)
-        spec.check_timestamp_of_click_data_against_metadata("birdnet", 1, 1.0)
+        spec.check_timestamp_of_click_data_against_metadata("insect459", 0, 0.0)
+        spec.check_timestamp_of_click_data_against_metadata("insect459", 1, 1.0)
         # the metadata file is only read once per model, not once per click
         assert len(calls) == 1
 
@@ -817,7 +817,7 @@ class TestPlotEmbeddingsPxCustomData:
             "timestamp": [0.0, 1.0],
             "index": [0, 1],
             "metadata": {
-                "model_name": "birdnet",
+                "model_name": "insect459",
                 "audio_files": ["a.wav", "a.wav"],
                 "segment_length (samples)": 48000,
                 "sample_rate (Hz)": 48000,
@@ -839,7 +839,7 @@ class TestPlotEmbeddingsPxCustomData:
         customdata = np.asarray(rows, dtype=object)
         assert customdata.shape == (2, 8)
         # column 7 is the model name, column 6 the numeric label id
-        assert set(customdata[:, 7]) == {"birdnet"}
+        assert set(customdata[:, 7]) == {"insect459"}
         assert set(customdata[:, 6]) == {0, 1}
 
 def _aligned_embeds(n=6):
@@ -855,7 +855,7 @@ def _aligned_embeds(n=6):
             "audio_files": [f"file_{i}.wav" for i in range(n)],
             "segment_length (samples)": 48000,
             "sample_rate (Hz)": 48000,
-            "model_name": "birdnet",
+            "model_name": "insect459",
             "embed_dir": "/tmp/does/not/matter",
         },
     }
@@ -1056,7 +1056,7 @@ class TestAlignAnnotationsDfWithEmbeddings:
             }
         )
 
-    def _embeds(self, model="birdnet"):
+    def _embeds(self, model="insect459"):
         embeds = _aligned_embeds()
         embeds["metadata"]["model_name"] = model
         return embeds
@@ -1098,7 +1098,7 @@ class TestAlignAnnotationsDfWithEmbeddings:
         df = self._plot_df()
         annots = pd.DataFrame(
             {
-                "model": ["birdnet"] * 6 + ["other_model"] * 6,
+                "model": ["insect459"] * 6 + ["other_model"] * 6,
                 "audiofilename": [f"file_{i}.wav" for i in range(6)] * 2,
                 "start": [float(i) for i in range(6)] * 2,
                 "annotator": [f"ann_{i}" for i in range(6)] + ["other"] * 6,
@@ -1173,6 +1173,62 @@ class TestAlignAnnotationsDfWithEmbeddings:
         assert len(aligned["annotator"]) == len(df)
         assert "None of the rows" in caplog.text
 
+    def _folder_structure_df(self, sep, n=6):
+        """Plot dataframe of a dataset with a folder structure.
+
+        The file names of the embeddings come from ``metadata.yml``, which
+        stores the path relative to the audio directory with the separators
+        of the operating system the embeddings were created on.
+        """
+        df = self._plot_df(n=n)
+        df["audiofilename"] = [
+            f"audio{sep}FewShot{sep}file_{i}.wav" for i in range(n)
+        ]
+        return df
+
+    def _folder_structure_annots(self, sep, n=6):
+        return pd.DataFrame(
+            {
+                "audiofilename": [
+                    f"audio{sep}FewShot{sep}file_{i}.wav" for i in range(n)
+                ],
+                "start": [float(i) for i in range(n)],
+                "annotator": [f"ann_{i}" for i in range(n)],
+            }
+        )
+
+    def test_windows_embeddings_match_posix_annotations(self):
+        # embeddings created on windows: metadata.yml holds backslashes while
+        # the annotations file uses forward slashes
+        aligned = align_annotations_df_with_embeddings(
+            self._folder_structure_df("\\"),
+            self._folder_structure_annots("/"),
+            self._embeds(),
+        )
+        assert aligned["annotator"] == [f"ann_{i}" for i in range(6)]
+
+    def test_posix_embeddings_match_windows_annotations(self):
+        # the other way around: the annotations were written on windows while
+        # the embeddings were created on linux
+        aligned = align_annotations_df_with_embeddings(
+            self._folder_structure_df("/"),
+            self._folder_structure_annots("\\"),
+            self._embeds(),
+        )
+        assert aligned["annotator"] == [f"ann_{i}" for i in range(6)]
+
+    def test_path_objects_as_filenames_are_matched(self):
+        # a user can build the file name column from Path objects, which
+        # carry the separators of their own operating system
+        annots = self._folder_structure_annots("/")
+        annots["audiofilename"] = [
+            Path(name) for name in annots.audiofilename
+        ]
+        aligned = align_annotations_df_with_embeddings(
+            self._folder_structure_df("/"), annots, self._embeds()
+        )
+        assert aligned["annotator"] == [f"ann_{i}" for i in range(6)]
+
     def test_positional_fallback_requires_one_row_per_embedding(self, caplog):
         df = self._plot_df()
         annots = pd.DataFrame({"annotator": ["ann_0", "ann_1"]})
@@ -1236,6 +1292,31 @@ class TestPlotEmbeddingsPxWithAnnotationsDf:
         for trace in fig.data:
             rows.extend(np.asarray(trace.customdata, dtype=object).tolist())
         return np.asarray(rows, dtype=object)
+
+    def test_windows_filenames_are_matched_to_posix_annotations(self):
+        # mirrors the dashboard on windows: metadata.yml stores the paths
+        # relative to the audio_dir with backslashes while the annotations
+        # csv of the user holds forward slashes
+        embeds = _aligned_embeds()
+        embeds["metadata"]["audio_files"] = [
+            f"audio\\FewShot\\file_{i}.wav" for i in range(6)
+        ]
+        annots = self._annotations()
+        annots["audiofilename"] = [
+            "audio/" + name.replace("file_", "FewShot/file_")
+            for name in annots.audiofilename
+        ]
+        fig = plot_embeddings_px(
+            embeds,
+            self._labels(),
+            label_by="species",
+            annotations_df=annots,
+        )
+        annotators = [
+            json.loads(row[5])["annotator"] for row in self._customdata(fig)
+        ]
+        assert len(annotators) == 6
+        assert all(name.startswith("ann_") for name in annotators)
 
     def test_click_data_keeps_eight_columns(self):
         fig = plot_embeddings_px(
@@ -1647,12 +1728,12 @@ class TestVisualizeUsingDashboardCustomModels:
             pass
 
         bacpipe.visualize_using_dashboard(
-            models=["birdnet", "my_model"],
+            models=["insect459", "my_model"],
             CustomModels=[None, MyModel],
             audio_dir="bacpipe/tests/test_data",
         )
 
-        assert captured["models"] == ["birdnet", "my_model"]
+        assert captured["models"] == ["insect459", "my_model"]
         assert captured["built"] and captured["shown"]
 
     def test_unknown_model_without_custom_class_still_raises(
@@ -1679,7 +1760,7 @@ class TestVisualizeUsingDashboardCustomModels:
 
         with pytest.raises(AssertionError):
             bacpipe.visualize_using_dashboard(
-                models=["birdnet", "my_model"],
+                models=["insect459", "my_model"],
                 CustomModels=[MyModel],
                 audio_dir="bacpipe/tests/test_data",
             )
@@ -1766,7 +1847,7 @@ class TestGetLabelsForPlotGroundTruthMode:
     def test_full_mode_uses_the_unsuffixed_file(self, tmp_path, monkeypatch):
         self._patch(tmp_path, monkeypatch, self._ALL_SEGMENTS)
         labels, bool_noise = get_labels_for_plot(
-            model_name="birdnet", only_embed_annotations=False
+            model_name="insect459", only_embed_annotations=False
         )
         assert "species" in labels
         # the file of the other mode must not add a second label key
@@ -1780,7 +1861,7 @@ class TestGetLabelsForPlotGroundTruthMode:
     ):
         self._patch(tmp_path, monkeypatch, self._ANNOTATED)
         labels, bool_noise = get_labels_for_plot(
-            model_name="birdnet", only_embed_annotations=True
+            model_name="insect459", only_embed_annotations=True
         )
         assert "species" in labels
         assert "species_only_annotated" not in labels
