@@ -134,6 +134,13 @@ class MetadataLabelMaker:
             model name
         metadata_label_keys : list
             list of metadata labels, see settings.yaml
+        **kwargs : dict
+            additional keyword arguments. If ``only_embed_annotations`` is
+            True the annotations are needed to compute the timestamps of the
+            embeddings; they are either taken from the ``annotations_df``
+            kwarg (a pandas.DataFrame, which is filtered by the ``model``
+            column if it has one) or loaded from
+            ``annotations_filename``.
 
         Raises
         ------
@@ -145,8 +152,12 @@ class MetadataLabelMaker:
         self.paths = paths
         if kwargs.get("only_embed_annotations"):
             self.only_embed_annotations = True
-            if not kwargs.get('annotations_df') is None:
-                self.df = kwargs.get('annotations_df')
+            if not kwargs.get("annotations_df") is None:
+                self.df = kwargs.get("annotations_df")
+                # annotations can be built for several models at once, only
+                # the rows of this model line up with its embeddings
+                if "model" in self.df.columns:
+                    self.df = self.df[self.df.model == model]
             else:
                 self.df = load_labels_and_build_dict(
                     paths,
@@ -715,7 +726,7 @@ def ensure_windoof_path_to_posix(path):
 
     Parameters
     ----------
-    path : str
+    path : str or pathlib.Path
         path that may contain windows separators
 
     Returns
@@ -723,6 +734,7 @@ def ensure_windoof_path_to_posix(path):
     str
         path converted to posix separators
     """
+    path = str(path)
     if "\\" in path:
         from pathlib import PureWindowsPath
 
@@ -817,6 +829,71 @@ def get_ground_truth(model_name, file_path=None, return_type="dataframe"):
             get_paths(model_name).labels_path.joinpath("ground_truth.npy"),
             allow_pickle=True,
         ).item()
+
+
+ONLY_ANNOTATED_SUFFIX = "_only_annotated"
+
+
+def strip_only_annotated_suffix(name):
+    """
+    Remove the ``_only_annotated`` suffix from a ground truth label name.
+
+    Ground truth files are cached per ``only_embed_annotations`` mode, which
+    means their names carry an ``_only_annotated`` suffix (see
+    ``ground_truth_by_model``). The suffix is an implementation detail of the
+    caching, so it is removed before the label is displayed. Splitting the
+    name by underscores would also cut off label names that contain
+    underscores themselves (e.g. ``call_type``), therefore only the exact
+    suffix is replaced.
+
+    Parameters
+    ----------
+    name : str or pathlib.Path
+        label name, e.g. the stem of a ground truth file
+
+    Returns
+    -------
+    str
+        label name without the ``_only_annotated`` suffix
+    """
+    return str(name).replace(ONLY_ANNOTATED_SUFFIX, "")
+
+
+def select_ground_truth_files_for_mode(
+    ground_truth_files, only_embed_annotations=False
+):
+    """
+    Select the ground truth files that belong to the current
+    ``only_embed_annotations`` mode.
+
+    Both modes can be present in the labels directory at the same time, but
+    they contain a different number of rows (one row per embedded segment).
+    Only the files of the active mode align with the embeddings, so only
+    those may be used to build labels. If no file of the active mode exists,
+    all files are returned so that custom ground truth files are not
+    silently dropped.
+
+    Parameters
+    ----------
+    ground_truth_files : list
+        ground truth files found in the labels directory of a model
+    only_embed_annotations : bool, optional
+        if True, only the annotated segments were embedded, by default False
+
+    Returns
+    -------
+    list
+        ground truth files of the active mode, as pathlib.Path objects
+    """
+    files = [Path(f) for f in ground_truth_files]
+    selected = [
+        f
+        for f in files
+        if f.stem.endswith(ONLY_ANNOTATED_SUFFIX) == bool(only_embed_annotations)
+    ]
+    if len(selected) == 0:
+        return files
+    return selected
 
 
 def get_dt_filename(file):
@@ -1392,6 +1469,11 @@ def build_ground_truth_labels_by_file(
     Build the ground truth labels for a single audio file and add them to
     the ground truth labels of all files.
 
+    If the annotations contain a ``model`` column - which is the case when
+    the annotations were generated for several models, e.g. by a classifier -
+    only the rows of ``model`` are used, because the segment grid of the
+    annotations is model specific.
+
     Parameters
     ----------
     ind : int
@@ -1423,7 +1505,8 @@ def build_ground_truth_labels_by_file(
     """
     audio_file = metadata["files"]["audio_files"][ind]
     df = filter_df_by_filename(label_df, audio_file, filename_array=filename_array, model=model)
-    df = df[df.model==model]
+    if 'model' in df.columns:
+        df = df[df.model==model]
     if len(df) == 0:
         logger.info(
             f"\nNo annotations found for {audio_file=}. "

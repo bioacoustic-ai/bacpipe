@@ -55,8 +55,8 @@ class TestSupportedModels:
         assert isinstance(bacpipe.supported_models, list)
         assert len(bacpipe.supported_models) > 0
 
-    def test_contains_birdnet(self):
-        assert "birdnet" in bacpipe.supported_models
+    def test_contains_insect459(self):
+        assert "insect459" in bacpipe.supported_models
 
 
 class TestEmbeddingDimensions:

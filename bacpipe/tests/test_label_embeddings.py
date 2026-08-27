@@ -163,6 +163,13 @@ class TestEnsureWindoofPathToPosix:
             "/audio/file.wav"
         )
 
+    def test_accepts_path_objects(self):
+        # file names can also be Path objects, e.g. when a user builds an
+        # annotations dataframe from paths
+        assert ensure_windoof_path_to_posix(Path("audio") / "file.wav") == (
+            "audio/file.wav"
+        )
+
 
 class TestLoadMetadataFile:
     def _write_metadata(self, folder, audio_files, embed_files):
@@ -788,4 +795,249 @@ class TestMetadataLabelMakerDefaultClassifier:
 
         assert dl.default_classifier_per_embedding == ["c1", "c2", "c3"]
 
+
+
+class TestStripOnlyAnnotatedSuffix:
+    """The ``_only_annotated`` suffix of the cached ground truth files is an
+    implementation detail of the caching and must not become part of the
+    label name.
+
+    Regression: the name was cut at the first underscore of the suffix (or
+    split by underscores), which truncated label names that contain
+    underscores themselves, e.g. ``call_type``.
+    """
+
+    def test_suffix_is_removed(self):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            strip_only_annotated_suffix,
+        )
+
+        assert strip_only_annotated_suffix("species_only_annotated") == "species"
+
+    def test_label_names_with_underscores_stay_intact(self):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            strip_only_annotated_suffix,
+        )
+
+        assert (
+            strip_only_annotated_suffix("call_type_only_annotated")
+            == "call_type"
+        )
+
+    def test_name_without_suffix_is_unchanged(self):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            strip_only_annotated_suffix,
+        )
+
+        assert strip_only_annotated_suffix("call_type") == "call_type"
+
+    def test_paths_are_accepted(self):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            strip_only_annotated_suffix,
+        )
+
+        assert (
+            strip_only_annotated_suffix(Path("species_only_annotated"))
+            == "species"
+        )
+
+
+class TestSelectGroundTruthFilesForMode:
+    """Ground truth files are cached per ``only_embed_annotations`` mode and
+    both modes can be present in the labels directory at the same time. They
+    hold a different number of rows (one per embedded segment), so only the
+    files of the active mode line up with the embeddings.
+    """
+
+    def _files(self, tmp_path):
+        return [
+            tmp_path / "ground_truth_species.csv",
+            tmp_path / "ground_truth_species_only_annotated.csv",
+        ]
+
+    def test_full_mode_selects_the_unsuffixed_file(self, tmp_path):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            select_ground_truth_files_for_mode,
+        )
+
+        selected = select_ground_truth_files_for_mode(self._files(tmp_path))
+        assert [f.name for f in selected] == ["ground_truth_species.csv"]
+
+    def test_annotated_mode_selects_the_suffixed_file(self, tmp_path):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            select_ground_truth_files_for_mode,
+        )
+
+        selected = select_ground_truth_files_for_mode(
+            self._files(tmp_path), only_embed_annotations=True
+        )
+        assert [f.name for f in selected] == [
+            "ground_truth_species_only_annotated.csv"
+        ]
+
+    def test_falls_back_to_all_files_if_the_mode_has_none(self, tmp_path):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            select_ground_truth_files_for_mode,
+        )
+
+        # only the file of the other mode exists -> it is kept instead of
+        # silently dropping the users only ground truth
+        files = [tmp_path / "ground_truth_species.csv"]
+        selected = select_ground_truth_files_for_mode(
+            files, only_embed_annotations=True
+        )
+        assert [f.name for f in selected] == ["ground_truth_species.csv"]
+
+    def test_strings_are_converted_to_paths(self, tmp_path):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            select_ground_truth_files_for_mode,
+        )
+
+        selected = select_ground_truth_files_for_mode(
+            [str(f) for f in self._files(tmp_path)]
+        )
+        assert all(isinstance(f, Path) for f in selected)
+
+    def test_empty_input_returns_empty_list(self, tmp_path):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            select_ground_truth_files_for_mode,
+        )
+
+        assert select_ground_truth_files_for_mode([]) == []
+
+
+
+class TestMetadataLabelMakerAnnotationsDf:
+    """``annotations_df`` lets users pass annotations as a dataframe instead
+    of a file (see the ``simple_use_cases`` notebook).
+
+    Regressions:
+    1. The kwarg was ignored in annotated-segment mode, so bacpipe tried to
+       load an annotation *file* and crashed although the annotations had
+       been passed in.
+    2. Annotations built for several models at once carry a ``model`` column.
+       Without filtering it, the rows of the other models were used to
+       compute the timestamps of this models embeddings.
+    """
+
+    AUDIO_FILE = "CHE_01_20190101_163410.wav"
+
+    def _paths(self, tmp_path):
+        paths = SimpleNamespace(
+            audio_dir=tmp_path / "audio",
+            main_embeds_path=tmp_path / "embeddings",
+            labels_path=tmp_path / "labels",
+            preds_path=tmp_path / "predictions",
+        )
+        for path in [
+            paths.audio_dir,
+            paths.main_embeds_path,
+            paths.labels_path,
+            paths.preds_path,
+        ]:
+            path.mkdir(parents=True, exist_ok=True)
+        return paths
+
+    def _metadata(self, nr_embeds=2):
+        return {
+            "files": {
+                "audio_files": [self.AUDIO_FILE],
+                "nr_embeds_per_file": [nr_embeds],
+            },
+            "nr_embeds_total": nr_embeds,
+            "segment_length (samples)": 48000,
+            "sample_rate (Hz)": 48000,
+        }
+
+    def _annotations_df(self):
+        return pd.DataFrame(
+            {
+                "audiofilename": [self.AUDIO_FILE] * 4,
+                "start": [0, 5, 100, 200],
+                "end": [5, 10, 105, 205],
+                "label:species": ["s1", "s2", "s3", "s4"],
+                "model": ["birdnet", "birdnet", "other", "other"],
+            }
+        )
+
+    def _make(self, tmp_path, monkeypatch, nr_embeds=2, **kwargs):
+        import bacpipe.embedding_evaluation.label_embeddings as le
+
+        monkeypatch.setattr(
+            le,
+            "get_files_if_no_embeds",
+            lambda *a, **k: ([], 1.0, self._metadata(nr_embeds)),
+        )
+
+        def no_file_loading(*a, **k):
+            raise AssertionError(
+                "annotations must be taken from the annotations_df kwarg"
+            )
+
+        monkeypatch.setattr(le, "load_labels_and_build_dict", no_file_loading)
+        return le.MetadataLabelMaker(
+            self._paths(tmp_path),
+            model="birdnet",
+            metadata_label_keys=["time_of_day"],
+            **kwargs,
+        )
+
+    def test_dataframe_is_used_instead_of_a_file(self, tmp_path, monkeypatch):
+        dl = self._make(
+            tmp_path,
+            monkeypatch,
+            only_embed_annotations=True,
+            annotations_df=self._annotations_df(),
+        )
+        assert dl.only_embed_annotations is True
+        assert isinstance(dl.df, pd.DataFrame)
+
+    def test_rows_of_other_models_are_dropped(self, tmp_path, monkeypatch):
+        dl = self._make(
+            tmp_path,
+            monkeypatch,
+            only_embed_annotations=True,
+            annotations_df=self._annotations_df(),
+        )
+        # only the rows of this model line up with its embeddings
+        assert dl.df.model.unique().tolist() == ["birdnet"]
+        assert dl.df.start.tolist() == [0, 5]
+
+    def test_timestamps_are_based_on_the_filtered_annotations(
+        self, tmp_path, monkeypatch
+    ):
+        dl = self._make(
+            tmp_path,
+            monkeypatch,
+            only_embed_annotations=True,
+            annotations_df=self._annotations_df(),
+        )
+        dl.time_of_day()
+        # 16:34:10 plus the annotation starts (0 s, 5 s) of this model
+        assert dl.time_of_day_per_embedding == ["16-34-10", "16-34-15"]
+
+    def test_dataframe_without_model_column_is_used_as_is(
+        self, tmp_path, monkeypatch
+    ):
+        annots = self._annotations_df().drop(columns=["model"])
+        dl = self._make(
+            tmp_path,
+            monkeypatch,
+            nr_embeds=4,
+            only_embed_annotations=True,
+            annotations_df=annots,
+        )
+        assert dl.df.start.tolist() == [0, 5, 100, 200]
+
+    def test_dataframe_is_ignored_without_only_embed_annotations(
+        self, tmp_path, monkeypatch
+    ):
+        dl = self._make(
+            tmp_path,
+            monkeypatch,
+            annotations_df=self._annotations_df(),
+        )
+        # a regular time grid is used, no annotations are needed
+        assert not hasattr(dl, "only_embed_annotations")
+        assert not hasattr(dl, "df")
 

@@ -34,9 +34,60 @@ class TestConvertNumpyTypes:
     def test_ndarray_converted_to_list(self):
         assert convert_numpy_types(np.array([1, 2, 3])) == [1, 2, 3]
 
-    def test_other_types_return_none(self):
-        assert convert_numpy_types("not a numpy type") is None
-        assert convert_numpy_types(5) is None
+    def test_other_types_return_correctly(self):
+        assert convert_numpy_types("not a numpy type") is "not a numpy type"
+        assert convert_numpy_types(5) is 5
+
+
+class TestConvertNumpyTypesCascadesValues:
+    """Regression tests for the label values shown with the spectrogram.
+
+    ``convert_numpy_types`` only exists to make numpy types json
+    serializable. Handling numpy types exclusively (and implicitly returning
+    ``None`` for everything else) silently dropped every string label - which
+    is what most label values are - from the hover text of the embedding
+    plots.
+    """
+
+    def test_strings_are_returned_unchanged(self):
+        assert convert_numpy_types("Tree Pipit") == "Tree Pipit"
+        assert convert_numpy_types(np.str_("Tree Pipit")) == "Tree Pipit"
+
+    def test_native_python_types_are_returned_unchanged(self):
+        assert convert_numpy_types(3) == 3
+        assert convert_numpy_types(3.5) == 3.5
+        assert convert_numpy_types(True) is True
+        assert convert_numpy_types(None) is None
+        assert convert_numpy_types(["a", 1]) == ["a", 1]
+
+    def test_numpy_scalars_become_native_python_types(self):
+        for value, expected in [
+            (np.int32(7), 7),
+            (np.int64(7), 7),
+            (np.float32(0.5), 0.5),
+            (np.float64(0.5), 0.5),
+            (np.bool_(True), True),
+        ]:
+            converted = convert_numpy_types(value)
+            assert converted == expected
+            assert not isinstance(converted, np.generic)
+
+    def test_all_values_stay_json_serializable(self):
+        values = [
+            np.int32(1),
+            np.int64(2),
+            np.float32(0.5),
+            np.bool_(False),
+            np.array([1.0, 2.0]),
+            "Tree Pipit",
+            4,
+            None,
+        ]
+        dumped = json.dumps([convert_numpy_types(v) for v in values])
+        # the string label must survive the conversion, otherwise the
+        # spectrogram text of the dashboard shows "null"
+        assert "Tree Pipit" in dumped
+        assert json.loads(dumped)[-1] is None
 
 
 class TestSaveClusteringPerformance:

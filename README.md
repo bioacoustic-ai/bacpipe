@@ -3,9 +3,9 @@
 [![Documentation Status](https://readthedocs.org/projects/bacpipe/badge/?version=latest)](https://bacpipe.readthedocs.io/en/latest/?badge=latest)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/bacpipe?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/bacpipe)
 [![PyPI version](https://badge.fury.io/py/bacpipe.svg?icon=si%3Apython&icon_color=%23f66151)](https://badge.fury.io/py/bacpipe)
-[![arXiv](https://img.shields.io/badge/arXiv-2604.11560-b31b1b.svg)](https://arxiv.org/abs/2604.11560)
 [![DOI](https://zenodo.org/badge/874895988.svg)](https://doi.org/10.5281/zenodo.22035528)
 
+[![DOI](https://img.shields.io/badge/Methods_in_Ecology_and_Evolution-10.1111%2F2041--210X.70406-002f6c)](https://doi.org/10.1111/2041-210X.70406)
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_311_linux.yaml?label=3.11&&logo=linux)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_311_linux.yaml)
 [![Tests](https://img.shields.io/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_312_linux.yaml?label=3.12&&logo=linux)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_312_linux.yaml)
@@ -37,7 +37,7 @@ bacpipe.play()
 ```
 A more detailed description of the API can be found under [API](#api). 
 
-In `bacpipe/examples` you can find 5 **jupyter notebooks** demonstrating different use cases of the API. A good starting point is the notebook **simple_use_cases.ipynb** which you can find as a file [here](bacpipe/examples/basic_examples/simple_use_cases.ipynb) or online in the documentation [here](https://bacpipe.readthedocs.io/en/latest/examples/basic_examples/simple_use_cases.html). To see how you can easily compare a model of your own to an existing model check out the notebook **using_a_custom_model.ipynb** which you can find as a file [here](bacpipe/examples/basic_examples/using_a_custom_model.ipynb) or online in the documentation [here](https://bacpipe.readthedocs.io/en/latest/examples/basic_examples/using_a_custom_model.html).
+In `bacpipe/examples` you can find 6 **jupyter notebooks** demonstrating different use cases of the API. A good starting point is the notebook **simple_use_cases.ipynb** which you can find as a file [here](bacpipe/examples/basic_examples/simple_use_cases.ipynb) or online in the documentation [here](https://bacpipe.readthedocs.io/en/latest/examples/basic_examples/simple_use_cases.html). To see how you can easily compare a model of your own to an existing model check out the notebook **using_a_custom_model.ipynb** which you can find as a file [here](bacpipe/examples/basic_examples/using_a_custom_model.ipynb) or online in the documentation [here](https://bacpipe.readthedocs.io/en/latest/examples/basic_examples/using_a_custom_model.html).
 
 
 Full documentation can be found at [https://bacpipe.readthedocs.io](https://bacpipe.readthedocs.io). The github repository can be found at [https://github.com/bioacoustic-ai/bacpipe](https://github.com/bioacoustic-ai/bacpipe).
@@ -49,6 +49,7 @@ __Try it out__ and (__please__) feel free to give feedback, make suggestions and
 
 This project is still in its early stages and so bugs can still occur. However, all models have been tested successfully on different operating systems. The traffic suggests that it is useful for researchers in our field. It would be great to see it grow into a community project.
 
+If you would like to **contribute** to the project. Have a look at existing feature requests and issues [here](https://github.com/bioacoustic-ai/bacpipe/issues) and please check out the [contribution guidelines](#contribute) below.
 
 ## 📚 Table of Contents
 
@@ -1044,17 +1045,32 @@ Most of the models are based on pytorch. For tensorflow models, see __birdnet__,
 
 # Contribute
 
-This repository is intended to be a collaborative project for people working in the field of bioacoustics. If you think there is some improvement that could be useful, please raise an [issue](https://github.com/bioacoustic-ai/bacpipe/issues), submit a [PR](https://github.com/bioacoustic-ai/bacpipe/pulls) or get in touch. 
+This repository is intended to be a collaborative project for people working in the field of bioacoustics. Checkout the [issues](https://github.com/bioacoustic-ai/bacpipe/issues) and [pull requests](https://github.com/bioacoustic-ai/bacpipe/pulls) to see what is currently being worked on, or planned. 
 
-There are two main intentions for this repository that should always be considered when contributing: 
-      
-      1. Only add new requirements if truly necessary
+Contributions can be anything from **adding a model**, to **fixing a bug**, to **improving the documentation**. Given the complexity of the repository, **improvements to the documentation are especially very welcome**.
+
+If you think there is some improvement that could be useful beyond what already exists, please raise an [issue](https://github.com/bioacoustic-ai/bacpipe/issues), submit a [PR](https://github.com/bioacoustic-ai/bacpipe/pulls) or if you prefer, simply send an email. 
+
+**Things to keep in mind**
+
+There are two main design intentions for this repository that would be good to keep in mind when contributing: 
+
+1. Only add new requirements if truly necessary
+
+2. The main purpose of bacpipe is quickly generating embeddings from models
 
 Given the large number of different models, there are already a lot of requirements. To ensure that the repository is stable, and installation errors are kept minimal, please only add code with new requirements if truly necessary.
       
-      2. The main purpose of bacpipe is quickly generating embeddings from models
-      
 There should always be a baseline minimal use case, where embeddings are created from different feature extractors and everything else is an add-on.
+
+**Finalizing your contribution**
+
+Please ensure all tests for the contribution you are submitting pass. 
+
+If you are adding a new model, please
+1. add the model to bacpipe.core.constants,
+2. add documentation in this `README.md` (follow documentation for other models as guidline)
+3. add the model name in the github-actions workflow files in `.github/workflows` so that the model is tested on every push and pull request.
 
 # Known issues
 
@@ -1083,14 +1099,13 @@ A lot of work has gone into creating these bioacoustic models, both by data coll
 This work now has a paper associated with it. The manuscript is currently under review. A preprint is available on arXiv. If you use **bacpipe** for your research, please include the following reference:
 
 ```bibtex
-@misc{kather2026bacpipe,
-      title={bacpipe: a Python package to make bioacoustic deep learning models accessible}, 
-      author={Vincent S. Kather and Sylvain Haupert and Burooj Ghani and Dan Stowell},
-      year={2026},
-      eprint={2604.11560},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2604.11560}, 
+@article{kather2026bacpipe,
+  author    = {Kather, Vincent S. and Haupert, Sylvain and Ghani, Burooj and Stowell, Dan},
+  title     = {bacpipe: A {Python} package to make bioacoustic deep learning models accessible},
+  journal   = {Methods in Ecology and Evolution},
+  year      = {2026},
+  doi       = {10.1111/2041-210X.70406},
+  note      = {In press}
 }
 ```
 

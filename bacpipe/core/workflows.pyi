@@ -48,8 +48,8 @@ def play(
 
 
 def ensure_models_exist(
-    model_base_path: Optional[str | Path] = None,
-    model_names: Optional[list[str]] = None,
+    model_base_path: Optional[str | Path] = ...,
+    model_names: Optional[list[str]] = ...,
     repo_id: str = "vskode/bacpipe_models",
     CustomModel: Any = None,
     CustomModels: Any = None,
@@ -134,3 +134,8 @@ def visualize_using_dashboard(
     dashboard_websocket_origin: Any = False,
     **kwargs: Any,
 ) -> None: ...
+
+
+# private helpers of the module are not declared in this stub
+def __getattr__(name: str) -> Any: ...
+
