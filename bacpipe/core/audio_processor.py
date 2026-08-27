@@ -494,13 +494,8 @@ class AudioHandler:
                 f"No annotations found for audio file {file_path.relative_to(self.audio_dir)}. "
                 "Continuing with next file."
             )
-            if len(file_annots) == 0:
-                raise AssertionError(
-                    f"No annotations found for audio file {file_path.relative_to(self.audio_dir)}. "
-                    "Continuing with next file."
-                )
 
-            file_annots = file_annots.drop_duplicates(subset=["start", "end"])
+        file_annots = file_annots.drop_duplicates(subset=["start", "end"])
 
         self.get_file_length(file_path)
         file_duration = self.file_length[file_path.stem]

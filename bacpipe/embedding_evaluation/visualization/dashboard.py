@@ -191,19 +191,6 @@ class DashBoard(DashBoardHelper):
         )
 
         
-        kwargs = replace_default_kwargs_with_user_kwargs(
-            remove_keys=[
-                'audio_dir',
-                'evaluation_task',
-                'dim_reduction_model',
-                'metadata_label_keys',
-                'main_results_dir',
-                'dim_reduc_parent_dir'
-                ], 
-            **kwargs
-            )
-        
-        
         self.audio_dir = audio_dir
         self.path_func = le.make_set_paths_func(
             audio_dir, 

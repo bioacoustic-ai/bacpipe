@@ -171,7 +171,6 @@ class Loader:
         self.testing = testing
         self.use_folder_structure = use_folder_structure
         self.continue_incomplete_run = False
-        self.audio_suffixes = kwargs.get('audio_suffixes', settings.audio_suffixes)
 
         self._initialize_path_structure(testing=testing, **kwargs)
 
@@ -429,8 +428,6 @@ class Loader:
             # load the metadata.yml file contained in d
             with open(d.joinpath("metadata.yml"), "r") as f:
                 mdata = yaml.load(f, Loader=yaml.CLoader)
-                if mdata is None:
-                    continue
                 if not self.model_name == mdata["model_name"]:
                     continue
 
@@ -489,7 +486,7 @@ class Loader:
                 return
             else:
                 logger.info(f"Found {num_files} embedding files.")
-                num_audio_files = len(self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes))
+                num_audio_files = len(self.get_audio_files(self.audio_dir))
         except AssertionError as e:
             self._get_metadata_dict(d)
             self.combination_already_exists = True
@@ -561,7 +558,7 @@ class Loader:
         """
         self.continue_incomplete_run = True
         self.embed_dir = directory
-        self.files = self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes)
+        self.files = self.get_audio_files(self.audio_dir)
         self._init_metadata_dict()
         self._get_metadata_from_created_embeddings()
 
@@ -570,7 +567,7 @@ class Loader:
         Collect all audio files in the audio directory and initialize
         ``self.embed_dir`` with a timestamp-based directory name.
         """
-        self.files = self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes)
+        self.files = self.get_audio_files(self.audio_dir)
         self.files.sort()
         if not hasattr(self, "embed_parent_dir"):
             from bacpipe import settings as settings
