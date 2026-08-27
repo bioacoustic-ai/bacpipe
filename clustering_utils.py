@@ -53,11 +53,11 @@ def get_embeddings(path, models):
             snr_string = snr_dir.stem if snr_dir.is_dir() else False
             if not snr_string:
                 continue
-            if not '0' in snr_string:# and not '6' in snr_string:
-                continue
+            # if not '0' in snr_string:# and not '6' in snr_string:
+            #     continue
                 # no need to work on other snr's for now
 
-            loader = Loader(snr_dir, model_name, use_folder_structure=True, audio_suffixes=['.h5'], main_results_dir=f'bacpipe_results/{audio_dir.stem}')
+            loader = Loader(snr_dir, model_name, use_folder_structure=True, audio_suffixes=['.h5'], main_results_dir=f'{settings.main_results_dir}/{audio_dir.stem}')
             try:
                 if loader.continue_incomplete_run:
                     raise FileNotFoundError('Not all files have been processed yet.')
@@ -68,7 +68,7 @@ def get_embeddings(path, models):
                 embed_obj = Embedder(model_name, loader=loader, device='cuda', padding=PAD_FUNC, global_batch_size=24)
                 for file in loader.files:
                     df, audio = read_dataset(file)
-                    embeds_snr[model_name][snr_string] = embed_obj.embeddings_using_multithreading(audio)
+                    embeds_snr[model_name][snr_string] = embed_obj.generate_embeddings_from_audio_array(audio)
                     embeds_snr[model_name][snr_string] = np.vstack(embeds_snr[model_name][snr_string])
                     length = (
                         embeds_snr[model_name][snr_string].shape[0] 
@@ -92,7 +92,7 @@ def get_embeddings(path, models):
                 embeds_snr[model_name][snr_string] = np.vstack(list(embeds_snr[model_name][snr_string].values()))
         
 
-            loader_dr = Loader(snr_dir, model_name, use_folder_structure=True, dim_reduction_model='umap', audio_suffixes=['.h5'], main_results_dir=f'bacpipe_results/{audio_dir.stem}')
+            loader_dr = Loader(snr_dir, model_name, use_folder_structure=True, dim_reduction_model='umap', audio_suffixes=['.h5'], main_results_dir=f'{settings.main_results_dir}/{audio_dir.stem}')
 
             try:
                 files = list(loader_dr.embed_dir.rglob('*json'))
@@ -130,7 +130,7 @@ def load_umap_model(path):
 
 
 def fetch_clustering(embeds, df, clustering_dict, overwrite=False):
-    if False:#overwrite or not (main_results_path / f'clusters.csv').exists():
+    if overwrite or not (main_results_path / f'clusters.csv').exists():
         clust_df = df.copy()
         centroid_dict = dict()
 
@@ -219,14 +219,19 @@ def evaluate_clustering(df, clust_df, embeds, clustering_dict, overwrite=False):
                                 # Create a series initialized with False, set true values where index matches
                                 col_series = pd.Series(False, index=df.index)
                                 col_series.loc[df_tmp.index] = True
-                                boolean_dict[col_name] = col_series
+                                boolean_dict[col_name] = col_series.values
                                 
                                 # Ground truth and evaluation processing
                                 ground_truth = [1 if l == species else 0 for l in df_tmp.species]
                                 clusters = clust_df[f"{model_name}_{snr}_{clust_name}"][df_tmp.index]
+                                unique, counts = np.unique(clusters, return_counts=True)
+                                big_clusters = unique[counts>50]
+                                for big_clust in big_clusters:
+                                    clusters[clusters==big_clust] = -2
                                 
                                 clust_results[model_name][snr][clust_name][eval_name][noise_env].update({
-                                    species: HS(clusters, ground_truth)
+                                    # ground truth is expected first, for HS this matters!
+                                    species: HS(ground_truth, clusters) 
                                 })
                                 
                                 # Calculate average safely
@@ -238,12 +243,17 @@ def evaluate_clustering(df, clust_df, embeds, clustering_dict, overwrite=False):
             # If cluster_booleans already exists, combine them; otherwise, assign it directly
             cluster_booleans = pd.concat([cluster_booleans, new_booleans], axis=1)
 
-        cluster_booleans.to_parquet(main_results_path / 'cluster_booleans.parquet', index=False)
+        cluster_booleans.to_csv(main_results_path / 'cluster_booleans.csv', index=False)
         
         with open(main_results_path / 'clust_results.json', 'w') as f:
             json.dump(clust_results, f)
             
             
+    else:
+        cluster_booleans = pd.read_csv(main_results_path / 'cluster_booleans.csv', index_col=False)
+        
+        with open(main_results_path / 'clust_results.json', 'r') as f:
+            clust_results = json.load(f)
         if len(df.snr.unique()) > 3:
             for model in embeds.keys():
                 for clust_name in clustering_dict.keys():
@@ -256,11 +266,6 @@ def evaluate_clustering(df, clust_df, embeds, clustering_dict, overwrite=False):
                         save_path = main_results_path / f'{clust_name}_{model}'
                         save_path.mkdir(exist_ok=True)
                         plot_clusterings(clust_results, df, model, clust_name, eval_name, save_path)
-    else:
-        cluster_booleans = pd.read_parquet(main_results_path / 'cluster_booleans.parquet', index_col=False)
-        
-        with open(main_results_path / 'clust_results.json', 'r') as f:
-            clust_results = json.load(f)
     return cluster_booleans, clust_results
         
 def fetch_visualization_df(clust_df, path, clustering_dict, umaps, overwrite=True, overwrite_gt=False):
@@ -343,14 +348,14 @@ def plot_clusterings(clust_results, df, model, clust_name, eval_name, save_path)
             ax[idx%3, idx//3].plot([s for s in np.sort(df.snr.unique()) if s >= 0], plot_data[species][noise_env], label=noise_env)
         ax[idx%3, idx//3].set_title(species)
         
-        if (
-            not eval_name == 'species_vs_infile_noise' 
-            and not np.max(list(plot_data[species].values())) > 0.5
-            ):
+        # if (
+        #     not eval_name == 'species_vs_infile_noise' 
+        #     and not np.max(list(plot_data[species].values())) > 0.5
+        #     ):
             
-            ax[idx%3, idx//3].set_ylim([0, 0.5])
-        else:
-            ax[idx%3, idx//3].set_ylim([0, 1])
+        #     ax[idx%3, idx//3].set_ylim([0, 0.5])
+        # else:
+        ax[idx%3, idx//3].set_ylim([0, 1])
         
         ax[idx%3, idx//3].set_xticks([s for s in df.snr.unique() if s >= 0], [str(s) for s in df.snr.unique() if s >= 0])
         idx += 1
@@ -421,7 +426,7 @@ def load_df_same_order_as_embeddings(audio_dir, model, snr):
             if not (snr_string in str(snr_dir) and str(snr).split('.')[-1] in snr_string):
                 continue
     
-        loader = Loader(audio_dir / snr_string, model, use_folder_structure=True, audio_suffixes=['.h5'], main_results_dir=f'bacpipe_results/{Path(audio_dir).stem}')
+        loader = Loader(audio_dir / snr_string, model, use_folder_structure=True, audio_suffixes=['.h5'], main_results_dir=f'{settings.main_results_dir}/{Path(audio_dir).stem}')
         
         
         snr_model_df = pd.DataFrame()

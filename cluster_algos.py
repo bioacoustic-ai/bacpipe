@@ -251,9 +251,9 @@ class Clustering_Approach:
         for idx_centroid in np.arange(len(centroids)):
             new_labels[new_labels == idx_centroid] = labels[idx_centroid]
             
-        for idx_centroid in np.arange(len(centroids)):
-            if len(new_labels[new_labels == idx_centroid]) > self.max_cluster_size:
-                new_labels[new_labels == idx_centroid] = -2
+        # for idx_centroid in np.arange(len(centroids)):
+        #     if len(new_labels[new_labels == idx_centroid]) > self.max_cluster_size:
+        #         new_labels[new_labels == idx_centroid] = -2
         
         return new_labels
 
