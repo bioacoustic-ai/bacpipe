@@ -136,6 +136,7 @@ available_models : [
     "perch_v2",
     "protoclr",
     "rcl_fs_bsed",
+    "repertoire_embedder",
     "surfperch",
     "google_whale",
     "vggish"
@@ -242,6 +243,7 @@ Models currently include:
 |   Perch_V2       |   [paper](https://arxiv.org/abs/2508.04665)   |   [code](https://github.com/google-research/perch_hoplite)    |   32 kHz|   5 s| 1536 |
 |   ProtoCLR     |   [paper](https://arxiv.org/pdf/2409.08589)   |   [code](https://github.com/ilyassmoummad/ProtoCLR)    |   16 kHz|   6 s| 384 |
 |   RCL_FS_BSED     |   [paper](https://arxiv.org/abs/2309.08971)   |   [code](https://github.com/ilyassmoummad/RCL_FS_BSED)    |   22.05 kHz|   0.2 s| 2048 |
+|   repertoire_embedder     |     [paper](https://doi.org/10.1371/journal.pone.0283396)  |   [code](https://gitlab.lis-lab.fr/paul.best/repertoire_embedder)  |   22.05 kHz|    1 s| 256 |
 |   SurfPerch       |   [paper](https://arxiv.org/abs/2404.16436)   |   [code](https://www.kaggle.com/models/google/surfperch)    |   32 kHz|   5 s| 1280 |
 |   VGGish      |   [paper](https://ieeexplore.ieee.org/document/7952132)   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   16 kHz|   0.96 s| 128 |
 
@@ -779,6 +781,7 @@ This is the resulting folder structure:
 |   [Perch_V2](#perch_v2)       |   [paper](https://arxiv.org/abs/2508.04665)   |   [code](https://github.com/google-research/perch_hoplite)    |   sup l |   CNN | EfficientNetB3 | included |
 |   [ProtoCLR](#protoclr)     |   [paper](https://arxiv.org/pdf/2409.08589)   |   [code](https://github.com/ilyassmoummad/ProtoCLR)    |   sup cl|   trafo| CvT-13 | [weights](https://huggingface.co/ilyassmoummad/ProtoCLR)|
 |   [RCL_FS_BSED](#rcl_fs_bsed)     |   [paper](https://arxiv.org/abs/2309.08971)   |   [code](https://github.com/ilyassmoummad/RCL_FS_BSED)    |   sup cl|   CNN| ResNet9 | [weights](https://zenodo.org/records/11353694)|
+|   [repertoire_embedder](#repertoire_embedder)  |  [paper](https://doi.org/10.1371/journal.pone.0283396)  |  [code](https://gitlab.lis-lab.fr/paul.best/repertoire_embedder)  |  ssl  |  CNN  |  sparrow  |  [weights](https://gitlab.lis-lab.fr/paul.best/repertoire_embedder/-/blob/main/new_specie/generic_embedder.weights)
 |   [SurfPerch](#surfperch)       |   [paper](https://arxiv.org/abs/2404.16436)   |   [code](https://www.kaggle.com/models/google/surfperch)    |   sup l|   CNN| EffNetb0 | included |
 |   [VGGish](#vggish)      |   [paper](https://ieeexplore.ieee.org/document/7952132)   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   sup l|   CNN| VGG | [weights](https://storage.googleapis.com/audioset/vggish_model.ckpt)|
 
@@ -941,6 +944,13 @@ NatureLM-Audio is a very ambitious foundational model specifically for bioacoust
 - trained on dcase 2023 task 5 dataset [link](https://zenodo.org/records/6482837)
 
 RCL_FS_BSED stands for Regularized Contrastive Learning for Few-shot Bioacoustic Sound Event Detection and features a model based on a ResNet model. The model was originally created for the DCASE bioacoustic few shot challenge (task 5) and later improved.
+
+### repertoire_embedder
+- CNN
+- self-supervised auto-encoder
+- trained on 7 different bioacoustic datasets, including birds and cetaceans, and with varying SNR.
+
+Published in [PLOS One in 2023](https://doi.org/10.1371/journal.pone.0283396), repertoire_embedder is an auto-encoder trained and evaluated on 7 different bioacoustics datasets, with various species from birds to cetaceans. When clustering on the auto-encoder's embeddings, agreements with expert labels of call types and individual signatures are better than other approaches. Despite not needing labels to be trained on new data, performance without retraining is also higher than other approaches. For bacpipe compatibility, the included model has fixed spectrogram parameters (SR, NFFT, hop size, and sample length). However, with the [original python interface](https://gitlab.lis-lab.fr/paul.best/repertoire_embedder), users can choose whatever setting best suits their data (pretrained weights do work even if spectrogram settings differ).
 
 ### ProtoCLR
 - transformer
