@@ -486,7 +486,7 @@ class Loader:
                 return
             else:
                 logger.info(f"Found {num_files} embedding files.")
-                num_audio_files = len(self.get_audio_files(self.audio_dir))
+                num_audio_files = len(self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes))
         except AssertionError as e:
             self._get_metadata_dict(d)
             self.combination_already_exists = True
@@ -558,7 +558,7 @@ class Loader:
         """
         self.continue_incomplete_run = True
         self.embed_dir = directory
-        self.files = self.get_audio_files(self.audio_dir)
+        self.files = self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes)
         self._init_metadata_dict()
         self._get_metadata_from_created_embeddings()
 
@@ -567,7 +567,7 @@ class Loader:
         Collect all audio files in the audio directory and initialize
         ``self.embed_dir`` with a timestamp-based directory name.
         """
-        self.files = self.get_audio_files(self.audio_dir)
+        self.files = self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes)
         self.files.sort()
         if not hasattr(self, "embed_parent_dir"):
             from bacpipe import settings as settings

@@ -36,6 +36,8 @@ class Model(ModelBaseClass):
         """
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
         
+        self.batch_size = 2 * self.batch_size
+        
         label_path = self.model_utils_base_path / 'birdnet_v3/BirdNET+_V3.0-preview3.1_Global_11K_Labels.csv'
         checkpoint_path=(
             self.model_base_path / 'birdnet_v3' / 'model.onnx'
@@ -150,6 +152,7 @@ class birdnet_v3_ONNX(nn.Module):
             providers = ["CPUExecutionProvider"]
 
         providers.append("CPUExecutionProvider")
+        return providers
     
 
     def forward(
