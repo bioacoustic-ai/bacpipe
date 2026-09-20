@@ -20,9 +20,9 @@ image by Nicole Allison
 **bacpipe** makes using deep learning models for bioacoustics easy!
 Using **bacpipe** you can generate embeddings and classifier predictions and evaluate them using probing, clustering and benchmarking. All you need is your audio data!
 
-There's an applications paper available on [arxiv](https://arxiv.org/abs/2604.11560) describing the pipeline and its capabilities which is currently under review.
+There's an applications paper available in [methods in ecology and evolution](https://doi.org/10.1111/2041-210X.70406) describing the pipeline and its capabilities.
 
-The best part is, **bacpipe** comes with an interactive GUI for you to explore your data organized by the state-of-the-art deep learning models for bioacoustics. 
+The best part is, **bacpipe** comes with an interactive GUI for you to explore your data organized by the state-of-the-art deep learning models for bioacoustics. A demo of the GUI can be found at [bacpipe.siriusly.me](https://bacpipe.siriusly.me).
 
 **bacpipe** is also available on pip: `pip install bacpipe`
 
@@ -35,7 +35,7 @@ import bacpipe
 
 bacpipe.play()
 ```
-A more detailed description of the API can be found under [API](#api). A demo of the GUI can be found at [bacpipe.siriusly.me](https://bacpipe.siriusly.me).
+A more detailed description of the API can be found under [API](#api). 
 
 In `bacpipe/examples` you can find 6 **jupyter notebooks** demonstrating different use cases of the API. A good starting point is the notebook **simple_use_cases.ipynb** which you can find as a file [here](bacpipe/examples/basic_examples/simple_use_cases.ipynb) or online in the documentation [here](https://bacpipe.readthedocs.io/en/latest/examples/basic_examples/simple_use_cases.html). To see how you can easily compare a model of your own to an existing model check out the notebook **using_a_custom_model.ipynb** which you can find as a file [here](bacpipe/examples/basic_examples/using_a_custom_model.ipynb) or online in the documentation [here](https://bacpipe.readthedocs.io/en/latest/examples/basic_examples/using_a_custom_model.html).
 
