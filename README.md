@@ -3,7 +3,7 @@
 [![Documentation Status](https://readthedocs.org/projects/bacpipe/badge/?version=latest)](https://bacpipe.readthedocs.io/en/latest/?badge=latest)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/bacpipe?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/bacpipe)
 [![PyPI version](https://badge.fury.io/py/bacpipe.svg?icon=si%3Apython&icon_color=%23f66151)](https://badge.fury.io/py/bacpipe)
-[![DOI](https://zenodo.org/badge/874895988.svg)](https://doi.org/10.5281/zenodo.22035528)
+[![Zenodo](https://img.shields.io/badge/Zenodo-DOI-blue)](https://doi.org/10.5281/zenodo.22035528)
 
 [![DOI](https://img.shields.io/badge/Methods_in_Ecology_and_Evolution-10.1111%2F2041--210X.70406-002f6c)](https://doi.org/10.1111/2041-210X.70406)
 
@@ -35,21 +35,21 @@ import bacpipe
 
 bacpipe.play()
 ```
-A more detailed description of the API can be found under [API](#api). 
+A more detailed description of the API can be found under [API](#api). A demo of the GUI can be found at [bacpipe.siriusly.me](https://bacpipe.siriusly.me).
 
 In `bacpipe/examples` you can find 6 **jupyter notebooks** demonstrating different use cases of the API. A good starting point is the notebook **simple_use_cases.ipynb** which you can find as a file [here](bacpipe/examples/basic_examples/simple_use_cases.ipynb) or online in the documentation [here](https://bacpipe.readthedocs.io/en/latest/examples/basic_examples/simple_use_cases.html). To see how you can easily compare a model of your own to an existing model check out the notebook **using_a_custom_model.ipynb** which you can find as a file [here](bacpipe/examples/basic_examples/using_a_custom_model.ipynb) or online in the documentation [here](https://bacpipe.readthedocs.io/en/latest/examples/basic_examples/using_a_custom_model.html).
 
 
 Full documentation can be found at [https://bacpipe.readthedocs.io](https://bacpipe.readthedocs.io). The github repository can be found at [https://github.com/bioacoustic-ai/bacpipe](https://github.com/bioacoustic-ai/bacpipe).
 
-There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) available on youtube to install and run bacpipe.
+There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) available on youtube to install and run bacpipe (Bacpipe has evolved a lot since this video and a new video will be published soon).
 
 
 __Try it out__ and (__please__) feel free to give feedback, make suggestions and ask questions either in the [Discussion](https://github.com/bioacoustic-ai/bacpipe/discussions), [Raise an Issue](https://github.com/bioacoustic-ai/bacpipe/issues) or submit a [Pull Request](https://github.com/bioacoustic-ai/bacpipe/pulls). 
 
-This project is still in its early stages and so bugs can still occur. However, all models have been tested successfully on different operating systems. The traffic suggests that it is useful for researchers in our field. It would be great to see it grow into a community project.
+All models have been tested successfully on different operating systems. Bugs might occur nonetheless, and if they do please reach out directly or [raise an issue](https://github.com/bioacoustic-ai/bacpipe/issues). The traffic suggests that it is useful for researchers in our field. It would be great to see it grow into a community project.
 
-If you would like to **contribute** to the project. Have a look at existing feature requests and issues [here](https://github.com/bioacoustic-ai/bacpipe/issues) and please check out the [contribution guidelines](#contribute) below.
+If you would like to **contribute** to the project. Have a look at existing feature requests and [issues](https://github.com/bioacoustic-ai/bacpipe/issues) and please check out the [contribution guidelines](#contribute) below. And you do not have to be a coder to contribute. Helping to make the documentation more understandable is just as valuable as adding code!
 
 ## 📚 Table of Contents
 
@@ -89,6 +89,8 @@ If you would like to **contribute** to the project. Have a look at existing feat
 - [Contribute](#contribute)
 - [Known issues](#known-issues)
 - [Citation](#citation)
+- [Statement about AI use](#statement-about-ai-use)
+- [Acknowledgements](#acknowledgements)
 - [Newsletter and Q&A sessions](#newsletter-and-qa-sessions)
 
 
@@ -1070,7 +1072,12 @@ Please ensure all tests for the contribution you are submitting pass.
 If you are adding a new model, please
 1. add the model to bacpipe.core.constants,
 2. add documentation in this `README.md` (follow documentation for other models as guidline)
-3. add the model name in the github-actions workflow files in `.github/workflows` so that the model is tested on every push and pull request.
+3. add the model code to bacpipe/model_pipelines/feature_extractors
+4. if the model requires a checkpoint, upload the model to the [huggingface repository](https://huggingface.co/datasets/vskode/bacpipe_models/tree/main) where all model checkpoints are collected. 
+    
+    - the checkpoint should be in the format: model_name.tar.xz so that when you unpack it you get model_name/model_name/checkpoint_name. 
+    - download a few models to see the structure.
+    - if you do not have a huggingface account or any of this is too confusing, just contact me via [email](mailto:vincent.kather@naturalis.nl)
 
 # Known issues
 
@@ -1109,6 +1116,14 @@ This work now has a paper associated with it. The manuscript is currently under 
 }
 ```
 
+# Statement about AI use
+
+The vast majority of this repository was coded without AI. 
+AI was used to build a large amount of unit tests and docstrings for the entire codebase (deepseek v4 flash and pro). It was also used on a few select functions. When contributing generated code please thoroughly check the submitted code.
+
+# Acknowledgements
+
+This repository wouldn't be where it is if it were not for the various people that have contributed to it already. Aside from the people already mentioned listed as contributors we would like to thank Minkyung Kwak and Lorenzo Dubois for extensive testing and Nicole Allison for the design of the logo.
 
 # Newsletter and Q&A sessions
 
