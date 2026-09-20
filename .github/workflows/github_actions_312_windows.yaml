@@ -37,6 +37,11 @@ jobs:
                       if getattr(target, 'id', None) == 'EMBEDDING_DIMENSIONS':
                           keys = [k.value for k in node.value.keys]
                           keys.remove('birdnet')
+                          keys.remove('vggish')
+                          keys.remove('perch_bird')
+                          keys.remove('hbdet')
+                          keys.remove('surfperch')
+                          keys.remove('google_whale')
                           print(json.dumps(keys))
                           found = True
           if not found:
