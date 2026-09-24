@@ -344,6 +344,14 @@ class Embedder(AudioHandler):
         else:
             use_sample_of_files = False
             sample_files = self.loader.files
+            
+        if not (
+            sample_files[-1].stem.replace(f'_{self.loader.metadata_dict['model_name']}', '') 
+            == Path(self.loader.metadata_dict['files']['audio_files'][-1]).stem
+            ):
+            snr_file_name = sample_files[0]
+            sample_files.remove(sample_files[0])
+            sample_files.append(snr_file_name)
 
         embeddings_list = []
         for file in tqdm(

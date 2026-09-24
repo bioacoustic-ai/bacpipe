@@ -470,7 +470,7 @@ class Loader:
                 [
                     f
                     for f in tqdm(
-                        d.rglob(f"*{self.embed_suffix}"),
+                        d.parent.rglob(f"*{self.model_name}*{self.embed_suffix}"),
                         "Finding all generated embeddings",
                     )
                 ]
@@ -486,7 +486,7 @@ class Loader:
                 return
             else:
                 logger.info(f"Found {num_files} embedding files.")
-                num_audio_files = len(self.get_audio_files(self.audio_dir))
+                num_audio_files = len(self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes))
         except AssertionError as e:
             self._get_metadata_dict(d)
             self.combination_already_exists = True
@@ -558,7 +558,7 @@ class Loader:
         """
         self.continue_incomplete_run = True
         self.embed_dir = directory
-        self.files = self.get_audio_files(self.audio_dir)
+        self.files = self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes)
         self._init_metadata_dict()
         self._get_metadata_from_created_embeddings()
 
@@ -567,7 +567,7 @@ class Loader:
         Collect all audio files in the audio directory and initialize
         ``self.embed_dir`` with a timestamp-based directory name.
         """
-        self.files = self.get_audio_files(self.audio_dir)
+        self.files = self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes)
         self.files.sort()
         if not hasattr(self, "embed_parent_dir"):
             from bacpipe import settings as settings
@@ -631,6 +631,8 @@ class Loader:
             for file in tqdm(audio_dir.rglob("*"), "finding audio files")
             if file.suffix in audio_suffixes
         ]
+        if audio_suffixes == ['.h5']:
+            files_list.extend([f for f in Path(audio_dir / '../noise/').glob('*.h5')])
         files_list = list(set(files_list))
         files_list.sort()
         logger.info(f"Found {len(files_list)} number of audio files.")
@@ -740,8 +742,20 @@ class Loader:
         new embedding directory name is created.
         """
         embed_dir = self.get_embedding_dir()
-        self.files = [f for f in embed_dir.rglob(f"*{self.embed_suffix}")]
+        if not embed_dir:
+            self.files = []
+        else:
+            self.files = [f for f in embed_dir.parent.rglob(f"*{self.model_name}*{self.embed_suffix}")]
         self.files.sort()
+            
+        if hasattr(self, 'metadata_dict'):
+            if not (
+                self.files[-1].stem.replace(f'_{self.metadata_dict['model_name']}', '') 
+                == Path(self.metadata_dict['files']['audio_files'][-1]).stem
+                ):
+                snr_file_name = self.files[0]
+                self.files.remove(self.files[0])
+                self.files.append(snr_file_name)
 
         if not self.combination_already_exists:
             self._get_metadata_dict(embed_dir)
@@ -837,7 +851,7 @@ class Loader:
             rel_file_path = file.relative_to(
                 self.embed_parent_dir.joinpath(
                     Path(self.metadata_dict["embed_dir"]).stem
-                )
+                ).parent
             )
         self.metadata_dict["files"]["embedding_files"].append(
             str(rel_file_path)
@@ -936,7 +950,7 @@ class Loader:
             embed_dir = self.embed_dir
             embed_suffix = self.embed_suffix
         if not self.files or not self.files[0].suffix == embed_suffix:
-            embedding_files = list(embed_dir.rglob(f"*{embed_suffix}"))
+            embedding_files = list(embed_dir.parent.rglob(f"*{self.model_name}*{embed_suffix}"))
             if len(embedding_files) == 0:
                 logger.warning(
                     "No embedding files were found. Check that the path is right "
@@ -949,7 +963,8 @@ class Loader:
                 self.files.sort()
         for file in self.files:
             embeds = np.load(file)
-            d[str(file.relative_to(embed_dir))] = embeds
+            d[file] = embeds
+            # d[str(file.relative_to(embed_dir))] = embeds
         if return_type == "dict":
             return d
         elif return_type == "array":
