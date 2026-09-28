@@ -35,7 +35,8 @@ class Model(ModelBaseClass):
             additional keyword arguments passed to the base class
         """
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
-        
+        # from empirical testing batch size can be doubled without
+        # risk of OOM errors
         self.batch_size = 2 * self.batch_size
         
         label_path = self.model_utils_base_path / 'birdnet_v3/BirdNET+_V3.0-preview3.1_Global_11K_Labels.csv'
