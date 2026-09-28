@@ -37,6 +37,7 @@ jobs:
           - perch_v2
           - protoclr
           - rcl_fs_bsed
+          - repertoire_embedder
           - surfperch
           - google_whale
           - vggish

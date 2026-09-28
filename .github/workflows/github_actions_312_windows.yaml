@@ -34,6 +34,7 @@ jobs:
           - perch_v2
           - protoclr
           - rcl_fs_bsed
+          - repertoire_embedder
           # Simply add more model keys here as you expand bacpipe!
 
     steps:

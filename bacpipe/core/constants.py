@@ -32,6 +32,7 @@ EMBEDDING_DIMENSIONS = {
     "perch_v2": 1536,
     "protoclr": 384,
     "rcl_fs_bsed": 2048,
+    "repertoire_embedder": 256,
     "surfperch": 1280,
     "google_whale": 1280,
     "vggish": 128,
@@ -55,6 +56,7 @@ NEEDS_CHECKPOINT = [
     "perch_v2",
     "protoclr",
     "rcl_fs_bsed",
+    "repertoire_embedder"
 ]
 """list[str]: models that require a checkpoint to be downloaded to be run"""
 
