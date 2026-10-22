@@ -46,7 +46,7 @@ The best way to learn bacpipe is through the **Jupyter notebooks** in `bacpipe/e
 - **Using a custom model**: compare your own model against existing ones
   ([notebook](bacpipe/examples/basic_examples/using_a_custom_model.ipynb) · [docs](https://bacpipe.readthedocs.io/en/latest/examples/basic_examples/using_a_custom_model.html))
 
-## Resources
+There is a [video tutorial](https://www.youtube.com/watch?v=kw713jF5ts8) available on youtube to install and run bacpipe (Bacpipe has evolved a lot since this video and a new video will be published soon).
 
 - 📖 **Documentation:** [bacpipe.readthedocs.io](https://bacpipe.readthedocs.io)
 - 💻 **Source code:** [github.com/bioacoustic-ai/bacpipe](https://github.com/bioacoustic-ai/bacpipe)
@@ -54,19 +54,9 @@ The best way to learn bacpipe is through the **Jupyter notebooks** in `bacpipe/e
 
 ## Feedback and support
 
-Please try bacpipe out and tell us what you think! Questions, suggestions and bug reports are all welcome:
+All models have been tested successfully on different operating systems. Bugs might occur nonetheless, and if they do please reach out directly or [raise an issue](https://github.com/bioacoustic-ai/bacpipe/issues). The traffic suggests that it is useful for researchers in our field. It would be great to see it grow into a community project.
 
-- 💬 [Discussions](https://github.com/bioacoustic-ai/bacpipe/discussions) for questions and ideas
-- 🐛 [Issues](https://github.com/bioacoustic-ai/bacpipe/issues) for bugs and feature requests
-- 🔧 [Pull requests](https://github.com/bioacoustic-ai/bacpipe/pulls) for model, code and documentation contributions
-
-All models have been tested successfully on several operating systems. Bugs can still occur, though, so if you run into one, please reach out directly or [raise an issue](https://github.com/bioacoustic-ai/bacpipe/issues).
-
-## Contributing
-
-Bacpipe is already being used by researchers in our field, and we'd love to see it grow into a community project. To get involved, browse the open [feature requests and issues](https://github.com/bioacoustic-ai/bacpipe/issues) and read the [contribution guidelines](#contribute) below.
-
-You don't have to be a coder to contribute. Making the documentation clearer is just as valuable as adding code!
+If you would like to **contribute** to the project. Have a look at existing feature requests and [issues](https://github.com/bioacoustic-ai/bacpipe/issues) and please check out the [contribution guidelines](#contribute) below. And you do not have to be a coder to contribute. Helping to make the documentation more understandable is just as valuable as adding code!
 
 ## 📚 Table of Contents
 
