@@ -235,35 +235,34 @@ The models all have their model specific code to ensure inference runs smoothly.
 
 Models currently include:
 
-|   Name|   ref paper|   ref code|   sampling rate|   input length| embedding dimension |
-|---|---|---|---|---|---|
-|   AudioMAE    |   [paper](https://proceedings.neurips.cc/paper_files/paper/2022/hash/b89d5e209990b19e33b418e14f323998-Abstract-Conference.html)   |   [code](https://github.com/facebookresearch/AudioMAE)    |   16 kHz|   10 s| 768 |
-|   AudioProtoPNet   |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954125000901)   |   [code](https://github.com/DBD-research-group/AudioProtoPNet)    |   32 kHz|   5 s| 1024 |
-|   AvesEcho_PASST   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   32 kHz|   3 s| 768 |
-|   AVES_ESpecies        |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 768 |
-| Bat | [paper](https://arxiv.org/abs/2309.11218) | [code](https://github.com/FrankFundel/BAT-cli) | 220.5 kHz | ~1 s | 64 |
-| BatDetect2_Clip_Avg | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | 256 kHz | 1 s | 32 |
-| BatDetect2_Dets_avg | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | 256 kHz | 1 s | 32 |
-| BEATs | [paper](https://arxiv.org/abs/2212.09058) | [code](https://github.com/microsoft/unilm/tree/master/beats) | 16 kHz | 10 s | 768 |
-|   BioLingual  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   48 kHz|   10 s| 512 |
-|   BirdAVES_ESpecies    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 1024 |
-|   BirdMAE    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   32 kHz|   10 s| 1280 |
-|   BirdNET     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s| 1024 |
-|   BirdNET_v3     |   paper   |   [code](https://github.com/birdnet-team/birdnet-V3.0-dev)    |   32 kHz|   variable, default 3 s | 1280 |
-|   ConveNeXT_BirdSet   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |   32 kHz|   5 s| 1024 |
-|   Google_Whale       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   24 kHz|   5 s| 1280 |
-|   hbdet |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s| 2048|
-|   Insect66NET |   [paper](https://doi.org/10.1371/journal.pcbi.1011541)   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   44.1 kHz|   5.5 s| 1280 |
-|   Insect459NET |   [paper](https://arxiv.org/pdf/2503.15074)   |   pending    |   44.1 kHz|   5.5 s| 1280 |
-|   Mix2        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   16 kHz|   3 s| 960 |
-|   NatureBEATs        |   [paper](https://arxiv.org/abs/2411.07186)   |   [code](https://github.com/earthspecies/NatureLM-audio)    |   16 kHz|   5 s| 768 |
-|   Perch_Bird       |   [paper](https://www.nature.com/articles/s41598-023-49989-z.epdf)   |   [code](https://github.com/google-research/perch)    |   32 kHz|   5 s| 1280 |
-|   Perch_V2       |   [paper](https://arxiv.org/abs/2508.04665)   |   [code](https://github.com/google-research/perch_hoplite)    |   32 kHz|   5 s| 1536 |
-|   ProtoCLR     |   [paper](https://arxiv.org/pdf/2409.08589)   |   [code](https://github.com/ilyassmoummad/ProtoCLR)    |   16 kHz|   6 s| 384 |
-|   RCL_FS_BSED     |   [paper](https://arxiv.org/abs/2309.08971)   |   [code](https://github.com/ilyassmoummad/RCL_FS_BSED)    |   22.05 kHz|   0.2 s| 2048 |
-|   SurfPerch       |   [paper](https://arxiv.org/abs/2404.16436)   |   [code](https://www.kaggle.com/models/google/surfperch)    |   32 kHz|   5 s| 1280 |
-|   VGGish      |   [paper](https://ieeexplore.ieee.org/document/7952132)   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   16 kHz|   0.96 s| 128 |
-
+|   Name|   ref paper|   ref code|   sampling rate|   input length| embedding dimension | License |
+|---|---|---|---|---|---|---| 
+|   AudioMAE    |   [paper](https://proceedings.neurips.cc/paper_files/paper/2022/hash/b89d5e209990b19e33b418e14f323998-Abstract-Conference.html)   |   [code](https://github.com/facebookresearch/AudioMAE)    |   16 kHz|   10 s| 768 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/audiomae/LICENSE) | 
+|   AudioProtoPNet   |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954125000901)   |   [code](https://github.com/DBD-research-group/AudioProtoPNet)    |   32 kHz|   5 s| 1024 | [License](https://github.com/DBD-research-group/AudioProtoPNet/blob/main/LICENSE.txt) | 
+|   AvesEcho_PASST   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   32 kHz|   3 s| 768 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/avesecho_passt/LICENSE) | 
+|   AVES_ESpecies        |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 768 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/aves_especies/LICENSE) | 
+| Bat | [paper](https://arxiv.org/abs/2309.11218) | [code](https://github.com/FrankFundel/BAT-cli) | 220.5 kHz | ~1 s | 64 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/bat/LICENSE) | 
+| BatDetect2_Clip_Avg | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | 256 kHz | 1 s | 32 | [License](https://github.com/macaodha/batdetect2/blob/main/LICENSE.md) | 
+| BatDetect2_Dets_avg | [paper](https://www.biorxiv.org/content/10.1101/2022.12.14.520490v1) | [code](https://github.com/macaodha/batdetect2) | 256 kHz | 1 s | 32 | [License](https://github.com/macaodha/batdetect2/blob/main/LICENSE.md) | 
+| BEATs | [paper](https://arxiv.org/abs/2212.09058) | [code](https://github.com/microsoft/unilm/tree/master/beats) | 16 kHz | 10 s | 768 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/beats/LICENSE) | 
+|   BioLingual  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   48 kHz|   10 s| 512 | [License](https://github.com/david-rx/BioLingual/blob/main/LICENSE) | 
+|   BirdAVES_ESpecies    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 1024 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/birdaves_especies/LICENSE) | 
+|   BirdMAE    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   32 kHz|   10 s| 1280 | none found | 
+|   BirdNET     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s| 1024 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/birdnet/LICENSE) | 
+|   BirdNET_v3     |   paper   |   [code](https://github.com/birdnet-team/birdnet-V3.0-dev)    |   32 kHz|   variable, default 3 s | 1280 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/birdnet_v3/LICENSE) | 
+|   ConveNeXT_BirdSet   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |   32 kHz|   5 s| 1024 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/convenext_birdset/LICENSE) | 
+|   Google_Whale       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   24 kHz|   5 s| 1280 | [License](https://github.com/google/multispecies-whale-detection/blob/main/LICENSE) | 
+|   hbdet |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s| 2048| [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/hbdet/LICENSE) | 
+|   Insect66NET |   [paper](https://doi.org/10.1371/journal.pcbi.1011541)   |   [code](https://github.com/danstowell/insect_classifier_GDSC23_insecteffnet)    |   44.1 kHz|   5.5 s| 1280 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/insect66/LICENSE) | 
+|   Insect459NET |   [paper](https://arxiv.org/pdf/2503.15074)   |   pending    |   44.1 kHz|   5.5 s| 1280 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/insect459/LICENSE) | 
+|   Mix2        |   [paper](https://arxiv.org/abs/2403.09598)   |   [code](https://github.com/ilyassmoummad/Mix2/tree/main)    |   16 kHz|   3 s| 960 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/mix2/LICENSE) | 
+|   NatureBEATs        |   [paper](https://arxiv.org/abs/2411.07186)   |   [code](https://github.com/earthspecies/NatureLM-audio)    |   16 kHz|   5 s| 768 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/naturebeats/LICENSE) | 
+|   Perch_Bird       |   [paper](https://www.nature.com/articles/s41598-023-49989-z.epdf)   |   [code](https://github.com/google-research/perch)    |   32 kHz|   5 s| 1280 | [License](https://github.com/google-research/perch-hoplite/blob/main/LICENSE) | 
+|   Perch_V2       |   [paper](https://arxiv.org/abs/2508.04665)   |   [code](https://github.com/google-research/perch_hoplite)    |   32 kHz|   5 s| 1536 | [License](https://github.com/google-research/perch-hoplite/blob/main/LICENSE) | 
+|   ProtoCLR     |   [paper](https://arxiv.org/pdf/2409.08589)   |   [code](https://github.com/ilyassmoummad/ProtoCLR)    |   16 kHz|   6 s| 384 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/protoclr/LICENSE) | 
+|   RCL_FS_BSED     |   [paper](https://arxiv.org/abs/2309.08971)   |   [code](https://github.com/ilyassmoummad/RCL_FS_BSED)    |   22.05 kHz|   0.2 s| 2048 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/rcl_fs_bsed/LICENSE) | 
+|   SurfPerch       |   [paper](https://arxiv.org/abs/2404.16436)   |   [code](https://www.kaggle.com/models/google/surfperch)    |   32 kHz|   5 s| 1280 | [License](https://github.com/google-research/perch-hoplite/blob/main/LICENSE) | 
+|   VGGish      |   [paper](https://ieeexplore.ieee.org/document/7952132)   |   [code](https://github.com/tensorflow/models/tree/master/research/audioset/vggish)    |   16 kHz|   0.96 s| 128 | [License](https://github.com/google-research/perch-hoplite/blob/main/LICENSE) | 
 
 
 ---
