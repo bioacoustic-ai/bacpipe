@@ -1098,6 +1098,7 @@ If you are adding a new model, please
 
 # Known issues
 
+It was brought up that under Firefox spectrograms can display a uniform striped pattern instead of the actual audio. This can be caused by Firefox's fingerprinting protection. Disabling the fingerprinting protection for the tab where the dashboard is shown should fix the issue (Thank you Paul!).
 
 `bacpipe` is being updated regularly. To make sure you're always up to date with the latest fixes run `git pull` regularly.
 If you have local changes (like changes in the `config` or `settings` files) you don't want to lose run the following:
