@@ -83,6 +83,7 @@ dependencies = [
     "nvidia-nvtx-cu12==12.4.127; sys_platform == 'linux'",
     "triton==3.2.0; sys_platform == 'linux'",
     "tensorstore==0.1.74; sys_platform == 'linux'",
+    "onnxruntime-gpu>=1.26.0, <2.0.0; sys_platform == 'linux'",
 ]
 
 
