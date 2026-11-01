@@ -35,6 +35,9 @@ class Model(ModelBaseClass):
             additional keyword arguments passed to the base class
         """
         super().__init__(sr=sr, segment_length=segment_length, **kwargs)
+        # from empirical testing batch size can be doubled without
+        # risk of OOM errors
+        self.batch_size = 2 * self.batch_size
         
         label_path = self.model_utils_base_path / 'birdnet_v3/BirdNET+_V3.0-preview3.1_Global_11K_Labels.csv'
         checkpoint_path=(
@@ -127,29 +130,33 @@ class birdnet_v3_ONNX(nn.Module):
             print(f"Error loading ONNX model: {e}", file=sys.stderr)
             sys.exit(1)
 
-    def _get_execution_providers(self, device: str) -> list[str]:
+    def _get_execution_providers(self, requested_device: str) -> list[str]:
         """
         Resolve the ONNX execution providers for the requested device.
 
         Parameters
         ----------
-        device : str
-            requested device ("auto", "cpu", or "cuda")
+        requested_device : str
+            requested device ("auto", "cpu", "gpu", or "cuda")
 
         Returns
         -------
         list of str
             execution providers to use for the ONNX session
         """
+        available = ort.get_available_providers()
         providers = []
 
-        # Select execution provider based on device
-        if device == "cuda":
-            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-        else:
-            providers = ["CPUExecutionProvider"]
+        if requested_device.lower() in ("gpu", "cuda", "auto"):
+            if sys.platform == "darwin" and "CoreMLExecutionProvider" in available:
+                providers.append("CoreMLExecutionProvider")
+            elif "CUDAExecutionProvider" in available:
+                providers.append("CUDAExecutionProvider")
+            elif "DmlExecutionProvider" in available:
+                providers.append("DmlExecutionProvider")
 
         providers.append("CPUExecutionProvider")
+        return providers
     
 
     def forward(
