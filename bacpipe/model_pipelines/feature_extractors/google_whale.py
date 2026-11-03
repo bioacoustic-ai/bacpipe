@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 from .perch_bird import Model
 
@@ -75,4 +76,4 @@ class Model(Model):
         np.array
             class logits for each frame
         """
-        return np.array(self.logits).squeeze()
+        return torch.sigmoid(torch.tensor(np.array(self.logits).squeeze()))
