@@ -16,6 +16,7 @@ class Model(ModelBaseClass):
         super().__init__(sr=SAMPLE_RATE, segment_length=LENGTH_IN_SAMPLES, **kwargs)
         nMel, bottleneck, NFFT, sampleDur = 128, 256, 1024, LENGTH_IN_SEC
         self.frontend = frontend_medfilt(SAMPLE_RATE, NFFT, sampleDur, nMel)
+        self.frontend.to(self.device)
         encoder = sparrow_encoder(bottleneck // (nMel//32 * 4), (nMel//32, 4))
         decoder = sparrow_decoder(bottleneck, (nMel//32, 4))
         self.model = torch.nn.Sequential(encoder, decoder)
