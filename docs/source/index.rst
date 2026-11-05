@@ -1,19 +1,25 @@
 Welcome to the documentation for **bacpipe**
 =================================
 
-
 **bacpipe** makes using deep learning models for bioacoustics easy!
 Using **bacpipe** you can generate embeddings and classifier predictions and evaluate them using probing, clustering and benchmarking. All you need is your audio data!.
 
 And the best part is, it comes with an interactive GUI for you to explore your data organized by the state-of-the-art deep learning models for bioacoustics. 
 
+.. figure:: ../../src/bacpipe_demo.gif
+   :alt: bacpipe GUI demo
+   :width: 80%
+
+   The bacpipe GUI for exploring embeddings. Find a live demo at https://bacpipe.siriusly.me including explanations of the different sections.
+
+
+Full documentation can be found at https://bacpipe.readthedocs.io. 
 **bacpipe** is also available on pip: `pip install bacpipe`
 
 `import bacpipe`
 
 `bacpipe.play()`
 
-Full documentation can be found at https://bacpipe.readthedocs.io. 
 The github repository can be found at https://github.com/bioacoustic-ai/bacpipe.
 
 .. toctree::

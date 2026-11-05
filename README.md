@@ -14,15 +14,25 @@
 [![Tests](https://custom-icon-badges.demolab.com/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_312_windows.yaml?label=3.12&logo=windows11&logoColor=white)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_312_windows.yaml)
 [![Tests](https://custom-icon-badges.demolab.com/github/actions/workflow/status/bioacoustic-ai/bacpipe/github_actions_311_windows.yaml?label=3.11&logo=windows11&logoColor=white)](https://github.com/bioacoustic-ai/bacpipe/actions/workflows/github_actions_311_windows.yaml)
 
-![](src/bacpipe_logo.png)
-image by Nicole Allison
+<p align="center">
+    <img src="src/bacpipe_logo.png" alt="bacpipe GUI demo" width="400"> 
+    <br>
+    image by Nicole Allison
+</p>
 
 **bacpipe** makes using deep learning models for bioacoustics easy!
 Using **bacpipe** you can generate embeddings and classifier predictions and evaluate them using probing, clustering and benchmarking. All you need is your audio data!
 
 There's an applications paper available in [methods in ecology and evolution](https://doi.org/10.1111/2041-210X.70406) describing the pipeline and its capabilities.
 
-The best part is, **bacpipe** comes with an interactive GUI for you to explore your data organized by the state-of-the-art deep learning models for bioacoustics. A demo of the GUI can be found at [bacpipe.siriusly.me](https://bacpipe.siriusly.me).
+The best part is, **bacpipe** comes with an interactive GUI! 
+
+
+![](src/bacpipe_demo.gif)
+
+This way you can explore your data organized by the state-of-the-art deep learning models for bioacoustics. A live demo of the GUI can be found at [bacpipe.siriusly.me](https://bacpipe.siriusly.me) including explanations of the different sections.
+
+Embeddings can also be visualized in 3 dimensions using the `visualization_dimensions` parameter in the [settings](bacpipe/settings.yaml) file.
 
 **bacpipe** is also available on pip: `pip install bacpipe`
 
@@ -188,10 +198,6 @@ available_evaluation_tasks: [
 ### bacpipe includes a dashboard visualization by default allowing you to easily explore the generated embeddings
 
 Once embeddings are generated, they can be easily visualized using a dashboard (built using `panel`) by simply setting the `dashboard` setting in the [config.yaml](bacpipe/config.yaml) file to `True`.
-
-Below you can see a gif showing the basic usage of the dashboard. Embeddings can also be visualized in 3 dimensions using the `visualization_dimensions` parameter in the [settings](bacpipe/settings.yaml) file.
-
-![](src/bacpipe_demo.gif)
 
 The dashboard has 5 main sections:
 1. Single model
