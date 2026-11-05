@@ -245,7 +245,7 @@ Models currently include:
 |   Name|   ref paper|   ref code|   sampling rate|   input length| embedding dimension | License |
 |---|---|---|---|---|---|---| 
 |   AudioMAE    |   [paper](https://proceedings.neurips.cc/paper_files/paper/2022/hash/b89d5e209990b19e33b418e14f323998-Abstract-Conference.html)   |   [code](https://github.com/facebookresearch/AudioMAE)    |   16 kHz|   10 s| 768 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/audiomae/LICENSE) | 
-|   AudioProtoPNet   |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954125000901)   |   [code](https://github.com/DBD-research-group/AudioProtoPNet)    |   32 kHz|   5 s| 1024 | [License](https://github.com/DBD-research-group/AudioProtoPNet/blob/main/LICENSE.txt) | 
+|   AudioProtoPNet   |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954125000901)   |   [code](https://github.com/DBD-research-group/AudioProtoPNet)    |   32 kHz|   5 s| 1024 | [code](https://github.com/DBD-research-group/AudioProtoPNet/blob/main/LICENSE.txt) / [weights](#audioprotopnet) | 
 |   AvesEcho_PASST   |   [paper](https://arxiv.org/abs/2409.15383)   |   [code](https://gitlab.com/arise-biodiversity/DSI/algorithms/avesecho-v1)    |   32 kHz|   3 s| 768 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/avesecho_passt/LICENSE) | 
 |   AVES_ESpecies        |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 768 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/aves_especies/LICENSE) | 
 | Bat | [paper](https://arxiv.org/abs/2309.11218) | [code](https://github.com/FrankFundel/BAT-cli) | 220.5 kHz | ~1 s | 64 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/bat/LICENSE) | 
@@ -255,8 +255,8 @@ Models currently include:
 |   BioLingual  |   [paper](https://arxiv.org/abs/2308.04978)   |   [code](https://github.com/david-rx/biolingual)    |   48 kHz|   10 s| 512 | [License](https://github.com/david-rx/BioLingual/blob/main/LICENSE) | 
 |   BirdAVES_ESpecies    |   [paper](https://arxiv.org/abs/2210.14493)   |   [code](https://github.com/earthspecies/aves)    |   16 kHz|   1 s| 1024 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/birdaves_especies/LICENSE) | 
 |   BirdMAE    |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/Bird-MAE)    |   32 kHz|   10 s| 1280 | none found | 
-|   BirdNET     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s| 1024 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/birdnet/LICENSE) | 
-|   BirdNET_v3     |   paper   |   [code](https://github.com/birdnet-team/birdnet-V3.0-dev)    |   32 kHz|   variable, default 3 s | 1280 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/birdnet_v3/LICENSE) | 
+|   BirdNET     |   [paper](https://www.sciencedirect.com/science/article/pii/S1574954121000273)   |   [code](https://github.com/kahst/BirdNET-Analyzer)    |   48 kHz|   3 s| 1024 | [License](https://github.com/birdnet-team/BirdNET-Analyzer#license) | 
+|   BirdNET_v3     |   paper   |   [code](https://github.com/birdnet-team/birdnet-V3.0-dev)    |   32 kHz|   variable, default 3 s | 1280 | [License](https://github.com/birdnet-team/BirdNET-Analyzer#license) | 
 |   ConveNeXT_BirdSet   |   [paper](https://arxiv.org/abs/2504.12880)   |   [code](https://github.com/DBD-research-group/BirdSet)    |   32 kHz|   5 s| 1024 | [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/convenext_birdset/LICENSE) | 
 |   Google_Whale       |   paper   |   [code](https://www.kaggle.com/models/google/multispecies-whale/TensorFlow2/default/2)    |   24 kHz|   5 s| 1280 | [License](https://github.com/google/multispecies-whale-detection/blob/main/LICENSE) | 
 |   hbdet |   [paper](https://pubs.aip.org/asa/jasa/article/155/3/2050/3271347)   |   [code](https://github.com/vskode/acodet)    |   2 kHz|   3.9124 s| 2048| [License](https://huggingface.co/datasets/vskode/bacpipe_models/blob/main/hbdet/LICENSE) | 
@@ -826,7 +826,7 @@ AudioMAE from the facebook research group is a vision transformer pretrained on 
 - ConvNext architecture as feature extractor
 - trained on the xeno-canto large section of BirdSet
 
-This CNN is trained in two phases. The main contribution of this model is its interpretability. It learned prototypes during its second training phase which can be used during inference time to visualize sections of the spectrogram that were most important for classification. It also reaches competitive performance on bird classification tasks. The (included) prototype-based classifier can distinguish 9736 classes. 
+This CNN is trained in two phases. The main contribution of this model is its interpretability. It learned prototypes during its second training phase which can be used during inference time to visualize sections of the spectrogram that were most important for classification. It also reaches competitive performance on bird classification tasks. The (included) prototype-based classifier can distinguish 9736 classes. The License indicated in the table is for the code itself, the models are licensed under cc-by-nc-4.0.
 
 ### AvesEcho_PaSST
 - transformer
