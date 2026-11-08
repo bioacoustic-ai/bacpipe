@@ -1,9 +1,52 @@
 name: Model Testing Pipeline
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
+  discover-models:
+    name: Discover model list
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      models: ${{ steps.get-models.outputs.models }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Find constants.py (debug)
+        run: find . -name "constants.py"
+
+      - name: Extract model names
+        id: get-models
+        run: |
+          python -c "
+          import ast, json, sys
+          with open('bacpipe/core/constants.py') as f:
+              tree = ast.parse(f.read())
+          found = False
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Assign):
+                  for target in node.targets:
+                      if getattr(target, 'id', None) == 'EMBEDDING_DIMENSIONS':
+                          keys = [k.value for k in node.value.keys]
+                          print(json.dumps(keys))
+                          found = True
+          if not found:
+              print('ERROR: EMBEDDING_DIMENSIONS not found', file=sys.stderr)
+              sys.exit(1)
+          " > models.json
+          cat models.json
+          echo "models=$(cat models.json)" >> "$GITHUB_OUTPUT"
+
   test-models:
+    needs: discover-models
     name: ${{ matrix.model }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     defaults:
@@ -13,34 +56,7 @@ jobs:
       fail-fast: false  # Ensures all OS/model combinations finish even if one fails
       matrix:
         os: [macos-latest]
-        model:
-          - audiomae
-          - audioprotopnet
-          - avesecho_passt
-          - aves_especies
-          - bat
-          - batdetect2_clip_avg
-          - batdetect2_dets_avg
-          - beats
-          - birdaves_especies
-          - biolingual
-          - birdnet
-          - birdnet_v3
-          - birdmae
-          - convnext_birdset
-          - hbdet
-          - insect66
-          - insect459
-          - mix2
-          - naturebeats
-          - perch_bird
-          - perch_v2
-          - protoclr
-          - rcl_fs_bsed
-          - surfperch
-          - google_whale
-          - vggish
-          # Simply add more model keys here as you expand bacpipe!
+        model: ${{ fromJson(needs.discover-models.outputs.models) }}
 
     steps:
       # 1. Clone repository code

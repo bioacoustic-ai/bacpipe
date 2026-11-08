@@ -171,6 +171,7 @@ class Loader:
         self.testing = testing
         self.use_folder_structure = use_folder_structure
         self.continue_incomplete_run = False
+        self.audio_suffixes = kwargs.get('audio_suffixes', settings.audio_suffixes)
 
         self._initialize_path_structure(testing=testing, **kwargs)
 
@@ -325,6 +326,17 @@ class Loader:
             corresponding_audio_file_bool = relative_audio_stems == str(
                 file.relative_to(self.embed_dir)
             ).replace(f"_{self.model_name}.npy", "")
+            if len(relative_audio_stems[corresponding_audio_file_bool]) == 0:
+                error_str = (
+                    f"\nThe directory {self.embed_dir} is not empty. "
+                    "It seems like a previous run failed. "
+                    "If you interrupted the run on purpose and want to "
+                    "start from the beginning, please cancel using "
+                    "Ctrl + C and then remove "
+                    f"the folder {self.embed_dir} manually.\n"
+                )
+                logger.exception(error_str)
+                raise FileNotFoundError(error_str)
             try:
                 embed = np.load(file, mmap_mode="r")
             except Exception as e:
@@ -400,7 +412,7 @@ class Loader:
             # require that the model name and the audio dir are in the folder name
 
             if not (
-                self.model_name in d.stem
+                d.stem.replace(f'-{self.audio_dir.stem}', '').endswith(self.model_name)
                 and not self.combination_already_exists
                 and Path(self.audio_dir).stem in d.parts[-1]
             ):
@@ -486,7 +498,7 @@ class Loader:
                 return
             else:
                 logger.info(f"Found {num_files} embedding files.")
-                num_audio_files = len(self.get_audio_files(self.audio_dir))
+                num_audio_files = len(self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes))
         except AssertionError as e:
             self._get_metadata_dict(d)
             self.combination_already_exists = True
@@ -558,7 +570,7 @@ class Loader:
         """
         self.continue_incomplete_run = True
         self.embed_dir = directory
-        self.files = self.get_audio_files(self.audio_dir)
+        self.files = self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes)
         self._init_metadata_dict()
         self._get_metadata_from_created_embeddings()
 
@@ -567,7 +579,7 @@ class Loader:
         Collect all audio files in the audio directory and initialize
         ``self.embed_dir`` with a timestamp-based directory name.
         """
-        self.files = self.get_audio_files(self.audio_dir)
+        self.files = self.get_audio_files(self.audio_dir, audio_suffixes=self.audio_suffixes)
         self.files.sort()
         if not hasattr(self, "embed_parent_dir"):
             from bacpipe import settings as settings

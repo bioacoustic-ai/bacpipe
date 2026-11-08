@@ -176,7 +176,7 @@ class AudioHandler:
     def __init__(
         self,
         model,
-        audio_dir,
+        audio_dir=None,
         padding='constant',
         bool_change_speed=False,
         new_speed=None,
@@ -195,8 +195,8 @@ class AudioHandler:
             the segment length are read from the model module and the
             model itself is only loaded if it is needed (see
             ``prepare_audio``).
-        audio_dir : pathlib.Path object
-            path to audio dir
+        audio_dir : pathlib.Path object or str, optional
+            path to audio dir, defaykts to None.
         padding : str, optional
             padding function to use for where padding is necessary.
             Detaults to constant.
