@@ -41,7 +41,7 @@ dependencies = [
     "transformers>=4.56.0, <5.0.0",
     "einops>=0.8.0, <1.0.0",
     "safetensors==0.4.5",
-    "onnxruntime>=1.27.0, <2.0.0",
+    "onnxruntime>=1.26.0, <1.29.0",
 
     # --- TensorFlow & JAX Ecosystem ---
     "tensorflow==2.20.0; sys_platform != 'win32'",
@@ -83,7 +83,7 @@ dependencies = [
     "nvidia-nvtx-cu12==12.4.127; sys_platform == 'linux'",
     "triton==3.2.0; sys_platform == 'linux'",
     "tensorstore==0.1.74; sys_platform == 'linux'",
-    "onnxruntime-gpu>=1.26.0, <2.0.0; sys_platform == 'linux'",
+    "onnxruntime-gpu>=1.26.0, <1.27.0; sys_platform == 'linux'",
 ]
 
 
