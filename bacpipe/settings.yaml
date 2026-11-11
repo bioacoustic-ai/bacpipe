@@ -260,6 +260,44 @@ bool_change_speed: False
 new_speed: 0.1
 
 
+######################################################
+#######-----------------------------------############
+#######        SSH CONFIGURATION          ############
+#######-----------------------------------############
+######################################################
+
+# use these settings to specify the ssh settings
+# so that the audio data can be access from a remote 
+# location. This section only becomes relevant if the
+# audio_dir starts with "ssh ". If that's the case,
+# after all the processing is finished and the embeddings 
+# are displayed, bacpipe will try to establish a connection
+# to the server so that when you click on a point, bacpipe
+# can ssh into the server where the audio data is located,
+# read the segment corresponding to the embedding and visualize
+# and play it. 
+
+ssh_configs:
+  # host cluster that you're trying to connect to
+  host: "example.cluster.com"
+  # the standard port is 22, but this might vary for you
+  port: 22
+  # you're username that you use to log in to the cluster
+  username: "UserName"
+  # the location of the ssh key. The default location 
+  # is "/home/USERNAME/.ssh/id_ed25519" for linux systems.
+  # If you're on windows activate hidden folders so that the 
+  # .ssh folder get's shown. You need the private key here,
+  # so not the one ending on .pub
+  key_filename: "path/to/ssh/file" 
+  # Some clusters use a proxy jump, meaning you have a login node
+  # and then from there a cluster node. That means you're performing
+  # two ssh commands. To support this, uncomment the next line starting with cmd
+  # and specify the necessary values (the ones with <>) for the second ssh command.
+  # cmd: "ssh -q -o BatchMode=yes -p 22 <UserName>@<second_host> -W <host>:<port>"
+  # UserName, host and port should be as above and second_host should be the address
+  # that you ssh into from your login node.
+
 ###########################################
 
 # If set to true bacpipe will always use the same test files and save it in a 
