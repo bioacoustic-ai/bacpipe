@@ -1,0 +1,85 @@
+# ---------------------------------------------------------------------------
+# Configuration of app/build.py - everything about a build that is a choice
+# and not logic lives in this file.
+# ---------------------------------------------------------------------------
+
+[app]
+name = "bacpipe"
+company = "bioacoustic-ai"
+description = "bacpipe - bioacoustic collection pipeline"
+# image for the program icon (.ico / .icns are generated from it). A larger
+# image than this 64x64 one would give a sharper icon on big screens.
+icon = "bacpipe/imgs/bacpipe_favicon_white.png"
+
+
+# The Python that is shipped inside the application: a relocatable CPython
+# from https://github.com/astral-sh/python-build-standalone (the builds that
+# `uv` uses). It is pinned, so that the same commit always gives the same
+# application.
+#
+# To update: pick a release from
+#   https://github.com/astral-sh/python-build-standalone/releases
+# and copy the version, the release tag and the sha256 of the
+#   cpython-<version>+<release>-<platform>-install_only_stripped.tar.gz
+# files (shown next to each file on the release page).
+# Keep the minor version (3.11) within `requires-python` of pyproject.toml.
+[python]
+version = "3.11.18"
+release = "20261110"
+
+[python.sha256]
+x86_64-pc-windows-msvc = "f31751f4a8483f5ac7cd77ad83f8dfb80d9f2a7245bff1585e27516c777fb46f"
+x86_64-unknown-linux-gnu = "3288c54cea3db350052019b3f8b558dd8a3da8afa6fda573f5fd2bcb37635b4a"
+aarch64-unknown-linux-gnu = "7e71f26a003949b57757e287f4f4b6689da07e7a229f5bbee7919c19ed77155d"
+aarch64-apple-darwin = "3afb0567b2a2b30b3a7341bd143cb4e8a69f3d8e95d4641218eaa45f0fabbd07"
+x86_64-apple-darwin = "c2e4b51e535ead2e526b8974909a1b1e00fbc2ebe2281087b9b8b14dad0cad5d"
+
+
+# Which packages are installed into the shipped Python.
+#
+#   "pyproject"        the dependencies declared in pyproject.toml
+#                      (`pip install .`). On Linux this includes the CUDA
+#                      packages, i.e. a GPU build of several GB.
+#   a file name        `pip install -r <file>` followed by
+#                      `pip install --no-deps .`
+#
+# The default is requirements_no_cuda.txt, because that is the set of
+# packages the test workflows in .github/workflows install and test on all
+# three systems. Override per build with `--requirements`.
+[requirements]
+windows = "requirements_no_cuda.txt"
+macos = "requirements_no_cuda.txt"
+linux = "requirements_no_cuda.txt"
+
+# additional packages per system, installed after the ones above
+[extra_requirements]
+windows = []
+macos = []
+linux = []
+
+
+# Files that are deleted from the shipped Python after the installation, as
+# glob patterns relative to its site-packages folder. These are C/C++
+# development files that are not needed to run anything. Removing them saves
+# several hundred MB and - important on Windows - removes the files with the
+# longest paths (see "path length" in app/README.md).
+# The tests of the build import every package afterwards, so a pattern that
+# removes too much is noticed.
+[prune]
+patterns = [
+    "tensorflow/include",
+    "torch/include",
+    "torch/lib/*.lib",
+    "torch/share/cmake",
+    "**/*.pdb",
+]
+
+
+[windows]
+# target of the launcher (bacpipe.exe), see `zig targets`
+zig_target = "x86_64-windows-gnu"
+# The longest path inside the application folder that the build accepts.
+# Windows allows 260 characters for a complete path unless an administrator
+# enabled long paths. With a limit of 200 the folder still works when it is
+# unpacked to a location like C:\Users\<name>\Downloads\ .
+max_path_length = 200
