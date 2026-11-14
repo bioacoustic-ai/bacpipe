@@ -251,7 +251,22 @@ def unpack_python(archive, layout):
 def pip_install(layout, installer, link_mode, *arguments):
     """Install into the runtime with uv (fast) or pip."""
     if installer == "uv":
-        run(["uv", "pip", "install", "--python", layout.python, "--link-mode", link_mode, *arguments])
+        run(
+            [
+                "uv", "pip", "install",
+                "--python", layout.python,
+                "--link-mode", link_mode,
+                # The requirements file adds the PyTorch package index
+                # (--extra-index-url). That index also hosts old copies of
+                # ordinary packages like tqdm. pip picks the best version
+                # from all indexes; uv by default only looks at the first
+                # index that has the package and then fails on the version
+                # bounds. This option makes uv behave like pip, which is
+                # what the test workflows install with.
+                "--index-strategy", "unsafe-best-match",
+                *arguments,
+            ]
+        )
     else:
         run(
             [
