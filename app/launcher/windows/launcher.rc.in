@@ -1,0 +1,34 @@
+// Resources of bacpipe.exe: icon, manifest and version information.
+// app/build.py fills in the @PLACEHOLDERS@ and writes launcher.rc.
+
+// the icon shown in the Explorer and the taskbar
+1 ICON "@ICON_FILE@"
+
+// 1 = CREATEPROCESS_MANIFEST_RESOURCE_ID, 24 = RT_MANIFEST
+1 24 "launcher.manifest"
+
+1 VERSIONINFO
+FILEVERSION     @VERSION_COMMAS@
+PRODUCTVERSION  @VERSION_COMMAS@
+FILEOS          0x40004L   // VOS_NT_WINDOWS32
+FILETYPE        0x1L       // VFT_APP
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"   // US English, Unicode
+        BEGIN
+            VALUE "CompanyName",      "@COMPANY@"
+            VALUE "FileDescription",  "@DESCRIPTION@"
+            VALUE "FileVersion",      "@VERSION@"
+            VALUE "InternalName",     "bacpipe"
+            VALUE "OriginalFilename", "bacpipe.exe"
+            VALUE "ProductName",      "bacpipe"
+            VALUE "ProductVersion",   "@VERSION@"
+            VALUE "LegalCopyright",   "@COPYRIGHT@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

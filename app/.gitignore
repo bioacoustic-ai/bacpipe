@@ -1,0 +1,4 @@
+# output of app/build.py
+dist/
+# downloaded Python runtimes and temporary build files
+.cache/

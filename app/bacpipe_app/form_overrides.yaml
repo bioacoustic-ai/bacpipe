@@ -1,0 +1,115 @@
+# ---------------------------------------------------------------------------
+# Hints for the configuration form of the bacpipe application.
+#
+# The form is generated from bacpipe/config.yaml and bacpipe/settings.yaml
+# (see schema.py). A key that is not mentioned here still shows up in the
+# form, with a widget chosen from the type of its default value. Only add an
+# entry here when the automatic choice is not good enough.
+#
+# Keys are written as dotted paths, wildcards are allowed:
+#     clust_configs.*.params.n_clusters
+#
+# Available hints:
+#   options:       list of allowed values -> dropdown
+#                  (multi-select dropdown if the default value is a list)
+#   options_from:  name of a list computed in schema.option_sources():
+#                  supported_models, dim_reduction_models, plotly_colorscales
+#   widget:        force a widget: bool, int, float, text, folder, file, yaml
+#                  "folder" = text input with a Browse button
+#                  "file"   = the same, the dialog selects a file
+#                  "yaml"   = text input whose content is parsed as YAML, for
+#                             values that can have different types
+#                             (e.g. `False` or a number)
+#   description:   replace the help text taken from the YAML comment
+#   label:         replace the label (default: the key)
+#   section:       move the field to another section
+#   hidden:        true -> not shown, the default value is always used
+#
+# app/tests/test_schema.py fails if an entry refers to a key that no longer
+# exists, so stale entries are noticed when a setting is renamed.
+# ---------------------------------------------------------------------------
+
+# Which sections start unfolded. The titles are the banners of the YAML file
+# (#####  TITLE  #####) in title case, exactly as shown in the form. A file
+# that is not listed here has all its sections unfolded.
+sections:
+  settings:
+    expanded:
+      - Path Settings
+      - Using Your Anootation Settings   # spelled like the banner in settings.yaml
+      - Integrated Classifier Settings
+
+config:
+  audio_dir:
+    widget: folder
+    section: Audio Data
+    description: >-
+      Folder containing your audio files (subfolders are included).
+      The default 'bacpipe/tests/test_data' uses the small example dataset
+      that ships with bacpipe.
+  models:
+    options_from: supported_models
+  dim_reduction_model:
+    options_from: dim_reduction_models
+  evaluation_task:
+    options: [clustering, probing]
+    description: >-
+      Evaluations to run on the embeddings. Probing requires an annotations
+      file in the audio folder. Leave empty to only compute embeddings.
+
+settings:
+  main_results_dir:
+    widget: folder
+    description: >-
+      Folder in which embeddings and all results are stored. This is also
+      where bacpipe looks for existing embeddings, so it is advised not to
+      change it between runs.
+  model_base_path:
+    widget: folder
+    description: >-
+      Folder in which model checkpoints are stored. Missing checkpoints are
+      downloaded into this folder.
+  device:
+    options: [cpu, cuda, mps]
+  padding:
+    # modes of numpy.pad that work without extra arguments
+    options: [wrap, constant, edge, linear_ramp, maximum, mean, median,
+              minimum, reflect, symmetric, empty]
+  annotations_filename:
+    # shown as the complete path of the file; ui.py keeps it next to the
+    # audio folder and hands bacpipe the name relative to that folder
+    widget: file
+    description: >-
+      The annotations file. By default bacpipe looks for annotations.csv in
+      your audio folder; choose another file if yours is somewhere else or
+      has a different name.
+  nr_parallel_workers:
+    widget: yaml
+  max_labels_per_timestamp:
+    widget: yaml
+  min_annotation_length:
+    widget: float
+  visualization_dimensions:
+    options: [2, 3]
+  spec_colorscale:
+    options_from: plotly_colorscales
+  color_continuous:
+    options_from: plotly_colorscales
+  probe_configs.*.name:
+    options: [linear, knn]
+  clust_configs.*.name:
+    options: [kmeans, hdbscan]
+  clust_configs.*.params.n_clusters:
+    widget: yaml
+
+  # The application serves the dashboard itself on a free local port, these
+  # settings of the standalone dashboard do not apply.
+  dashboard_port:
+    hidden: true
+  dashboard_address:
+    hidden: true
+  dashboard_websocket_origin:
+    hidden: true
+  # developer switch: runs on the test data and deletes the results again
+  testing:
+    hidden: true
