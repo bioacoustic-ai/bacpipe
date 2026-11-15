@@ -179,6 +179,27 @@ def test_pipeline_run_collects_output_and_exit_code(monkeypatch, tmp_path):
 # --------------------------------------------------------------------
 # The annotations file, the theme, the sidebar link
 # --------------------------------------------------------------------
+def test_worker_recognises_a_failed_download(tmp_path):
+    """No internet gives a short explanation instead of a long traceback."""
+    import socket
+
+    from bacpipe_app import worker
+
+    try:
+        try:
+            raise socket.gaierror(11001, "getaddrinfo failed")
+        except socket.gaierror as cause:
+            raise RuntimeError("could not locate the file on the Hub") from cause
+    except RuntimeError as error:
+        assert worker.is_no_connection_error(error)
+    assert not worker.is_no_connection_error(FileNotFoundError("no audio files"))
+    assert not worker.is_no_connection_error(BrokenPipeError())
+
+    run = {"settings": {"model_base_path": "some/checkpoints"}}
+    message = worker.no_connection_message(run, tmp_path / "error_traceback.log")
+    assert "No internet connection" in message and "some/checkpoints" in message
+
+
 def test_annotations_path_follows_the_audio_folder(tmp_path):
     audio = tmp_path / "audio"
     audio.mkdir()
