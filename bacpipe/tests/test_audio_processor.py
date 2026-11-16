@@ -218,7 +218,7 @@ class TestOnlyLoadAnnotatedSegments:
         )
         handler.file_length = {}
         segments = handler.only_load_annotated_segments(
-            tmp_path / TEST_AUDIO_FILE.name
+            tmp_path / TEST_AUDIO_FILE.name, annotation_multi_embed=False
         )
         assert isinstance(segments, torch.Tensor)
         assert segments.shape[1] == handler.model.segment_length
@@ -485,8 +485,9 @@ class TestPrepareAudioWithModelPassedAsString:
         )
         frames = handler.prepare_audio(TEST_AUDIO_FILE)
         assert frames.shape[1] == handler.model.segment_length
-        # 13 annotated windows for this file, i.e. not the whole recording
-        assert frames.shape[0] == 13
+        # 13 annotated windows of 5 s for this file, each split into
+        # 5 segments of the 1 s model input length
+        assert frames.shape[0] == 13 * 5
 
     def test_annotations_df_kwarg_is_forwarded(self, monkeypatch):
         self._patch_embedder(monkeypatch)
@@ -497,6 +498,7 @@ class TestPrepareAudioWithModelPassedAsString:
             padding="wrap",
             only_embed_annotations=True,
             annotations_df=annots[annots.start < 10],
+            annotation_multi_embed=False,
         )
         frames = handler.prepare_audio(TEST_AUDIO_FILE)
         # only the two annotated windows below 10 seconds
@@ -569,7 +571,7 @@ class TestOnlyLoadAnnotatedSegmentsWithAnnotationsDf:
             == "audio/FewShot/CHE_01_20190101_163410.wav"
         ]
         segments = handler.only_load_annotated_segments(
-            TEST_AUDIO_FILE, annotations_df=annots
+            TEST_AUDIO_FILE, annotations_df=annots, annotation_multi_embed=False
         )
         assert segments.shape[0] == len(file_rows)
         assert segments.shape[0] < len(annots)
@@ -584,7 +586,7 @@ class TestOnlyLoadAnnotatedSegmentsWithAnnotationsDf:
             }
         )
         segments = handler.only_load_annotated_segments(
-            TEST_AUDIO_FILE, annotations_df=annots
+            TEST_AUDIO_FILE, annotations_df=annots, annotation_multi_embed=False
         )
         assert segments.shape[0] == 2
 
@@ -642,14 +644,64 @@ class TestOnlyLoadAnnotatedSegmentsWithAnnotationsDf:
     def test_none_falls_back_to_the_annotations_csv(self):
         handler = make_handler()
         segments = handler.only_load_annotated_segments(
-            TEST_AUDIO_FILE, annotations_df=None
+            TEST_AUDIO_FILE, annotations_df=None, annotation_multi_embed=False
         )
         assert segments.shape[0] == 13
 
     def test_file_path_can_be_a_string(self):
         handler = make_handler()
         segments = handler.only_load_annotated_segments(
-            str(TEST_AUDIO_FILE), annotations_df=self._annotations()
+            str(TEST_AUDIO_FILE),
+            annotations_df=self._annotations(),
+            annotation_multi_embed=False,
         )
         assert segments.shape == (13, handler.model.segment_length)
 
+
+class TestAnnotationMultiEmbed:
+    """Annotations longer than the model input length (1 s here) produce
+    several segments if ``annotation_multi_embed`` is set."""
+
+    @staticmethod
+    def _segments(start, end, **kwargs):
+        handler = make_handler()
+        segments = handler.only_load_annotated_segments(
+            TEST_AUDIO_FILE,
+            annotations_df=pd.DataFrame({"start": [start], "end": [end]}),
+            **kwargs,
+        )
+        return handler, segments
+
+    def test_long_annotation_is_split_into_consecutive_segments(self):
+        handler, segments = self._segments(2, 5, annotation_multi_embed=True)
+        seg = handler.model.segment_length
+        assert segments.shape == (3, seg)
+        expected, _ = lb.load(
+            str(TEST_AUDIO_FILE), sr=handler.model.sr, offset=2, duration=3
+        )
+        assert np.allclose(
+            segments.numpy().reshape(-1), expected[: 3 * seg], atol=1e-6
+        )
+
+    def test_single_embed_only_keeps_the_first_input_length(self):
+        _, segments = self._segments(2, 5, annotation_multi_embed=False)
+        assert segments.shape[0] == 1
+
+    def test_remainder_respects_min_annotation_length(self):
+        kwargs = dict(annotation_multi_embed=True)
+        # 3.5 s annotation: the 0.5 s remainder is embedded ...
+        _, segments = self._segments(2, 5.5, min_annotation_length=0, **kwargs)
+        assert segments.shape[0] == 4
+        # ... unless it is not longer than min_annotation_length
+        _, segments = self._segments(2, 5.5, min_annotation_length=1, **kwargs)
+        assert segments.shape[0] == 3
+
+    def test_segments_shared_by_overlapping_annotations_are_loaded_once(self):
+        handler = make_handler()
+        segments = handler.only_load_annotated_segments(
+            TEST_AUDIO_FILE,
+            # (2, 5) is split into (2, 3), (3, 4), (4, 5)
+            annotations_df=pd.DataFrame({"start": [2, 4], "end": [5, 5]}),
+            annotation_multi_embed=True,
+        )
+        assert segments.shape[0] == 3

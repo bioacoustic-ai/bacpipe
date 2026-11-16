@@ -1442,6 +1442,7 @@ class Loader:
                 load_labels_and_build_dict,
                 assign_global_get_paths_function,
                 get_paths,
+                unique_start_end_annot_pairs
             )
 
             assign_global_get_paths_function(self.audio_dir)
@@ -1452,6 +1453,19 @@ class Loader:
                 self.audio_dir,
                 audio_files=self.metadata_dict["files"]["audio_files"],
                 bool_filter_labels=False,
+            )
+            # per file, identical pairs of different files are not duplicates
+            df = pd.concat(
+                [
+                    unique_start_end_annot_pairs(
+                        df[df["audiofilename"] == file],
+                        input_len,
+                        annotation_multi_embed=getattr(self, "annotation_multi_embed", None),
+                        only_embed_annotations=True,
+                        min_annotation_length=getattr(self, "min_annotation_length", None),
+                    )
+                    for file in df["audiofilename"].unique()
+                ]
             )
             t_stamps = df.start.values.tolist()
             durations = df.end - df.start

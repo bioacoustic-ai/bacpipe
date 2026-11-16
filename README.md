@@ -519,7 +519,7 @@ If you selected probing, a linear probe will be trained and saved in the probing
 ## Only generate embeddings for annotated segments
 
 
-Using the settings attribute `only_embed_annotations`, you can also decide to only generate embedding corresponding to your annotations. In that case **bacpipe** will take each annotation and create embeddings for each selected model from only those segments. If segments are shorter than the model input length, the segments will be padded. If they are longer, they will produce several embeddings.
+Using the settings attribute `only_embed_annotations`, you can also decide to only generate embedding corresponding to your annotations. In that case **bacpipe** will take each annotation and create embeddings for each selected model from only those segments. If segments are shorter than the model input length, the segments will be padded. If they are longer, they will produce several embeddings (the remainder only if it is longer than `min_annotation_length`), unless `annotation_multi_embed` is set to `False`, in which case only the first model input length is embedded.
 
 
 ## Models with classifiers
