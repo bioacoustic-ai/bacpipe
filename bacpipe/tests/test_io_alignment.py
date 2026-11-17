@@ -445,7 +445,11 @@ class TestEmbeddingAlignment:
                 file_annots = Loader.filter_df_by_file(
                     TEST_AUDIO_DIR, annots, Path(TEST_AUDIO_DIR) / file
                 )
-                expected_starts.extend(file_annots.start.unique().tolist())
+                # annotations are split into segments of the input length
+                for start, end in zip(file_annots.start, file_annots.end):
+                    expected_starts.extend(
+                        np.arange(start, end, segment_s).tolist()
+                    )
             assert labels["start"].tolist() == [
                 round(s, 4) for s in expected_starts
             ]

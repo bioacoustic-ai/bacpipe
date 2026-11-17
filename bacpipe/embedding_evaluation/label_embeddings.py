@@ -58,7 +58,53 @@ def deduplicate_annotation_pairs(df):
     return df.drop_duplicates(subset=subset)
 
 
-def unique_start_end_annot_pairs(df):
+def nr_segments_per_annotation(
+    durations, input_length, annotation_multi_embed=None, min_annotation_length=None
+):
+    """
+    Number of embeddings per annotation if only annotations are embedded.
+
+    Annotations longer than ``input_length`` are split into segments of
+    ``input_length`` if ``annotation_multi_embed`` is set. The remainder
+    only counts if it is longer than ``min_annotation_length``. Both
+    default to the values from the settings.
+
+    Parameters
+    ----------
+    durations : float or array-like
+        annotation durations in seconds
+    input_length : float
+        model input length in seconds
+    annotation_multi_embed : bool, optional
+        split long annotations, by default None
+    min_annotation_length : float, optional
+        minimum length of the remainder in seconds, by default None
+
+    Returns
+    -------
+    numpy.ndarray
+        number of segments per annotation (at least 1)
+    """
+    if annotation_multi_embed is None:
+        annotation_multi_embed = bacpipe.settings.annotation_multi_embed
+    if min_annotation_length is None:
+        min_annotation_length = bacpipe.settings.min_annotation_length
+    durations = np.asarray(durations, dtype=float)
+    if not annotation_multi_embed:
+        return np.ones(durations.shape, dtype=int)
+    # rounding avoids extra segments caused by floating point noise
+    nr_full = np.floor(np.round(durations / input_length, 6)).astype(int)
+    remainder = np.round(durations - nr_full * input_length, 6)
+    return np.maximum(1, nr_full + (remainder > min_annotation_length))
+
+
+def unique_start_end_annot_pairs(
+    df,
+    input_length=None,
+    annotation_multi_embed=None,
+    only_embed_annotations=False,
+    min_annotation_length=None,
+):
     """
     Keep one row per unique ``(start, end)`` pair.
 
@@ -79,19 +125,56 @@ def unique_start_end_annot_pairs(df):
     yourself): identical pairs from different audio files must count once
     per file.
 
+    If ``only_embed_annotations`` is set and ``input_length`` is given,
+    each pair is split into the segments it is embedded as (see
+    ``nr_segments_per_annotation``), sorted by start.
+
     Parameters
     ----------
     df : pandas.DataFrame
         annotations of a single audio file (must have ``start`` and
         ``end`` columns)
+    input_length : float, optional
+        model input length in seconds, by default None
+    annotation_multi_embed : bool, optional
+        see ``nr_segments_per_annotation``, by default None
+    only_embed_annotations : bool, optional
+        if True, only the annotated parts of the audio files are embedded,
+        by default False
+    min_annotation_length : float, optional
+        see ``nr_segments_per_annotation``, by default None
 
     Returns
     -------
     pandas.DataFrame
-        dataframe with only the first occurrence of each ``(start, end)``
-        pair
+        dataframe with one row per embedded segment
     """
-    return df.drop_duplicates(subset=["start", "end"])
+    df = df.drop_duplicates(subset=["start", "end"])
+    if only_embed_annotations and input_length:
+        repeats = nr_segments_per_annotation(
+            df["end"] - df["start"],
+            input_length,
+            annotation_multi_embed,
+            min_annotation_length,
+        )
+
+        pos = np.repeat(np.arange(len(df)), repeats)
+        df_new = df.iloc[pos].copy()
+
+        chunk_idx = df_new.groupby(pos).cumcount().to_numpy()
+        orig_end = df_new["end"].to_numpy()
+
+        df_new["start"] = df_new["start"].to_numpy() + chunk_idx * input_length
+        # annotations that are not split keep their end
+        df_new["end"] = np.where(
+            repeats[pos] > 1,
+            np.minimum(df_new["start"].to_numpy() + input_length, orig_end),
+            orig_end,
+        )
+        return df_new.drop_duplicates(subset=["start", "end"]).sort_values(
+            "start", kind="stable"
+        )
+    return df
 
 
 class MetadataLabelMaker:
@@ -121,7 +204,7 @@ class MetadataLabelMaker:
         
     """
 
-    def __init__(self, paths, model, metadata_label_keys, **kwargs):
+    def __init__(self, paths, model, metadata_label_keys, annotation_multi_embed=None, **kwargs):
         """
         Class to generate metadata labels based on audio files and
         number of generated embeddings per file.
@@ -150,6 +233,8 @@ class MetadataLabelMaker:
         self.model = model
         self.metadata_label_keys = metadata_label_keys
         self.paths = paths
+        self.annotation_multi_embed = annotation_multi_embed
+        self.min_annotation_length = kwargs.get("min_annotation_length")
         if kwargs.get("only_embed_annotations"):
             self.only_embed_annotations = True
             if not kwargs.get("annotations_df") is None:
@@ -186,7 +271,7 @@ class MetadataLabelMaker:
                 "No embeddings found. Gathering files and nr of embeddings "
                 "per file from audio files."
             )
-            _, _, metadata = get_files_if_no_embeds(paths.audio_dir, model)
+            _, _, metadata = get_files_if_no_embeds(paths.audio_dir, model, annotation_multi_embed=annotation_multi_embed)
             self.metadata = metadata
             self.nr_embeds_per_file = metadata["files"]["nr_embeds_per_file"]
             self.nr_embeds_total = sum(metadata["files"]["nr_embeds_per_file"])
@@ -287,7 +372,13 @@ class MetadataLabelMaker:
                     # audio loader embeds each unique pair once. Keep one
                     # start per embedded segment so they line up with the
                     # embeddings.
-                    starts = unique_start_end_annot_pairs(df).start.values
+                    starts = unique_start_end_annot_pairs(
+                        df, 
+                        segment_s, 
+                        annotation_multi_embed=self.annotation_multi_embed,
+                        only_embed_annotations=self.only_embed_annotations,
+                        min_annotation_length=self.min_annotation_length,
+                        ).start.values
                     timestamp = (
                         (
                             time_of_day
@@ -398,7 +489,13 @@ class MetadataLabelMaker:
                         Path(self.paths.audio_dir) / file,
                     )
                     # keep one start per embedded segment, see ``time_of_day``
-                    starts = unique_start_end_annot_pairs(df).start.values
+                    starts = unique_start_end_annot_pairs(
+                        df,
+                        segment_s,
+                        annotation_multi_embed=self.annotation_multi_embed,
+                        only_embed_annotations=self.only_embed_annotations,
+                        min_annotation_length=self.min_annotation_length,
+                        ).start.values
                     timestamp = (
                         (
                             datetime_per_file
@@ -525,7 +622,13 @@ class MetadataLabelMaker:
                     Path(self.paths.audio_dir) / file,
                 )
                 # keep one start per embedded segment, see ``time_of_day``
-                starts = unique_start_end_annot_pairs(df_tmp).start.values
+                starts = unique_start_end_annot_pairs(
+                    df_tmp,
+                    seg_len,
+                    annotation_multi_embed=self.annotation_multi_embed,
+                    only_embed_annotations=self.only_embed_annotations,
+                    min_annotation_length=self.min_annotation_length,
+                    ).start.values
                 all_time_bins = np.round(starts, 4).tolist()
             else:
                 all_time_bins = np.round(
@@ -1345,6 +1448,7 @@ def fit_labels_to_embedding_timestamps(
     segment_s,
     label_column=None,
     only_embed_annotations=False,
+    annotation_multi_embed=None,
     **kwargs,
 ):
     """
@@ -1386,7 +1490,13 @@ def fit_labels_to_embedding_timestamps(
     df = df.sort_values("start")
 
     if only_embed_annotations:
-        pairs_for_grid = unique_start_end_annot_pairs(df)
+        pairs_for_grid = unique_start_end_annot_pairs(
+            df,
+            segment_s,
+            annotation_multi_embed=annotation_multi_embed,
+            only_embed_annotations=only_embed_annotations,
+            min_annotation_length=kwargs.get("min_annotation_length"),
+            )
         num_embeds = len(pairs_for_grid)
     else:
         pairs_for_grid = None
@@ -1415,6 +1525,11 @@ def fit_labels_to_embedding_timestamps(
         start_at_embed_nr = np.where(
             df_fitted_gt["start"] - row.start <= 0
             )[0][-1]
+        if only_embed_annotations:
+            # first of the segments sharing the start of the annotation
+            start_at_embed_nr = np.where(
+                df_fitted_gt["start"] - row.start >= 0
+            )[0][0]
         end_at_embed_nr = np.where(df_fitted_gt["start"] - row.end >= 0)[0]
         if len(end_at_embed_nr) > 0:
             end_at_embed_nr = end_at_embed_nr[0]
@@ -1808,6 +1923,7 @@ def ground_truth_by_model(
     only_embed_annotations=False,
     overwrite=True,
     bool_filter_labels=False,
+    annotation_multi_embed=None,
     **kwargs,
 ):
     """
@@ -1935,11 +2051,17 @@ def ground_truth_by_model(
                 )
             except:
                 files, segment_s, metadata = get_files_if_no_embeds(
-                    audio_dir, model, label_df, only_embed_annotations
+                    audio_dir, model, label_df, 
+                    only_embed_annotations, 
+                    annotation_multi_embed=annotation_multi_embed,
+                    min_annotation_length=kwargs.get("min_annotation_length"),
                 )    
         else:
             files, segment_s, metadata = get_files_if_no_embeds(
-                audio_dir, model, label_df, only_embed_annotations
+                audio_dir, model, label_df, 
+                only_embed_annotations, 
+                annotation_multi_embed=annotation_multi_embed,
+                min_annotation_length=kwargs.get("min_annotation_length"),
             )
 
         # find all label columns
@@ -1956,6 +2078,7 @@ def ground_truth_by_model(
                 label_df,
                 label_column=clean_label_column,
                 only_embed_annotations=only_embed_annotations,
+                annotation_multi_embed=annotation_multi_embed,
                 **kwargs,
             )
             cols = list(ground_truth.columns)[::-1]
@@ -2050,7 +2173,14 @@ def ensure_audio_files(found_audio_files, annotated_audio_files, audio_dir):
     return [str(f) for f in found_audio_files]
 
 
-def get_files_if_no_embeds(audio_dir, model, label_df=None, only_embed_annotations=False):
+def get_files_if_no_embeds(
+    audio_dir,
+    model,
+    label_df=None,
+    only_embed_annotations=False,
+    annotation_multi_embed=None,
+    min_annotation_length=None,
+):
     """
     Get the files and metadata for a model when no embeddings exist yet.
 
@@ -2109,7 +2239,11 @@ def get_files_if_no_embeds(audio_dir, model, label_df=None, only_embed_annotatio
         metadata["files"]["nr_embeds_per_file"] = [
             len(
                 unique_start_end_annot_pairs(
-                    filter_df_by_filename(label_df, f, model=model)
+                    filter_df_by_filename(label_df, f, model=model),
+                    module.LENGTH_IN_SAMPLES / module.SAMPLE_RATE,
+                    annotation_multi_embed=annotation_multi_embed,
+                    only_embed_annotations=only_embed_annotations,
+                    min_annotation_length=min_annotation_length,
                 )
             )
             for f in matching_audio_files

@@ -375,6 +375,8 @@ class AudioHandler:
         file_path,
         annotations_filename="annotations.csv",
         annotations_df=None,
+        annotation_multi_embed=None,
+        min_annotation_length=None,
         **_,
     ):
         """
@@ -447,6 +449,14 @@ class AudioHandler:
             an ``audiofilename`` column, it is filtered down to the rows
             belonging to ``file_path``, otherwise it is expected to only
             contain the annotations of that file, by default None
+        annotation_multi_embed : bool, optional
+            split annotations longer than the model input length into
+            several segments instead of cutting them off, by default None
+            (value from the settings)
+        min_annotation_length : float, optional
+            minimum length in seconds of the remainder of a split
+            annotation to get its own segment, by default None (value from
+            the settings)
 
         Returns
         -------
@@ -463,6 +473,9 @@ class AudioHandler:
         """
         import pandas as pd
         from bacpipe import Loader
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            nr_segments_per_annotation,
+        )
 
         file_path = Path(file_path)
         if isinstance(annotations_df, pd.DataFrame):
@@ -500,7 +513,7 @@ class AudioHandler:
         self.get_file_length(file_path)
         file_duration = self.file_length[file_path.stem]
 
-        segments = []
+        segments, starts, ends = [], [], []
         for s, e in zip(file_annots["start"], file_annots["end"]):
             s, e = float(s), float(e)
             if e <= s:
@@ -524,12 +537,27 @@ class AudioHandler:
                 offset=s,
                 duration=duration,
             )
+            segment_s = self.model.segment_length / self.model.sr
+            # same segment count as the labels, so they line up
+            nr_segments = int(
+                nr_segments_per_annotation(
+                    e - s,
+                    segment_s,
+                    annotation_multi_embed,
+                    min_annotation_length,
+                )
+            )
             segments.append(
                 lb.util.fix_length(
                     audio,
-                    size=self.model.segment_length,
+                    size=nr_segments * self.model.segment_length,
                     mode=self.padding,
-                )
+                ).reshape(nr_segments, -1)
+            )
+            segment_starts = s + np.arange(nr_segments) * segment_s
+            starts.extend(segment_starts)
+            ends.extend(
+                np.minimum(segment_starts + segment_s, e) if nr_segments > 1 else [e]
             )
 
         if len(segments) == 0:
@@ -540,6 +568,15 @@ class AudioHandler:
             )
 
         cumulative_segments = torch.Tensor(np.vstack(segments))
+        if len(starts) > len(segments):
+            # annotations were split: unique segments sorted by start same as labels
+            keep = (
+                pd.DataFrame({"start": starts, "end": ends})
+                .drop_duplicates()
+                .sort_values("start", kind="stable")
+                .index.to_numpy()
+            )
+            cumulative_segments = cumulative_segments[keep]
         return cumulative_segments
 
     def _load_audio_based_on_fixed_segment_length(

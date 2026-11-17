@@ -175,7 +175,7 @@ class TestNotebookWorkflow:
         from sklearn.cluster import KMeans
 
         embeds = loader_dict[self.MODELS[0]].embeddings(return_type="array")
-        gt_labels = gt["simultaneous_labels"].values
+        gt_labels = gt[list(label2index)].values.argmax(axis=1)
 
         clusterings = bacpipe.run_clustering(
             embeds=embeds,

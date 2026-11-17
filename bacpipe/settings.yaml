@@ -96,6 +96,14 @@ only_embed_annotations: False
 # acoustic features than the annotated one.
 min_annotation_length: 0
 
+# ONLY necessary if only_embed_annotations is TRUE
+# IF the length of an annotation exceeds model's input length
+# choose to separate annotation into multiple segments and have multiple embeddings 
+# or to discard the latter segments to have a single embedding.
+# The remainder of an annotation only gets its own embedding if it is 
+# longer than min_annotation_length.
+annotation_multi_embed: True
+
 ##########-----------------------------#################
 ##########   METADATA LABELS SETTINGS   #################
 ##########-----------------------------#################

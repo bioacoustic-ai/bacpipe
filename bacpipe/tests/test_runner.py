@@ -45,8 +45,10 @@ class TestFillDataframeWithClassiefierResults:
     class _DummyModel:
         classes = ["Species A", "Species B"]
         device = "cpu"
+        sr = 48000
+        segment_length = 5 * 48000
 
-    def _make_classifier(self, tmp_path):
+    def _make_classifier(self, tmp_path, annotation_multi_embed=False):
         (tmp_path / "annotations.csv").write_text(
             "audiofilename,start,end,label:species\n"
             "rec.wav,0,5,Species A\n"
@@ -62,6 +64,7 @@ class TestFillDataframeWithClassiefierResults:
             classifier_threshold=0.5,
             use_folder_structure=False,
             only_embed_annotations=True,
+            annotation_multi_embed=annotation_multi_embed,
             annotations_filename="annotations.csv",
         )
         classifier.predictions = torch.tensor(
@@ -87,6 +90,23 @@ class TestFillDataframeWithClassiefierResults:
         assert table["start"].tolist() == [0, 0, 5]
         assert table["end"].tolist() == [5, 10, 10]
         assert table["audiofilename"].tolist() == ["rec.wav"] * 3
+
+    def test_long_annotations_are_split_into_segments(self, tmp_path):
+        # 5 s input length: (0, 10) is split into (0, 5) and (5, 10), which
+        # are already annotated, so two unique segments remain
+        classifier = self._make_classifier(tmp_path, annotation_multi_embed=True)
+        classifier.predictions = torch.tensor([[0.9, 0.1], [0.1, 0.9]])
+
+        class DummyLoader:
+            audio_dir = tmp_path
+            continue_incomplete_run = False
+
+        classifier._fill_dataframe_with_classiefier_results(
+            DummyLoader(), tmp_path / "rec.wav"
+        )
+        table = classifier.cumulative_annotations
+        assert table["start"].tolist() == [0, 5]
+        assert table["end"].tolist() == [5, 10]
 
     def test_mismatched_segment_count_does_not_raise(self, tmp_path):
         # Simulate the fallback path (e.g. offline classifier run) where the
