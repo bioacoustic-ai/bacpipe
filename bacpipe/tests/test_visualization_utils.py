@@ -1442,6 +1442,65 @@ class TestFriendlyExportError:
         for exc in errors:
             assert _friendly_export_error(exc) is not None
 
+    def test_download_button_is_offered_only_when_no_browser_was_found(self):
+        import panel as pn
+        from kaleido.errors import ChromeNotFoundError
+
+        from bacpipe.embedding_evaluation.visualization.dashboard_utils import (
+            _chrome_download_button,
+            _show_export_error,
+        )
+
+        notification = pn.pane.Markdown("")
+        button = _chrome_download_button(notification, retry=lambda event: None)
+        assert not button.visible
+
+        _show_export_error(ChromeNotFoundError(), notification, button)
+        assert button.visible
+        assert "Download Chrome" in notification.object
+
+        _show_export_error(OSError("disk full"), notification, button)
+        assert not button.visible
+        assert "disk full" in notification.object
+
+    def test_download_button_downloads_chrome_and_saves_again(self, monkeypatch):
+        import asyncio
+
+        import kaleido
+        import panel as pn
+
+        from bacpipe.embedding_evaluation.visualization.dashboard_utils import (
+            _chrome_download_button,
+            _download_chrome_and_retry,
+        )
+
+        calls = []
+        monkeypatch.setattr(kaleido, "get_chrome_sync", lambda: calls.append("download"))
+        notification = pn.pane.Markdown("")
+        button = _chrome_download_button(notification, retry=None)
+        button.visible = True
+
+        def download():
+            asyncio.run(
+                _download_chrome_and_retry(
+                    None, button, notification, lambda event: calls.append("save")
+                )
+            )
+
+        download()
+        assert calls == ["download", "save"]
+        assert not button.visible and not button.disabled
+
+        def fails():
+            raise OSError("no connection")
+
+        monkeypatch.setattr(kaleido, "get_chrome_sync", fails)
+        button.visible = True
+        download()
+        assert calls == ["download", "save"]  # the figure is not saved again
+        assert button.visible and not button.disabled
+        assert "could not be downloaded" in notification.object
+
     def test_returns_hint_for_missing_kaleido_package(self):
         # plotly raises ValueError (or a raw ModuleNotFoundError) when kaleido
         # is not installed
@@ -1512,6 +1571,7 @@ class TestDashboardEmbeddingPanelKwargs:
         dash.dim_reduction_model = "umap"
         dash.embed_save_button = {0: None}
         dash.embed_notification = {0: None}
+        dash.embed_chrome_button = {0: None}
 
         captured = {}
 

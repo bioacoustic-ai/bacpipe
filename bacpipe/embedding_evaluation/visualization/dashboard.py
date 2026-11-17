@@ -263,6 +263,7 @@ class DashBoard(DashBoardHelper):
 
         self.embed_save_button = dict()
         self.embed_notification = dict()
+        self.embed_chrome_button = dict()
 
         self.interactive_embed_plot = dict()
         self._embed_view_ranges = dict()
@@ -406,6 +407,7 @@ class DashBoard(DashBoardHelper):
                 embedding_plot,
                 self.embed_save_button[widget_idx],
                 self.embed_notification[widget_idx],
+                self.embed_chrome_button.get(widget_idx),
             ),
         )
 
