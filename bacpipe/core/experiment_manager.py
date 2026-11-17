@@ -56,7 +56,7 @@ def save_logs(**kwargs):
     # Save current config + settings snapshot
     settings_dict, config_dict = {}, {}
     for k, v in vars(settings).items():
-        if "/" in str(v) or "\\" in str(v):
+        if ("/" in str(v) or "\\" in str(v)) and not "{" in str(v):
             settings_dict[k] = Path(v).as_posix()
         else:
             settings_dict[k] = v

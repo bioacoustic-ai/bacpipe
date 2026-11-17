@@ -6,6 +6,8 @@ from scipy.signal.windows import tukey
 from pathlib import Path
 from bacpipe import settings
 import logging
+import time
+import soundfile
 
 logger = logging.getLogger("bacpipe")
 
@@ -65,6 +67,8 @@ class SpectrogramPlot:
             padding, bool_change_speed, new_speed)
         """
         self.audio_dir = audio_dir
+        if str(audio_dir).startswith("ssh "):
+            self._initiate_ssh_connection(kwargs)
         self.panel_static_text = panel_static_text
         self.all_sample_rates = {}
         self.all_segment_lengths = {}
@@ -81,6 +85,40 @@ class SpectrogramPlot:
                 "segment_length (samples)"
             ]
         self.kwargs = kwargs
+        
+    def _initiate_ssh_connection(self, kwargs):
+        import fsspec
+        
+        try:
+            import paramiko
+        except ModuleNotFoundError as e:
+            import traceback
+            error_str = (
+                "\nTo use the ssh connection, you need to install the package paramiko: "
+                "run 'uv pip install paramiko', then restart bacpipe and it should "
+                "establish the connection.\n"
+            )
+            tb = traceback.format_exc()
+            
+            logger.error(f"{tb}\n{error_str}")
+            import sys
+            sys.exit(0)
+            
+        logger.info('Initiating ssh connection.')
+        if not 'cmd' in kwargs['ssh_configs']:
+            self.ssh_connector = fsspec.filesystem(
+                "sftp", **kwargs['ssh_configs']
+            )
+        else:
+            pass_dict = kwargs['ssh_configs'].copy()
+            pass_dict.pop('cmd')
+            self.ssh_connector = fsspec.filesystem(
+                "sftp",
+                sock=paramiko.ProxyCommand(kwargs['ssh_configs']['cmd']),
+                **pass_dict
+                )
+        
+        logger.info('ssh connection successful.')
 
     def _update_spec_obj(self, model, bool_autoplay_audio):
         """
@@ -436,12 +474,27 @@ class SpectrogramPlot:
         """
         path = Path(self.audio_dir) / filename
         if not self.kwargs.get("bool_change_speed"):
-            audio, self.orig_sr = lb.load(
-                path,
-                sr=self.sample_rate,
-                offset=float(start),
-                duration=float(end) - float(start),
-            )
+            if not str(self.audio_dir).startswith("ssh "):
+                audio, self.orig_sr = lb.load(
+                    path,
+                    sr=self.sample_rate,
+                    offset=float(start),
+                    duration=float(end) - float(start),
+                )
+            else:
+                try:
+                    logger.info('Collecting audio data via ssh')
+                    start_timer = time.time()
+                    with self.ssh_connector.open(str(path).replace('ssh ', ''), "rb") as f:
+                        with soundfile.SoundFile(f) as snd:
+                            sr = snd.samplerate
+                            snd.seek(int(float(start) * sr))
+                            audio = snd.read(int(float(end) - float(start)) * sr)
+                    end_timer = time.time()
+                    logger.info(f'Successfully retrieved audio via ssh. Retrieval took {end_timer-start_timer:.2f}s.')
+                except Exception as e:
+                    logger.warning('Unable to read file due to error: ', e)
+                audio = lb.resample(audio, orig_sr = sr, target_sr=self.sample_rate)
         else:
             audio, self.orig_sr = lb.load(
                 path,
