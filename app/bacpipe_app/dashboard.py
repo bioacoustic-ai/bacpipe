@@ -1,22 +1,13 @@
 """
-Stage 3: build the regular bacpipe dashboard so that it can be placed inside
-the page of the application.
-
-``bacpipe.visualize_using_dashboard`` builds the dashboard *and* starts its
-own web server for it. The application already is a web server, so this
-module does the first half only: it creates ``DashBoard`` with the arguments
-the pipeline would have used (worker.py stored them) and returns its layout.
-
-This is the only place where the application reaches into bacpipe internals.
-The names it relies on are listed in ``BACPIPE_CONTRACT`` and checked by
-``app/tests/test_contract.py`` on every push, so a rename in bacpipe is
-noticed in the normal test run and not by a user of the application.
+Build the bacpipe dashboard for a finished run and return its layout, so it
+can be embedded in the application page instead of being served on its own
+by ``visualize_using_dashboard``.
 """
 
 import inspect
 import pickle
 
-#: what this module (and worker.py) needs from bacpipe: {file: [names]}
+#: names used from bacpipe by this module and worker.py, checked by tests/test_contract.py
 BACPIPE_CONTRACT = {
     "core/workflows.py": ["play", "visualize_using_dashboard"],
     "embedding_evaluation/visualization/dashboard.py": [
@@ -30,10 +21,7 @@ BACPIPE_CONTRACT = {
 
 def build_dashboard(config, settings, dashboard_kwargs_file):
     """
-    Create the dashboard for a finished run.
-
-    This imports bacpipe (torch, tensorflow, ...) into the application
-    process, which takes a few seconds the first time.
+    Create the dashboard for a finished run. Imports bacpipe.
 
     Parameters
     ----------

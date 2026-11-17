@@ -6,9 +6,7 @@ What happens on start (``main``):
 1. If the application is already running, its page is opened in the browser
    and this second process ends.
 2. The splash screen is shown (splash.py, own process).
-3. The Panel web server is started on a free port. It only listens on
-   127.0.0.1, i.e. it is not reachable from other computers and does not
-   trigger a firewall question.
+3. The Panel web server is started on a free port on 127.0.0.1.
 4. The browser is opened and the splash screen closed.
 5. The server runs until the close button is pressed, or until no browser
    tab has been connected for a while and no pipeline is running.
@@ -36,13 +34,8 @@ PING_TEXT = "bacpipe_app is running"
 #: seconds without a connected browser tab after which the app closes
 DEFAULT_IDLE_TIMEOUT = 300
 
-# Loaded by every page. It asks the server every 1.5 seconds whether it is
-# still there. When the application has been closed (close button in any
-# stage, also the one of the dashboard), the page tries to close its tab.
-# Browsers only allow a page to close a tab in some situations (Chrome and
-# Edge do for a tab that was opened by the application and never navigated,
-# Firefox does not), so otherwise the page is replaced by a short message
-# instead of staying behind as a dead page.
+# Loaded by every page: polls /ping and, once the server is gone, closes the
+# tab or, where the browser does not allow that, replaces the page content.
 PAGE_SCRIPT = """
 (function () {
   var failures = 0;
@@ -73,11 +66,8 @@ PAGE_SCRIPT = """
 # --------------------------------------------------------------------
 def setup_logging():
     """
-    Log to ``app_state/app.log``.
-
-    Started through the Windows launcher there is no console: stdout and
-    stderr do not exist. They are pointed to the log file, so that ``print``
-    and tracebacks of bacpipe and its dependencies end up somewhere useful.
+    Log to ``app_state/app.log``. Without a console (``pythonw.exe``),
+    stdout and stderr are redirected to the same file.
     """
     log_file = paths.app_log_file()
     try:
@@ -136,10 +126,8 @@ def start_splash():
 
 def splash_image(width=380):
     """
-    The logo with the "bacpipe" writing, scaled down for the splash screen.
-
-    Tk can only load an image in its original size, so a small copy is
-    created once and kept in the app state folder.
+    The logo scaled down for the splash screen, cached in the app state
+    folder.
     """
     source = paths.logo_path()
     target = paths.state_dir() / "cache" / f"splash_{width}_{int(source.stat().st_mtime)}.png"
@@ -184,8 +172,6 @@ def create_server(state, port):
     from .help_page import HelpHandler, ReadmeAssetHandler
     from .ui import SITE_TITLE, Page
 
-    # The extensions have to be known before the first page is created,
-    # including the ones only the dashboard of stage 3 needs.
     pn.extension(*PANEL_EXTENSIONS, js_files={"bacpipe_app": "bacpipe_app.js"})
 
     class PingHandler(RequestHandler):
@@ -229,11 +215,8 @@ def create_server(state, port):
 
 def watch_for_idle(server, state, timeout):
     """
-    Close the application when nobody is using it any more.
-
-    Without this, closing the browser tab would leave an invisible process
-    behind. The app stays alive while a pipeline is running, also without an
-    open tab; starting the program again then reconnects to it.
+    Close the application once no browser tab has been connected for
+    ``timeout`` seconds and no pipeline is running.
     """
     from tornado.ioloop import PeriodicCallback
 
@@ -254,11 +237,8 @@ def watch_for_idle(server, state, timeout):
 
 def selftest(port):
     """
-    Used by the tests of the build (``bacpipe --selftest``): request the
-    main page and the help page from the running server.
-
-    Requesting the main page makes the server create a complete page
-    including the form, so this fails if the form can not be built.
+    ``--selftest``: request the main page (which builds the form), the help
+    page and the ping endpoint from the running server.
     """
     for path, expected in (("", "bacpipe"), ("help", "bacpipe help"), ("ping", PING_TEXT)):
         with urllib.request.urlopen(f"http://{HOST}:{port}/{path}", timeout=60) as response:

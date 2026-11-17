@@ -13,13 +13,8 @@ an archive of that folder to hand out:
     app/dist/bacpipe.app/                   (macOS)
     app/dist/bacpipe-<version>-<system>-<arch>.zip | .tar.gz
 
-How it works - there is no "freezing" of the code involved. The build takes
-a relocatable Python, installs bacpipe into it with pip exactly like a user
-would, and adds a small launcher that starts `python -m bacpipe_app`. So if
-`pip install` gives a working bacpipe, the application works too, and a
-change in bacpipe needs no change in this script.
-
-The steps, in the order of the functions below:
+The build takes a relocatable Python, installs bacpipe into it with pip and
+adds a launcher that starts `python -m bacpipe_app`. The steps, in the order of the functions below:
 
     1. download_python      fetch the pinned standalone Python (cached)
     2. install_packages     pip install the dependencies and bacpipe
@@ -30,10 +25,8 @@ The steps, in the order of the functions below:
     7. check_paths          refuse paths that are too long for Windows
     8. make_archive         zip (Windows) or tar.gz (Linux, macOS)
 
-Requirements for running this script: Python >= 3.11 with the packages of
-app/requirements-build.txt, and internet access. Options: `--help`.
-Everything that is a choice (Python version, package list, ...) is in
-app/build_config.toml. The documentation is in app/README.md.
+Requires Python >= 3.11 with app/requirements-build.txt and internet access.
+Build options are in app/build_config.toml, see also `--help`.
 """
 
 import argparse
@@ -256,13 +249,8 @@ def pip_install(layout, installer, link_mode, *arguments):
                 "uv", "pip", "install",
                 "--python", layout.python,
                 "--link-mode", link_mode,
-                # The requirements file adds the PyTorch package index
-                # (--extra-index-url). That index also hosts old copies of
-                # ordinary packages like tqdm. pip picks the best version
-                # from all indexes; uv by default only looks at the first
-                # index that has the package and then fails on the version
-                # bounds. This option makes uv behave like pip, which is
-                # what the test workflows install with.
+                # pick the best version across all indexes like pip does,
+                # needed for the PyTorch --extra-index-url
                 "--index-strategy", "unsafe-best-match",
                 *arguments,
             ]
@@ -294,8 +282,6 @@ def install_packages(config, layout, requirements, installer, link_mode):
         requirements_file = REPO_ROOT / requirements
         if not requirements_file.exists():
             raise SystemExit(f"Requirements file not found: {requirements_file}")
-        # run from the repository root, relative paths inside the
-        # requirements file refer to it
         pip_install(layout, installer, link_mode, "-r", requirements_file)
         pip_install(layout, installer, link_mode, "--no-deps", REPO_ROOT)
 
@@ -384,15 +370,11 @@ def prune(config, layout):
 # --------------------------------------------------------------------
 def compile_bytecode(layout):
     """
-    Precompile all python files of the runtime.
-
-    Python otherwise does this on first import, which makes the first start
-    slow and fails silently if the application folder is read-only.
+    Precompile all python files of the runtime, so nothing is written into
+    the application folder at runtime.
     """
     step("5/8 Compile bytecode")
-    # some packages ship files that are not valid for this Python version
-    # (templates, python 2 examples); they do not matter, so errors are
-    # not fatal here
+    # errors are ignored, some packages ship files that are not valid Python
     subprocess.run(
         [str(layout.python), "-m", "compileall", "-q", "-j", "0", str(site_packages(layout))],
         stdout=subprocess.DEVNULL,
@@ -529,9 +511,8 @@ def longest_paths(layout, count=5):
 
 def check_paths(config, layout):
     """
-    Windows refuses paths longer than 260 characters unless an administrator
-    changed a system setting. The folder has to work wherever a user unpacks
-    it, so the longest path inside the folder is limited.
+    Limit the longest path inside the folder, since Windows refuses paths
+    longer than 260 characters by default.
     """
     step("7/8 Path lengths")
     limit = config["windows"]["max_path_length"]

@@ -36,7 +36,6 @@ from .theme import load_theme
 _THEME = load_theme()
 
 LABEL_STYLE = {"font-weight": "600", "font-size": "1em"}
-# color and size of the help texts are set in theme.yaml
 HELP_STYLE = {
     "color": _THEME["help_text"]["color"],
     "font-size": str(_THEME["help_text"]["font_size"]),
@@ -214,8 +213,6 @@ class FolderField(TextField):
             name="Browse …", width=90, margin=(4, 0)
         )
         self.browse_button.on_click(self._browse)
-        # a note below the field that the pages can fill in, e.g. "this
-        # file does not exist"; it never blocks anything
         self.note = pn.pane.Alert(
             "", alert_type="warning", visible=False, margin=(2, 10, 6, 10),
             max_width=FIELD_WIDTH + 200,
@@ -239,14 +236,7 @@ class FolderField(TextField):
         return ""
 
     def _browse(self, event):
-        """
-        Show the file dialog of the system.
-
-        The server runs on the user's own machine, so it can open a real
-        dialog (a browser can not tell a web page the path of a folder). The
-        dialog runs in its own process (dialogs.py) and a thread waits for
-        it, so the page stays responsive while the dialog is open.
-        """
+        """Open the native dialog (dialogs.py) without blocking the page."""
         doc = pn.state.curdoc
         start_dir = self.dialog_start_dir()
         self.browse_button.disabled = True

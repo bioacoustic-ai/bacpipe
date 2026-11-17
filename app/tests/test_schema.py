@@ -91,7 +91,7 @@ def test_overrides_only_mention_known_files():
 
 
 # --------------------------------------------------------------------
-# The dropdowns the user asked for
+# Dropdown options
 # --------------------------------------------------------------------
 def test_models_are_taken_from_supported_models(definitions, bacpipe_dir):
     models = next(spec for spec in definitions["config"] if spec.key == "models")

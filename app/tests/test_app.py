@@ -1,9 +1,7 @@
 """
 Tests of the application code, run from the checkout.
 
-They need panel (see app/requirements-build.txt) but not the heavy
-dependencies of bacpipe: the application never imports bacpipe before the
-dashboard is shown.
+They need panel, but not torch or tensorflow.
 """
 
 import subprocess

@@ -1,10 +1,6 @@
 """
-Tell the user when a newer version of the application has been released.
-
-On start of a *built* application one small request is sent to the GitHub
-API (latest release of the bacpipe repository). No data about the user is
-transmitted, and without a connection the check is skipped silently.
-Set the environment variable ``BACPIPE_NO_UPDATE_CHECK=1`` to disable it.
+Check the GitHub API for a newer release of bacpipe. No user data is sent,
+failures are ignored. Disabled by ``BACPIPE_NO_UPDATE_CHECK=1``.
 """
 
 import json

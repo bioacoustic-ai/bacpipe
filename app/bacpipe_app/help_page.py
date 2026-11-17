@@ -1,10 +1,6 @@
 """
-The help page: the README of bacpipe as a web page under ``/help``.
-
-The README is converted from markdown to HTML when the page is opened. Its
-images are served from ``/readme_assets/``. Links to other files of the
-repository are pointed to GitHub, because those files are not part of the
-application.
+The bacpipe README rendered as a web page under ``/help``. Its images are
+served from ``/readme_assets/``, other relative links point to GitHub.
 """
 
 import html
@@ -63,8 +59,6 @@ def render_help_page():
     text = (root / "README.md").read_text(encoding="utf-8")
     body = markdown.markdown(
         link_bare_urls(rewrite_links(text, root, REPO_URL)),
-        # tables, fenced code blocks, heading ids for the links of the
-        # table of contents
         extensions=["extra", "toc", "sane_lists"],
     )
     return PAGE.format(body=body)

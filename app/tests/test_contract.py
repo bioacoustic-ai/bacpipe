@@ -1,14 +1,8 @@
 """
 The contract between the application and bacpipe.
 
-The application calls bacpipe through a handful of names (see
-``BACPIPE_CONTRACT`` in ``bacpipe_app/dashboard.py``). These tests check
-that the names still exist, by reading the source files - bacpipe itself is
-not imported, so the tests need neither torch nor tensorflow and run in a
-second.
-
-If one of them fails, bacpipe was changed in a way the application has to
-follow. The failing test says what to adapt.
+The tests check that the names the application uses from bacpipe still
+exist, by reading the source files without importing bacpipe.
 """
 
 import ast

@@ -1,8 +1,7 @@
 /*
  * bacpipe.exe - the launcher of the bacpipe application on Windows.
  *
- * It does one thing: start the Python that is shipped in the "runtime"
- * folder next to this file,
+ * Starts the Python shipped in the "runtime" folder next to this file,
  *
  *     runtime\pythonw.exe -E -s -X utf8 -m bacpipe_app <arguments>
  *
@@ -13,14 +12,9 @@
  *   -s        ignore packages installed in the user's home directory
  *   -X utf8   use UTF-8 for files and output regardless of the system locale
  *
- * pythonw.exe is the Python without a console window. To see a console (for
- * debugging) use bacpipe_debug.cmd, which starts python.exe instead.
+ * bacpipe_debug.cmd does the same with python.exe, which has a console.
  *
- * The launcher needs no installation and no administrator rights: it does
- * not write anything and only reads its own location.
- *
- * It is compiled by app/build.py with the zig compiler (pip package
- * "ziglang"), which works on Windows, Linux and macOS:
+ * Compiled by app/build.py with the zig compiler (pip package "ziglang"):
  *
  *     python -m ziglang cc launcher.c launcher.rc -o bacpipe.exe
  *            -target x86_64-windows-gnu -municode -Wl,--subsystem,windows -O2 -s

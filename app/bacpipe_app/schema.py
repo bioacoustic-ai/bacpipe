@@ -1,13 +1,10 @@
 """
 Turn ``config.yaml`` / ``settings.yaml`` into a description of form fields.
 
-This module is the reason the application does not need to be touched when a
-setting is added to bacpipe: every key in the YAML files becomes a field, the
-widget type is derived from the type of the default value, the help text is
-taken from the comment above the key and the section headings are taken from
-the ``#####  TITLE  #####`` banners. A banner that is followed by an empty line and
-another banner, without a key in between, is a heading above the following
-sections (``EVALUATION SETTINGS`` in settings.yaml).
+Every key becomes a field. The field kind is derived from the default value,
+the help text from the comment above the key and the section from the
+``#####  TITLE  #####`` banners. A banner followed by an empty line and
+another banner is a heading above the following sections.
 
 =================  ==========================================================
 default value      field kind (see ``form.py`` for the widget)
@@ -20,12 +17,8 @@ list                ``multichoice``  dropdown with multiple selection
 mapping             ``group``        box containing one field per entry
 =================  ==========================================================
 
-Whatever cannot be derived from the YAML file (the options of a dropdown,
-which text fields are folders, fields that make no sense in the app) is
-declared in ``form_overrides.yaml``.
-
-The module has no dependency on Panel or bacpipe and is unit tested in
-``app/tests/test_schema.py``.
+Hints that cannot be derived from the YAML files are declared in
+``form_overrides.yaml``.
 """
 
 import fnmatch
@@ -201,11 +194,8 @@ def _clean_description(comment_lines):
 # --------------------------------------------------------------------
 def load_constants(bacpipe_dir):
     """
-    Load ``bacpipe/core/constants.py`` as a standalone module.
-
-    The file only contains plain data, so it can be executed directly. Doing
-    ``import bacpipe.core.constants`` instead would run ``bacpipe/__init__``
-    first, which imports torch and tensorflow.
+    Load ``bacpipe/core/constants.py`` as a standalone module, without
+    running ``bacpipe/__init__``.
     """
     constants_file = Path(bacpipe_dir) / "core" / "constants.py"
     spec = importlib.util.spec_from_file_location(
@@ -398,8 +388,8 @@ def iter_specs(specs):
 
 def unused_override_patterns(specs, overrides):
     """
-    Override patterns that match no key. They point at a setting that was
-    renamed or removed in bacpipe, the tests fail when this is not empty.
+    Override patterns that match no key, i.e. refer to a renamed or removed
+    setting.
     """
     dotted = [spec.dotted for spec in iter_specs(specs)]
     return [

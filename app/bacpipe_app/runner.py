@@ -1,10 +1,6 @@
 """
-Starting, watching and stopping the pipeline process (worker.py).
-
-``PipelineRun`` starts the worker with the values of the form and collects
-everything it prints in an ``OutputBuffer``. The pages read from that buffer,
-so a browser tab that is opened (or reloaded) in the middle of a run shows
-the complete output so far.
+Starting, watching and stopping the pipeline process (worker.py). The output
+is collected in an ``OutputBuffer`` that every open page reads from.
 """
 
 import codecs
@@ -29,10 +25,8 @@ class OutputBuffer:
     """
     Thread safe text buffer with a position counter.
 
-    Readers remember how far they have read (``cursor``) and ask for
-    everything after that. Only the last ``max_chars`` characters are kept,
-    which is plenty for the terminal view; the complete output is in the log
-    file of the run.
+    Readers keep a ``cursor`` and ask for everything after it. Only the last
+    ``max_chars`` characters are kept.
     """
 
     def __init__(self, max_chars=2_000_000):
@@ -119,8 +113,7 @@ class PipelineRun:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,  # one stream, like in a terminal
             stdin=subprocess.DEVNULL,
-            # relative paths behave like in `python run_pipeline.py`, with
-            # the workspace taking the place of the repository folder
+            # relative paths are resolved against the workspace
             cwd=str(paths.workspace_dir()),
             env=paths.child_env(
                 COLUMNS=TERMINAL_COLUMNS,

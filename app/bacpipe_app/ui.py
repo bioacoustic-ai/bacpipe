@@ -3,18 +3,16 @@ The pages of the application.
 
 There are three stages, all inside the same browser page:
 
-1. ``config``   - the form for config.yaml and settings.yaml with the big
-                  "Run pipeline" button
+1. ``config``   - the form for config.yaml and settings.yaml with the
+                  "Play the bacpipe" button
 2. ``running``  - the terminal output of the pipeline
                   (``loading_dashboard`` and ``ended`` show the same view
                   with a different status line)
 3. ``dashboard``- the regular bacpipe dashboard
 
-``AppState`` exists once per application and knows which stage is active.
-``Page`` exists once per browser tab and shows the active stage. A page looks
-at the state a few times per second (``Page.tick``), which is how the output
-of the pipeline gets into the terminal and how every open tab follows along
-when the stage changes.
+``AppState`` exists once per application and holds the active stage.
+``Page`` exists once per browser tab and polls the state (``Page.tick``) to
+follow stage changes and stream the pipeline output.
 """
 
 import logging
@@ -63,7 +61,6 @@ a.bacpipe-help:hover { background: rgba(255, 255, 255, 0.2); }
 
 THEME = load_theme()
 
-# the size of the text and of the drawing on the button come from theme.yaml
 PLAY_BUTTON_CSS = """
 :host .bk-btn {{
   font-size: {font_size}; font-weight: 600; line-height: 1;
@@ -77,9 +74,8 @@ ANNOTATIONS_KEY = "annotations_filename"
 # --------------------------------------------------------------------
 # The annotations file
 # --------------------------------------------------------------------
-# bacpipe wants the *name* of the annotations file and looks for it in the
-# audio folder. The form shows the complete path instead (so that it can be
-# chosen with a file dialog) and these functions translate between the two.
+# bacpipe expects the annotations file relative to the audio folder, the form
+# shows the complete path.
 def default_annotations_path(audio_dir, filename):
     """'/data/audio' + 'annotations.csv' -> '/data/audio/annotations.csv'"""
     return str(Path(audio_dir) / Path(filename).name) if audio_dir else filename
@@ -116,10 +112,7 @@ def annotations_file_exists(shown_path, audio_dir):
 # --------------------------------------------------------------------
 def validate(config, settings):
     """
-    Check the values of the form before the pipeline is started.
-
-    Only problems that would make the pipeline fail right away are reported,
-    everything else is left to bacpipe.
+    Check for problems that would make the pipeline fail right away.
 
     Returns
     -------
@@ -177,9 +170,7 @@ class AppState:
         if not run.wants_dashboard:
             self.stage = "ended"
             return
-        # Stage 2 -> 3. Building the dashboard imports bacpipe into this
-        # process and loads the results, which takes a few seconds. It
-        # happens here, in the background thread, so the pages stay alive.
+        # stage 2 -> 3, built in this background thread
         self.stage = "loading_dashboard"
         run.output.write("\nLoading the dashboard ...\n")
         try:
@@ -276,10 +267,7 @@ class Page:
 
     # -- the sidebar shown in stage 1 and 2 ---------------------------
     def _sidebar(self):
-        """
-        Logo, contact text and close button, like the sidebar of the
-        dashboard (which adds the same elements below its own widgets).
-        """
+        """Logo, version, contact text and close button."""
         info = paths.build_info()
         version = f"bacpipe {info['version']}"
         if info.get("commit"):
@@ -346,9 +334,7 @@ class Page:
             pn.Tabs(
                 ("Configuration", self.config_form.layout),
                 ("Settings", self.settings_form.layout),
-                # only the visible tab takes up space; otherwise the shorter
-                # page would be as tall as the longer one, leaving a gap
-                # above the button
+                # render only the active tab so its height fits its content
                 dynamic=True,
                 sizing_mode="stretch_width",
             ),
@@ -378,18 +364,16 @@ class Page:
 
     def _link_annotations_to_audio_dir(self):
         """
-        Keep the annotations file next to the audio folder: when the audio
-        folder changes, the annotations path follows - unless the user chose
-        a file somewhere else. A missing file is pointed out, but only if
-        `only_embed_annotations` needs it, and it never blocks a run.
+        Move the annotations path along when the audio folder changes, unless
+        a file elsewhere was chosen, and warn if it is missing while
+        `only_embed_annotations` is True.
         """
         annotations = self._annotations_field()
         if annotations is None:
             return
         audio_dir = self.config_form.field("audio_dir").widget
 
-        # a bare file name (the YAML default, or a value remembered by an
-        # older version) is shown as a path inside the audio folder
+        # a bare file name is shown as a path inside the audio folder
         if Path(annotations.widget.value).name == annotations.widget.value:
             annotations.set_value(
                 default_annotations_path(audio_dir.value, annotations.widget.value)
@@ -465,7 +449,6 @@ class Page:
             self.problems.visible = True
             return
         try:
-            # remembered the way they are shown in the form
             paths.last_values_file().write_text(
                 yaml.safe_dump({"config": config, "settings": settings}, sort_keys=False),
                 encoding="utf-8",
@@ -481,7 +464,7 @@ class Page:
 
     # -- stage 2: the terminal ----------------------------------------
     def _run_view(self):
-        look = THEME["terminal"]  # colors and font size: theme.yaml
+        look = THEME["terminal"]
         self.terminal = pn.widgets.Terminal(
             options={
                 "cursorBlink": False,
@@ -498,8 +481,7 @@ class Page:
             sizing_mode="stretch_width",
         )
         self.cursor = 0
-        # give the browser a moment to create the terminal before the first
-        # text is sent, text sent earlier than that would be dropped
+        # text sent before the browser has created the terminal is dropped
         self.terminal_ready_at = time.monotonic() + 1.0
 
         self.spinner = pn.indicators.LoadingSpinner(
@@ -576,7 +558,6 @@ class Page:
 
     def _on_stop(self, event):
         self.stop_button.disabled = True
-        # stopping waits for the process, do not block the page meanwhile
         threading.Thread(target=self.state.stop_run, daemon=True).start()
 
     def _on_back(self, event):

@@ -1,10 +1,7 @@
 # ---------------------------------------------------------------------------
-# Hints for the configuration form of the bacpipe application.
-#
-# The form is generated from bacpipe/config.yaml and bacpipe/settings.yaml
-# (see schema.py). A key that is not mentioned here still shows up in the
-# form, with a widget chosen from the type of its default value. Only add an
-# entry here when the automatic choice is not good enough.
+# Hints for the configuration form, which is generated from
+# bacpipe/config.yaml and bacpipe/settings.yaml. Keys not listed here get a
+# widget chosen from the type of their default value.
 #
 # Keys are written as dotted paths, wildcards are allowed:
 #     clust_configs.*.params.n_clusters
@@ -24,19 +21,15 @@
 #   label:         replace the label (default: the key)
 #   section:       move the field to another section
 #   hidden:        true -> not shown, the default value is always used
-#
-# app/tests/test_schema.py fails if an entry refers to a key that no longer
-# exists, so stale entries are noticed when a setting is renamed.
 # ---------------------------------------------------------------------------
 
-# Which sections start unfolded. The titles are the banners of the YAML file
-# (#####  TITLE  #####) in title case, exactly as shown in the form. A file
-# that is not listed here has all its sections unfolded.
+# Sections that start unfolded, by their title as shown in the form. Files
+# not listed here have all sections unfolded.
 sections:
   settings:
     expanded:
       - Path Settings
-      - Using Your Anootation Settings   # spelled like the banner in settings.yaml
+      - Using Your Annotation Settings
       - Integrated Classifier Settings
 
 config:
@@ -76,8 +69,7 @@ settings:
     options: [wrap, constant, edge, linear_ramp, maximum, mean, median,
               minimum, reflect, symmetric, empty]
   annotations_filename:
-    # shown as the complete path of the file; ui.py keeps it next to the
-    # audio folder and hands bacpipe the name relative to that folder
+    # complete path in the form, see ui.py
     widget: file
     description: >-
       The annotations file. By default bacpipe looks for annotations.csv in
@@ -102,14 +94,12 @@ settings:
   clust_configs.*.params.n_clusters:
     widget: yaml
 
-  # The application serves the dashboard itself on a free local port, these
-  # settings of the standalone dashboard do not apply.
+  # the application serves the dashboard itself
   dashboard_port:
     hidden: true
   dashboard_address:
     hidden: true
   dashboard_websocket_origin:
     hidden: true
-  # developer switch: runs on the test data and deletes the results again
   testing:
     hidden: true

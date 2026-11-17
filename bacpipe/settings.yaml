@@ -71,7 +71,7 @@ check_if_already_dim_reduced: True
 
 
 #########------------------------------------###########
-#########   USING YOUR ANOOTATION SETTINGS   ###########
+#########   USING YOUR ANNOTATION SETTINGS   ###########
 #########------------------------------------###########
 
 # key corresponding to the label in the annotation.csv file, if labeled data exists

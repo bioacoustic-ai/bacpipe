@@ -5,7 +5,7 @@ Start
 -----
 Run the file "bacpipe" in this folder (double-click it in your file manager
 or run ./bacpipe in a terminal). A page opens in your web browser where you
-choose your audio folder and the models, press "Run pipeline", and
+choose your audio folder and the models, press "Play the bacpipe", and
 afterwards explore the results in the dashboard.
 
 Keep "bacpipe" inside this folder; to start it from somewhere else create a

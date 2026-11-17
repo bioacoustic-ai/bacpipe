@@ -1,24 +1,13 @@
 """
-The file and folder dialogs of the operating system, run as a separate
-process:
+Native file and folder dialogs, run as a separate process because a dialog
+needs the main thread:
 
     python dialogs.py folder [start_directory]
     python dialogs.py file   [start_directory]
 
-prints the chosen path (or nothing if the dialog was cancelled).
-
-Which dialog is used:
-
-* Windows and macOS: the dialog of the system, through tkinter (which only
-  forwards to the native dialog there).
-* Linux: ``zenity`` (GNOME and most other desktops) or ``kdialog`` (KDE),
-  which show the normal dialog of the desktop. tkinter is only the fallback
-  if neither is installed, because on Linux it draws a dated dialog of its
-  own.
-
-It is a separate process because a dialog needs to own the main thread,
-which belongs to the web server in the application process. The script only
-uses the standard library and must not import bacpipe_app.
+Prints the chosen path, or nothing if the dialog was cancelled. Uses tkinter
+on Windows and macOS, and ``zenity`` or ``kdialog`` on Linux with tkinter as
+fallback. Standard library only, must not import bacpipe_app.
 """
 
 import os

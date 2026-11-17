@@ -3,8 +3,6 @@ Shared setup of the application tests.
 
     python -m pytest app/tests                        tests of the source code
     python -m pytest app/tests --app-dist app/dist    ... plus the built app
-
-See "Tests" in app/README.md.
 """
 
 import sys

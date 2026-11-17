@@ -1,15 +1,10 @@
-# ---------------------------------------------------------------------------
 # Colors and font sizes of the bacpipe application.
-#
-# Change a value, save, and start the application again
-# (python app/run_app.py). Colors are hex codes, for example from
-# https://htmlcolorcodes.com/color-picker/ . Keep the quotation marks.
-# ---------------------------------------------------------------------------
+# Colors are quoted hex codes. Changes apply after a restart.
 
 # the terminal that shows the output of the pipeline
 terminal:
-  background: "#1b1f3b"   # dark blue, like the squares in the tartan
-  text: "#f0ff66"         # yellow, like the stripes in the tartan
+  background: "#1b1f3b"
+  text: "#f0ff66"
   font_size: 16           # in pixels
   height: 600             # in pixels
 

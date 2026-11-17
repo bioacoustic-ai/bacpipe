@@ -1,9 +1,6 @@
 """
-Reads ``theme.yaml``, the file with the colors and font sizes that are meant
-to be changed by hand.
-
-A value that is missing in the file falls back to the default below, so a
-typo in the file can not keep the application from starting.
+Reads the colors and font sizes from ``theme.yaml``. Missing or invalid
+values fall back to ``DEFAULTS``.
 """
 
 from pathlib import Path

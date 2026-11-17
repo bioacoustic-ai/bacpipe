@@ -1,10 +1,6 @@
 """
-Where things live: the bacpipe package, the bundled resources and the folders
-the application writes to.
-
-Nothing in here imports ``bacpipe`` itself. The package is only *located*
-(``importlib.util.find_spec``), because importing it loads torch and
-tensorflow and takes several seconds.
+Locations of the bacpipe package, the bundled resources and the folders the
+application writes to. The bacpipe package is located, never imported.
 """
 
 import importlib.util
@@ -135,17 +131,12 @@ def readme_root():
 
 
 # --------------------------------------------------------------------
-# Folders the app writes to. Everything is inside the user's home
-# directory, so the app never needs administrator rights.
+# Folders the app writes to
 # --------------------------------------------------------------------
 def workspace_dir():
     """
-    Folder holding results, model checkpoints and the app state.
-
-    Relative paths in the settings (``bacpipe_results``,
-    ``bacpipe_model_checkpoints``) are resolved against this folder, in the
-    same way they are resolved against the repository folder when running
-    ``python run_pipeline.py``.
+    Folder holding results, model checkpoints and the app state. Relative
+    paths in the settings are resolved against it.
     """
     custom = os.environ.get(WORKSPACE_ENV)
     path = Path(custom).expanduser() if custom else Path.home() / "bacpipe"
@@ -197,25 +188,18 @@ def child_command(script, *args):
     """
     Command line to run one of the helper scripts of this package
     (``worker.py``, ``splash.py``, ``dialogs.py``) in a new process.
-
-    The scripts are run by file path and are self-contained, so this works
-    the same in a built app and in a checkout.
     """
     flags = ["-u", "-X", "utf8", "-s"]
     if is_bundled():
-        # ignore PYTHONPATH/PYTHONHOME of the user's machine, the bundled
-        # runtime must only ever see its own packages
+        # ignore PYTHONPATH/PYTHONHOME of the host system
         flags.append("-E")
     return [python_executable(), *flags, str(PACKAGE_DIR / script), *args]
 
 
 def child_env(**extra):
     """
-    Environment for helper processes.
-
-    ``BACPIPE_APP_SYS_PATH`` hands the import path of this process to the
-    child, so that a checkout that put the repository on ``sys.path`` (see
-    ``app/run_app.py``) also works in the child.
+    Environment for helper processes. ``BACPIPE_APP_SYS_PATH`` passes the
+    import path of this process on to the child.
     """
     env = os.environ.copy()
     env["BACPIPE_APP_SYS_PATH"] = os.pathsep.join(p for p in sys.path if p)

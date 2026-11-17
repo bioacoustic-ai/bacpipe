@@ -1,18 +1,10 @@
 """
-End-to-end check without a browser: run the pipeline on the example data
-that ships with bacpipe and build the dashboard, exactly the way the
-application does it (worker process, then ``build_dashboard``).
+Run the pipeline on the bundled example data and build the dashboard the same
+way the application does, without a browser.
 
     python -m bacpipe_app.e2e_check --model batdetect2_clip_avg
 
-Exit code 0 means stage 2 and stage 3 work. Used by
-``app/tests/test_build.py`` (option ``--app-e2e-model``) to check a finished
-build, and handy while developing:
-
-    python app/run_app.py ...          the application
-    python -m bacpipe_app.e2e_check    the same machinery, in the terminal
-
-The default model needs no checkpoint download.
+Exits with 0 if both succeed.
 """
 
 import argparse
@@ -31,7 +23,6 @@ def main(argv=None):
     parser.add_argument("--no-dashboard", action="store_true", help="only run the pipeline")
     args = parser.parse_args(argv)
 
-    # the default values of the form, i.e. of config.yaml and settings.yaml
     definitions = schema.load_form_definitions(paths.bacpipe_package_dir())
     values = {}
     for name, specs in definitions.items():
@@ -46,7 +37,6 @@ def main(argv=None):
         print("\n".join(problems))
         return 1
 
-    # stage 2: the pipeline in the worker process
     run = PipelineRun(config, settings)
     run.start()
     cursor, started = 0, time.time()
@@ -72,7 +62,6 @@ def main(argv=None):
     if args.no_dashboard:
         return 0
 
-    # stage 3: the dashboard, inside this process like in the application
     from .dashboard import build_dashboard
 
     layout = build_dashboard(config, settings, run.dashboard_kwargs_file)

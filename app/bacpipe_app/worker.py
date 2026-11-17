@@ -1,31 +1,18 @@
 """
-Runs the bacpipe pipeline, started by the application as its own process:
+Runs the bacpipe pipeline in its own process, equivalent to
+``python run_pipeline.py``:
 
     python worker.py path/to/run.yaml
 
-This is the equivalent of ``python run_pipeline.py``: the values of the form
-replace the values of ``config.yaml`` / ``settings.yaml`` and then
-``bacpipe.play(bool_save_logs=True)`` is called. Everything the pipeline
-prints ends up in the terminal view of the application.
-
-The pipeline runs in its own process so that
-
-* the output (including progress bars and messages of tensorflow/torch) can
-  be shown exactly like in a terminal,
-* it can be stopped,
-* the memory of the models is released when it is finished.
-
-The one difference to ``run_pipeline.py``: the pipeline does not open the
-dashboard itself. The arguments it would have used are stored in a file and
-the application shows the dashboard inside its own page (see dashboard.py).
-
-``run.yaml`` contains::
+Instead of opening the dashboard, the arguments for
+``visualize_using_dashboard`` are stored in ``dashboard_kwargs_file`` for
+dashboard.py. ``run.yaml`` contains::
 
     config:   {...}            values for bacpipe.config
     settings: {...}            values for bacpipe.settings
     dashboard_kwargs_file: ... where to store the dashboard arguments
 
-The script must not import bacpipe_app.
+Must not import bacpipe_app.
 """
 
 import os
@@ -41,8 +28,7 @@ for _entry in os.environ.get("BACPIPE_APP_SYS_PATH", "").split(os.pathsep):
         sys.path.append(_entry)
 
 
-#: Exceptions that mean "the internet could not be reached", by class name,
-#: so that requests / urllib3 / httpx / huggingface_hub need not be imported.
+#: Class names of exceptions raised when the internet cannot be reached.
 NO_CONNECTION_ERRORS = {
     "gaierror",  # socket: the name of the server could not be resolved
     "NameResolutionError",
@@ -107,14 +93,13 @@ def main(run_file):
     import bacpipe
     import bacpipe.core.workflows as workflows
 
-    # same effect as editing config.yaml and settings.yaml
     for key, value in run["config"].items():
         setattr(bacpipe.config, key, value)
     for key, value in run["settings"].items():
         setattr(bacpipe.settings, key, value)
 
     def remember_dashboard_arguments(**kwargs):
-        """Stand-in for ``visualize_using_dashboard``, see module docstring."""
+        """Stand-in for ``visualize_using_dashboard``."""
         with open(run["dashboard_kwargs_file"], "wb") as f:
             pickle.dump(kwargs, f)
 
@@ -125,7 +110,6 @@ def main(run_file):
     except Exception as error:
         if not is_no_connection_error(error):
             raise
-        # a short explanation in the terminal view, the traceback in a file
         traceback_file = Path(run_file).with_name("error_traceback.log")
         traceback_file.write_text(traceback.format_exc(), encoding="utf-8")
         print(no_connection_message(run, traceback_file), flush=True)

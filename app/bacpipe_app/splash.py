@@ -1,14 +1,10 @@
 """
-The splash screen shown while the application starts, run as its own process:
+Splash screen shown while the application starts, run as its own process:
 
     python splash.py path/to/splash.png
 
-It shows the image in a small borderless window until its standard input is
-closed (the application does that when the browser page is ready), or until
-the timeout is reached.
-
-The script only uses the standard library (tkinter) and must not import
-bacpipe_app, so that it appears as fast as possible.
+Shows the image until standard input is closed or the timeout is reached.
+Standard library only, must not import bacpipe_app.
 """
 
 import sys
@@ -37,7 +33,6 @@ def show(image_path):
         root, text="starting …", bg="white", fg="#666666", font=("Helvetica", 11)
     ).pack(pady=(0, 18))
 
-    # centre the window on the screen
     root.update_idletasks()
     width, height = root.winfo_reqwidth(), root.winfo_reqheight()
     x = (root.winfo_screenwidth() - width) // 2

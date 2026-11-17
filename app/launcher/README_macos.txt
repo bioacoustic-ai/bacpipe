@@ -4,7 +4,7 @@ bacpipe @VERSION@
 Start
 -----
 Double-click bacpipe.app. A page opens in your web browser where you choose
-your audio folder and the models, press "Run pipeline", and afterwards
+your audio folder and the models, press "Play the bacpipe", and afterwards
 explore the results in the dashboard.
 
 The first time, macOS may say that bacpipe "cannot be opened because the

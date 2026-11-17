@@ -1,9 +1,6 @@
 """
-The links inside README.md.
-
-Used by the help page (to make the links work outside of the repository) and
-by ``app/build.py`` (to find the images that have to be shipped with the
-README). Standard library only.
+Link handling for README.md, used by the help page and by ``app/build.py``.
+Standard library only.
 """
 
 import re
