@@ -113,11 +113,48 @@ def test_validate(tmp_path):
     assert ui.validate({**ok, "models": [], "already_computed": True}, {}) == []
 
 
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        ("ssh /data/audio", True),
+        ("ssh ~/audio", True),
+        ("ssh C:/audio", True),
+        ("/data/audio", False),
+        ("ssh_data/audio", False),
+        ("sshfs /data", False),
+        (" ssh /data/audio", False),
+        ("", False),
+        (None, False),
+    ],
+)
+def test_ssh_locations_are_recognised(value, expected):
+    assert paths.is_ssh_location(value) is expected
+
+
+def test_validate_does_not_look_for_an_ssh_audio_folder():
+    ok = {"audio_dir": "ssh /data/audio/that/is/not/here", "models": ["birdnet"]}
+    assert ui.validate(ok, {}) == []
+    assert ui.validate({**ok, "already_computed": True, "models": []}, {}) == []
+    assert ui.validate({**ok, "models": []}, {})
+
+
 def test_relative_folders_are_resolved_against_the_workspace(isolated_workspace):
     values = {"main_results_dir": "bacpipe_results", "audio_dir": paths.TEST_DATA_AUDIO_DIR}
     result = absolute_path_values(values, ["main_results_dir", "audio_dir"])
     assert result["main_results_dir"] == str(isolated_workspace / "bacpipe_results")
     assert result["audio_dir"] == paths.TEST_DATA_AUDIO_DIR  # special value is kept
+
+
+def test_ssh_audio_folder_is_kept_as_it_is(isolated_workspace):
+    values = {"audio_dir": "ssh data/audio", "main_results_dir": "bacpipe_results"}
+    result = absolute_path_values(values, ["audio_dir", "main_results_dir"])
+    assert result["audio_dir"] == "ssh data/audio"
+    assert result["main_results_dir"] == str(isolated_workspace / "bacpipe_results")
+
+
+def test_annotations_of_an_ssh_audio_folder_are_handed_over_by_name():
+    shown = ui.default_annotations_path("ssh /data/audio", "annotations.csv")
+    assert ui.annotations_for_bacpipe(shown, "ssh /data/audio") == "annotations.csv"
 
 
 def test_output_buffer_serves_readers_at_different_positions():

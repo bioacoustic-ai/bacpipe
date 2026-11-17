@@ -27,6 +27,7 @@ dependencies = [
     "fastparquet>=2024.11.0",
     "huggingface-hub>=0.34.4",
     "ijson>=3.2",
+    "paramiko>=3.4",
 
     # --- PyTorch Ecosystem ---
     "torch==2.6.0",

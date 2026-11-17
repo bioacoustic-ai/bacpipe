@@ -23,6 +23,14 @@ WORKSPACE_ENV = "BACPIPE_WORKSPACE"
 #: ``audio_dir`` value that makes ``bacpipe.play`` use the bundled test data.
 TEST_DATA_AUDIO_DIR = "bacpipe/tests/test_data"
 
+#: Prefix of an ``audio_dir`` on a server, read by the dashboard via ssh.
+SSH_PREFIX = "ssh "
+
+
+def is_ssh_location(value):
+    """True if ``value`` is an ``audio_dir`` on a server (``"ssh /path"``)."""
+    return isinstance(value, str) and value.startswith(SSH_PREFIX)
+
 
 # --------------------------------------------------------------------
 # The bacpipe package and the build information

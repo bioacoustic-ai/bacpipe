@@ -231,6 +231,8 @@ def absolute_path_values(values, keys):
             continue
         if value == paths.TEST_DATA_AUDIO_DIR:
             continue  # special value understood by bacpipe.play
+        if paths.is_ssh_location(value):
+            continue
         path = Path(value).expanduser()
         if not path.is_absolute():
             path = paths.workspace_dir() / path

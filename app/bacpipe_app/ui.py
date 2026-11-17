@@ -128,7 +128,7 @@ def validate(config, settings):
     """
     problems = []
     audio_dir = config.get("audio_dir", "")
-    if audio_dir != paths.TEST_DATA_AUDIO_DIR:
+    if audio_dir != paths.TEST_DATA_AUDIO_DIR and not paths.is_ssh_location(audio_dir):
         if not audio_dir:
             problems.append("Please choose the folder containing your audio files (audio_dir).")
         elif not Path(audio_dir).is_dir():
@@ -419,8 +419,10 @@ class Page:
             return
         settings = self.settings_form.values()
         audio_dir = self.config_form.field("audio_dir").value
-        missing = settings.get("only_embed_annotations") and not annotations_file_exists(
-            annotations.value, audio_dir
+        missing = (
+            settings.get("only_embed_annotations")
+            and not paths.is_ssh_location(audio_dir)
+            and not annotations_file_exists(annotations.value, audio_dir)
         )
         annotations.show_note(
             "This file does not exist, and `only_embed_annotations` is True: "

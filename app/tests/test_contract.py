@@ -15,6 +15,7 @@ import ast
 import inspect
 
 import pytest
+import yaml
 
 from bacpipe_app import PANEL_EXTENSIONS, paths
 from bacpipe_app.dashboard import BACPIPE_CONTRACT
@@ -93,6 +94,16 @@ def test_test_data_shortcut_is_still_understood(bacpipe_dir):
     source = (bacpipe_dir / "core" / "workflows.py").read_text(encoding="utf-8")
     assert paths.TEST_DATA_AUDIO_DIR in source
     assert (bacpipe_dir / "tests" / "test_data").is_dir()
+
+
+def test_ssh_prefix_is_still_understood(bacpipe_dir):
+    """An audio_dir starting with "ssh " is read from a server by the dashboard."""
+    source = (
+        bacpipe_dir / "embedding_evaluation" / "visualization" / "visualize_spectrograms.py"
+    ).read_text(encoding="utf-8")
+    assert f'startswith("{paths.SSH_PREFIX}")' in source
+    settings = yaml.safe_load((bacpipe_dir / "settings.yaml").read_text(encoding="utf-8"))
+    assert {"host", "port", "username", "key_filename"} <= set(settings["ssh_configs"])
 
 
 def test_panel_extensions_of_bacpipe_are_loaded_by_the_application(bacpipe_dir):
