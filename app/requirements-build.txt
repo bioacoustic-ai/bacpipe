@@ -1,0 +1,17 @@
+# Packages needed to run app/build.py and the tests in app/tests.
+# They are NOT shipped in the application.
+
+# the C compiler used to build the Windows launcher (bacpipe.exe). It is a
+# normal pip package and works without Visual Studio.
+ziglang==0.17.1; sys_platform == 'win32'
+
+# creates the program icon (.ico / .icns) from the logo
+pillow>=10
+
+# the tests of the application
+pytest>=8
+# needed by the tests that start the application from the checkout
+panel>=1.6.2,<2.0.0
+pyyaml>=6
+markdown>=3.5
+plotly>=6
