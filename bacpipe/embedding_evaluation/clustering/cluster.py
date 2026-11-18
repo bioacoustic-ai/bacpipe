@@ -201,31 +201,31 @@ def eval_clustering(
         performance results
     """
     results = {"AMI": dict(), "ARI": dict()}
-    for cl_name, cl_labels in clusterings.items():
-        if cl_name == f"{label_column}_no_noise":
-            if 'noise' in ground_truth:
-                embeds = embeds[ground_truth != 'noise']
-                cl_labels = ground_truth[ground_truth != 'noise']
+    ground_truth = np.asarray(ground_truth)
+    has_gt = len(ground_truth) > 0
+    not_noise = ground_truth != 'noise' if has_gt else None
 
-        if metadata_labels and not hasattr(metadata_labels, "kmeans"):
-            metadata_labels["kmeans"] = clusterings["kmeans"]
-        if not metadata_labels:
-            results[f"AMI"][f"{cl_name}-ground_truth"] = AMI(
-                ground_truth, cl_labels
-            )
-            results[f"ARI"][f"{cl_name}-ground_truth"] = ARI(
-                ground_truth, cl_labels
-            )
-        else:
-            for def_name, def_labels in metadata_labels.items():
-                if "no_noise" in cl_name:
-                    def_labels = np.array(def_labels)[ground_truth != 'noise']
-                results[f"AMI"][f"{cl_name}-{def_name}"] = AMI(
-                    def_labels, cl_labels
-                )
-                results[f"ARI"][f"{cl_name}-{def_name}"] = ARI(
-                    def_labels, cl_labels
-                )
+    ref_labels = dict(metadata_labels or {})
+    for cl_name, cl_labels in clusterings.items():
+        if (
+            "no_noise" not in cl_name
+            and cl_name != label_column
+            and cl_name not in ref_labels
+        ):
+            ref_labels[cl_name] = cl_labels
+    if has_gt:
+        ref_labels[label_column or "ground_truth"] = ground_truth
+
+    for cl_name, cl_labels in clusterings.items():
+        no_noise = "no_noise" in cl_name
+        if cl_name == f"{label_column}_no_noise" and has_gt:
+            cl_labels = ground_truth[not_noise]
+        for ref_name, ref in ref_labels.items():
+            ref = np.asarray(ref)
+            if no_noise and has_gt:
+                ref = ref[not_noise]
+            results["AMI"][f"{cl_name}-{ref_name}"] = AMI(ref, cl_labels)
+            results["ARI"][f"{cl_name}-{ref_name}"] = ARI(ref, cl_labels)
     return results
 
 
