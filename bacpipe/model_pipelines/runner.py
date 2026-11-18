@@ -785,8 +785,12 @@ class Classifier:
 
         self.predictions = torch.tensor([])
 
-        if kwargs.get("only_embed_annotations"):
-            self.only_embed_annotations = True
+        self.only_embed_annotations = kwargs.get("only_embed_annotations")
+        self.annotation_multi_embed = kwargs.get(
+            "annotation_multi_embed", bacpipe.settings.annotation_multi_embed
+        )
+        self.min_annotation_length = kwargs.get("min_annotation_length")
+        if self.only_embed_annotations:
             if not use_folder_structure:
                 from bacpipe.embedding_evaluation.label_embeddings import (
                     load_labels_and_build_dict
@@ -975,7 +979,13 @@ class Classifier:
             # One row per embedded segment: several species can share a
             # window but the classifier predicts per segment, so collapse to
             # the unique (start, end) pairs (mirroring the audio loader).
-            df = unique_start_end_annot_pairs(df)
+            df = unique_start_end_annot_pairs(
+                df,
+                self.model.segment_length / self.model.sr,
+                annotation_multi_embed=self.annotation_multi_embed,
+                only_embed_annotations=self.only_embed_annotations,
+                min_annotation_length=self.min_annotation_length,
+                )
             starts = df["start"].to_numpy()
             ends = df["end"].to_numpy()
             if len(starts) != len(maxes.values):

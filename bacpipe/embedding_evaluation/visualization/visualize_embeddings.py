@@ -335,15 +335,16 @@ def plot_embeddings(
         lab: i for i, lab in enumerate(np.unique(labels[label_by]))
     }
 
-    if return_axes:
-        points = plot_embedding_points(
-            axes, embeds, split_data, labels[label_by], c_label_dict, **kwargs
-        )
-        return axes, c_label_dict, points
-    elif dashboard:
+    if dashboard and not return_axes:
         return plot_embeddings_px(
             embeds, labels, label_by=label_by, **kwargs
         )
+    else:
+        points = plot_embedding_points(
+            axes, embeds, split_data, labels[label_by], c_label_dict, **kwargs
+        )
+    if return_axes:
+        return axes, c_label_dict, points
     else:
         set_colorbar_or_legend(
             fig, axes, points, c_label_dict, label_by=label_by, **kwargs

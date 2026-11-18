@@ -25,6 +25,7 @@ Using **bacpipe** you can generate embeddings and classifier predictions and eva
 
 There's an applications paper available in [methods in ecology and evolution](https://doi.org/10.1111/2041-210X.70406) describing the pipeline and its capabilities.
 
+
 The best part is, **bacpipe** comes with an interactive GUI! 
 
 
@@ -33,6 +34,8 @@ The best part is, **bacpipe** comes with an interactive GUI!
 This way you can explore your data organized by the state-of-the-art deep learning models for bioacoustics. A live demo of the GUI can be found at [bacpipe.siriusly.me](https://bacpipe.siriusly.me) including explanations of the different sections.
 
 Embeddings can also be visualized in 3 dimensions using the `visualization_dimensions` parameter in the [settings](bacpipe/settings.yaml) file.
+
+**bacpipe** can also be run as a **standalone application** without installing Python. Download it from the [latest release](https://github.com/bioacoustic-ai/bacpipe/releases/latest), see [Standalone application](#standalone-application) for details.
 
 **bacpipe** is also available on pip: `pip install bacpipe`
 
@@ -85,6 +88,7 @@ You don't have to be a coder to contribute. Making the documentation clearer is 
     - [Using your annotations](#using-your-annotations)
 - [Available models](#available-models)
 - [Installation](#installation)
+    - [Standalone application](#standalone-application)
     - [Install prerequisites](#install-prerequisites)
     - [Clone the git repository](#clone-the-git-repository)
     - [Create a virtual environment for this project](#create-a-virtual-environment-for-this-project)
@@ -276,6 +280,29 @@ Models currently include:
 ---
 # Installation
 
+## Standalone application
+
+The standalone application includes Python and all dependencies, so nothing else needs to be installed. Download the archive for your system from the [latest release](https://github.com/bioacoustic-ai/bacpipe/releases/latest):
+
+| System | Archive | Start |
+|---|---|---|
+| Windows | `bacpipe-<version>-windows-x86_64.zip` | `bacpipe.exe` |
+| macOS (Apple Silicon) | `bacpipe-<version>-macos-aarch64.tar.gz` | `bacpipe.app` |
+| Linux | `bacpipe-<version>-linux-x86_64.tar.gz` | `bacpipe` |
+
+Extract the archive and start the program. A page opens in your browser where you configure and run the pipeline and then explore the results in the dashboard.
+
+- The application runs on the CPU only. For GPU support, install **bacpipe** with Python as described below. There is no build for Intel Macs, use the Python installation there as well.
+- Once extracted, the application takes up about 4 GB.
+- Results and model checkpoints are stored in `~/bacpipe` (`C:\Users\<you>\bacpipe` on Windows); both folders can be changed in the settings. The checkpoint of a model is downloaded the first time the model is used, so an internet connection is needed then.
+
+The application is not yet signed (we're working on it), so the operating system will warn you the first time you start it:
+
+- **Windows** shows "Windows protected your PC". Click "More info" and then "Run anyway". To avoid the message, right-click the downloaded `.zip` before extracting it, choose "Properties", tick "Unblock" and click OK.
+- **macOS** says that the developer cannot be verified. Right-click (or Control-click) `bacpipe.app`, choose "Open" and confirm with "Open".
+
+If your organisation's security policy does not allow the application to run, install **bacpipe** with Python by following the steps below.
+
 **bacpipe** runs on all major operating systems and is supported for Python version 3.11 and 3.12. For linux and mac all models are supported for both 3.11 and 3.12. For windows tensorflow models (birdnet, perch_bird, surfperch, google_whale and vggish) are only supported for Python 3.11.
 
 ## Install prerequisites
@@ -450,7 +477,10 @@ If everything passes then you've successfully installed bacpipe and can now proc
 
 # Using bacpipe
 
+If you cloned the repository, you can run `python app/run_app.py` to launch the [standalone application](#standalone-application) from your checkout and set the config and settings interactively. If you prefer using the yaml files, or installed **bacpipe** with pip, follow the next steps.
+
 ## Configurations and settings
+
 
 To see the capabilities of bacpipe, go ahead and run the `run_pipeline.py` script. This will run the pipeline with the default settings and configurations on a small set of test data. 
 
@@ -519,7 +549,7 @@ If you selected probing, a linear probe will be trained and saved in the probing
 ## Only generate embeddings for annotated segments
 
 
-Using the settings attribute `only_embed_annotations`, you can also decide to only generate embedding corresponding to your annotations. In that case **bacpipe** will take each annotation and create embeddings for each selected model from only those segments. If segments are shorter than the model input length, the segments will be padded. If they are longer, they will produce several embeddings.
+Using the settings attribute `only_embed_annotations`, you can also decide to only generate embedding corresponding to your annotations. In that case **bacpipe** will take each annotation and create embeddings for each selected model from only those segments. If segments are shorter than the model input length, the segments will be padded. If they are longer, they will produce several embeddings (the remainder only if it is longer than `min_annotation_length`), unless `annotation_multi_embed` is set to `False`, in which case only the first model input length is embedded.
 
 
 ## Models with classifiers

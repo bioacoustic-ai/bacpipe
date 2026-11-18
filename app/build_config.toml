@@ -1,0 +1,61 @@
+# Configuration of app/build.py
+
+[app]
+name = "bacpipe"
+company = "bioacoustic-ai"
+description = "bacpipe - bioacoustic collection pipeline"
+# source image for the program icon (.ico / .icns / .png)
+icon = "bacpipe/imgs/bacpipe_favicon_white.png"
+
+
+# The shipped Python, from
+#   https://github.com/astral-sh/python-build-standalone/releases
+# sha256 values are those of the
+#   cpython-<version>+<release>-<platform>-install_only_stripped.tar.gz
+# files. The version must satisfy `requires-python` in pyproject.toml.
+[python]
+version = "3.11.18"
+release = "20261110"
+
+[python.sha256]
+x86_64-pc-windows-msvc = "f31751f4a8483f5ac7cd77ad83f8dfb80d9f2a7245bff1585e27516c777fb46f"
+x86_64-unknown-linux-gnu = "3288c54cea3db350052019b3f8b558dd8a3da8afa6fda573f5fd2bcb37635b4a"
+aarch64-unknown-linux-gnu = "7e71f26a003949b57757e287f4f4b6689da07e7a229f5bbee7919c19ed77155d"
+aarch64-apple-darwin = "3afb0567b2a2b30b3a7341bd143cb4e8a69f3d8e95d4641218eaa45f0fabbd07"
+x86_64-apple-darwin = "c2e4b51e535ead2e526b8974909a1b1e00fbc2ebe2281087b9b8b14dad0cad5d"
+
+
+# Packages installed into the shipped Python, overridable with --requirements:
+#
+#   "pyproject"        `pip install .` (on Linux this includes CUDA)
+#   a file name        `pip install -r <file>` followed by
+#                      `pip install --no-deps .`
+[requirements]
+windows = "requirements_no_cuda.txt"
+macos = "requirements_no_cuda.txt"
+linux = "requirements_no_cuda.txt"
+
+# additional packages per system, installed after the ones above
+[extra_requirements]
+windows = []
+macos = []
+linux = []
+
+
+# Glob patterns, relative to site-packages, of files deleted after the
+# installation (C/C++ development files not needed at runtime).
+[prune]
+patterns = [
+    "tensorflow/include",
+    "torch/include",
+    "torch/lib/*.lib",
+    "torch/share/cmake",
+    "**/*.pdb",
+]
+
+
+[windows]
+# target of the launcher (bacpipe.exe), see `zig targets`
+zig_target = "x86_64-windows-gnu"
+# longest path allowed inside the application folder (Windows limit: 260)
+max_path_length = 200

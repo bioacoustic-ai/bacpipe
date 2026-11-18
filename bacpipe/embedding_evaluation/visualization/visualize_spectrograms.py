@@ -6,6 +6,8 @@ from scipy.signal.windows import tukey
 from pathlib import Path
 from bacpipe import settings
 import logging
+import time
+import soundfile
 
 logger = logging.getLogger("bacpipe")
 
@@ -65,6 +67,8 @@ class SpectrogramPlot:
             padding, bool_change_speed, new_speed)
         """
         self.audio_dir = audio_dir
+        if str(audio_dir).startswith("ssh "):
+            self._initiate_ssh_connection(kwargs)
         self.panel_static_text = panel_static_text
         self.all_sample_rates = {}
         self.all_segment_lengths = {}
@@ -81,6 +85,43 @@ class SpectrogramPlot:
                 "segment_length (samples)"
             ]
         self.kwargs = kwargs
+        
+    def _initiate_ssh_connection(self, kwargs):
+        import fsspec
+
+        try:
+            import paramiko
+        except ImportError as e:
+            raise ImportError(
+                "\nTo use the ssh connection, you need to install the package paramiko: "
+                "run 'uv pip install paramiko', then restart bacpipe and it should "
+                "establish the connection.\n"
+            ) from e
+
+        logger.info('Initiating ssh connection.')
+        ssh_configs = dict(kwargs['ssh_configs'])
+        cmd = ssh_configs.pop('cmd', None)
+        if cmd:
+            ssh_configs['sock'] = paramiko.ProxyCommand(cmd)
+        self.ssh_connector = fsspec.filesystem("sftp", **ssh_configs)
+        logger.info('ssh connection successful.')
+
+    def _remote_audio_path(self, filename):
+        """
+        Path of an audio file on the ssh server.
+
+        Parameters
+        ----------
+        filename : str
+            name of the audio file relative to the audio directory
+
+        Returns
+        -------
+        str
+            posix path on the server, independent of the local system
+        """
+        remote_dir = str(self.audio_dir)[len("ssh "):].replace("\\", "/").rstrip("/")
+        return f"{remote_dir}/{str(filename).replace(chr(92), '/').lstrip('/')}"
 
     def _update_spec_obj(self, model, bool_autoplay_audio):
         """
@@ -436,12 +477,34 @@ class SpectrogramPlot:
         """
         path = Path(self.audio_dir) / filename
         if not self.kwargs.get("bool_change_speed"):
-            audio, self.orig_sr = lb.load(
-                path,
-                sr=self.sample_rate,
-                offset=float(start),
-                duration=float(end) - float(start),
-            )
+            if not str(self.audio_dir).startswith("ssh "):
+                audio, self.orig_sr = lb.load(
+                    path,
+                    sr=self.sample_rate,
+                    offset=float(start),
+                    duration=float(end) - float(start),
+                )
+            else:
+                remote_path = self._remote_audio_path(filename)
+                logger.info('Collecting audio data via ssh')
+                start_timer = time.time()
+                try:
+                    with self.ssh_connector.open(remote_path, "rb") as f:
+                        with soundfile.SoundFile(f) as snd:
+                            sr = snd.samplerate
+                            snd.seek(int(float(start) * sr))
+                            audio = snd.read(
+                                int((float(end) - float(start)) * sr),
+                                dtype="float32",
+                            )
+                except Exception as e:
+                    logger.warning(f"Unable to read {remote_path} via ssh: {e}")
+                    raise
+                end_timer = time.time()
+                logger.info(f'Successfully retrieved audio via ssh. Retrieval took {end_timer-start_timer:.2f}s.')
+                if audio.ndim > 1:
+                    audio = audio.mean(axis=1)
+                audio = lb.resample(audio, orig_sr=sr, target_sr=self.sample_rate)
         else:
             audio, self.orig_sr = lb.load(
                 path,

@@ -1,0 +1,24 @@
+#!/bin/sh
+# Launcher of the bacpipe application on Linux and macOS.
+# app/build.py fills in @RUNTIME@ (the path of the shipped Python relative to
+# this script) and writes the result as "bacpipe".
+#
+#   -E        ignore PYTHONPATH / PYTHONHOME of the user's machine
+#   -s        ignore packages installed in the user's home directory
+#   -X utf8   use UTF-8 for files and output regardless of the locale
+
+# the folder this script is in, also when it was started through a symlink
+SCRIPT="$0"
+while [ -L "$SCRIPT" ]; do
+    LINK="$(readlink "$SCRIPT")"
+    case "$LINK" in
+        /*) SCRIPT="$LINK" ;;
+        *) SCRIPT="$(dirname "$SCRIPT")/$LINK" ;;
+    esac
+done
+HERE="$(cd "$(dirname "$SCRIPT")" && pwd)"
+
+BACPIPE_APP_DIR="$HERE"
+export BACPIPE_APP_DIR
+
+exec "$HERE/@RUNTIME@/bin/python3" -E -s -X utf8 -m bacpipe_app "$@"

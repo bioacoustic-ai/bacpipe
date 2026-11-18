@@ -1,3 +1,5 @@
+import asyncio
+
 import panel as pn
 import matplotlib
 import seaborn as sns
@@ -14,9 +16,12 @@ matplotlib.use("agg")
 
 _SAVE_FIGURE_CHROME_HINT = (
     "Saving figures requires Google Chrome or Microsoft Edge (kaleido uses it for "
-    "static image export) but none could be found on this system. Install Chrome or "
-    "Edge from your browser's official website, or run `kaleido_get_chrome` in the "
-    "terminal to install a compatible Chrome automatically."
+    "static image export) but none could be found on this system. Click "
+    "**Download Chrome** below to download a copy that is only used for saving "
+    "figures (about 200 MB, the same as running `kaleido_get_chrome` in a "
+    "terminal), or install Chrome or Edge yourself. Without any of that you can "
+    "also click the camera icon in the menu bar at the top right of a plot, "
+    "which downloads the plot as an image through your browser."
 )
 
 _SAVE_FIGURE_KALEIDO_HINT = (
@@ -80,6 +85,81 @@ def _friendly_export_error(exc):
         return _SAVE_FIGURE_KALEIDO_HINT
 
     return None
+
+
+def _show_export_error(exc, notification, chrome_button=None):
+    """
+    Show why saving a figure failed and, if no browser was found, offer the
+    button that downloads one.
+
+    Parameters
+    ----------
+    exc : Exception
+        the exception raised while exporting the figure
+    notification : panel Markdown pane
+        where the message is shown
+    chrome_button : panel Button, optional
+        the button made by ``_chrome_download_button``
+    """
+    message = _friendly_export_error(exc)
+    if chrome_button is not None:
+        chrome_button.visible = message is _SAVE_FIGURE_CHROME_HINT
+    notification.object = f"✗ {message or f'Error: {exc}'}"
+
+
+def _chrome_download_button(notification, retry):
+    """
+    Button that downloads a Chrome for kaleido and then saves the figure.
+
+    The button is hidden until ``_show_export_error`` finds that saving
+    failed because there is no Chrome or Edge on the machine. Nothing is
+    downloaded without the click. The download goes to the folder kaleido
+    looks in by itself (in the user's home), so it is needed only once.
+
+    Parameters
+    ----------
+    notification : panel Markdown pane
+        where progress and errors are shown
+    retry : callable
+        the save handler to call again after the download, takes the event
+
+    Returns
+    -------
+    panel Button
+    """
+    button = pn.widgets.Button(
+        name="Download Chrome", button_type="default", visible=False
+    )
+
+    async def download(event):
+        await _download_chrome_and_retry(event, button, notification, retry)
+
+    button.on_click(download)
+    return button
+
+
+async def _download_chrome_and_retry(event, button, notification, retry):
+    """Click handler of the button made by ``_chrome_download_button``."""
+    button.disabled = True
+    notification.object = (
+        "Downloading Chrome (about 200 MB), this can take a few minutes ..."
+    )
+    try:
+        import kaleido
+
+        # in a thread, so that the message above is shown meanwhile
+        await asyncio.to_thread(kaleido.get_chrome_sync)
+    except Exception as e:
+        logger.error(f"Error downloading Chrome: {str(e)}")
+        notification.object = (
+            "✗ Chrome could not be downloaded, check the internet "
+            f"connection and try again. ({e})"
+        )
+        return
+    finally:
+        button.disabled = False
+    button.visible = False
+    retry(event)
 
 
 def _capture_view_ranges(relayout_data):
@@ -333,6 +413,9 @@ class DashBoardHelper:
 
         self.embed_save_button[widget_idx] = button
         self.embed_notification[widget_idx] = notification
+        self.embed_chrome_button[widget_idx] = _chrome_download_button(
+            notification, lambda e: self._on_save_button_click(e, widget_idx)
+        )
 
     def _store_view_ranges(self, event, widget_idx):
         """
@@ -386,8 +469,11 @@ class DashBoardHelper:
                 f"✓ Saved to: {save_path}"
             )
         except Exception as e:
-            message = _friendly_export_error(e) or f"Error: {str(e)}"
-            self.embed_notification[widget_idx].object = f"✗ {message}"
+            _show_export_error(
+                e,
+                self.embed_notification[widget_idx],
+                self.embed_chrome_button.get(widget_idx),
+            )
 
     def update_main_plot(self, p_type, plot_func, widget_idx, **kwargs):
         """
@@ -625,8 +711,7 @@ class DashBoardHelper:
                     fig.savefig(save_path, dpi=300, bbox_inches="tight")
             except Exception as e:
                 logger.error(f"Error saving figure: {str(e)}")
-                message = _friendly_export_error(e) or f"Error: {str(e)}"
-                notification.object = f"✗ {message}"
+                _show_export_error(e, notification, chrome_button)
                 return
 
             notification.object = f"✓ Figure saved to: {save_path}"
@@ -635,10 +720,12 @@ class DashBoardHelper:
         button = pn.widgets.Button(name="Save Figure", button_type="primary")
         button.on_click(save_figure)
         notification = pn.pane.Markdown("")
+        chrome_button = _chrome_download_button(notification, save_figure)
 
         return pn.Column(
             fig_panel,
             pn.Row(button),
             notification,
+            chrome_button,
             sizing_mode="stretch_width",
         )

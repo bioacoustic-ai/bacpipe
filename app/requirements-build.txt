@@ -1,0 +1,11 @@
+# Packages needed to run app/build.py and app/tests (not shipped).
+
+# C compiler for the Windows launcher
+ziglang==0.17.1; sys_platform == 'win32'
+
+pillow>=10
+pytest>=8
+panel>=1.6.2,<2.0.0
+pyyaml>=6
+markdown>=3.5
+plotly>=6

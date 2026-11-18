@@ -176,8 +176,8 @@ class TestEvalClustering:
             clusterings, ground_truth, label_column="species"
         )
         assert set(results.keys()) == {"AMI", "ARI"}
-        assert "kmeans-ground_truth" in results["AMI"]
-        assert "kmeans-ground_truth" in results["ARI"]
+        assert "kmeans-species" in results["AMI"]
+        assert "kmeans-species" in results["ARI"]
 
     def test_with_metadata_labels(self):
         clusterings = {

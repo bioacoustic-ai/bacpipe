@@ -1,0 +1,139 @@
+name: Build application
+
+# Builds the bacpipe desktop application (app/build.py) for Windows, Linux
+# and macOS, tests the result and stores it.
+#
+#   push to main      -> build + test, archives kept as workflow artifacts
+#                        ("Actions" tab -> this run -> Artifacts)
+#   published release -> build + test, archives attached to the release
+#   pull request      -> only if it touches something the application
+#                        depends on
+#   weekly            -> catches breakage caused by new versions of
+#                        dependencies even when nobody pushes
+#   manually          -> "Run workflow" button in the Actions tab
+#
+# Documentation: app/README.md
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "app/**"
+      - "bacpipe/config.yaml"
+      - "bacpipe/settings.yaml"
+      - "bacpipe/core/**"
+      - "bacpipe/embedding_evaluation/visualization/**"
+      - "pyproject.toml"
+      - "requirements*.txt"
+      - ".github/workflows/build_app.yaml"
+  release:
+    types: [published]
+  schedule:
+    - cron: "0 4 * * 1"   # Mondays 04:00 UTC
+  workflow_dispatch:
+
+# a newer push to the same branch replaces a build that is still running
+concurrency:
+  group: build-app-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Fast tests of the application code (about a minute). They do not install
+  # torch/tensorflow: the form, the process handling and the contract with
+  # bacpipe are tested from the checkout.
+  # ---------------------------------------------------------------------------
+  app-tests:
+    name: Application tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: app/requirements-build.txt
+
+      - name: Install build and test requirements
+        run: pip install -r app/requirements-build.txt
+
+      - name: Run application tests
+        run: python -m pytest app/tests -v
+
+  # ---------------------------------------------------------------------------
+  # Build the application, then test the built folder: start the real
+  # launcher, import bacpipe inside it and run the pipeline on the example
+  # data with a model that needs no download.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build (${{ matrix.name }})
+    needs: app-tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, name: windows }
+          - { os: ubuntu-latest, name: linux }
+          - { os: macos-latest, name: macos }
+    permissions:
+      contents: write   # only used to attach the archives to a release
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # uv makes the installation of the packages several times faster;
+      # build.py falls back to pip when uv is not available
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            requirements*.txt
+            pyproject.toml
+
+      - name: Install build and test requirements
+        run: pip install -r app/requirements-build.txt
+
+      - name: Build the application
+        run: python app/build.py
+
+      - name: Test the built application
+        run: >-
+          python -m pytest app/tests/test_build.py -v
+          --app-dist app/dist
+          --app-e2e-model batdetect2_clip_avg
+
+      - name: Store the archive as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bacpipe-${{ matrix.name }}
+          path: |
+            app/dist/bacpipe-*.zip
+            app/dist/bacpipe-*.tar.gz
+          compression-level: 0   # the archive is compressed already
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Attach the archive to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" app/dist/bacpipe-*.* --clobber

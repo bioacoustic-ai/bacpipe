@@ -513,6 +513,43 @@ class TestDeduplicateAnnotationPairs:
         # first occurrence of each pair wins, input order preserved
         assert deduped["label:species"].tolist() == ["sp_A", "sp_C", "sp_D"]
 
+    @staticmethod
+    def _split(rows, input_length=3.0, multi=True, min_len=0):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            unique_start_end_annot_pairs,
+        )
+
+        out = unique_start_end_annot_pairs(
+            pd.DataFrame(rows, columns=["start", "end"]),
+            input_length,
+            annotation_multi_embed=multi,
+            only_embed_annotations=True,
+            min_annotation_length=min_len,
+        )
+        return list(zip(out["start"].round(6), out["end"].round(6)))
+
+    def test_long_annotations_are_split_into_segments(self):
+        # 3 s input length: remainder, exact multiple and short annotation
+        assert self._split([(10, 17)]) == [(10, 13), (13, 16), (16, 17)]
+        assert self._split([(0, 6)]) == [(0, 3), (3, 6)]
+        assert self._split([(0, 1)]) == [(0, 1)]
+        assert self._split([(10, 17)], multi=False) == [(10, 17)]
+
+    def test_split_respects_min_annotation_length(self):
+        # the 0.5 s remainder is shorter than min_annotation_length
+        assert self._split([(0, 3.5)], min_len=1) == [(0, 3.5)]
+        assert self._split([(0, 3.5)], min_len=0) == [(0, 3), (3, 3.5)]
+        # annotations shorter than min_annotation_length keep their segment
+        assert self._split([(0, 0.5)], min_len=1) == [(0, 0.5)]
+
+    def test_split_ignores_floating_point_noise(self):
+        # 0.1 + 0.2 is 0.30000000000000004
+        assert len(self._split([(0.0, 0.1 + 0.2)], input_length=0.3)) == 1
+
+    def test_split_segments_are_unique_and_sorted(self):
+        rows = [(0, 6), (0, 6), (1, 2), (3, 6)]
+        assert self._split(rows) == [(0, 3), (1, 2), (3, 6)]
+
 
 
 class TestFitLabelsToEmbeddingTimestamps:
@@ -557,11 +594,68 @@ class TestFitLabelsToEmbeddingTimestamps:
             segment_s=5.0,
             label_column="species",
             only_embed_annotations=True,
+            annotation_multi_embed=False,
             min_annotation_length=0,
         )
         assert len(fitted) == 3
         assert fitted["start"].tolist() == [0, 0, 5]
         assert fitted["end"].tolist() == [5, 10, 10]
+
+    def test_pairs_sharing_a_start_keep_their_own_labels(self):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            fit_labels_to_embedding_timestamps,
+        )
+
+        # Regression: the (0, 5) row lost sp_A because (0, 10) shares its start
+        df = pd.DataFrame(
+            {
+                "audiofilename": ["a.wav"] * 2,
+                "start": [0, 0],
+                "end": [5, 10],
+                "label:species": ["sp_A", "sp_B"],
+            }
+        )
+        fitted = fit_labels_to_embedding_timestamps(
+            df,
+            self._fitted_frame(),
+            num_embeds=99,
+            segment_s=10.0,
+            label_column="species",
+            only_embed_annotations=True,
+            min_annotation_length=0,
+        )
+        assert fitted["end"].tolist() == [5, 10]
+        assert fitted["sp_A"].tolist() == [1, 1]
+        assert fitted["sp_B"].tolist() == [1, 1]
+
+    def test_long_annotations_get_one_row_per_segment(self):
+        from bacpipe.embedding_evaluation.label_embeddings import (
+            fit_labels_to_embedding_timestamps,
+        )
+
+        df = pd.DataFrame(
+            {
+                "audiofilename": ["a.wav"] * 3,
+                "start": [0, 0, 10],
+                "end": [7, 7, 12],
+                "label:species": ["sp_A", "sp_B", "sp_C"],
+            }
+        )
+        fitted = fit_labels_to_embedding_timestamps(
+            df,
+            self._fitted_frame(),
+            num_embeds=99,
+            segment_s=3.0,
+            label_column="species",
+            only_embed_annotations=True,
+            annotation_multi_embed=True,
+            min_annotation_length=0,
+        )
+        assert fitted["start"].tolist() == [0, 3, 6, 10]
+        assert fitted["end"].tolist() == [3, 6, 7, 12]
+        assert fitted["sp_A"].tolist() == [1, 1, 1, 0]
+        assert fitted["sp_B"].tolist() == [1, 1, 1, 0]
+        assert fitted["sp_C"].tolist() == [0, 0, 0, 1]
 
     def test_multi_label_species_sharing_a_window_are_all_kept(self):
         from bacpipe.embedding_evaluation.label_embeddings import (
@@ -682,9 +776,18 @@ class TestGetFilesIfNoEmbeds:
         files, segment_s, metadata = le.get_files_if_no_embeds(
             tmp_path, "testmodel", label_df=label_df,
             only_embed_annotations=True,
+            annotation_multi_embed=False,
         )
         # (0, 5) is duplicated -> 3 unique pairs, not 4 rows
         assert metadata["files"]["nr_embeds_per_file"] == [3]
+
+        # 1 s input length: each of the 3 unique 5 s pairs gives 5 segments
+        _, _, metadata = le.get_files_if_no_embeds(
+            tmp_path, "testmodel", label_df=label_df,
+            only_embed_annotations=True,
+            annotation_multi_embed=True,
+        )
+        assert metadata["files"]["nr_embeds_per_file"] == [15]
         assert segment_s == 1.0
         assert files == [Path("a_testmodel")]
 
@@ -722,6 +825,8 @@ class TestMetadataLabelMakerOnlyEmbedAnnotations:
 
         dl = object.__new__(MetadataLabelMaker)
         dl.only_embed_annotations = True
+        dl.annotation_multi_embed = False
+        dl.min_annotation_length = 0
         dl.paths = SimpleNamespace(audio_dir=tmp_path)
         audio_file = "CHE_01_20190101_163410.wav"
         dl.metadata = {
@@ -975,6 +1080,7 @@ class TestMetadataLabelMakerAnnotationsDf:
             )
 
         monkeypatch.setattr(le, "load_labels_and_build_dict", no_file_loading)
+        kwargs.setdefault("annotation_multi_embed", False)
         return le.MetadataLabelMaker(
             self._paths(tmp_path),
             model="birdnet",
